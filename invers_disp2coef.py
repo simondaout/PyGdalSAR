@@ -11,63 +11,62 @@
 """\
 invers_disp2coef.py
 -------------
-Spatial and temporal inversions of the time series delay maps (used depl_cumule (BIP format) and images_retenues, output of invers_pixel), based on an iteration procedure. 
-At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal), 
-(3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
+Spatial and temporal inversions of the time series delay maps (used depl_cumule (BIP format) and images_retenues, output of invers_pixel), based on an iteration procedure. At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal), (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
-Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
-[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<VALUE>] [--semianual=<yes/no>]  [--dem=<yes/no>] \
-[--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
-[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc=<value>] \
+Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
+[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<VALUE>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
+[--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>] [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
+[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--perc=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
 [--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
-[<ibeg>] [<iend>] [<jbeg>] [<jend>] 
+[<ibeg>] [<iend>] [<jbeg>] [<jend>]
 invers_disp2coef.py -h | --help
 
 Options:
 -h --help               Show this screen
 --cube PATH             Path to displacement file [default: depl_cumul]
---lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
---list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
---aps PATH              Path to the APS file giving an input error to each dates [default: No weigthing if no spatial estimation or misfit spatial estimation used as input uncertianties]
+--lectfile PATH         Path of the lect.in file (output of invers_pixel) [default: lect.in]
+--aps PATH              Path of the APS file giving an error to each dates
+[default: No weigthing, aps.txt is created at the first iteration and use for next iteration]
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
---threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
---interseismic YES/NO   Add a linear function in the inversion 
---threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic, 
-: if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.] 
+--threshold_rms VALUE    threshold on RMS for ramp estimation [default: 1.]
+--interseismic YES/NO   Add a linear function to the inversion
+--threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic,
+: if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
---postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) 
---slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events
-(e.g. 2004.,1,2006,0.5), default: None 
---seasonal YES/NO       If yes, add seasonal terms in the inversion
---semianual YES/NO      If yes, add semianual terms in the inversion
---dem Yes/No            If yes, add term proportional to the perpendicular baseline in the inversion
---ivar VALUE            Define phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation
---nfit VALUE            Fit degree in azimuth or in elevation [0:linear (default), 1: quadratic]
---flat PATH             Remove a spatial ramp at each iteration. 
-0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c, 
-4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 
+--postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
+--slowslip   VALUE           Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events
+(e.g. 2004.,1,2006,0.5), default: None
+--seasonal Yes/No        If yes, add seasonal terms in the inversion
+--semianual YEs/NO       If yes, add semianual terms in the inversion
+--vector PATH            If path, try to find the vector forme
+--dem Yes/No              If yes, add term proportional to the perpendicular baseline in the inversion
+--ivar VALUE            define phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation
+--nfit VALUE            fit degree in azimuth or in elevation [0:linear (default), 1: quadratic]
+--flat PATH             Remove a spatial ramp at each iteration.
+0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
+4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e,
 8: ay**2+by+cx**3+dx**2+ex+f, 9: ax+by+cxy**2+dxy+e
---niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, 
-while for the next itarations, uncertainties are equals to the global RMS of the previous iteration for each map [default: 1]
---spatialiter  YES/NO   If yes iterate the spatial estimations at each iterations (defined by niter) on the maps minus the temporal terms (ie. interseismic, coseismic...) [default: no]
---sampling VALUE        Downsampling factor [default: 1]
+--niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by --aps file
+while for the next itarations, uncertainties are equals to the RMS of the previous iteration [default: 1]
+--sampling VALUE    downsampling factor [default: 1]
 --imref VALUE           Reference image number [default: 1]
---mask PATH             Path to mask file in r4 or tif format for the spatial estimations (Keep only values > threshold_mask for ramp estimation).
+--mask PATH             Path to mask file in r4 format for the spatial estimations.
+Keep only values > threshold_mask for ramp estimation.
 --rampmask YES/NO       Remove a quadratic ramp in range a linear in azimuth on the mask before computing threshold [default: no]
 --threshold_mask VALUE  Threshold on mask: take only > values (use scale factor for convenience) [default: 0]
 --scale_mask  VALUE     Scale factor to apply on mask
 --tempmask YES/NO       If yes, also use the spatial mask for the temporal inversion [default: no]
---topofile PATH         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation.
---aspect PATH           Path to aspect file in r4 or tif format: take into account the slope orientation in the phase/topo relationship [default: None].
---perc VALUE            Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:90.]
+--topofile PATH         Path to topographic file in r4 format. If not None, add a phase-elevation relationship
+in the spatial iteration [default: None].
+--perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:90.]
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
 as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
---fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]  
---geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4] 
---plot YES/NO           Display plots [default: yes] 
+--fulloutput Yes/No     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
+--geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
+--plot Yes/No           Display plots [default: yes]
 --ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
 --iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
 --jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
@@ -102,8 +101,8 @@ import os
 
 # plot
 import matplotlib
-if environ["TERM"].startswith("screen"):
-    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+#if environ["TERM"].startswith("screen"):
+#matplotlib.use('TkAgg') # Must be before importing matplotlib.pyplot or pylab!
 from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -112,9 +111,7 @@ from datetime import datetime
 import datetime
 
 # docopt (command line parser)
-import docopt
-
-np.warnings.filterwarnings('ignore')
+from nsbas import docopt
 
 ################################
 # Create lib of wavelet functions
@@ -224,6 +221,19 @@ class cosvar(pattern):
             func[i]=math.cos(2*math.pi*(t[i]-self.to))
         return func
 
+class vector(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+        #self.vect=vecteur
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in xrange(t.size):
+            func[i]=self.to[i]
+        return func
+
+
 class slowslip(pattern):
       def __init__(self,name,reduction,date,tcar=1):
           pattern.__init__(self,name,reduction,date)
@@ -246,10 +256,6 @@ if arguments["--lectfile"] ==  None:
     infile = "lect.in"
 else:
     infile = arguments["--lectfile"]
-if arguments["--list_images"] ==  None:
-    listim = "images_retenues"
-else:
-    listim = arguments["--list_images"]
 if arguments["--aps"] ==  None:
     apsf = 'no'
 else:
@@ -270,11 +276,17 @@ if arguments["--dem"] ==  None:
     dem = 'no'
 else:
     dem = arguments["--dem"]
+
+if arguments["--vector"] != None:
+    vect = arguments["--vector"]
+else:
+    vect = None
+
 if arguments["--coseismic"] ==  None:
     cos = []
 else:
     cos = map(float,arguments["--coseismic"].replace(',',' ').split())
-    
+
 if arguments["--postseismic"] ==  None:
     pos = []
 else:
@@ -297,10 +309,6 @@ if arguments["--niter"] ==  None:
     niter = 1
 else:
     niter = int(arguments["--niter"])
-if arguments["--spatialiter"] ==  None:
-    spatialiter = 'no'
-else:
-    spatialiter = arguments["--spatialiter"]  
 if arguments["--flat"] == None:
     flat = 0
 elif int(arguments["--flat"]) <  10:
@@ -339,12 +347,6 @@ if arguments["--topofile"] ==  None:
    radar = None
 else:
    radar = arguments["--topofile"]
-
-if arguments["--aspect"] ==  None:
-   aspect = None
-else:
-   aspect = arguments["--aspect"]
-
 if arguments["--imref"] ==  None:
     imref = 0
 elif arguments["--imref"] < 1:
@@ -357,6 +359,7 @@ if arguments["--crop"] ==  None:
 else:
     crop = map(float,arguments["--crop"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+
 
 if arguments["<ibeg>"] ==  None:
     ibegref = 0
@@ -390,7 +393,7 @@ else:
 if arguments["--threshold_rmsd"] ==  None:
     maxrmsd = 0.
 else:
-    maxrmsd = float(arguments["--threshold_rmsd"]) 
+    maxrmsd = float(arguments["--threshold_rmsd"])
 if arguments["--fulloutput"] ==  None:
     fulloutput = 'no'
 else:
@@ -445,8 +448,9 @@ if len(cos) > 0:
 #######################################################
 
 # load images_retenues file
-nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-
+fimages='images_retenues'
+nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+# nb images
 N=len(dates)
 print 'Number images: ', N
 datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
@@ -471,11 +475,11 @@ print 'Reshape cube: ', maps.shape
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     d = as_strided(maps[:,:,l])
-    # d[kk] = np.float('NaN')
+    d[kk] = np.float('NaN')
     maps[:,:,l] = maps[:,:,l] - cst
     if l != imref:
         index = np.nonzero(d==0.0)
-        d[index] = np.float('NaN') 
+        d[index] = np.float('NaN')
 
 # plt.imshow(maps[ibeg:iend,jbeg:jend,-1])
 # fig = plt.figure(12)
@@ -483,67 +487,28 @@ for l in xrange((N)):
 # open mask file
 mask = np.zeros((nlign,ncol))
 if maskfile is not None:
-    extension = os.path.splitext(maskfile)[1]
-    if extension == ".tif":
-      ds = gdal.Open(maskfile, gdal.GA_ReadOnly)
-      band = ds.GetRasterBand(1)
-      maski = band.ReadAsArray()*scale
-      del ds
-    else:
-      fid = open(maskfile,'r')
-      maski = np.fromfile(fid,dtype=np.float32)*scale
-      fid.close()
+    fid = open(maskfile,'r')
+    maski = np.fromfile(fid,dtype=np.float32)[:nlign*ncol]*scale
     mask = maski.reshape((nlign,ncol))
-    
+    fid.close()
 
 elev = np.zeros((nlign,ncol))
 # open elevation map
 if radar is not None:
-    extension = os.path.splitext(radar)[1]
-    if extension == ".tif":
-      ds = gdal.Open(radar, gdal.GA_ReadOnly)
-      band = ds.GetRasterBand(1)
-      elevi = band.ReadAsArray()
-      del ds
-    else:
-      fid = open(radar,'r')
-      elevi = np.fromfile(fid,dtype=np.float32)
-      fid.close()
-    # elevi = elevi[:nlign*ncol]
+    fid = open(radar,'r')
+    elevi = np.fromfile(fid,dtype=np.float32)
+    elevi = elevi[:nlign*ncol]
     # fig = plt.figure(10)
     # plt.imshow(elevi.reshape(nlign,ncol)[ibeg:iend,jbeg:jend])
+    elevi[np.isnan(maps[:,:,-1].flatten())] = float('NaN')
     elev = elevi.reshape((nlign,ncol))
-    elev[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(elev)>9999.)
+    kk = np.nonzero(np.logical_or(elev==0.0, elev>9999.))
     elev[kk] = float('NaN')
     # fig = plt.figure(11)
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
     # plt.show()
-    
+    fid.close()
 
-if aspect is not None:
-    extension = os.path.splitext(aspect)[1]
-    if extension == ".tif":
-      ds = gdal.Open(aspect, gdal.GA_ReadOnly)
-      band = ds.GetRasterBand(1)
-      aspecti = band.ReadAsArray()
-      print ds.RasterYSize, ds.RasterXSize
-      del ds
-    else:
-      fid = open(aspect,'r')
-      aspecti = np.fromfile(fid,dtype=np.float32)
-      fid.close()
-    # aspecti = aspecti[:nlign*ncol]
-    slope = aspecti.reshape((nlign,ncol))
-    slope[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(slope>9999.))
-    slope[kk] = float('NaN')
-    # print slope[slope<0]
-    # fig = plt.figure(11)
-    # plt.imshow(elev[ibeg:iend,jbeg:jend])
-    # plt.show()
-    # sys.exit()
-    
 if rmsf is not None:
     rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlign,ncol))
     rmsmap = rmsmap[:nlign,:ncol]
@@ -563,10 +528,21 @@ if rmsf is not None:
     if plot=='yes':
        plt.show()
 
+if vect is not None:
+    v = np.loadtxt(vect, comments='#', unpack=True,dtype='f')
+    #vect = np.array(vect).astype('float32')
+    print dates, v.dtype, dates.shape, v.shape
+    #fig2, ax2 = subplots(111)
+    plt.plot(dates[:,],v[:,])
+    plt.suptitle('vector')
 #fig, ax = plt.subplots(1)
 #plt.imshow(rmsmap[:,:], vmax=1, vmin=0)
 #plt.show()
 #sys.exit()
+
+# perp baseline term
+base_moy = np.mean(base)
+#base = base - base_moy
 
 # plot last date
 #fig, ax = plt.subplots(1)
@@ -576,8 +552,7 @@ if rmsf is not None:
 #sys.exit()
 
 # plot bperp vs time
-fig = plt.figure(1,figsize=(10,4))
-ax = fig.add_subplot(1,2,1)
+fig, ax = plt.subplots(1)
 # convert idates to num
 x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
 # format the ticks
@@ -589,13 +564,9 @@ ax.plot(x,base,"green")
 fig.autofmt_xdate()
 ax.set_xlabel('Time (Year/month/day)')
 ax.set_ylabel('Perpendicular Baseline')
-plt.legend(loc='best')
-
-ax = fig.add_subplot(1,2,2)
-ax.plot(np.mod(dates,1),base,"ro",label='Baseline seasonality of the {} images'.format(N))
-plt.legend(loc='best')
-
+plt.legend(loc=2)
 fig.savefig('baseline.eps', format='EPS',dpi=150)
+#save in txt file
 np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
 
 # initialize number of figures
@@ -692,7 +663,7 @@ if maskfile is not None:
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.savefig('mask.eps', format='EPS',dpi=150)
     del mask_flat_clean
-    
+
     if plot=='yes':
         plt.show()
     #sys.exit()
@@ -749,7 +720,7 @@ if inter=='yes':
     index = index + 1
 
 if seasonal=='yes':
-    indexseas = index 
+    indexseas = index
     basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
     basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
     index = index + 2
@@ -759,6 +730,12 @@ if semianual=='yes':
      basis.append(cos2var(name='semi-anual var (cos)',reduction='cosw2t',date=datemin))
      basis.append(sin2var(name='semi-anual var (sin)',reduction='sinw2t',date=datemin))
      index = index + 2
+
+if vect != None:
+   # 5
+   basis.append(vector(name='vector',reduction='vect',date=v))
+   indexvect = index
+   index = index + 1
 
 indexco = np.zeros(len(cos))
 for i in xrange(len(cos)):
@@ -789,14 +766,15 @@ if dem=='yes':
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
-
+print 'IndexSSE', indexsse
+print
 Mbasis=len(basis)
 print 'Number of basis functions:', Mbasis
 Mker=len(kernels)
 print 'Number of kernel functions:', Mker
 M = Mbasis + Mker
 
-print 
+print
 print 'Basis functions, Time:'
 for i in xrange((Mbasis)):
     basis[i].info()
@@ -815,27 +793,26 @@ for l in xrange((Mker)):
 # initialize qual
 if apsf=='no':
     inaps=np.ones((N)) # no weigthing for the first itertion
+    maxinaps=1
 else:
-    fimages=apsf 
+    fimages=apsf
     inaps=np.loadtxt(fimages, comments='#', dtype='f')
-    print 
+    print
     print 'Input uncertainties:', inaps
     print 'Scale input uncertainties between 0 and 1 and set very low values to the 2 percentile to avoid overweighting...'
-    # maxinaps = np.nanmax(inaps) 
-    # inaps= inaps/maxinaps
+    maxinaps = np.nanmax(inaps)
     minaps= np.nanpercentile(inaps,2)
     index = flatnonzero(inaps<minaps)
     inaps[index] = minaps
     print 'Output uncertainties for first iteration:', inaps
     print
 
-
-## inversion procedure 
-def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
+## inversion procedure
+def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
     '''Solves the constrained inversion problem.
 
     Minimize:
-    
+
     ||Ax-b||^2
 
     Subject to:
@@ -846,7 +823,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        
+
         # build Cov matrix
         Cd = np.diag(sigmad**2,k=0)
         Cov = (np.linalg.inv(Cd))
@@ -857,7 +834,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
             fsoln = lst.lstsq(A,b,cond=cond)[0]
         # print 'least-square solution:'
         # print fsoln
-        # print 
+        # print
             # fsoln = np.ones((A.shape[1]))*float('NaN')
 
     else:
@@ -865,7 +842,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         Ain = np.copy(A)
         bin = np.copy(b)
 
-        ## We here want a solution as much conservatif as possible, ie only coseismic steps 
+        ## We here want a solution as much conservatif as possible, ie only coseismic steps
         ## least-squqre solution without post-seismic
         for i in xrange(len(indexco)):
             if pos[i] > 0.:
@@ -873,14 +850,14 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         minit = lst.lstsq(Ain,bin,cond=cond)[0]
 
         # # initialize bounds
-        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
+        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf
 
         # We here define bounds for postseismic to be the same sign than coseismic
-        # and coseisnic inferior or egal to the coseimic initial 
+        # and coseisnic inferior or egal to the coseimic initial
         for i in xrange(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])] 
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
+                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])]
+                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])]
                 if minit[int(indexpo[i])] < 0 :
                     minit[int(indexpo[i])] = 0.
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
@@ -893,10 +870,10 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        
+
         bounds=zip(mmin,mmax)
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-            iter=iter,full_output=True,iprint=0,acc=acc)  
+            iter=iter,full_output=True,iprint=0,acc=acc)
         fsoln = res[0]
         # print 'optimization:'
         # print fsoln
@@ -908,7 +885,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
-       scale = 1./(A.shape[0]-A.shape[1]) 
+       scale = 1./(A.shape[0]-A.shape[1])
        #scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
@@ -920,2203 +897,2207 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
 maps_flata = np.copy(maps)
 models = np.zeros((nlign,ncol,N))
 
-# prepare flatten maps
-maps_ramp = np.zeros((nlign,ncol,N))
-maps_topo = np.zeros((nlign,ncol,N))
-maps_noramps = np.zeros((nlign,ncol,N))
-rms = np.zeros((N))
+#############################
+# SPATIAL ITERATION N  ######
+#############################
 
-for ii in xrange(niter):    
-    print
-    print '---------------'
-    print 'iteration: ', ii
-    print '---------------'
+print
+print 'Spatial correction..'
+print
 
-    #############################
-    # SPATIAL ITERATION N  ######
-    #############################
+def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
-    print
-    print 'Spatial correction..'
-    print
+  # initialize topo
+  topo = np.zeros((nlign,ncol))
+  ramp = np.zeros((nlign,ncol))
 
-    def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
+  if radar is not None:
+    # calc elevi as los
+    elev_temp = np.matrix.copy(elevi)
 
-      # initialize topo  
-      topo = np.zeros((nlign,ncol))
-      ramp = np.zeros((nlign,ncol))
+  if order==0:
 
-      if radar is not None:
-        # calc elevi as los
-        elev_temp = np.matrix.copy(elevi)
+    if radar is None:
 
-      if order==0:
-        
-        if radar is None:
+        # G=np.zeros((len(los_clean),1))
+        # G[:,0] = 1
 
-            # G=np.zeros((len(los_clean),1))
-            # G[:,0] = 1
+        # # ramp inversion
+        # x0 = lst.lstsq(G,los_clean)[0]
+        # _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        # _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        # pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        # a = pars[0]
+        # print 'Remove ref frame %f  for date: %i'%(a,idates[l])
 
-            # # ramp inversion
-            # x0 = lst.lstsq(G,los_clean)[0]
-            # _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            # _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            # pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            # a = pars[0]
-            # print 'Remove ref frame %f  for date: %i'%(a,idates[l])
-        
-            # # build total G matrix
-            # G=np.zeros((len(los),1))
-            # G[:,0] = 1
+        # # build total G matrix
+        # G=np.zeros((len(los),1))
+        # G[:,0] = 1
 
-            # ramp = np.dot(G,pars).reshape(nlign,ncol)
+        # ramp = np.dot(G,pars).reshape(nlign,ncol)
 
-            print 'No fattening for date: %i'%(idates[l])
-            rms = np.sqrt(np.nanmean(los**2))
-            print 'RMS:', rms
+        print 'No fattening for date: %i'%(idates[l])
+        rms = np.sqrt(np.nanmean(los**2))
+        print 'RMS:', rms
 
-        else:
+    else:
 
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),2))
-                G[:,0] = 1
-                G[:,1] = topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]
-                print 'Remove ref frame %f + %f z for date: %i'%(a,b,idates[l])
-            
-                # plot phase/elev
-                funct = a 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,b*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),2))
-                G[:,0] = 1
-                G[:,1] = elev_temp
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                topo = np.dot(G,pars).reshape(nlign,ncol)
-
-
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),3))
-                G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c=pars[2]
-                print 'Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l])
-            
-                # plot phase/elev
-                funct = a 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,b*x+c*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),3))
-                G[:,0] = 1
-                G[:,1] = elev_temp
-                G[:,2] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                topo = np.dot(G,pars).reshape(nlign,ncol)
-            
-            
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),3))
-                G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = x*topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]
-                print 'Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l])
-            
-                # plot phase/elev
-                funct = a + c*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,b*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),3))
-                G[:,0] = 1
-                G[:,1] = elev_temp
-                G[:,2] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                topo = np.dot(G,pars).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = 1
-                G[:,1] = x*topo_clean
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
-            
-                # plot phase/elev
-                funct = a + b*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x+d*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),4))
-                G[:,0] = 1
-                G[:,1] = elev_temp
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,1] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                topo = np.dot(G,pars).reshape(nlign,ncol)
-
-      elif order==1: # Remove a range ramp ay+b for each maps (y = col)
-
-        if radar is None:
+        if (ivar==0 and nfit==0):
             G=np.zeros((len(los_clean),2))
-            G[:,0] = y
-            G[:,1] = 1
+            G[:,0] = 1
+            G[:,1] = topo_clean
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]
-            print 'Remove ramp %f r + %f for date: %i'%(a,b,idates[l])
+            print 'Remove ref frame %f + %f z for date: %i'%(a,b,idates[l])
+
+            # plot phase/elev
+            funct = a
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,b*x,'-r', lw =4.)
 
             # build total G matrix
             G=np.zeros((len(los),2))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-            G[:,1] = 1
+            G[:,0] = 1
+            G[:,1] = elev_temp
 
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
-
-        else:
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),3))
-                G[:,0] = y
-                G[:,1] = 1
-                G[:,2] = topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]
-                print 'Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l])
-            
-                # plot phase/elev
-                funct = a*y + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),3))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[:,1] = 1
-                G[:,2] = elev_temp
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y
-                G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
-                print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
-            
-                # plot phase/elev
-                funct = a*y + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x+d*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y
-                G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
-            
-                # plot phase/elev
-                funct = a*y + b + d*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),4))
-                G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+            topo = np.dot(G,pars).reshape(nlign,ncol)
 
 
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = 1
-                G[:,2] = topo_clean*x
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
-            
-                # plot phase/elev
-                funct = a*y + b + c*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-
-
-      elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
-        if radar is None:
-            G=np.zeros((len(los_clean),2))
-            G[:,0] = x
-            G[:,1] = 1
+        elif (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),3))
+            G[:,0] = 1
+            G[:,1] = topo_clean
+            G[:,2] = topo_clean**2
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            a = pars[0]; b = pars[1]
-            print 'Remove ramp %f az + %f for date: %i'%(a,b,idates[l])
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c=pars[2]
+            print 'Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l])
+
+            # plot phase/elev
+            funct = a
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,b*x+c*x**2,'-r', lw =4.)
 
             # build total G matrix
-            G=np.zeros((len(los),2))
+            G=np.zeros((len(los),3))
+            G[:,0] = 1
+            G[:,1] = elev_temp
+            G[:,2] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            topo = np.dot(G,pars).reshape(nlign,ncol)
+
+
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),3))
+            G[:,0] = 1
+            G[:,1] = topo_clean
+            G[:,2] = x*topo_clean
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]
+            print 'Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l])
+
+            # plot phase/elev
+            funct = a + c*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,b*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),3))
+            G[:,0] = 1
+            G[:,1] = elev_temp
+            G[:,2] = elev_temp
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] =(i - ibegref)   
-            G[:,1] = 1
+                G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
 
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            topo = np.dot(G,pars).reshape(nlign,ncol)
 
-        else:
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),3))
-                G[:,0] = x
-                G[:,1] = 1
-                G[:,2] = topo_clean
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),4))
+            G[:,0] = 1
+            G[:,1] = x*topo_clean
+            G[:,2] = topo_clean
+            G[:,3] = topo_clean**2
 
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]
-                print 'Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l])
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+            print 'Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
 
-                # plot phase/elev
-                funct = a*x + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
-                
+            # plot phase/elev
+            funct = a + b*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x+d*x**2,'-r', lw =4.)
+
             # build total G matrix
-                G=np.zeros((len(los),3))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)   
-                G[:,1] = 1
-                G[:,2] = elev_temp
+            G=np.zeros((len(los),4))
+            G[:,0] = 1
+            G[:,1] = elev_temp
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,1] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            topo = np.dot(G,pars).reshape(nlign,ncol)
+
+  elif order==1: # Remove a range ramp ay+b for each maps (y = col)
+
+    if radar is None:
+        G=np.zeros((len(los_clean),2))
+        G[:,0] = y
+        G[:,1] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]
+        print 'Remove ramp %f r + %f for date: %i'%(a,b,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),2))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+        G[:,1] = 1
 
 
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
 
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-            
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = x
-                G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
 
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
-
-                # plot phase/elev
-                funct = a*x + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x + d*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)   
-                G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = x
-                G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
-
-                # plot phase/elev
-                funct = a*x + b + d*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),4))
-                G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = x
-                G[:,1] = 1
-                G[:,2] = topo_clean*x
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
-
-                # plot phase/elev
-                funct = a*x + b + c*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-
-      elif order==3: # Remove a ramp ay+bx+c for each maps
-        if radar is None:
+    else:
+        if (ivar==0 and nfit==0):
             G=np.zeros((len(los_clean),3))
             G[:,0] = y
-            G[:,1] = x
-            G[:,2] = 1
+            G[:,1] = 1
+            G[:,2] = topo_clean
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]
-            print 'Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l])
+            print 'Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x,'-r', lw =4.)
 
             # build total G matrix
             G=np.zeros((len(los),3))
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
-            G[:,2] = 1
+            G[:,1] = 1
+            G[:,2] = elev_temp
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
 
-        else:
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = 1
-                G[:,3] = topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)   
-                G[:,2] = 1
-                G[:,3] = elev_temp
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-            
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)   
-                G[:,2] = 1
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
-                print 'Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                G[:,2] = 1
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref) 
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = 1
-                G[:,3] = topo_clean*x
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                try:
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                except:
-                    pars = x0
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
-                print 'Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c + d*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.1, alpha=0.01, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                G[:,2] = 1
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref) 
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-
-      elif order==4:
-        if radar is None:
+        elif (ivar==0 and nfit==1):
             G=np.zeros((len(los_clean),4))
             G[:,0] = y
-            G[:,1] = x
-            G[:,2] = y*x
-            G[:,3] = 1
+            G[:,1] = 1
+            G[:,2] = topo_clean
+            G[:,3] = topo_clean**2
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-            print 'Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l])
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
+            print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
             # build total G matrix
             G=np.zeros((len(los),4))
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)    
-            G[:,3] = 1
+            G[:,1] = 1
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp**2
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
 
-        else:
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
-                G[:,3] = 1
-                G[:,4] = topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*x*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                G[:,3] = 1
-                G[:,4] = elev_temp
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
-                G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*x*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
-                G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*x*y + d + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,5] *=  (i - ibegref)
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
-                G[:,3] = 1
-                G[:,4] = topo_clean*x
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
-                
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*x*y + d + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,4] *=  (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-
-      elif order==5:
-
-        if radar is None:
+        elif (ivar==1 and nfit==0):
             G=np.zeros((len(los_clean),4))
+            G[:,0] = y
+            G[:,1] = 1
+            G[:,2] = topo_clean
+            G[:,3] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+            print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b + d*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),4))
+            G[:,1] = 1
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),5))
+            G[:,0] = y
+            G[:,1] = 1
+            G[:,2] = topo_clean*x
+            G[:,3] = topo_clean
+            G[:,4] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+            print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b + c*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),5))
+            G[:,1] = 1
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp
+            G[:,4] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+
+  elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
+    if radar is None:
+        G=np.zeros((len(los_clean),2))
+        G[:,0] = x
+        G[:,1] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]
+        print 'Remove ramp %f az + %f for date: %i'%(a,b,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),2))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
+        G[:,1] = 1
+
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+        if (ivar==0 and nfit==0):
+            G=np.zeros((len(los_clean),3))
+            G[:,0] = x
+            G[:,1] = 1
+            G[:,2] = topo_clean
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]
+            print 'Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l])
+
+            # plot phase/elev
+            funct = a*x + b
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x,'-r', lw =4.)
+
+        # build total G matrix
+            G=np.zeros((len(los),3))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
+            G[:,1] = 1
+            G[:,2] = elev_temp
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+
+        elif (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),4))
+            G[:,0] = x
+            G[:,1] = 1
+            G[:,2] = topo_clean
+            G[:,3] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+            print 'Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
+
+            # plot phase/elev
+            funct = a*x + b
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x + d*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),4))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
+            G[:,1] = 1
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),4))
+            G[:,0] = x
+            G[:,1] = 1
+            G[:,2] = topo_clean
+            G[:,3] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+            print 'Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
+
+            # plot phase/elev
+            funct = a*x + b + d*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,c*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),4))
+            G[:,1] = 1
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = i - ibegref
+                G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),5))
+            G[:,0] = x
+            G[:,1] = 1
+            G[:,2] = topo_clean*x
+            G[:,3] = topo_clean
+            G[:,4] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+            print 'Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*x + b + c*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),5))
+            G[:,1] = 1
+            G[:,2] = elev_temp
+            G[:,3] = elev_temp
+            G[:,4] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+  elif order==3: # Remove a ramp ay+bx+c for each maps
+    if radar is None:
+        G=np.zeros((len(los_clean),3))
+        G[:,0] = y
+        G[:,1] = x
+        G[:,2] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]
+        print 'Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),3))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+            G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
+        G[:,2] = 1
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+        if (ivar==0 and nfit==0):
+            G=np.zeros((len(los_clean),4))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = 1
+            G[:,3] = topo_clean
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+            print 'Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,d*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),4))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
+            G[:,2] = 1
+            G[:,3] = elev_temp
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+
+        elif (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),5))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = 1
+            G[:,3] = topo_clean
+            G[:,4] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+            print 'Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),5))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
+            G[:,2] = 1
+            G[:,3] = elev_temp
+            G[:,4] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),5))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = 1
+            G[:,3] = topo_clean
+            G[:,4] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
+            print 'Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c + e*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,d*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),5))
+            G[:,2] = 1
+            G[:,3] = elev_temp
+            G[:,4] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = 1
+            G[:,3] = topo_clean*x
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            try:
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0, acc=1.e-04)[0]
+            except:
+                pars = x0
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
+            print 'Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c + d*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.1, alpha=0.01, rasterized=True)
+            ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            G[:,2] = 1
+            G[:,3] = elev_temp
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+  elif order==4:
+    if radar is None:
+        G=np.zeros((len(los_clean),4))
+        G[:,0] = y
+        G[:,1] = x
+        G[:,2] = y*x
+        G[:,3] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+        print 'Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),4))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+            G[i*ncol:(i+1)*ncol,1] = i - ibegref
+            G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+        G[:,3] = 1
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+        if (ivar==0 and nfit==0):
+            G=np.zeros((len(los_clean),5))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = y*x
+            G[:,3] = 1
+            G[:,4] = topo_clean
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+
+            print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*x*y + d
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),5))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+            G[:,3] = 1
+            G[:,4] = elev_temp
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+
+        elif (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = y*x
+            G[:,3] = 1
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+
+            print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*x*y + d
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),5))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = y*x
+            G[:,3] = 1
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+
+            print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*x*y + d + f*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                G[i*ncol:(i+1)*ncol,5] *=  (i - ibegref)
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = y*x
+            G[:,3] = 1
+            G[:,4] = topo_clean*x
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
+
+            print 'Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*x*y + d + e*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                G[i*ncol:(i+1)*ncol,4] *=  (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+  elif order==5:
+
+    if radar is None:
+        G=np.zeros((len(los_clean),4))
+        G[:,0] = y**2
+        G[:,1] = y
+        G[:,2] = x
+        G[:,3] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+        print 'Remove ramp %f r**2 %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),4))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
+            G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbegref
+            G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+        G[:,3] = 1
+
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+
+        if (ivar==0 and nfit==0):
+
+            G=np.zeros((len(los_clean),5))
             G[:,0] = y**2
             G[:,1] = y
             G[:,2] = x
             G[:,3] = 1
+            G[:,4] = topo_clean
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-            print 'Remove ramp %f r**2 %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l])
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+            print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*y**2 + b*y + c*x + d
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
 
             # build total G matrix
-            G=np.zeros((len(los),4))
+            G=np.zeros((len(los),5))
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
             G[:,3] = 1
+            G[:,4] = elev_temp
 
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+
+        elif (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = y**2
+            G[:,1] = y
+            G[:,2] = x
+            G[:,3] = 1
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+            print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*y**2 + b*y + c*x + d
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==0):
+
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = y**2
+            G[:,1] = y
+            G[:,2] = x
+            G[:,3] = 1
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+            print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*y**2 + b*y + c*x + d + f*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+
+        elif (ivar==1 and nfit==1):
+
+            G=np.zeros((len(los_clean),7))
+            G[:,0] = y**2
+            G[:,1] = y
+            G[:,2] = x
+            G[:,3] = 1
+            G[:,4] = topo_clean*x
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
+            print 'Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*y**2 + b*y + c*x + d + e*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
 
         else:
+            pass
 
-            if (ivar==0 and nfit==0):
+  elif order==6:
+    if radar is None:
+        G=np.zeros((len(los_clean),4))
+        G[:,0] = x**2
+        G[:,1] = x
+        G[:,2] = y
+        G[:,3] = 1
 
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
-                G[:,3] = 1
-                G[:,4] = topo_clean
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+        print 'Remove ramp %f az**2 %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l])
 
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
-
-                # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-            
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                G[:,3] = 1
-                G[:,4] = elev_temp
+        # build total G matrix
+        G=np.zeros((len(los),4))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+            G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
+            G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+        G[:,3] = 1
 
 
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
 
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
 
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
-                G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
-
-                # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-                
-
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
-            elif (ivar==1 and nfit==0):
-
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
-                G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
-
-                # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-
-            elif (ivar==1 and nfit==1):
-
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
-                G[:,3] = 1
-                G[:,4] = topo_clean*x
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
-                
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
-
-                # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-            
-            else:
-                pass
-
-      elif order==6:
-        if radar is None:
-            G=np.zeros((len(los_clean),4))
+    else:
+        if (ivar==0 and nfit==0) :
+            G=np.zeros((len(los_clean),5))
             G[:,0] = x**2
             G[:,1] = x
             G[:,2] = y
             G[:,3] = 1
+            G[:,4] = topo_clean
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-            print 'Remove ramp %f az**2 %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l])
-
-            # build total G matrix
-            G=np.zeros((len(los),4))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
-                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref   
-            G[:,3] = 1
-
-
-            res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
-
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
-
-        else:
-            if (ivar==0 and nfit==0) :
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
-                G[:,3] = 1
-                G[:,4] = topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
-                G[:,3] = 1
-                G[:,4] = elev_temp
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-
-            elif (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
-                G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
-                G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
-                G[:,3] = 1
-                G[:,4] = topo_clean*x
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-
-
-      elif order==7:
-        if radar is None:
-            G=np.zeros((len(los_clean),5))
-            G[:,0] = x**2
-            G[:,1] = x
-            G[:,2] = y**2
-            G[:,3] = y
-            G[:,4] = 1
-
-            # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-            print 'Remove ramp %f az**2 %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l])
+            print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y + d
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
 
             # build total G matrix
             G=np.zeros((len(los),5))
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
-                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref   
-            G[:,4] = 1
+                G[i*ncol:(i+1)*ncol,1] = i -  ibegref
+                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+            G[:,3] = 1
+            G[:,4] = elev_temp
 
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
 
-        else:
-            if (ivar==0 and nfit ==0):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
-                G[:,4] = 1
-                G[:,5] = topo_clean
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
-                G[:,4] = 1
-                G[:,5] = elev_temp
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-
-            if (ivar==0 and nfit ==1):
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
-                G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
-                G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit ==0):
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
-                G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e + g*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
-
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),8))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
-                G[:,4] = 1
-                G[:,5] = topo_clean*x
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
-
-                # build total G matrix
-                G=np.zeros((len(los),8))
-                G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-
-      elif order==8:
-        if radar is None:
+        elif (ivar==0 and nfit==1):
             G=np.zeros((len(los_clean),6))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y
+            G[:,3] = 1
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+            print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y + d
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i -  ibegref
+                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y
+            G[:,3] = 1
+            G[:,4] = topo_clean
+            G[:,5] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+            print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y + d + f*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i -  ibegref
+                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),7))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y
+            G[:,3] = 1
+            G[:,4] = topo_clean*x
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
+            print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y + d + e*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            G[:,3] = 1
+            G[:,4] = elev_temp
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i -  ibegref
+                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+
+  elif order==7:
+    if radar is None:
+        G=np.zeros((len(los_clean),5))
+        G[:,0] = x**2
+        G[:,1] = x
+        G[:,2] = y**2
+        G[:,3] = y
+        G[:,4] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+        print 'Remove ramp %f az**2 %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),5))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+            G[i*ncol:(i+1)*ncol,1] = i - ibegref
+            G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
+            G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+        G[:,4] = 1
+
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+        if (ivar==0 and nfit ==0):
+            G=np.zeros((len(los_clean),6))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y**2
+            G[:,3] = y
+            G[:,4] = 1
+            G[:,5] = topo_clean
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+            print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y**2 + d*y + e
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),6))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+            G[:,4] = 1
+            G[:,5] = elev_temp
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+
+        if (ivar==0 and nfit ==1):
+            G=np.zeros((len(los_clean),7))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y**2
+            G[:,3] = y
+            G[:,4] = 1
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
+            print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y**2 + d*y + e
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+            G[:,4] = 1
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit ==0):
+            G=np.zeros((len(los_clean),7))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y**2
+            G[:,3] = y
+            G[:,4] = 1
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
+            print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y**2 + d*y + e + g*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            G[:,4] = 1
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),8))
+            G[:,0] = x**2
+            G[:,1] = x
+            G[:,2] = y**2
+            G[:,3] = y
+            G[:,4] = 1
+            G[:,5] = topo_clean*x
+            G[:,6] = topo_clean
+            G[:,7] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
+            print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+
+            # plot phase/elev
+            funct = a*x**2 + b*x + c*y**2 + d*y + e + f*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),8))
+            G[:,4] = 1
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp
+            G[:,7] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+  elif order==8:
+    if radar is None:
+        G=np.zeros((len(los_clean),6))
+        G[:,0] = x**3
+        G[:,1] = x**2
+        G[:,2] = x
+        G[:,3] = y**2
+        G[:,4] = y
+        G[:,5] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+        print 'Remove ramp %f az**3 %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),6))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
+            G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
+            G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+            G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
+            G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbegref)
+        G[:,5] = 1
+
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+        if (ivar==0 and nfit==0):
+            G=np.zeros((len(los_clean),7))
             G[:,0] = x**3
             G[:,1] = x**2
             G[:,2] = x
             G[:,3] = y**2
             G[:,4] = y
             G[:,5] = 1
+            G[:,6] = topo_clean
 
-            # ramp inversion
+            # ramp inversion1
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-            print 'Remove ramp %f az**3 %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l])
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
+            print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,g*x,'-r', lw =4.)
 
             # build total G matrix
-            G=np.zeros((len(los),6))
+            G=np.zeros((len(los),7))
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                 G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2  
-                G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbegref) 
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
             G[:,5] = 1
+            G[:,6] = elev_temp
 
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
 
-        else:
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
-                G[:,5] = 1
-                G[:,6] = topo_clean
+        if (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),8))
+            G[:,0] = x**3
+            G[:,1] = x**2
+            G[:,2] = x
+            G[:,3] = y**2
+            G[:,4] = y
+            G[:,5] = 1
+            G[:,6] = topo_clean
+            G[:,7] = topo_clean**2
 
-                # ramp inversion1
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x,'-r', lw =4.) 
-        
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
-                G[:,5] = 1
-                G[:,6] = elev_temp
+            # ramp inversion1
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
+            print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
+            # plot phase/elev
+            funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+            # build total G matrix
+            G=np.zeros((len(los),8))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
+                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
+            G[:,5] = 1
+            G[:,6] = elev_temp
+            G[:,7] = elev_temp**2
 
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
 
-            if (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),8))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
-                G[:,5] = 1
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean**2
-
-                # ramp inversion1
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
-        
-                # build total G matrix
-                G=np.zeros((len(los),8))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
-                G[:,5] = 1
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
-
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),8))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
-                G[:,5] = 1
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean*x
-
-                # ramp inversion1
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + h*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x,'-r', lw =4.) 
-        
-                # build total G matrix
-                G=np.zeros((len(los),8))
-                G[:,5] = 1
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,7] *= (i - ibegref)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
 
 
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),8))
+            G[:,0] = x**3
+            G[:,1] = x**2
+            G[:,2] = x
+            G[:,3] = y**2
+            G[:,4] = y
+            G[:,5] = 1
+            G[:,6] = topo_clean
+            G[:,7] = topo_clean*x
 
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+            # ramp inversion1
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
+            print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),9))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
-                G[:,5] = 1
-                G[:,6] = topo_clean*x
-                G[:,7] = topo_clean
-                G[:,8] = topo_clean
-                
-                # ramp inversion1
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,i,idates[l])
-            
-                # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + g*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,h*x+i*x**2,'-r', lw =4.) 
-        
-                # build total G matrix
-                G=np.zeros((len(los),9))
-                G[:,5] = 1
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp
-                G[:,8] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+            # plot phase/elev
+            funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + h*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,g*x,'-r', lw =4.)
 
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+            # build total G matrix
+            G=np.zeros((len(los),8))
+            G[:,5] = 1
+            G[:,6] = elev_temp
+            G[:,7] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
+                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,7] *= (i - ibegref)
 
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
 
-      elif order==9:
-        if radar is None:
-            G=np.zeros((len(los_clean),5))
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),9))
+            G[:,0] = x**3
+            G[:,1] = x**2
+            G[:,2] = x
+            G[:,3] = y**2
+            G[:,4] = y
+            G[:,5] = 1
+            G[:,6] = topo_clean*x
+            G[:,7] = topo_clean
+            G[:,8] = topo_clean
+
+            # ramp inversion1
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]
+            print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,i,idates[l])
+
+            # plot phase/elev
+            funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + g*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,h*x+i*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),9))
+            G[:,5] = 1
+            G[:,6] = elev_temp
+            G[:,7] = elev_temp
+            G[:,8] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
+                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+  elif order==9:
+    if radar is None:
+        G=np.zeros((len(los_clean),5))
+        G[:,0] = y
+        G[:,1] = x
+        G[:,2] = (y*x)**2
+        G[:,3] = y*x
+        G[:,4] = 1
+
+        # ramp inversion
+        x0 = lst.lstsq(G,los_clean)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+        print 'Remove ramp %f r %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l])
+
+        # build total G matrix
+        G=np.zeros((len(los),5))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+            G[i*ncol:(i+1)*ncol,1] = i - ibegref
+            G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
+            G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+        G[:,4] = 1
+
+        res = los - np.dot(G,pars)
+        rms = np.sqrt(np.nanmean(res**2))
+        print 'RMS:', rms
+
+        ramp = np.dot(G,pars).reshape(nlign,ncol)
+
+    else:
+        if (ivar==0 and nfit==0):
+            G=np.zeros((len(los_clean),6))
             G[:,0] = y
             G[:,1] = x
             G[:,2] = (y*x)**2
             G[:,3] = y*x
             G[:,4] = 1
+            G[:,5] = topo_clean
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-            print 'Remove ramp %f r %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l])
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+
+            print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,e*x,'-r', lw =4.)
 
             # build total G matrix
-            G=np.zeros((len(los),5))
+            G=np.zeros((len(los),6))
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                 G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2 
-                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)    
+                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
+                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
             G[:,4] = 1
+            G[:,5] = elev_temp
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
             print 'RMS:', rms
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
 
+        if (ivar==0 and nfit==1):
+            G=np.zeros((len(los_clean),7))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = (y*x)**2
+            G[:,3] = y*x
+            G[:,4] = 1
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
+
+            print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
+                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+            G[:,4] = 1
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp**2
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==0):
+            G=np.zeros((len(los_clean),7))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = (y*x)**2
+            G[:,3] = y*x
+            G[:,4] = 1
+            G[:,5] = topo_clean
+            G[:,6] = topo_clean*x
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
+
+            print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + g*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,f*x,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),7))
+            G[:,4] = 1
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
+                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+
+        elif (ivar==1 and nfit==1):
+            G=np.zeros((len(los_clean),8))
+            G[:,0] = y
+            G[:,1] = x
+            G[:,2] = (y*x)**2
+            G[:,3] = y*x
+            G[:,4] = 1
+            G[:,5] = topo_clean*x
+            G[:,6] = topo_clean
+            G[:,7] = topo_clean**2
+
+            # ramp inversion
+            x0 = lst.lstsq(G,los_clean)[0]
+            _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
+
+            print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+
+            # plot phase/elev
+            funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + f*topo_clean*x
+            x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+            ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+            ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+
+            # build total G matrix
+            G=np.zeros((len(los),8))
+            G[:,4] = 1
+            G[:,5] = elev_temp
+            G[:,6] = elev_temp
+            G[:,7] = elev_temp**2
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,1] = i - ibegref
+                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
+                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+
+            res = los - np.dot(G,pars)
+            rms = np.sqrt(np.nanmean(res**2))
+            print 'RMS:', rms
+
+            nparam = G.shape[1]
+            ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
+            topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+
+  # flata = (los - np.dot(G,pars)).reshape(nlign,ncol)
+  flata = los.reshape(nlign,ncol) - ramp - topo
+  noramps = los.reshape(nlign,ncol) - ramp
+
+  if radar is not None:
+    del elev_temp
+
+  return ramp, flata, topo, rms, noramps
+
+# prepare flatten maps
+maps_ramp = np.zeros((nlign,ncol,N))
+maps_topo = np.zeros((nlign,ncol,N))
+maps_noramps = np.zeros((nlign,ncol,N))
+rms = np.zeros((N))
+
+# Loop over the dates
+if radar is not None:
+    nfigure +=1
+    fig = plt.figure(nfigure,figsize=(14,10))
+
+for l in xrange((N)):
+ if l is not imref:
+
+    # first clean los
+    # maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l]) - np.matrix.copy(models[ibegref:iendref,jbegref:jendref,l])
+
+    # test without removing model for Bene, jsut uncertainties change
+    maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l])
+
+    maxlos,minlos=np.nanpercentile(maps_temp,98.),np.nanpercentile(maps_temp,2.)
+    kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
+    maps_temp[kk] = np.float('NaN')
+
+    itemp = ibegref
+    for lign in xrange(ibegref,iendref,10):
+        # find the begining of the image
+        if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
+            itemp = lign
         else:
-            if (ivar==0 and nfit==0):
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
-                G[:,4] = 1
-                G[:,5] = topo_clean
+            break
 
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] 
-
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),6))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                G[:,4] = 1
-                G[:,5] = elev_temp
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-
-            if (ivar==0 and nfit==1):
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
-                G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6] 
-
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
-            elif (ivar==1 and nfit==0):
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
-                G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean*x
-
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
-
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + g*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),7))
-                G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-
-            elif (ivar==1 and nfit==1):
-                G=np.zeros((len(los_clean),8))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
-                G[:,4] = 1
-                G[:,5] = topo_clean*x
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean**2
-                
-                # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
-
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-
-                # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
-                
-                # build total G matrix
-                G=np.zeros((len(los),8))
-                G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
-
-                res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
-
-                nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-            
-      # flata = (los - np.dot(G,pars)).reshape(nlign,ncol) 
-      flata = los.reshape(nlign,ncol) - ramp - topo
-      noramps = los.reshape(nlign,ncol) - ramp
-
-      if radar is not None:
-        del elev_temp
-
-      return ramp, flata, topo, rms, noramps
-
-    # Loop over the dates
     if radar is not None:
-      nfigure +=1
-      fig = plt.figure(nfigure,figsize=(14,10)) 
-      if (spatialiter=='yes' and ii>0) or (ii==0):  
-        for l in xrange((N)):
-         if l is not imref:
-            # first clean los
-            maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l]) - np.matrix.copy(models[ibegref:iendref,jbegref:jendref,l])
+        topo_map_temp = np.matrix.copy(elev[ibegref:iendref,jbegref:jendref])
+        maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc),np.nanpercentile(topo_map_temp,100-perc)
+        # print maxtopo,mintopo
+        # maxtopo,mintopo = 5000,4000
+        # maxtopo,mintopo = np.nanmax(topo_map_temp), np.nanmin(topo_map_temp)
+        # initialize plot
+        ax = fig.add_subplot(4,int(N/4)+1,l+1)
+    else:
+        topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+        maxtopo,mintopo = 2, 0
 
-            maxlos,minlos=np.nanpercentile(maps_temp,98.),np.nanpercentile(maps_temp,2.)
-            kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-            maps_temp[kk] = np.float('NaN')        
+    if rmsf is not None:
+        rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
+    else:
+        rms_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+        seuil_rms = 2
 
-            itemp = ibegref
-            for lign in xrange(ibegref,iendref,10):
-                # find the begining of the image
-                if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
-                    itemp = lign  
-                else:
-                    break
+    if maskfile is not None:
+        mask_map_temp = np.matrix.copy(mask_flat[ibegref:iendref,jbegref:jendref])
+    else:
+        mask_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
 
-            if radar is not None: 
-                topo_map_temp = np.matrix.copy(elev[ibegref:iendref,jbegref:jendref])
-                maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc),np.nanpercentile(topo_map_temp,100-perc) 
-                # print maxtopo,mintopo
-                # maxtopo,mintopo = 5000,4000 
-                # maxtopo,mintopo = np.nanmax(topo_map_temp), np.nanmin(topo_map_temp)
-                # initialize plot
-                ax = fig.add_subplot(4,int(N/4)+1,l+1)
-            else:
-                topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-                maxtopo,mintopo = 2, 0
-            
-            if rmsf is not None:
-                rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
-            else:
-                rms_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-                seuil_rms = 2
+    # selection pixels
+    index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
+        np.logical_and(topo_map_temp>mintopo,
+            np.logical_and(mask_map_temp>seuil,
+            np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(~np.isnan(rms_map_temp),
+                np.logical_and(~np.isnan(topo_map_temp),
+                    rms_map_temp<seuil_rms)))))))
 
-            if maskfile is not None:
-                mask_map_temp = np.matrix.copy(mask_flat[ibegref:iendref,jbegref:jendref])
-            else:
-                mask_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+    # extract coordinates for estimation
+    temp = np.array(index).T
+    x = temp[:,0]; y = temp[:,1]
 
-            if aspect is not None:
-                aspect_map = np.matrix.copy(slope[ibegref:iendref,jbegref:jendref])
-            else:
-                aspect_map = np.ones((iendref-ibegref,jendref-jbegref))
+    # clean maps
+    los_clean = maps_temp[index].flatten()
+    rms_clean = rms_map_temp[index].flatten()
+    topo_clean = topo_map_temp[index].flatten()
 
-            # selection pixels
-            index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
-                np.logical_and(topo_map_temp>mintopo,
-                    np.logical_and(mask_map_temp>seuil, 
-                    np.logical_and(~np.isnan(maps_temp),
-                        np.logical_and(~np.isnan(rms_map_temp),
-                        np.logical_and(~np.isnan(topo_map_temp),
-                        np.logical_and(rms_map_temp<seuil_rms,
-                            aspect_map>0.,
-                            ))))))))
+    # print itemp, iendref
+    #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
+    if flat>5 and iendref-itemp < .6*(iendref-ibegref):
+        print 'Image too short in comparison to master, set flat to 5'
+        temp_flat=5
+    # elif flat>5 and iendref-itemp < ncol:
+    #     print 'Lenght image inferior to width, set flat to 5'
+    #     temp_flat=5
+    else:
+        temp_flat=flat
 
-            # extract coordinates for estimation
-            temp = np.array(index).T
-            x = temp[:,0]; y = temp[:,1]
+    if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
+      print
+      print 'Image too short in comparison to master, set ivar to 0'
+      ivar_temp=0
+      nfit_temp=0
+    else:
+      ivar_temp=ivar
+      nfit_temp=nfit
 
-            # clean maps
-            los_clean = maps_temp[index].flatten()
-            rms_clean = rms_map_temp[index].flatten()
-            topo_clean = topo_map_temp[index].flatten()
+    # call ramp estim
+    los = as_strided(maps[:,:,l]).flatten()
+    samp = 1
 
-            # print itemp, iendref
-            #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
-            if flat>5 and iendref-itemp < .6*(iendref-ibegref):
-                print 'Image too short in comparison to master, set flat to 5'
-                temp_flat=5
-            # elif flat>5 and iendref-itemp < ncol:
-            #     print 'Lenght image inferior to width, set flat to 5'
-            #     temp_flat=5
-            else:
-                temp_flat=flat
+    # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
+    maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp]\
+        ,topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)
 
-            if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
-              print
-              print 'Image too short in comparison to master, set ivar to 0'
-              ivar_temp=0
-              nfit_temp=0
-            else:
-              ivar_temp=ivar
-              nfit_temp=nfit
+    # set ramp to NaN to have ramp of the size of the images
+    kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
+    ramp = as_strided(maps_ramp[:,:,l])
+    ramp[kk] = float('NaN')
+    topo = as_strided(maps_topo[:,:,l])
+    topo[kk] = float('NaN')
 
-            # call ramp estim
-            los = as_strided(maps[:,:,l]).flatten() 
-            samp = 1
+del los_clean
+del rms_clean
+del topo_clean
+del topo_map_temp
+del rms_map_temp
+del maps_temp
 
-            # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
-            maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)
+# create new cube
+cube_flata = maps_flata.flatten()
+cube_noramps = maps_noramps.flatten()
 
-            # set ramp to NaN to have ramp of the size of the images
-            kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
-            ramp = as_strided(maps_ramp[:,:,l])
-            ramp[kk] = float('NaN')
-            topo = as_strided(maps_topo[:,:,l])
-            topo[kk] = float('NaN')
+# save rms
+if apsf=='no':
+    # aps from rms
+    print
+    print 'Use RMS empirical estimation as uncertainties for time decomposition'
+    inaps = np.copy(rms)
+    print 'Set very low values to the 2 percentile to avoid overweighting...'
+    # scale between 0 and 1 for threshold_rmsd
+    # maxaps = np.max(inaps)
+    # inaps = inaps/maxaps
+    minaps= np.nanpercentile(inaps,2)
+    index = flatnonzero(inaps<minaps)
+    inaps[index] = minaps
+    np.savetxt('rms_empcor.txt', inaps.T)
 
-            del los_clean
-            del rms_clean
-            del topo_clean
-            del topo_map_temp
-            del rms_map_temp
-            del maps_temp
+del rms
 
-        # plot corrected ts
-        nfigure +=1
-        figd = plt.figure(nfigure,figsize=(14,10))
-        figd.subplots_adjust(hspace=0.001,wspace=0.001)
-        for l in xrange((N)):
-            axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
-            axd.set_title(idates[l],fontsize=6)
-            setp(axd.get_xticklabels(), visible=False)
-            setp(axd.get_yticklabels(), visible=False)
-        setp(axd.get_xticklabels(), visible=False)
-        setp(axd.get_yticklabels(), visible=False)
-        figd.colorbar(caxd, orientation='vertical',aspect=10)
-        figd.suptitle('Corrected time series maps')
-        figd.savefig('maps_flat.eps', format='EPS',dpi=150)
+# plot corrected ts
+nfigure +=1
+figd = plt.figure(nfigure,figsize=(14,10))
+figd.subplots_adjust(hspace=0.001,wspace=0.001)
+for l in xrange((N)):
+    axd = figd.add_subplot(4,int(N/4)+1,l+1)
+    caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axd.set_title(idates[l],fontsize=6)
+    setp(axd.get_xticklabels(), visible=False)
+    setp(axd.get_yticklabels(), visible=False)
+setp(axd.get_xticklabels(), visible=False)
+setp(axd.get_yticklabels(), visible=False)
+figd.colorbar(caxd, orientation='vertical',aspect=10)
+figd.suptitle('Corrected time series maps')
+figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
-        # lmax = np.abs([np.nanmedian(maps_ramp[:,:,-1]) + 2.*np.nanstd(maps_ramp[:,:,-1]),\
-        # np.nanmedian(maps_ramp[:,:,-1]) - 2.*np.nanstd(maps_ramp[:,:,-1])]).max()
-        # lmin = -lmax
-        
-        # plot corrected ts
-        nfigure +=1
-        figref = plt.figure(nfigure,figsize=(14,10))
-        figref.subplots_adjust(hspace=0.001,wspace=0.001)
-        for l in xrange((N)):
-            axref = figref.add_subplot(4,int(N/4)+1,l+1)
-            caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
-            axref.set_title(idates[l],fontsize=6)
-            setp(axref.get_xticklabels(), visible=False)
-            setp(axref.get_yticklabels(), visible=False)
-        setp(axref.get_xticklabels(), visible=False)
-        setp(axref.get_yticklabels(), visible=False)
-        figref.suptitle('Time series ramps')
-        figref.colorbar(caxref, orientation='vertical',aspect=10)
-        figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
+# lmax = np.abs([np.nanmedian(maps_ramp[:,:,-1]) + 2.*np.nanstd(maps_ramp[:,:,-1]),\
+# np.nanmedian(maps_ramp[:,:,-1]) - 2.*np.nanstd(maps_ramp[:,:,-1])]).max()
+# lmin = -lmax
 
-        # lmax = np.abs([np.nanmedian(maps_topo[:,:,-1]) + 2.*np.nanstd(maps_topo[:,:,-1]),\
-        # np.nanmedian(maps_topo[:,:,-1]) - 2.*np.nanstd(maps_topo[:,:,-1])]).max()
-        # lmin = -lmax
+# plot corrected ts
+nfigure +=1
+figref = plt.figure(nfigure,figsize=(14,10))
+figref.subplots_adjust(hspace=0.001,wspace=0.001)
+for l in xrange((N)):
+    axref = figref.add_subplot(4,int(N/4)+1,l+1)
+    caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cm.jet)
+    axref.set_title(idates[l],fontsize=6)
+    setp(axref.get_xticklabels(), visible=False)
+    setp(axref.get_yticklabels(), visible=False)
+setp(axref.get_xticklabels(), visible=False)
+setp(axref.get_yticklabels(), visible=False)
+figref.suptitle('Time series ramps')
+figref.colorbar(caxref, orientation='vertical',aspect=10)
+figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
 
-        if radar is not None:
-            fig.savefig('phase-topo.eps', format='EPS',dpi=150)
-            nfigure +=1
-            figtopo = plt.figure(nfigure,figsize=(14,10))
-            figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-            for l in xrange((N)):
-                axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
-                axtopo.set_title(idates[l],fontsize=6)
-                setp(axtopo.get_xticklabels(), visible=False)
-                setp(axtopo.get_yticklabels(), visible=False)
-                setp(axtopo.get_xticklabels(), visible=False)
-                setp(axtopo.get_yticklabels(), visible=False)
-            figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-            figtopo.suptitle('Time series tropospheric signal')
-            figtopo.savefig('tropo.eps', format='EPS',dpi=150)
+# lmax = np.abs([np.nanmedian(maps_topo[:,:,-1]) + 2.*np.nanstd(maps_topo[:,:,-1]),\
+# np.nanmedian(maps_topo[:,:,-1]) - 2.*np.nanstd(maps_topo[:,:,-1])]).max()
+# lmin = -lmax
 
-        if plot=='yes':
-            plt.show()
-        plt.close('all')
+if radar is not None:
+    fig.savefig('phase-topo.eps', format='EPS',dpi=150)
+    nfigure +=1
+    figtopo = plt.figure(nfigure,figsize=(14,10))
+    figtopo.subplots_adjust(hspace=.001,wspace=0.001)
+    for l in xrange((N)):
+        axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
+        caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l],cmap=cm.jet)
+        axtopo.set_title(idates[l],fontsize=6)
+        setp(axtopo.get_xticklabels(), visible=False)
+        setp(axtopo.get_yticklabels(), visible=False)
+        setp(axtopo.get_xticklabels(), visible=False)
+        setp(axtopo.get_yticklabels(), visible=False)
+    figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
+    figtopo.suptitle('Time series tropospheric signal')
+    figtopo.savefig('tropo.eps', format='EPS',dpi=150)
 
-      # save rms
-      if (apsf=='no' and ii==0):
-        # aps from rms
-        print
-        print 'Use RMS empirical estimation as uncertainties for time decomposition'
-        inaps = np.copy(rms) 
-        print 'Set very low values to the 2 percentile to avoid overweighting...'
-        # scale between 0 and 1 for threshold_rmsd
-        maxaps = np.max(inaps)
-        inaps = inaps/maxaps 
-        minaps= np.nanpercentile(inaps,2)
-        index = flatnonzero(inaps<minaps)
-        inaps[index] = minaps
-        np.savetxt('rms_empcor.txt', inaps.T) 
-        del rms
+if plot=='yes':
+    plt.show()
+plt.close('all')
+
+
+for ii in xrange(niter):
+    print
+    print '---------------'
+    print 'iteration: ', ii
+    print '---------------'
 
     ########################
     # TEMPORAL ITERATION N #
@@ -3130,39 +3111,38 @@ for ii in xrange(niter):
     aps = np.ones((N))
     n_aps = np.ones((N)).astype(int)
     print inaps
-    
+
     # reiinitialize maps models
     models = np.zeros((nlign,ncol,N))
-    
+
     if seasonal=='yes' or semianual=='yes' or inter=='yes':
         models_trends = np.zeros((nlign,ncol,N))
+        models_detrends = np.zeros((nlign,ncol,N))
+    if vect != None:
+        models_seas = np.zeros((nlign,ncol,N))
+
 
     # if ii == 0:
     #     maps_aps = np.ones((nlign,ncol,N))
     #     for j in xrange((N)):
-    #         maps_aps[:,:,j] *= inaps[j]  
-            
-    # ligns = [2014,2157,1840,1960,1951]
-    # cols = [100,117,843,189,43]
-    # for i,j in zip(ligns,cols):
+    #         maps_aps[:,:,j] *= inaps[j]
 
     for i in xrange(ibeg,iend,sampling):
         for j in xrange(jbeg,jend,sampling):
             #print j
-            
             # Initialisation
             mdisp=np.ones((N))*float('NaN')
-            #!!!!!
             disp = as_strided(maps_flata[i,j,:])
-            # disp = as_strided(maps[i,j,:])
-            # print disp
 
             k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
             # do not take into account NaN data
             kk = len(k)
             tabx = dates[k]
+            #print tabx.shape, v.shape
             taby = disp[k]
             bp = base[k]
+            # sigmad = as_strided(maps_aps[i,j,k]) + .01
+            sigmad = inaps[k] + .01 # I don't want zero uncertainties
 
             # Inisilize m to zero
             m = np.zeros((M))
@@ -3171,15 +3151,15 @@ for ii in xrange(niter):
             if kk > N/6:
                 G=np.zeros((kk,M))
                 # Build G family of function k1(t),k2(t),...,kn(t): #
-                #                                                   #   
+                #                                                   #
                 #           |k1(0) .. kM(0)|                        #
                 # Gfamily = |k1(1) .. kM(1)|                        #
-                #           |..    ..  ..  |                        # 
+                #           |..    ..  ..  |                        #
                 #           |k1(N) .. kM(N)|                        #
                 #                                                   #
 
                 rmsd = maxrmsd + 1
-                
+
                 if inter=='yes' and iteration is True:
                     Glin=np.zeros((kk,2+Mker))
                     for l in xrange((2)):
@@ -3187,36 +3167,37 @@ for ii in xrange(niter):
                     for l in xrange((Mker)):
                         Glin[:,2+l]=kernels[l].g(bp)
 
-                    mt,sigmamt = consInvert(Glin,taby,inaps[k],cond=rcond)
-                
+                    mt,sigmamt = consInvert(Glin,taby,sigmad,cond=rcond)
+
                     # compute rmsd
                     mdisp[k] = np.dot(Glin,mt)
                     # sum sur toutes les dates
-                    # rmsd = np.sum(abs((disp[k] - mdisp[k])/inaps[k]))/kk  S
-                    rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)  
-                    # print i,j,rmsd,maxrmsd
-      
+                    rmsd = np.sum(abs((disp[k] - mdisp[k])/sigmad))/kk
+                    # print i,j,rmsd
+
                 G=np.zeros((kk,M))
                 for l in xrange((Mbasis)):
-                    G[:,l]=basis[l].g(tabx)
+                    try:
+                        G[:,l]=basis[l].g(tabx)
+                    except:
+                        continue
                 for l in xrange((Mker)):
                     G[:,Mbasis+l]=kernels[l].g(bp)
 
-                # if only ref + seasonal: ref + cos + sin 
+                # if only ref + seasonal: ref + cos + sin
                 if rmsd >= maxrmsd or inter!='yes':
-                    mt,sigmamt = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
+                    # print sigmad
+                    mt,sigmamt = consInvert(G,taby,sigmad,cond=rcond,ineq=ineq)
 
                 # rebuild full vectors
                 if Mker>0:
                     m[Mbasis:],sigmam[Mbasis:] = mt[-Mker:],sigmamt[-Mker:]
                     m[:mt.shape[0]-Mker],sigmam[:mt.shape[0]-Mker] = mt[:-Mker],sigmamt[:-Mker]
                 else:
-                    sigmam[:mt.shape[0]] = sigmamt 
-                    m[:mt.shape[0]] = mt 
-                # print m
-                # print
+                    sigmam[:mt.shape[0]] = sigmamt
+                    m[:mt.shape[0]] = mt
 
-                # save m    
+                # save m
                 for l in xrange((Mbasis)):
                     basis[l].m[i-ibeg,j-jbeg] = m[l]
                     basis[l].sigmam[i-ibeg,j-jbeg] = sigmam[l]
@@ -3229,39 +3210,49 @@ for ii in xrange(niter):
                 mdisp[k] = np.dot(G,m)
 
                 # compute aps for each dates
-                # aps_tmp = pow((disp[k]-mdisp[k])/inaps[k],2)
-                aps_tmp = abs((disp[k]-mdisp[k]))/inaps[k]
-                
+                # aps_tmp = pow((disp[k]-mdisp[k])/sigmad,2)
+                aps_tmp = abs((disp[k]-mdisp[k]))/sigmad
+
                 # # remove NaN value for next iterations (but normally no NaN?)
                 index = np.flatnonzero(np.logical_or(np.isnan(aps_tmp),aps_tmp==0))
                 aps_tmp[index] = 1.0 # 1 is a bad misfit
-                
+
                 # save total aps of the map
                 aps[k] = aps[k] + aps_tmp
 
                 # count number of pixels per dates
                 n_aps[k] = n_aps[k] + 1.0
-                
+
                 # save new aps for each maps
                 # maps_aps[i,j,k] = aps_tmp
 
                 # fill maps models
-                models[i,j,:] = mdisp 
+                models[i,j,:] = mdisp
 
                 # Build seasonal and linear models
                 if seasonal=='yes':
                     models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexseas:indexseas+2],m[indexseas:indexseas+2])
                 if semianual=='yes':
                     models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexsemi:indexsemi+2],m[indexsemi:indexsemi+2])
-                # if inter=='yes':
-                #     models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
+
+                if inter=='yes':
+                    models_detrends[i,j,k] = models_detrends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
+
+                if vect != None:
+                    models_seas[i,j,k] = models_seas[i,j,k] + np.dot(G[:,indexvect],m[indexvect])
 
     # convert aps in rad
     aps = aps/n_aps
-    # aps = np.sqrt(abs(aps/n_aps))
-    minaps= np.nanpercentile(aps,2)
-    index = flatnonzero(aps<minaps)
-    aps[index] = minaps
+    # scale with max inaps to have identical threshold_rmsd
+    maxaps = np.nanmax(aps)
+    index = np.flatnonzero((np.isnan(aps)))
+    aps[index] = maxaps
+    # aps = (aps*maxinaps)/maxaps
+    # remove NaN value for next iterations (last check in case...)
+    maxaps = np.nanmax(aps)
+    if len(index) > 0:
+    	print 'NaN problems on dates:', index
+    	print 'Replace Nan by ', maxaps
 
     print
     print 'Dates      APS     # of points'
@@ -3279,10 +3270,6 @@ for ii in xrange(niter):
 # Save new cubes
 #######################################################
 
-# create new cube
-cube_flata = maps_flata[ibeg:iend,jbeg:jend,:].flatten()
-cube_noramps = maps_noramps[ibeg:iend,jbeg:jend,:].flatten()
-
 fid = open('depl_cumule_flat', 'wb')
 cube_flata.flatten().astype('float32').tofile(fid)
 fid.close()
@@ -3294,10 +3281,19 @@ fid.close()
 if fulloutput=='yes':
     if seasonal=='yes' or semianual=='yes':
     # if inter=='yes' or seasonal=='yes' or semianual=='yes':
-        fid = open('depl_cumule_dseas', 'wb')  
+        fid = open('depl_cumule_dseas', 'wb')
         (maps_flata - models_trends).flatten().astype('float32').tofile(fid)
         fid.close()
 
+if inter=='yes':
+    fid = open('depl_cumule_dtrend', 'wb')
+    (maps_flata - models_detrends).flatten().astype('float32').tofile(fid)
+    fid.close()
+
+if vect != None:
+    fid = open('depl_cumule_dseas', 'wb')
+    (maps_flata - models_detrends - models_seas).flatten().astype('float32').tofile(fid)
+    fid.close()
 # # save APS
 # print
 # print 'Saving APS in liste_images_aps.txt'
@@ -3332,6 +3328,11 @@ setp( ax.get_xticklabels(), visible=False)
 cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
 figclr.savefig('colorscale.eps', format='EPS',dpi=150)
 
+# if Mker>0:
+#     data = np.nanmedian(maps_flata[:,:,-1] - as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:]))
+# else:
+#     data = np.nanmedian(maps_flata[:,:,-1] - as_strided(basis[0].m[:,:]))
+
 # vmax = np.abs([np.nanmedian(data) + 2*nanstd(data),np.nanmedian(data) - 2*nanstd(data)]).max()
 # vmin = -vmax
 
@@ -3343,7 +3344,7 @@ for l in xrange((N)):
     else:
         data_flat = as_strided(maps_flata[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:])
         model = as_strided(models[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:])
-    
+
     res = data_flat - model
     ramp = as_strided(maps_ramp[ibeg:iend,jbeg:jend,l])
     tropo = as_strided(maps_topo[ibeg:iend,jbeg:jend,l])
@@ -3391,7 +3392,7 @@ for l in xrange((N)):
 
     cax = ax.imshow(model,cmap=cm.jet,vmax=vmax,vmin=vmin)
     caxres = axres.imshow(res,cmap=cm.jet,vmax=vmax,vmin=vmin)
-     
+
     ax.set_title(idates[l],fontsize=6)
     axres.set_title(idates[l],fontsize=6)
 
@@ -3667,7 +3668,7 @@ vmin = -vmax
 nfigure +=1
 fig=plt.figure(nfigure,figsize=(16,12))
 
-ax = fig.add_subplot(1,M,1) 
+ax = fig.add_subplot(1,M,1)
 cax = ax.imshow(basis[0].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
 setp(ax.get_xticklabels(), visible=False)
@@ -3677,7 +3678,7 @@ setp(ax.get_yticklabels(), visible=False)
 vmax = np.abs([np.nanpercentile(basis[1].m,98.),np.nanpercentile(basis[1].m,2.)]).max()
 vmin = -vmax
 
-ax = fig.add_subplot(1,M,2) 
+ax = fig.add_subplot(1,M,2)
 cax = ax.imshow(basis[1].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
 ax.set_title(basis[1].reduction)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
@@ -3689,19 +3690,19 @@ for l in range(2,Mbasis):
     vmax = np.abs([np.nanpercentile(basis[l].m,98.),np.nanpercentile(basis[l].m,2.)]).max()
     vmin = -vmax
 
-    ax = fig.add_subplot(1,M,l+1)   
+    ax = fig.add_subplot(1,M,l+1)
     cax = ax.imshow(basis[l].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
     ax.set_title(basis[l].reduction)
     # add colorbar
     cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
     setp(ax.get_xticklabels(), visible=False)
     setp(ax.get_yticklabels(), visible=False)
- 
+
 for l in xrange(Mker):
     vmax = np.abs([np.nanpercentile(kernels[l].m,98.),np.nanpercentile(kernels[l].m,2.)]).max()
     vmin = -vmax
 
-    ax = fig.add_subplot(1,M,Mbasis+l+1)    
+    ax = fig.add_subplot(1,M,Mbasis+l+1)
     cax = ax.imshow(kernels[l].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
     ax.set_title(kernels[l].reduction)
     setp(ax.get_xticklabels(), visible=False)
@@ -3711,7 +3712,7 @@ for l in xrange(Mker):
 plt.suptitle('Time series decomposition')
 
 nfigure += 1
-# fig.savefig('inversion.eps', format='EPS',dpi=150)
+fig.savefig('inversion.eps', format='EPS',dpi=150)
 
 if plot=='yes':
     plt.show()
