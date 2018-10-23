@@ -18,6 +18,7 @@ Spatial and temporal inversions of the time series delay maps (used depl\_cumule
 At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal), 
 (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
+```
 Usage: invers\_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list\_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<VALUE>] [--semianual=<yes/no>]  [--dem=<yes/no>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
@@ -25,7 +26,6 @@ Usage: invers\_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list\_images=
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold\_rms=<path>] \
 [--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] 
-invers\_disp2coef.py -h | --help
 
 Options:
 -h --help               Show this screen
@@ -75,12 +75,14 @@ as a first guess to iterate the inversion. Force postseismic to be the same sign
 --iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
 --jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
 --jend VALUE            Column numbers bounding the ramp estimation zone [default: ncol]
+```
 
 
 invers\_disp\_pixel.py
 ============
 Temporal inversions of the time series delays of selected pixels (used depl\_cumule (BIP format) and images\_retenues, output of invers\_pixel). 
 
+```
 Usage: invers\_disp\_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--interseismic=<value>] [--threshold\_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] \
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
@@ -118,12 +120,14 @@ same sign than coseismic [default: no].
 --iref                  colum numbers of the reference pixel [default: None] 
 --jref                  lign number of the reference pixel [default: None]
 --bounds                Min,Max time series plots 
+```
 
 lect\_disp\_pixel.py
 =============
 
 Plot time series results obtained with invers\_disp2coef.py for given pixels (reqiered image\_retenues file)
 
+```
 Usage: lect\_cube\_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--lectfile=<path>] \
 [--ref=<path>] [--slope=<path>] [--coseismic=<paths>] [--postseismic=<paths>] [--slowslip=<value>] \
  [--cos=<path>] [--sin=<path>] [--dem=<path>] [--aps=<path>] \
@@ -154,14 +158,15 @@ Options:
 --jref              lign number of the reference pixel [default: None]
 --imref VALUE           Reference image number [default: 1]
 --bounds                Min,Max time series plots 
+```
 
 invers\_disp\_gps.py
 ============
 
 Temporal inversions of the gps time series displacements
 
+```
 Usage: invers\_disp\_gps.py --network=<path> --reduction=<path> [--dim=<value>] [--wdir=<path>] [--extension=<value>] [--coseismic=<value>][--postseismic=<value>] [--seasonal=<yes/no>] [--cond=<value>] [--ineq=<value>] [--proj=<value>] [--scale=<value>]
-invers\_disp\_gps.py -h | --help
 
 Options:
 -h --help           Show this screen 
@@ -176,4 +181,5 @@ Options:
 --cond VALUE        Condition value for optimization: Singular value smaller than cond x largest\_singular\_value are considered zero [default: 1.0e-10]
 --ineq VALUE        If yes, add inequqlity constrained in the inversion: use lself.east square result to iterate the inversion. Force postseismic to be the same sign than coseismic [default: no].  
 --proj VALUE        LOS projection [default for Envisat satellite: 0.38690,-0.09645,0.91706]
---scale VALUE       Scale factor for the three components [default: 1,1,1] 
+--scale VALUE       Scale factor for the three components [default: 1,1,1]
+``` 
