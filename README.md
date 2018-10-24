@@ -20,12 +20,14 @@ At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in 
 
 ```
 Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
-[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<VALUE>] [--semianual=<yes/no>]  [--dem=<yes/no>] \
+[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
 [--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] 
+
+invers_disp2coef.py -h | --help
 
 Options:
 -h --help               Show this screen
@@ -40,8 +42,8 @@ Options:
 : if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.] 
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) 
---slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events
-(e.g. 2004.,1,2006,0.5), default: None 
+--slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None 
+--vector PATH           Path to the vector text file containing a value for each dates [default: None]
 --seasonal YES/NO       If yes, add seasonal terms in the inversion
 --semianual YES/NO      If yes, add semianual terms in the inversion
 --dem Yes/No            If yes, add term proportional to the perpendicular baseline in the inversion
@@ -65,7 +67,7 @@ while for the next itarations, uncertainties are equals to the global RMS of the
 --aspect PATH           Path to aspect file in r4 or tif format: take into account the slope orientation in the phase/topo relationship [default: None].
 --perc VALUE            Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:90.]
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
---cond VALUE            Condition value for optimization: Singular value smaller than cond x largest_singular_value are considered zero [default: 1.0e-10]
+--cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
 as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
 --fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]  
@@ -84,7 +86,7 @@ Temporal inversions of the time series delays of selected pixels (used depl_cumu
 
 ```
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] \
+[--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
 
@@ -107,6 +109,7 @@ basis functions [default: 1.]
 of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events
 (e.g. 2004.,1,2006,0.5), default: None 
+--vector PATH           Path to the vector text file containing a value for each dates [default: None]
 --seasonal PATH         If yes, add seasonal terms in the inversion
 --semianual PATH        If yes, add semianual  terms in the inversion
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
