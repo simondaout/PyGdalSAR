@@ -462,6 +462,10 @@ if len(cos) > 0:
 
 #######################################################
 
+# cm
+cmap = cm.jet
+cmap.set_bad('white')
+
 # load images_retenues file
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 
@@ -575,7 +579,7 @@ if rmsf is not None:
     fig = plt.figure(nfigure,figsize=(9,4))
     nfigure = nfigure + 1
     ax = fig.add_subplot(1,1,1)
-    cax = ax.imshow(spacial_mask,cmap=cm.jet)
+    cax = ax.imshow(spacial_mask,cmap=cmap)
     ax.set_title('Mask on spatial estimation based on RMSpixel')
     setp( ax.get_xticklabels(), visible=False)
     fig.colorbar(cax, orientation='vertical',aspect=10)
@@ -706,18 +710,18 @@ if maskfile is not None:
     vmin = -vmax
 
     ax = fig.add_subplot(1,3,1)
-    cax = ax.imshow(mask,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(mask,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title('Original Mask')
     setp( ax.get_xticklabels(), visible=False)
 
     ax = fig.add_subplot(1,3,2)
-    cax = ax.imshow(mask_flat,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(mask_flat,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title('Flat Mask')
     setp( ax.get_xticklabels(), visible=False)
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,3,3)
-    cax = ax.imshow(mask_flat_clean,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(mask_flat_clean,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title('Final Mask')
     setp( ax.get_xticklabels(), visible=False)
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
@@ -741,8 +745,8 @@ for l in xrange((N)):
     d = as_strided(maps[ibeg:iend,jbeg:jend,l])
     #ax = fig.add_subplot(1,N,l+1)
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    #cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
-    cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    #cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(idates[l],fontsize=6)
     setp( ax.get_xticklabels(), visible=False)
     setp( ax.get_yticklabels(), visible=False)
@@ -2797,7 +2801,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] 
 
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
@@ -3085,7 +3089,7 @@ for ii in xrange(niter):
         figd.subplots_adjust(hspace=0.001,wspace=0.001)
         for l in xrange((N)):
             axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
+            caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
             axd.set_title(idates[l],fontsize=6)
             setp(axd.get_xticklabels(), visible=False)
             setp(axd.get_yticklabels(), visible=False)
@@ -3106,7 +3110,7 @@ for ii in xrange(niter):
         figref.subplots_adjust(hspace=0.001,wspace=0.001)
         for l in xrange((N)):
             axref = figref.add_subplot(4,int(N/4)+1,l+1)
-            caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
+            caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
             axref.set_title(idates[l],fontsize=6)
             setp(axref.get_xticklabels(), visible=False)
             setp(axref.get_yticklabels(), visible=False)
@@ -3128,7 +3132,7 @@ for ii in xrange(niter):
             figtopo.subplots_adjust(hspace=.001,wspace=0.001)
             for l in xrange((N)):
                 axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l],cmap=cm.jet,vmax=vmax,vmin=vmin)
+                caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
                 axtopo.set_title(idates[l],fontsize=6)
                 setp(axtopo.get_xticklabels(), visible=False)
                 setp(axtopo.get_yticklabels(), visible=False)
@@ -3360,7 +3364,7 @@ figclr = plt.figure(nfigure)
 
 # plot color map
 ax = figclr.add_subplot(1,1,1)
-cax = ax.imshow(maps[:,:,-1],cmap=cm.jet,vmax=vmax,vmin=vmin)
+cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
 setp( ax.get_xticklabels(), visible=False)
 cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
 figclr.savefig('colorscale.eps', format='EPS',dpi=150)
@@ -3385,45 +3389,45 @@ for l in xrange((N)):
     axres = figres.add_subplot(4,int(N/4)+1,l+1)
 
     axall = figall.add_subplot(6,N,l+1)
-    axall.imshow(data,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axall.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
     axall.set_title(idates[l],fontsize=6)
     setp(axall.get_xticklabels(), visible=False)
     setp(axall.get_yticklabels(), visible=False)
     if l==0:
         axall.set_ylabel('DATA')
     axall = figall.add_subplot(6,N,l+1+N)
-    axall.imshow(ramp,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axall.imshow(ramp,cmap=cmap,vmax=vmax,vmin=vmin)
     setp(axall.get_xticklabels(), visible=False)
     setp(axall.get_yticklabels(), visible=False)
     if l==0:
         axall.set_ylabel('RAMP')
     axall = figall.add_subplot(6,N,l+1+2*N)
-    axall.imshow(tropo,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axall.imshow(tropo,cmap=cmap,vmax=vmax,vmin=vmin)
     setp(axall.get_xticklabels(), visible=False)
     setp(axall.get_yticklabels(), visible=False)
     if l==0:
         axall.set_ylabel('TROP0')
     axall = figall.add_subplot(6,N,l+1+3*N)
-    axall.imshow(data_flat,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axall.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
     setp(axall.get_xticklabels(), visible=False)
     setp(axall.get_yticklabels(), visible=False)
     if l==0:
         axall.set_ylabel('FLATTEN DATA')
     axall = figall.add_subplot(6,N,l+1+4*N)
-    axall.imshow(model,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axall.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
     setp(axall.get_xticklabels(), visible=False)
     setp(axall.get_yticklabels(), visible=False)
     if l==0:
         axall.set_ylabel('MODEL')
     axall = figall.add_subplot(6,N,l+1+5*N)
-    axall.imshow(res,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    axall.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
     setp(axall.get_xticklabels(), visible=False)
     setp(axall.get_yticklabels(), visible=False)
     if l==0:
         axall.set_ylabel('RES')
 
-    cax = ax.imshow(model,cmap=cm.jet,vmax=vmax,vmin=vmin)
-    caxres = axres.imshow(res,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
+    caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
      
     ax.set_title(idates[l],fontsize=6)
     axres.set_title(idates[l],fontsize=6)
@@ -3703,7 +3707,7 @@ nfigure +=1
 fig=plt.figure(nfigure,figsize=(14,12))
 
 ax = fig.add_subplot(1,M,1) 
-cax = ax.imshow(basis[0].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
+cax = ax.imshow(basis[0].m,cmap=cmap,vmax=vmax,vmin=vmin)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
 setp(ax.get_xticklabels(), visible=False)
 setp(ax.get_yticklabels(), visible=False)
@@ -3713,7 +3717,7 @@ vmax = np.abs([np.nanpercentile(basis[1].m,98.),np.nanpercentile(basis[1].m,2.)]
 vmin = -vmax
 
 ax = fig.add_subplot(1,M,2) 
-cax = ax.imshow(basis[1].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
+cax = ax.imshow(basis[1].m,cmap=cmap,vmax=vmax,vmin=vmin)
 ax.set_title(basis[1].reduction)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
 setp(ax.get_xticklabels(), visible=False)
@@ -3725,7 +3729,7 @@ for l in range(2,Mbasis):
     vmin = -vmax
 
     ax = fig.add_subplot(1,M,l+1)   
-    cax = ax.imshow(basis[l].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(basis[l].m,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(basis[l].reduction)
     # add colorbar
     cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
@@ -3737,7 +3741,7 @@ for l in xrange(Mker):
     vmin = -vmax
 
     ax = fig.add_subplot(1,M,Mbasis+l+1)    
-    cax = ax.imshow(kernels[l].m,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(kernels[l].m,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(kernels[l].reduction)
     setp(ax.get_xticklabels(), visible=False)
     setp(ax.get_yticklabels(), visible=False)
