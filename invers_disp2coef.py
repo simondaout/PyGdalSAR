@@ -129,6 +129,8 @@ class pattern:
     def info(self):
         print self.name, self.date
 
+### BASIS FUNCTIONS: function of time
+
 def Heaviside(t):
         h=np.zeros((len(t)))
         h[t>=0]=1.0
@@ -226,6 +228,8 @@ class slowslip(pattern):
           t=(t-self.to)/self.tcar
           funct = 0.5*(np.tanh(t)-1) + 1
           return funct
+
+### KERNEL FUNCTIONS: not function of time
 
 class corrdem(pattern):
     def __init__(self,name,reduction,date,x):

@@ -20,9 +20,20 @@
 	"buffers":
 	[
 		{
+			"file": "invers_disp2coef.py",
 			"settings":
 			{
-				"buffer_size": 0,
+				"buffer_size": 149600,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "/Users/symeone/Dropbox/TIMES_SERIE_D041_merge/nouvelles_donnes/invers_disp2coef_vector.py",
+			"settings":
+			{
+				"buffer_size": 139200,
+				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			}
 		}
@@ -63,6 +74,11 @@
 	],
 	"file_history":
 	[
+		"/Users/symeone/dev/TSdecomp/lect_disp_pixel.py",
+		"/Users/symeone/dev/TSdecomp/invers_disp_pixel.py",
+		"/Users/symeone/dev/TSdecomp/invers_disp_gps.py",
+		"/Users/symeone/dev/TSdecomp/invers_disp2coef.py",
+		"/Users/symeone/dev/TSdecomp/README.md",
 		"/Users/symeone/Dropbox/scripts/insar/python/invers_disp2coef.py",
 		"/Users/symeone/Dropbox/scripts/insar/python/plot_tiff.py",
 		"/Users/symeone/Dropbox/scripts/insar/python/geo2r4.py",
@@ -182,7 +198,7 @@
 	],
 	"find":
 	{
-		"height": 24.0
+		"height": 39.0
 	},
 	"find_in_files":
 	{
@@ -197,6 +213,17 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"maps_flata",
+			"models_trends",
+			"vector",
+			"kernel",
+			"fig",
+			"models_seas",
+			"model_seas",
+			"vect",
+			"basis",
+			"vector",
+			"\\_",
 			"image_retenues",
 			"SSE",
 			"IndexSSE",
@@ -313,18 +340,7 @@
 			"1420",
 			"4082",
 			"dem",
-			"${infile}_strat${try}.top",
-			"radar",
-			"RAW_DOPPLER_RANGE",
-			"Cov",
-			"residual",
-			"consI",
-			"depl_cumul",
-			"outfile",
-			"cube",
-			"vmax",
-			"coh",
-			"coh."
+			"${infile}_strat${try}.top"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -332,6 +348,7 @@
 		"regex": false,
 		"replace_history":
 		[
+			"_",
 			"iter=2000",
 			"(i - ibegref) ",
 			"ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)",
@@ -359,29 +376,68 @@
 			[
 				{
 					"buffer": 0,
+					"file": "invers_disp2coef.py",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 0,
+						"buffer_size": 149600,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								0,
-								0
+								4546,
+								4557
 							]
 						],
 						"settings":
 						{
-							"syntax": "Packages/Text/Plain text.tmLanguage"
+							"syntax": "Packages/Python/Python.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 0.0,
+						"translation.y": 541.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
+					"type": "text"
+				}
+			]
+		},
+		{
+			"selected": 0,
+			"sheets":
+			[
+				{
+					"buffer": 1,
+					"file": "/Users/symeone/Dropbox/TIMES_SERIE_D041_merge/nouvelles_donnes/invers_disp2coef_vector.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 139200,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								118517,
+								118546
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Python/Python.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 46517.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
 					"type": "text"
 				}
 			]
@@ -404,11 +460,18 @@
 				0,
 				1,
 				1
+			],
+			[
+				1,
+				0,
+				2,
+				1
 			]
 		],
 		"cols":
 		[
 			0.0,
+			0.541432318961,
 			1.0
 		],
 		"rows":
@@ -426,7 +489,7 @@
 	"project": "TS.sublime-project",
 	"replace":
 	{
-		"height": 44.0
+		"height": 70.0
 	},
 	"save_all_on_build": true,
 	"select_file":
@@ -464,7 +527,7 @@
 	"show_open_files": false,
 	"show_tabs": true,
 	"side_bar_visible": true,
-	"side_bar_width": 228.0,
+	"side_bar_width": 130.0,
 	"status_bar_visible": true,
 	"template_settings":
 	{
