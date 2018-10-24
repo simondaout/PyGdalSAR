@@ -14,9 +14,9 @@ This project needs the following external components:
 
 invers\_disp2coef.py
 ============
-Spatial and temporal inversions of the time series delay maps (used depl_cumule (BIP format) and images_retenues, output of invers_pixel), based on an iteration procedure. 
-At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal), 
-(3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
+Spatial and temporal inversions of the time series delay maps based on an iteration procedure. Requiered at least a cube of images (BIP format) and a list of images with temporal and perpendicular baselines. 
+At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal...) or a discretised vector file.  
+(3) estimation of RMS of each maps that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
 ```
 Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
@@ -82,7 +82,7 @@ as a first guess to iterate the inversion. Force postseismic to be the same sign
 
 invers\_disp\_pixel.py
 ============
-Temporal inversions of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
+Temporal decomposition of the time series delay maps of selected pixels. 
 
 ```
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
@@ -128,7 +128,7 @@ same sign than coseismic [default: no].
 lect\_disp\_pixel.py
 =============
 
-Plot time series results obtained with invers_disp2coef.py for given pixels (reqiered image_retenues file)
+Plot time series results obtained with invers_disp2coef.py for given pixels.
 
 ```
 Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--lectfile=<path>] \
@@ -166,7 +166,7 @@ Options:
 invers\_disp\_gps.py
 ============
 
-Temporal inversions of the gps time series displacements
+Temporal decomposition of gps time series and projection into a LOS vector. 
 
 ```
 Usage: invers_disp_gps.py --network=<path> --reduction=<path> [--dim=<value>] [--wdir=<path>] [--extension=<value>] [--coseismic=<value>][--postseismic=<value>] [--seasonal=<yes/no>] [--cond=<value>] [--ineq=<value>] [--proj=<value>] [--scale=<value>]
