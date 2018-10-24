@@ -190,7 +190,7 @@ class slowslip(pattern):
           return funct
 
 class corrdem(pattern):
-    def __init__(self,name,reduction,date,x):
+    def __init__(self,name,reduction,date,bp):
         pattern.__init__(self,name,reduction,date,bp)
         self.bpo=date
         self.bp=bp
@@ -460,7 +460,7 @@ for i in xrange(len(sse_time)):
 kernels=[]
 
 if dem=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',date=base[imref],x=base))
+   kernels.append(corrdem(name='dem correction',reduction='corrdem',date=base[imref],bp=base))
    indexdem = index
    index = index + 1
 

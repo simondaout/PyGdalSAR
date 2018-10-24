@@ -232,7 +232,7 @@ class slowslip(pattern):
 ### KERNEL FUNCTIONS: not function of time
 
 class corrdem(pattern):
-    def __init__(self,name,reduction,date,x):
+    def __init__(self,name,reduction,date,bp):
         pattern.__init__(self,name,reduction,date,bp)
         self.bpo=date
         self.bp=bp
@@ -552,7 +552,7 @@ if aspect is not None:
       ds = gdal.Open(aspect, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
       aspecti = band.ReadAsArray()
-      print ds.RasterYSize, ds.RasterXSize
+      # print ds.RasterYSize, ds.RasterXSize
       del ds
     else:
       fid = open(aspect,'r')
@@ -820,7 +820,7 @@ for i in xrange(len(sse_time)):
 kernels=[]
 
 if dem=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',date=base[imref],x=base))
+   kernels.append(corrdem(name='dem correction',reduction='corrdem',date=base[imref],bp=base))
    indexdem = index
    index = index + 1
 
