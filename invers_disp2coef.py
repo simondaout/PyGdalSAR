@@ -517,6 +517,7 @@ if maskfile is not None:
       fid = open(maskfile,'r')
       maski = np.fromfile(fid,dtype=np.float32)*scale
       fid.close()
+    maski = maski[:nlign*ncol]
     mask = maski.reshape((nlign,ncol))
     
 
@@ -533,7 +534,7 @@ if radar is not None:
       fid = open(radar,'r')
       elevi = np.fromfile(fid,dtype=np.float32)
       fid.close()
-    # elevi = elevi[:nlign*ncol]
+    elevi = elevi[:nlign*ncol]
     # fig = plt.figure(10)
     # plt.imshow(elevi.reshape(nlign,ncol)[ibeg:iend,jbeg:jend])
     elev = elevi.reshape((nlign,ncol))
@@ -557,7 +558,7 @@ if aspect is not None:
       fid = open(aspect,'r')
       aspecti = np.fromfile(fid,dtype=np.float32)
       fid.close()
-    # aspecti = aspecti[:nlign*ncol]
+    aspecti = aspecti[:nlign*ncol]
     slope = aspecti.reshape((nlign,ncol))
     slope[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(slope>9999.))
