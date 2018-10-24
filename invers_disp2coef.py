@@ -126,6 +126,7 @@ class pattern:
         self.name=name
         self.reduction=reduction
         self.date=date
+
     def info(self):
         print self.name, self.date
 
@@ -230,21 +231,28 @@ class slowslip(pattern):
           return funct
 
 ### KERNEL FUNCTIONS: not function of time
-
 class corrdem(pattern):
-    def __init__(self,name,reduction,date,bp):
-        pattern.__init__(self,name,reduction,date,bp)
-        self.bpo=date
+    def __init__(self,name,reduction,bp0,bp):
+        self.name = name
+        self.reduction = reduction
+        self.bpo=bp0
         self.bp=bp
+
+    def info(self):
+        print self.name
 
     def g(self,index):
         func = (self.bp-self.bpo)
-        return func[index]
+        return func[index]        
 
 class vector(pattern):
     def __init__(self,name,reduction,vect):
-        pattern.__init__(self,name,reduction,vect)
+        self.name = name
+        self.reduction = reduction
         self.func=vect
+
+    def info(self):
+        print self.name
 
     def g(self,index):
         return self.func[index]
@@ -820,7 +828,7 @@ for i in xrange(len(sse_time)):
 kernels=[]
 
 if dem=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',date=base[imref],bp=base))
+   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=base[imref],bp=base))
    indexdem = index
    index = index + 1
 
