@@ -18,7 +18,7 @@ At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in 
 Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
-[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc=<value>] \
+[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
 [--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] 
@@ -61,7 +61,8 @@ while for the next itarations, uncertainties are equals to the global RMS of the
 --tempmask YES/NO       If yes, also use the spatial mask for the temporal inversion [default: no]
 --topofile PATH         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation.
 --aspect PATH           Path to aspect file in r4 or tif format: take into account the slope orientation in the phase/topo relationship [default: None].
---perc VALUE            Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:90.]
+--perc_los VALUE        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:98.]
+--perc_topo VALUE       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:90.]
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
@@ -457,10 +458,16 @@ else:
     print 'Error: nfit > 1, set nfit to 0'
     nfit = 0
 
-if arguments["--perc"] ==  None:
-    perc = 90.
+if arguments["--perc_topo"] ==  None:
+    perc_topo = 90.
 else:
-    perc = float(arguments["--perc"])
+    perc_topo = float(arguments["--perc_topo"])
+
+if arguments["--perc_los"] ==  None:
+    perc_los = 98.
+else:
+    perc_los = float(arguments["--perc_los"])
+
 
 if len(cos) > 0:
     print
@@ -479,7 +486,7 @@ nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=
 
 N=len(dates)
 print 'Number images: ', N
-datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+datemin, datemax = np.int(np.nanmin(dates)), np.int(np.nanmax(dates))+1
 
 # lect cube
 cubei = np.fromfile(cubef,dtype=np.float32)
@@ -1036,14 +1043,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]
                 print 'Remove ref frame %f + %f z for date: %i'%(a,b,idates[l])
             
                 # plot phase/elev
                 funct = a 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,b*x,'-r', lw =4.) 
 
@@ -1069,14 +1075,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print 'Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l])
             
                 # plot phase/elev
                 funct = a 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,b*x+c*x**2,'-r', lw =4.) 
 
@@ -1102,14 +1107,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l])
             
                 # plot phase/elev
                 funct = a + c*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,b*x,'-r', lw =4.) 
 
@@ -1138,14 +1142,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
             
                 # plot phase/elev
                 funct = a + b*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x+d*x**2,'-r', lw =4.) 
 
@@ -1174,8 +1177,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]
             print 'Remove ramp %f r + %f for date: %i'%(a,b,idates[l])
 
@@ -1202,14 +1204,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l])
             
                 # plot phase/elev
                 funct = a*y + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.) 
 
@@ -1238,14 +1239,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
             
                 # plot phase/elev
                 funct = a*y + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x+d*x**2,'-r', lw =4.) 
 
@@ -1275,14 +1275,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
             
                 # plot phase/elev
                 funct = a*y + b + d*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.) 
 
@@ -1315,14 +1314,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
             
                 # plot phase/elev
                 funct = a*y + b + c*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
 
@@ -1354,8 +1352,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]
             print 'Remove ramp %f az + %f for date: %i'%(a,b,idates[l])
 
@@ -1382,14 +1379,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l])
 
                 # plot phase/elev
                 funct = a*x + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.) 
                 
@@ -1419,14 +1415,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
                 funct = a*x + b 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x + d*x**2,'-r', lw =4.) 
                 
@@ -1456,14 +1451,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
                 funct = a*x + b + d*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.) 
                 
@@ -1496,14 +1490,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
                 funct = a*x + b + c*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
                 
@@ -1535,8 +1528,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]
             print 'Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l])
 
@@ -1564,14 +1556,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,d*x,'-r', lw =4.) 
                 
@@ -1603,14 +1594,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
                 
@@ -1642,14 +1632,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
                 print 'Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,d*x,'-r', lw =4.) 
                 
@@ -1684,17 +1673,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                try:
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
-                except:
-                    pars = x0
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
                 print 'Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c + d*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.1, alpha=0.01, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
                 
@@ -1728,8 +1713,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print 'Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l])
 
@@ -1759,15 +1743,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
 
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
                 
@@ -1801,15 +1784,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
                 
@@ -1843,15 +1825,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
                 
@@ -1888,15 +1869,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
                 
@@ -1932,8 +1912,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print 'Remove ramp %f r**2 %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l])
 
@@ -1966,14 +1945,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
             
@@ -2007,14 +1985,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
                 
@@ -2050,14 +2027,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
                 
@@ -2095,14 +2071,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
                 
@@ -2140,8 +2115,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print 'Remove ramp %f az**2 %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l])
 
@@ -2172,14 +2146,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
 
@@ -2213,14 +2186,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
 
@@ -2254,14 +2226,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
 
@@ -2298,14 +2269,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d + e*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
 
@@ -2342,8 +2312,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print 'Remove ramp %f az**2 %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l])
 
@@ -2376,14 +2345,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x,'-r', lw =4.) 
 
@@ -2419,14 +2387,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
 
@@ -2462,14 +2429,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e + g*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x,'-r', lw =4.) 
 
@@ -2508,14 +2474,13 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
             
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
 
@@ -2553,8 +2518,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
             print 'Remove ramp %f az**3 %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l])
 
@@ -2589,14 +2553,13 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
             
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,g*x,'-r', lw =4.) 
         
@@ -2634,14 +2597,13 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
             
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f 
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
         
@@ -2680,14 +2642,13 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
             
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + h*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,g*x,'-r', lw =4.) 
         
@@ -2728,14 +2689,13 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,i,idates[l])
             
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + g*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,h*x+i*x**2,'-r', lw =4.) 
         
@@ -2773,8 +2733,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print 'Remove ramp %f r %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l])
 
@@ -2806,15 +2765,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] 
 
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.) 
                 
@@ -2849,15 +2807,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6] 
 
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
                 
@@ -2893,15 +2850,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
 
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + g*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,f*x,'-r', lw =4.) 
                 
@@ -2939,15 +2895,14 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
 
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + f*topo_clean*x
-                x = np.linspace(np.min(topo_clean), np.max(topo_clean), 100)
+                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
                 
@@ -2991,9 +2946,12 @@ for ii in xrange(niter):
             # first clean los
             maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l]) - np.matrix.copy(models[ibegref:iendref,jbegref:jendref,l])
 
-            maxlos,minlos=np.nanpercentile(maps_temp,98.),np.nanpercentile(maps_temp,2.)
+            maxlos,minlos=np.nanpercentile(maps_temp,perc_los),np.nanpercentile(maps_temp,100-perc_los)
             kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
             maps_temp[kk] = np.float('NaN')        
+
+            noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
+            print 'Accepted noise level in the ramp optimisation:', noise_level
 
             itemp = ibegref
             for lign in xrange(ibegref,iendref,10):
@@ -3005,10 +2963,7 @@ for ii in xrange(niter):
 
             if radar is not None: 
                 topo_map_temp = np.matrix.copy(elev[ibegref:iendref,jbegref:jendref])
-                maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc),np.nanpercentile(topo_map_temp,100-perc) 
-                # print maxtopo,mintopo
-                # maxtopo,mintopo = 5000,4000 
-                # maxtopo,mintopo = np.nanmax(topo_map_temp), np.nanmin(topo_map_temp)
+                maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc_topo),np.nanpercentile(topo_map_temp,100-perc_topo) 
                 # initialize plot
                 ax = fig.add_subplot(4,int(N/4)+1,l+1)
             else:
@@ -3039,8 +2994,10 @@ for ii in xrange(niter):
                         np.logical_and(~np.isnan(rms_map_temp),
                         np.logical_and(~np.isnan(topo_map_temp),
                         np.logical_and(rms_map_temp<seuil_rms,
+                        np.logical_and(~np.isnan(maps_temp),
                             aspect_map>0.,
                             ))))))))
+                        )
 
             # extract coordinates for estimation
             temp = np.array(index).T
@@ -3164,7 +3121,7 @@ for ii in xrange(niter):
         inaps = np.copy(rms) 
         print 'Set very low values to the 2 percentile to avoid overweighting...'
         # scale between 0 and 1 for threshold_rmsd
-        maxaps = np.max(inaps)
+        maxaps = np.nanmax(inaps)
         inaps = inaps/maxaps 
         minaps= np.nanpercentile(inaps,2)
         index = flatnonzero(inaps<minaps)
