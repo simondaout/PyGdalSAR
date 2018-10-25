@@ -22,7 +22,7 @@ At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in 
 Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
-[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc=<value>] \
+[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>]  \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
 [--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] 
@@ -65,7 +65,8 @@ while for the next itarations, uncertainties are equals to the global RMS of the
 --tempmask YES/NO       If yes, also use the spatial mask for the temporal inversion [default: no]
 --topofile PATH         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation.
 --aspect PATH           Path to aspect file in r4 or tif format: take into account the slope orientation in the phase/topo relationship [default: None].
---perc VALUE            Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:90.]
+--perc_los VALUE        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:98.]
+--perc_topo VALUE       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:90.]
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
