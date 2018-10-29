@@ -4,18 +4,17 @@ Tool package for iterative spatial and temporal decompositions of InSAR or GPS t
 
 To install the package
 =============
-git clone https://github.com/simondaout/TSdecomp.git
+```git clone https://github.com/simondaout/TSdecomp.git```
 
-To update the software
----------------
-git pull
+To update the software: 
+```git pull```
 
-In case of fire
----------------
+In case of fire:
+```
 git commit
 git push
 leave building
-
+```
 
 Organisation
 =============
