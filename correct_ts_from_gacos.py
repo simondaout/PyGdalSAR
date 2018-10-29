@@ -206,8 +206,8 @@ if load == True:
 
 # # load gacos cube
 gcubei = np.fromfile('cube_gacos',dtype=np.float32)
-gcube = as_strided(gcubei[:nlign*ncol*N])
-gacos = gcube.reshape((nlign,ncol,N))
+# gcube = as_strided(gcubei[:nlign*ncol*N])
+gacos = gcubei.reshape((nlign,ncol,N))
 
 # Apply correction
 maps_flat = np.zeros((nlign,ncol,N))
