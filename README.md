@@ -1,11 +1,20 @@
 # TSdecomp
-Tool package for iterative spatial and temporal decompositions of InSAR or GPS time series written in Python programming language.
+Tool package for iterative spatial and temporal decompositions of InSAR or GPS time series written in Python programming. 
+
+Organisation
+=============
+This project contains the following folders:
+ * src: Main programms for time series decomposition (see doc. bellow)
+ * utils: Some additional plotting or cleaning programms for .r4 or georeferenced format (default: .tif)
+ * tutorial: in progress
+
 
  Requirements
 =============
 This project needs the following external components:
  * Python (2.7)
  * NumPy
+ * gdal
  * SciPy
  * docopt
  * matplotlib
@@ -105,35 +114,6 @@ Options:
 """
 ```
 
-clean\_ts.py
-============
-Clean a ts file given an r4 file (mask) and a threshold on this mask
-
-```
-Usage: clean_ts.py --infile=<path> --mask=<path> --threshold=<value> --outfile=<path> \
-[--perc=<value>] [--vmin=<value>] [--vmax=<value>] [--rampmask=<yes/no>] \
-[--flatten_mask=<path>] [--lectfile=<path>] [--scale=<value>] [--imref=<value>] \
-[--images=<path>] [--clean=<values>]  [--crop=<values>] 
-
-Options:
--h --help           Show this screen.
---infile PATH       path to time series (depl_cumule)
---outfile PATH      output file
---mask PATH         r4 file used as mask
---flatten_mask PATH output r4 flatten mask [default: None]
---rampmask VALUE    flatten mask [default: yes]
---threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
---scale VALUE       scale the mask [default:1]
---lectfile PATH     Path of the lect.in file [default: lect.in]
---imref VALUE       Reference image number [default: 1]
---images PATH       Path to image_retuenues file [default: images_retenues]
---clean VALUE       Clean option [default: 0,0,0,0]
---crop VALUE        Crop option [default: 0,nlign,0,ncol]
---vmax              Max colorscale [default: 98th percentile]
---vmin              Min colorscale [default: 2th percentile]
---perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
-
-```
 
 invers\_disp\_pixel.py
 ============

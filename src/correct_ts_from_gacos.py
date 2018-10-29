@@ -34,7 +34,6 @@ import gdal
 from osgeo import osr
 import sys,os
 import numpy as np
-from scipy.ndimage import zoom
 import scipy.optimize as opt
 import scipy.linalg as lst
 import matplotlib.cm as cm
