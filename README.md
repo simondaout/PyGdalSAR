@@ -7,7 +7,7 @@ This project needs the following external components:
  * Python (2.7)
  * NumPy
  * SciPy
- * getopt
+ * docopt
  * matplotlib
  * datetime
 
@@ -80,6 +80,60 @@ as a first guess to iterate the inversion. Force postseismic to be the same sign
 --jend VALUE            Column numbers bounding the ramp estimation zone [default: ncol]
 ```
 
+correct\_ts\_from\_gacos.py
+============
+Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to .tif format, 2) re-project and re-resampel atmospheric models 3) correct data.
+
+```
+Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] \
+[--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--zone=<values>] [--plot=<yes/no>] [--load=<True/False>]
+
+correct_ts_from_gacos.py -h | --help
+
+Options:
+-h --help           Show this screen.
+--cube PATH         Path to the cube of TS displacements file to be corrected from atmo models [default: depl_cumul]
+--path PATH         Path to .ztd data (default: ./GACOS/)
+--list_images PATH  Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: list_images.txt] 
+--imref VALUE       Reference image number [default: 1]
+--ref  VALUES       Column and line number for referencing. If None then estimate the best linear relationship between model and data [default: None]. 
+--zone VALUES       Crop option for ramp estimation [default: 0,ncol,0,nlign]
+--proj VALUE        EPSG for projection GACOS map [default: 4326]
+--gacos2data        Scaling value between gacos data (m) and desired output (e.g data in mm) [default: 1000.]
+--plot              Display results [default: yes]   
+--load              If False, do not load data again and directly read cube_gacos [default: True]   
+"""
+```
+
+clean\_ts.py
+============
+Clean a ts file given an r4 file (mask) and a threshold on this mask
+
+```
+Usage: clean_ts.py --infile=<path> --mask=<path> --threshold=<value> --outfile=<path> \
+[--perc=<value>] [--vmin=<value>] [--vmax=<value>] [--rampmask=<yes/no>] \
+[--flatten_mask=<path>] [--lectfile=<path>] [--scale=<value>] [--imref=<value>] \
+[--images=<path>] [--clean=<values>]  [--crop=<values>] 
+
+Options:
+-h --help           Show this screen.
+--infile PATH       path to time series (depl_cumule)
+--outfile PATH      output file
+--mask PATH         r4 file used as mask
+--flatten_mask PATH output r4 flatten mask [default: None]
+--rampmask VALUE    flatten mask [default: yes]
+--threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
+--scale VALUE       scale the mask [default:1]
+--lectfile PATH     Path of the lect.in file [default: lect.in]
+--imref VALUE       Reference image number [default: 1]
+--images PATH       Path to image_retuenues file [default: images_retenues]
+--clean VALUE       Clean option [default: 0,0,0,0]
+--crop VALUE        Crop option [default: 0,nlign,0,ncol]
+--vmax              Max colorscale [default: 98th percentile]
+--vmin              Min colorscale [default: 2th percentile]
+--perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
+
+```
 
 invers\_disp\_pixel.py
 ============
