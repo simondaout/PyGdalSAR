@@ -10,7 +10,7 @@ invers_disp_pixel.py
 -------------
 Temporal inversions of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
-Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
+Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
@@ -24,6 +24,7 @@ Options:
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
 --list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
+--windowref size VALUE      Number of pixels around the referenced pixel defining the window [default: 0]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
 --rmspixel PATH         Path to the RMS map giving the error associated to each pixel (e.g RMSpixel, output of invers_pixel) [default: None]        
@@ -255,6 +256,10 @@ if arguments["--windowsize"] ==  None:
     w = 0
 else:
     w = int(arguments["--windowsize"])
+if arguments["--windowrefsize"] ==  None:
+    wref = 0
+else:
+    wref = int(arguments["--windowrefsize"])
 if arguments["--aps"] ==  None:
     apsf = None
 else:
@@ -637,7 +642,7 @@ for jj in xrange((Npix)):
     # extract data
     wind = as_strided(maps[j-w:j+w+1,i-w:i+w+1,:])
     if iref is not None:
-        windref = as_strided(maps[jref-w:jref+w+1,iref-w:iref+w+1,:])
+        windref = as_strided(maps[jref-wref:jref+wref+1,iref-wref:iref+wref+1,:])
         dispref = np.nanmean(windref,axis=(0,1))
     else:
         dispref = np.zeros((N))
