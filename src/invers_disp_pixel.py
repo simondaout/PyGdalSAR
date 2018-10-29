@@ -10,7 +10,7 @@ invers_disp_pixel.py
 -------------
 Temporal inversions of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
-Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
+Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
@@ -22,6 +22,7 @@ Options:
 --ncols VALUE           Pixel column numbers (eg. 200,400,450) 
 --nligns VALUE          Pixel lign numbers  (eg. 1200,1200,3000) 
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
+--list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
@@ -225,6 +226,11 @@ arguments = docopt.docopt(__doc__)
 # initialise iteration with interseismic alone
 iteration=False
 
+if arguments["--list_images"] ==  None:
+    listim = "images_retenues"
+else:
+    listim = arguments["--list_images"]
+
 if arguments["--ineq"] ==  None:
     ineq = 'no' 
 else:
@@ -341,8 +347,7 @@ Npix = len(ipix)
 ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
 
 # load images_retenues file
-fimages='images_retenues'
-nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
 N = len(dates)
 

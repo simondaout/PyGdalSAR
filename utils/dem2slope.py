@@ -5,6 +5,7 @@
 """\
 dem2slope.py
 -------------
+Convert dem to slope file in the LOS geeometry knowing los heading and lattitude mean
 
 Usage: dem2slope.py --infile=<path> --outfile=<path> --los=<value> --heading=<value> --lat=<value>
 dem2slope.py -h | --help

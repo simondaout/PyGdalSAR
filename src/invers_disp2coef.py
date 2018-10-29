@@ -1,9 +1,6 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-################################################################################
-#
-# NSBAS - New Small Baseline Chain
-#
+
 ################################################################################
 # Author        : Simon DAOUT (ISTerre)
 ################################################################################
@@ -3070,22 +3067,7 @@ for ii in xrange(niter):
         # np.nanmedian(maps_ramp[:,:,-1]) - 2.*np.nanstd(maps_ramp[:,:,-1])]).max()
         # lmin = -lmax
         
-        # plot corrected ts
-        nfigure +=1
-        figref = plt.figure(nfigure,figsize=(14,10))
-        figref.subplots_adjust(hspace=0.001,wspace=0.001)
-        for l in xrange((N)):
-            axref = figref.add_subplot(4,int(N/4)+1,l+1)
-            caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
-            axref.set_title(idates[l],fontsize=6)
-            setp(axref.get_xticklabels(), visible=False)
-            setp(axref.get_yticklabels(), visible=False)
-        setp(axref.get_xticklabels(), visible=False)
-        setp(axref.get_yticklabels(), visible=False)
-        figref.suptitle('Time series ramps')
-        figref.colorbar(caxref, orientation='vertical',aspect=10)
-        figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
-        fig.tight_layout()  
+
 
         # lmax = np.abs([np.nanmedian(maps_topo[:,:,-1]) + 2.*np.nanstd(maps_topo[:,:,-1]),\
         # np.nanmedian(maps_topo[:,:,-1]) - 2.*np.nanstd(maps_topo[:,:,-1])]).max()
@@ -3098,16 +3080,35 @@ for ii in xrange(niter):
             figtopo.subplots_adjust(hspace=.001,wspace=0.001)
             for l in xrange((N)):
                 axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+                caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l]+maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
                 axtopo.set_title(idates[l],fontsize=6)
                 setp(axtopo.get_xticklabels(), visible=False)
                 setp(axtopo.get_yticklabels(), visible=False)
                 setp(axtopo.get_xticklabels(), visible=False)
                 setp(axtopo.get_yticklabels(), visible=False)
             figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-            figtopo.suptitle('Time series tropospheric signal')
+            figtopo.suptitle('Time series RAMPS+TOPO')
             figtopo.savefig('tropo.eps', format='EPS',dpi=150)
             fig.tight_layout()  
+
+        else:
+            # plot corrected ts
+            nfigure +=1
+            figref = plt.figure(nfigure,figsize=(14,10))
+            figref.subplots_adjust(hspace=0.001,wspace=0.001)
+            for l in xrange((N)):
+                axref = figref.add_subplot(4,int(N/4)+1,l+1)
+                caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+                axref.set_title(idates[l],fontsize=6)
+                setp(axref.get_xticklabels(), visible=False)
+                setp(axref.get_yticklabels(), visible=False)
+            setp(axref.get_xticklabels(), visible=False)
+            setp(axref.get_yticklabels(), visible=False)
+            figref.suptitle('Time series RAMPS')
+            figref.colorbar(caxref, orientation='vertical',aspect=10)
+            figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
+            fig.tight_layout()  
+
 
         if plot=='yes':
             plt.show()
