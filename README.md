@@ -1,8 +1,17 @@
 # TSdecomp
 Tool package for iterative spatial and temporal decompositions of InSAR or GPS time series written in Python programming. 
 
-In case of fire
+
+To install the package
 =============
+git clone https://github.com/simondaout/TSdecomp.git
+
+To update the software
+---------------
+git pull
+
+In case of fire
+---------------
 git commit
 git push
 leave building
@@ -14,7 +23,7 @@ This project contains the following folders:
  * src: Main programms for time series decomposition (see doc. bellow)
  * utils: Some additional plotting or cleaning programms for .r4 or georeferenced format (default: .tif)
  * tutorial: in progress
- 
+
 
  Requirements
 =============
