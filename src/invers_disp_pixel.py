@@ -24,7 +24,7 @@ Options:
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
 --list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
---windowref size VALUE      Number of pixels around the referenced pixel defining the window [default: 0]
+--windowref size VALUE      Number of pixels around the referenced pixel defining the window [default: windowsize]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
 --rmspixel PATH         Path to the RMS map giving the error associated to each pixel (e.g RMSpixel, output of invers_pixel) [default: None]        
@@ -257,9 +257,10 @@ if arguments["--windowsize"] ==  None:
 else:
     w = int(arguments["--windowsize"])
 if arguments["--windowrefsize"] ==  None:
-    wref = 0
+    wref = np.copy(w)
 else:
     wref = int(arguments["--windowrefsize"])
+
 if arguments["--aps"] ==  None:
     apsf = None
 else:
