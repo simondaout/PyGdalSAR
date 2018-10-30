@@ -8,8 +8,8 @@
 """\
 invers_disp2coef.py
 -------------
-Spatial and temporal inversions of the time series delay maps (used depl_cumule (BIP format) and images_retenues, output of invers_pixel), based on an iteration procedure. 
-At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal), 
+Spatial and temporal inversions of the time series delay maps (used depl_cumule (BIP format) and images_retenues, output of invers_pixel), based on an iteration procedure.
+At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal),
 (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
 Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
@@ -18,7 +18,7 @@ Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<p
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
 [--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
-[<ibeg>] [<iend>] [<jbeg>] [<jend>] 
+[<ibeg>] [<iend>] [<jbeg>] [<jend>]
 
 invers_disp2coef.py -h | --help
 
@@ -26,27 +26,27 @@ Options:
 -h --help               Show this screen
 --cube PATH             Path to displacement file [default: depl_cumul]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
---list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
+--list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues]
 --aps PATH              Path to the APS file giving an input error to each dates [default: No weigthing if no spatial estimation or misfit spatial estimation used as input uncertianties]
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
---interseismic YES/NO   Add a linear function in the inversion 
---threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic, 
-: if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.] 
+--interseismic YES/NO   Add a linear function in the inversion
+--threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic,
+: if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
---postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) 
---slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None 
+--postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
+--slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None
 --vector PATH           Path to the vector text file containing a value for each dates [default: None]
 --seasonal YES/NO       If yes, add seasonal terms in the inversion
 --semianual YES/NO      If yes, add semianual terms in the inversion
 --dem Yes/No            If yes, add term proportional to the perpendicular baseline in the inversion
 --ivar VALUE            Define phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation
 --nfit VALUE            Fit degree in azimuth or in elevation [0:linear (default), 1: quadratic]
---flat PATH             Remove a spatial ramp at each iteration. 
-0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c, 
-4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 
+--flat PATH             Remove a spatial ramp at each iteration.
+0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
+4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e,
 8: ay**2+by+cx**3+dx**2+ex+f, 9: ax+by+cxy**2+dxy+e
---niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, 
+--niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration,
 while for the next itarations, uncertainties are equals to the global RMS of the previous iteration for each map [default: 1]
 --spatialiter  YES/NO   If yes iterate the spatial estimations at each iterations (defined by niter) on the maps minus the temporal terms (ie. interseismic, coseismic...) [default: no]
 --sampling VALUE        Downsampling factor [default: 1]
@@ -64,9 +64,9 @@ while for the next itarations, uncertainties are equals to the global RMS of the
 --cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
 as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
---fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]  
---geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4] 
---plot YES/NO           Display plots [default: yes] 
+--fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
+--geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
+--plot YES/NO           Display plots [default: yes]
 --ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
 --iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
 --jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
@@ -101,8 +101,7 @@ import os
 
 # plot
 import matplotlib
-if environ["TERM"].startswith("screen"):
-    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+#matplotlib.use('TkAgg') # Must be before importing matplotlib.pyplot or pylab!
 from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -241,7 +240,7 @@ class corrdem(pattern):
 
     def g(self,index):
         func = (self.bp-self.bpo)
-        return func[index]        
+        return func[index]
 
 class vector(pattern):
     def __init__(self,name,reduction,vect):
@@ -293,7 +292,7 @@ if arguments["--coseismic"] ==  None:
     cos = []
 else:
     cos = map(float,arguments["--coseismic"].replace(',',' ').split())
-    
+
 if arguments["--postseismic"] ==  None:
     pos = []
 else:
@@ -324,7 +323,7 @@ else:
 if arguments["--spatialiter"] ==  None:
     spatialiter = 'no'
 else:
-    spatialiter = arguments["--spatialiter"]  
+    spatialiter = arguments["--spatialiter"]
 if arguments["--flat"] == None:
     flat = 0
 elif int(arguments["--flat"]) <  10:
@@ -414,7 +413,7 @@ else:
 if arguments["--threshold_rmsd"] ==  None:
     maxrmsd = 0.
 else:
-    maxrmsd = float(arguments["--threshold_rmsd"]) 
+    maxrmsd = float(arguments["--threshold_rmsd"])
 if arguments["--fulloutput"] ==  None:
     fulloutput = 'no'
 else:
@@ -509,7 +508,7 @@ for l in xrange((N)):
     maps[:,:,l] = maps[:,:,l] - cst
     if l != imref:
         index = np.nonzero(d==0.0)
-        d[index] = np.float('NaN') 
+        d[index] = np.float('NaN')
 
 # plt.imshow(maps[ibeg:iend,jbeg:jend,-1])
 # fig = plt.figure(12)
@@ -531,7 +530,7 @@ if maskfile is not None:
       fid.close()
     maski = maski[:nlign*ncol]
     mask = maski.reshape((nlign,ncol))
-    
+
 
 elev = np.zeros((nlign,ncol))
 # open elevation map
@@ -556,7 +555,7 @@ if radar is not None:
     # fig = plt.figure(11)
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
     # plt.show()
-    
+
 
 if aspect is not None:
     extension = os.path.splitext(aspect)[1]
@@ -580,7 +579,7 @@ if aspect is not None:
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
     # plt.show()
     # sys.exit()
-    
+
 if rmsf is not None:
     rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlign,ncol))
     rmsmap = rmsmap[:nlign,:ncol]
@@ -597,8 +596,8 @@ if rmsf is not None:
     setp( ax.get_xticklabels(), visible=False)
     fig.colorbar(cax, orientation='vertical',aspect=10)
     del spacial_mask
-    if plot=='yes':
-       plt.show()
+    # if plot=='yes':
+    #    plt.show()
 
 
 #fig, ax = plt.subplots(1)
@@ -740,7 +739,7 @@ if maskfile is not None:
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.savefig('mask.eps', format='EPS',dpi=150)
     del mask_flat_clean
-    
+
     if plot=='yes':
         plt.show()
     #sys.exit()
@@ -797,7 +796,7 @@ if inter=='yes':
     index = index + 1
 
 if seasonal=='yes':
-    indexseas = index 
+    indexseas = index
     basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
     basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
     index = index + 2
@@ -851,7 +850,7 @@ Mker=len(kernels)
 print 'Number of kernel functions:', Mker
 M = Mbasis + Mker
 
-print 
+print
 print 'Basis functions, Time:'
 for i in xrange((Mbasis)):
     basis[i].info()
@@ -871,12 +870,12 @@ for l in xrange((Mker)):
 if apsf=='no':
     inaps=np.ones((N)) # no weigthing for the first itertion
 else:
-    fimages=apsf 
+    fimages=apsf
     inaps=np.loadtxt(fimages, comments='#', dtype='f')
-    print 
+    print
     print 'Input uncertainties:', inaps
     print 'Scale input uncertainties between 0 and 1 and set very low values to the 2 percentile to avoid overweighting...'
-    # maxinaps = np.nanmax(inaps) 
+    # maxinaps = np.nanmax(inaps)
     # inaps= inaps/maxinaps
     minaps= np.nanpercentile(inaps,2)
     index = flatnonzero(inaps<minaps)
@@ -885,12 +884,12 @@ else:
     print
 
 
-## inversion procedure 
+## inversion procedure
 def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
     '''Solves the constrained inversion problem.
 
     Minimize:
-    
+
     ||Ax-b||^2
 
     Subject to:
@@ -901,7 +900,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        
+
         # build Cov matrix
         Cd = np.diag(sigmad**2,k=0)
         Cov = (np.linalg.inv(Cd))
@@ -912,7 +911,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
             fsoln = lst.lstsq(A,b,cond=cond)[0]
         # print 'least-square solution:'
         # print fsoln
-        # print 
+        # print
             # fsoln = np.ones((A.shape[1]))*float('NaN')
 
     else:
@@ -920,7 +919,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         Ain = np.copy(A)
         bin = np.copy(b)
 
-        ## We here want a solution as much conservatif as possible, ie only coseismic steps 
+        ## We here want a solution as much conservatif as possible, ie only coseismic steps
         ## least-squqre solution without post-seismic
         for i in xrange(len(indexco)):
             if pos[i] > 0.:
@@ -928,14 +927,14 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         minit = lst.lstsq(Ain,bin,cond=cond)[0]
 
         # # initialize bounds
-        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
+        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf
 
         # We here define bounds for postseismic to be the same sign than coseismic
-        # and coseisnic inferior or egal to the coseimic initial 
+        # and coseisnic inferior or egal to the coseimic initial
         for i in xrange(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])] 
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
+                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])]
+                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])]
                 if minit[int(indexpo[i])] < 0 :
                     minit[int(indexpo[i])] = 0.
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
@@ -948,10 +947,10 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        
+
         bounds=zip(mmin,mmax)
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-            iter=iter,full_output=True,iprint=0,acc=acc)  
+            iter=iter,full_output=True,iprint=0,acc=acc)
         fsoln = res[0]
         # print 'optimization:'
         # print fsoln
@@ -963,7 +962,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
-       scale = 1./(A.shape[0]-A.shape[1]) 
+       scale = 1./(A.shape[0]-A.shape[1])
        #scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
@@ -981,7 +980,7 @@ maps_topo = np.zeros((nlign,ncol,N))
 maps_noramps = np.zeros((nlign,ncol,N))
 rms = np.zeros((N))
 
-for ii in xrange(niter):    
+for ii in xrange(niter):
     print
     print '---------------'
     print 'iteration: ', ii
@@ -997,7 +996,7 @@ for ii in xrange(niter):
 
     def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
-      # initialize topo  
+      # initialize topo
       topo = np.zeros((nlign,ncol))
       ramp = np.zeros((nlign,ncol))
 
@@ -1006,7 +1005,7 @@ for ii in xrange(niter):
         elev_temp = np.matrix.copy(elevi)
 
       if order==0:
-        
+
         if radar is None:
 
             # G=np.zeros((len(los_clean),1))
@@ -1019,7 +1018,7 @@ for ii in xrange(niter):
             # pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
             # a = pars[0]
             # print 'Remove ref frame %f  for date: %i'%(a,idates[l])
-        
+
             # # build total G matrix
             # G=np.zeros((len(los),1))
             # G[:,0] = 1
@@ -1043,12 +1042,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]
                 print 'Remove ref frame %f + %f z for date: %i'%(a,b,idates[l])
-            
+
                 # plot phase/elev
-                funct = a 
+                funct = a
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,b*x,'-r', lw =4.) 
+                ax.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),2))
@@ -1075,12 +1074,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print 'Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l])
-            
+
                 # plot phase/elev
-                funct = a 
+                funct = a
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,b*x+c*x**2,'-r', lw =4.) 
+                ax.plot(x,b*x+c*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
@@ -1093,8 +1092,8 @@ for ii in xrange(niter):
                 print 'RMS:', rms
 
                 topo = np.dot(G,pars).reshape(nlign,ncol)
-            
-            
+
+
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(los_clean),3))
                 G[:,0] = 1
@@ -1107,12 +1106,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l])
-            
+
                 # plot phase/elev
                 funct = a + c*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,b*x,'-r', lw =4.) 
+                ax.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
@@ -1142,12 +1141,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
-            
+
                 # plot phase/elev
                 funct = a + b*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x+d*x**2,'-r', lw =4.) 
+                ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
@@ -1204,12 +1203,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l])
-            
+
                 # plot phase/elev
-                funct = a*y + b 
+                funct = a*y + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
+                ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
@@ -1239,12 +1238,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
-            
+
                 # plot phase/elev
-                funct = a*y + b 
+                funct = a*y + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x+d*x**2,'-r', lw =4.) 
+                ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
@@ -1275,12 +1274,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*y + b + d*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
+                ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
@@ -1314,12 +1313,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*y + b + c*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
+                ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -1356,7 +1355,7 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),2))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] =(i - ibegref)   
+                G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
             G[:,1] = 1
 
 
@@ -1381,15 +1380,15 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l])
 
                 # plot phase/elev
-                funct = a*x + b 
+                funct = a*x + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
-                
+                ax.plot(x,c*x,'-r', lw =4.)
+
             # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
                 G[:,1] = 1
                 G[:,2] = elev_temp
 
@@ -1401,7 +1400,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-            
+
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(los_clean),4))
                 G[:,0] = x
@@ -1417,15 +1416,15 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
-                funct = a*x + b 
+                funct = a*x + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x + d*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,c*x + d*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
                 G[:,1] = 1
                 G[:,2] = elev_temp
                 G[:,3] = elev_temp**2
@@ -1456,8 +1455,8 @@ for ii in xrange(niter):
                 funct = a*x + b + d*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,c*x,'-r', lw =4.) 
-                
+                ax.plot(x,c*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
@@ -1495,8 +1494,8 @@ for ii in xrange(niter):
                 funct = a*x + b + c*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
@@ -1561,13 +1560,13 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x,'-r', lw =4.) 
-                
+                ax.plot(x,d*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
                 G[:,2] = 1
                 G[:,3] = elev_temp
 
@@ -1579,7 +1578,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
-            
+
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(los_clean),5))
                 G[:,0] = y
@@ -1599,13 +1598,13 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
                 G[:,2] = 1
                 G[:,3] = elev_temp
                 G[:,4] = elev_temp**2
@@ -1637,8 +1636,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,d*x,'-r', lw =4.) 
-                
+                ax.plot(x,d*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,2] = 1
@@ -1646,7 +1645,7 @@ for ii in xrange(niter):
                 G[:,4] = elev_temp
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref) 
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
 
 
@@ -1678,8 +1677,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c + d*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.1, alpha=0.01, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,2] = 1
@@ -1688,7 +1687,7 @@ for ii in xrange(niter):
                 G[:,5] = elev_temp**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref) 
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
 
                 res = los - np.dot(G,pars)
@@ -1719,7 +1718,7 @@ for ii in xrange(niter):
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                 G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)    
+                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
             G[:,3] = 1
 
             res = los - np.dot(G,pars)
@@ -1749,8 +1748,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*x*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
+                ax.plot(x,e*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
@@ -1790,8 +1789,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*x*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
@@ -1809,7 +1808,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
+
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(los_clean),6))
                 G[:,0] = y
@@ -1831,8 +1830,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*x*y + d + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
+                ax.plot(x,e*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
@@ -1862,7 +1861,7 @@ for ii in xrange(niter):
                 G[:,4] = topo_clean*x
                 G[:,5] = topo_clean
                 G[:,6] = topo_clean**2
-                
+
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
@@ -1875,8 +1874,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*x*y + d + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
@@ -1918,7 +1917,7 @@ for ii in xrange(niter):
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                 G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
             G[:,3] = 1
 
 
@@ -1950,14 +1949,14 @@ for ii in xrange(niter):
                 funct = a*y**2 + b*y + c*x + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-            
+                ax.plot(x,e*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                 G[:,3] = 1
                 G[:,4] = elev_temp
 
@@ -1990,15 +1989,15 @@ for ii in xrange(niter):
                 funct = a*y**2 + b*y + c*x + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                 G[:,3] = 1
                 G[:,4] = elev_temp
                 G[:,5] = elev_temp**2
@@ -2010,7 +2009,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
+
             elif (ivar==1 and nfit==0):
 
                 G=np.zeros((len(los_clean),6))
@@ -2032,8 +2031,8 @@ for ii in xrange(niter):
                 funct = a*y**2 + b*y + c*x + d + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
+                ax.plot(x,e*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
@@ -2042,7 +2041,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
 
                 res = los - np.dot(G,pars)
@@ -2064,7 +2063,7 @@ for ii in xrange(niter):
                 G[:,4] = topo_clean*x
                 G[:,5] = topo_clean
                 G[:,6] = topo_clean**2
-                
+
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
@@ -2076,8 +2075,8 @@ for ii in xrange(niter):
                 funct = a*y**2 + b*y + c*x + d + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
@@ -2087,7 +2086,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
 
                 res = los - np.dot(G,pars)
@@ -2097,7 +2096,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-            
+
             else:
                 pass
 
@@ -2121,7 +2120,7 @@ for ii in xrange(niter):
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                 G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
-                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref   
+                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
             G[:,3] = 1
 
 
@@ -2146,12 +2145,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
+                ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -2186,12 +2185,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.) 
+                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
@@ -2210,7 +2209,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
+
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(los_clean),6))
                 G[:,0] = x**2
@@ -2226,12 +2225,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
+                ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
@@ -2269,12 +2268,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
+                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -2318,8 +2317,8 @@ for ii in xrange(niter):
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                 G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
-                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref   
+                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
             G[:,4] = 1
 
 
@@ -2345,19 +2344,19 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
-            
+
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e 
+                funct = a*x**2 + b*x + c*y**2 + d*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x,'-r', lw =4.) 
+                ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
                 G[:,4] = 1
                 G[:,5] = elev_temp
@@ -2387,19 +2386,19 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
+
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e 
+                funct = a*x**2 + b*x + c*y**2 + d*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
+                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
                 G[:,4] = 1
                 G[:,5] = elev_temp
@@ -2429,12 +2428,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e + g*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x,'-r', lw =4.) 
+                ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -2444,7 +2443,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
 
@@ -2474,12 +2473,12 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
+                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
@@ -2490,7 +2489,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2  
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
 
@@ -2524,9 +2523,9 @@ for ii in xrange(niter):
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                 G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
-                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2  
-                G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbegref) 
+                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
+                G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbegref)
             G[:,5] = 1
 
 
@@ -2553,19 +2552,19 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
-            
+
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f 
+                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x,'-r', lw =4.) 
-        
+                ax.plot(x,g*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
                 G[:,5] = 1
@@ -2597,19 +2596,19 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-            
+
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f 
+                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
-        
+                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
                 G[:,5] = 1
@@ -2623,7 +2622,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
+
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(los_clean),8))
@@ -2642,13 +2641,13 @@ for ii in xrange(niter):
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + h*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x,'-r', lw =4.) 
-        
+                ax.plot(x,g*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,5] = 1
@@ -2657,7 +2656,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,7] *= (i - ibegref)
@@ -2682,20 +2681,20 @@ for ii in xrange(niter):
                 G[:,6] = topo_clean*x
                 G[:,7] = topo_clean
                 G[:,8] = topo_clean
-                
+
                 # ramp inversion1
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,i,idates[l])
-            
+
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + g*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,h*x+i*x**2,'-r', lw =4.) 
-        
+                ax.plot(x,h*x+i*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),9))
                 G[:,5] = 1
@@ -2705,7 +2704,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)   
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                     G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
@@ -2739,8 +2738,8 @@ for ii in xrange(niter):
             for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                 G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2 
-                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)    
+                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
+                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
             G[:,4] = 1
 
             res = los - np.dot(G,pars)
@@ -2763,7 +2762,7 @@ for ii in xrange(niter):
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] 
+                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
 
@@ -2771,8 +2770,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,e*x,'-r', lw =4.) 
-                
+                ax.plot(x,e*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
@@ -2805,7 +2804,7 @@ for ii in xrange(niter):
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
-                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6] 
+                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
@@ -2813,8 +2812,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 for i in xrange(nlign):
@@ -2833,7 +2832,7 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
-            
+
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(los_clean),7))
                 G[:,0] = y
@@ -2856,8 +2855,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + g*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,f*x,'-r', lw =4.) 
-                
+                ax.plot(x,f*x,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
@@ -2888,7 +2887,7 @@ for ii in xrange(niter):
                 G[:,5] = topo_clean*x
                 G[:,6] = topo_clean
                 G[:,7] = topo_clean**2
-                
+
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
@@ -2901,8 +2900,8 @@ for ii in xrange(niter):
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.) 
-                
+                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
@@ -2923,8 +2922,8 @@ for ii in xrange(niter):
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
-            
-      # flata = (los - np.dot(G,pars)).reshape(nlign,ncol) 
+
+      # flata = (los - np.dot(G,pars)).reshape(nlign,ncol)
       flata = los.reshape(nlign,ncol) - ramp - topo
       noramps = los.reshape(nlign,ncol) - ramp
 
@@ -2936,8 +2935,8 @@ for ii in xrange(niter):
     # Loop over the dates
     if radar is not None:
       nfigure +=1
-      fig = plt.figure(nfigure,figsize=(14,10)) 
-      if (spatialiter=='yes' and ii>0) or (ii==0):  
+      fig = plt.figure(nfigure,figsize=(14,10))
+      if (spatialiter=='yes' and ii>0) or (ii==0):
         for l in xrange((N)):
          if l is not imref:
             # first clean los
@@ -2945,7 +2944,7 @@ for ii in xrange(niter):
 
             maxlos,minlos=np.nanpercentile(maps_temp,perc_los),np.nanpercentile(maps_temp,100-perc_los)
             kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-            maps_temp[kk] = np.float('NaN')        
+            maps_temp[kk] = np.float('NaN')
 
             noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
             print 'Accepted noise level in the ramp optimisation:', noise_level
@@ -2954,19 +2953,19 @@ for ii in xrange(niter):
             for lign in xrange(ibegref,iendref,10):
                 # find the begining of the image
                 if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
-                    itemp = lign  
+                    itemp = lign
                 else:
                     break
 
-            if radar is not None: 
+            if radar is not None:
                 topo_map_temp = np.matrix.copy(elev[ibegref:iendref,jbegref:jendref])
-                maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc_topo),np.nanpercentile(topo_map_temp,100-perc_topo) 
+                maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc_topo),np.nanpercentile(topo_map_temp,100-perc_topo)
                 # initialize plot
                 ax = fig.add_subplot(4,int(N/4)+1,l+1)
             else:
                 topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
                 maxtopo,mintopo = 2, 0
-            
+
             if rmsf is not None:
                 rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
             else:
@@ -2986,7 +2985,7 @@ for ii in xrange(niter):
             # selection pixels
             index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
                 np.logical_and(topo_map_temp>mintopo,
-                    np.logical_and(mask_map_temp>seuil, 
+                    np.logical_and(mask_map_temp>seuil,
                     np.logical_and(~np.isnan(maps_temp),
                         np.logical_and(~np.isnan(rms_map_temp),
                         np.logical_and(~np.isnan(topo_map_temp),
@@ -3026,8 +3025,9 @@ for ii in xrange(niter):
               nfit_temp=nfit
 
             # call ramp estim
-            los = as_strided(maps[:,:,l]).flatten() 
+            los = as_strided(maps[:,:,l]).flatten()
             samp = 1
+
 
             # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
             maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)
@@ -3061,12 +3061,12 @@ for ii in xrange(niter):
         figd.colorbar(caxd, orientation='vertical',aspect=10)
         figd.suptitle('Corrected time series maps')
         figd.savefig('maps_flat.eps', format='EPS',dpi=150)
-        fig.tight_layout()  
+        fig.tight_layout()
 
         # lmax = np.abs([np.nanmedian(maps_ramp[:,:,-1]) + 2.*np.nanstd(maps_ramp[:,:,-1]),\
         # np.nanmedian(maps_ramp[:,:,-1]) - 2.*np.nanstd(maps_ramp[:,:,-1])]).max()
         # lmin = -lmax
-        
+
 
 
         # lmax = np.abs([np.nanmedian(maps_topo[:,:,-1]) + 2.*np.nanstd(maps_topo[:,:,-1]),\
@@ -3089,7 +3089,7 @@ for ii in xrange(niter):
             figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
             figtopo.suptitle('Time series RAMPS+TOPO')
             figtopo.savefig('tropo.eps', format='EPS',dpi=150)
-            fig.tight_layout()  
+            fig.tight_layout()
 
         else:
             # plot corrected ts
@@ -3107,28 +3107,118 @@ for ii in xrange(niter):
             figref.suptitle('Time series RAMPS')
             figref.colorbar(caxref, orientation='vertical',aspect=10)
             figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
-            fig.tight_layout()  
+            fig.tight_layout()
 
 
         if plot=='yes':
             plt.show()
         plt.close('all')
+    else:
+        for l in xrange((N)):
+         if l is not imref:
+            maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l])
+
+            maxlos,minlos=np.nanpercentile(maps_temp,98.),np.nanpercentile(maps_temp,2.)
+            kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
+            maps_temp[kk] = np.float('NaN')
+
+            itemp = ibegref
+            for lign in xrange(ibegref,iendref,10):
+                    # find the begining of the image
+                if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
+                    itemp = lign
+                else:
+                    break
+            topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+            maxtopo,mintopo = 2, 0
+
+            if rmsf is not None:
+                rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
+            else:
+                rms_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+                seuil_rms = 2
+
+            if maskfile is not None:
+                mask_map_temp = np.matrix.copy(mask_flat[ibegref:iendref,jbegref:jendref])
+            else:
+                mask_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+
+                    # selection pixels
+            index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
+                np.logical_and(topo_map_temp>mintopo,
+                    np.logical_and(mask_map_temp>seuil,
+                    np.logical_and(~np.isnan(maps_temp),
+                        np.logical_and(~np.isnan(rms_map_temp),
+                        np.logical_and(~np.isnan(topo_map_temp),
+                            rms_map_temp<seuil_rms)))))))
+
+                    # extract coordinates for estimation
+            temp = np.array(index).T
+            x = temp[:,0]; y = temp[:,1]               # clean maps
+            los_clean = maps_temp[index].flatten()
+            rms_clean = rms_map_temp[index].flatten()
+            topo_clean = topo_map_temp[index].flatten()
+
+                    # print itemp, iendref
+                    #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
+            if flat>5 and iendref-itemp < .6*(iendref-ibegref):
+                print 'Image too short in comparison to master, set flat to 5'
+                temp_flat=5
+            # elif flat>5 and iendref-itemp < ncol:
+            #     print 'Lenght image inferior to width, set flat to 5'
+            #     temp_flat=5
+            else:
+                temp_flat=flat
+
+            if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
+              print
+              print 'Image too short in comparison to master, set ivar to 0'
+              ivar_temp=0
+              nfit_temp=0
+            else:
+              ivar_temp=ivar
+              nfit_temp=nfit
+
+                    # call ramp estim
+            los = as_strided(maps[:,:,l]).flatten()
+            samp = 1
+            noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
+            print 'Accepted noise level in the ramp optimisation:', noise_level
+
+                    # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
+            maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp]\
+                ,topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)               # set ramp to NaN to have ramp of the size of the images
+            kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
+            ramp = as_strided(maps_ramp[:,:,l])
+            ramp[kk] = float('NaN')
+            topo = as_strided(maps_topo[:,:,l])
+            topo[kk] = float('NaN')
+        del los_clean
+        del rms_clean
+        del topo_clean
+        del topo_map_temp
+        del rms_map_temp
+        del maps_temp           # create new cube
+        cube_flata = maps_flata.flatten()
+        cube_noramps = maps_noramps.flatten()
+
+
 
       # save rms
-      if (apsf=='no' and ii==0):
-        # aps from rms
-        print
-        print 'Use RMS empirical estimation as uncertainties for time decomposition'
-        inaps = np.copy(rms) 
-        print 'Set very low values to the 2 percentile to avoid overweighting...'
-        # scale between 0 and 1 for threshold_rmsd
-        maxaps = np.nanmax(inaps)
-        inaps = inaps/maxaps 
-        minaps= np.nanpercentile(inaps,2)
-        index = flatnonzero(inaps<minaps)
-        inaps[index] = minaps
-        np.savetxt('rms_empcor.txt', inaps.T) 
-        del rms
+    if (apsf=='no' and ii==0):
+      # aps from rms
+      print
+      print 'Use RMS empirical estimation as uncertainties for time decomposition'
+      inaps = np.copy(rms)
+      print 'Set very low values to the 2 percentile to avoid overweighting...'
+      # scale between 0 and 1 for threshold_rmsd
+      maxaps = np.nanmax(inaps)
+      inaps = inaps/maxaps
+      minaps= np.nanpercentile(inaps,2)
+      index = flatnonzero(inaps<minaps)
+      inaps[index] = minaps
+      np.savetxt('rms_empcor.txt', inaps.T)
+      del rms
 
     ########################
     # TEMPORAL ITERATION N #
@@ -3142,12 +3232,14 @@ for ii in xrange(niter):
     aps = np.ones((N))
     n_aps = np.ones((N)).astype(int)
     print inaps
-    
+
     # reiinitialize maps models
     models = np.zeros((nlign,ncol,N))
-    
+
     if seasonal=='yes' or semianual=='yes' or inter=='yes' or vect != None:
         models_trends = np.zeros((nlign,ncol,N))
+        models_detrends = np.zeros((nlign,ncol,N))
+
 
     # ligns = [2014,2157,1840,1960,1951]
     # cols = [100,117,843,189,43]
@@ -3156,7 +3248,7 @@ for ii in xrange(niter):
     for i in xrange(ibeg,iend,sampling):
         for j in xrange(jbeg,jend,sampling):
             #print j
-            
+
             # Initialisation
             mdisp=np.ones((N))*float('NaN')
             #!!!!!
@@ -3178,15 +3270,15 @@ for ii in xrange(niter):
             if kk > N/6:
                 G=np.zeros((kk,M))
                 # Build G family of function k1(t),k2(t),...,kn(t): #
-                #                                                   #   
+                #                                                   #
                 #           |k1(0) .. kM(0)|                        #
                 # Gfamily = |k1(1) .. kM(1)|                        #
-                #           |..    ..  ..  |                        # 
+                #           |..    ..  ..  |                        #
                 #           |k1(N) .. kM(N)|                        #
                 #                                                   #
 
                 rmsd = maxrmsd + 1
-                
+
                 if inter=='yes' and iteration is True:
                     Glin=np.zeros((kk,2+Mker))
                     for l in xrange((2)):
@@ -3195,21 +3287,21 @@ for ii in xrange(niter):
                         Glin[:,2+l]=kernels[l].g(k)
 
                     mt,sigmamt = consInvert(Glin,taby,inaps[k],cond=rcond)
-                
+
                     # compute rmsd
                     mdisp[k] = np.dot(Glin,mt)
                     # sum sur toutes les dates
                     # rmsd = np.sum(abs((disp[k] - mdisp[k])/inaps[k]))/kk  S
-                    rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)  
+                    rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)
                     # print i,j,rmsd,maxrmsd
-      
+
                 G=np.zeros((kk,M))
                 for l in xrange((Mbasis)):
                     G[:,l]=basis[l].g(tabx)
                 for l in xrange((Mker)):
                     G[:,Mbasis+l]=kernels[l].g(k)
 
-                # if only ref + seasonal: ref + cos + sin 
+                # if only ref + seasonal: ref + cos + sin
                 if rmsd >= maxrmsd or inter!='yes':
                     mt,sigmamt = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
 
@@ -3218,12 +3310,12 @@ for ii in xrange(niter):
                     m[Mbasis:],sigmam[Mbasis:] = mt[-Mker:],sigmamt[-Mker:]
                     m[:mt.shape[0]-Mker],sigmam[:mt.shape[0]-Mker] = mt[:-Mker],sigmamt[:-Mker]
                 else:
-                    sigmam[:mt.shape[0]] = sigmamt 
-                    m[:mt.shape[0]] = mt 
+                    sigmam[:mt.shape[0]] = sigmamt
+                    m[:mt.shape[0]] = mt
                 # print m
                 # print
 
-                # save m    
+                # save m
                 for l in xrange((Mbasis)):
                     basis[l].m[i-ibeg,j-jbeg] = m[l]
                     basis[l].sigmam[i-ibeg,j-jbeg] = sigmam[l]
@@ -3238,24 +3330,27 @@ for ii in xrange(niter):
                 # compute aps for each dates
                 # aps_tmp = pow((disp[k]-mdisp[k])/inaps[k],2)
                 aps_tmp = abs((disp[k]-mdisp[k]))/inaps[k]
-                
+
                 # # remove NaN value for next iterations (but normally no NaN?)
                 index = np.flatnonzero(np.logical_or(np.isnan(aps_tmp),aps_tmp==0))
                 aps_tmp[index] = 1.0 # 1 is a bad misfit
-                
+
                 # save total aps of the map
                 aps[k] = aps[k] + aps_tmp
 
                 # count number of pixels per dates
                 n_aps[k] = n_aps[k] + 1.0
-                
+
                 # save new aps for each maps
                 # maps_aps[i,j,k] = aps_tmp
 
                 # fill maps models
-                models[i,j,:] = mdisp 
+                models[i,j,:] = mdisp
 
                 # Build seasonal and linear models
+                if inter=='yes':
+                    models_detrends[i,j,k] = models_detrends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
+
                 if inter=='yes':
                     models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
                 if vect != None:
@@ -3298,10 +3393,14 @@ fid.close()
 
 if fulloutput=='yes':
     if (seasonal=='yes' or semianual=='yes') and (vect != None or inter=='yes'):
-        fid = open('depl_cumule_dseas', 'wb')  
+        fid = open('depl_cumule_dseas', 'wb')
         (maps_flata - models_trends).flatten().astype('float32').tofile(fid)
         fid.close()
 
+if inter=='yes':
+    fid = open('depl_cumule_dtrend', 'wb')
+    (maps_flata - models_detrends).flatten().astype('float32').tofile(fid)
+    fid.close()
 # # save APS
 # print
 # print 'Saving APS in liste_images_aps.txt'
@@ -3347,7 +3446,7 @@ for l in xrange((N)):
     else:
         data_flat = as_strided(maps_flata[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:])
         model = as_strided(models[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:])
-    
+
     res = data_flat - model
     ramp = as_strided(maps_ramp[ibeg:iend,jbeg:jend,l])
     tropo = as_strided(maps_topo[ibeg:iend,jbeg:jend,l])
@@ -3395,7 +3494,7 @@ for l in xrange((N)):
 
     cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
     caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-     
+
     ax.set_title(idates[l],fontsize=6)
     axres.set_title(idates[l],fontsize=6)
 
@@ -3405,7 +3504,7 @@ for l in xrange((N)):
     setp(axres.get_xticklabels(), visible=False)
     setp(axres.get_yticklabels(), visible=False)
 
-    fig.tight_layout()    
+    fig.tight_layout()
 
 
     # ############
@@ -3673,7 +3772,7 @@ vmin = -vmax
 nfigure +=1
 fig=plt.figure(nfigure,figsize=(14,12))
 
-ax = fig.add_subplot(1,M,1) 
+ax = fig.add_subplot(1,M,1)
 cax = ax.imshow(basis[0].m,cmap=cmap,vmax=vmax,vmin=vmin)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
 setp(ax.get_xticklabels(), visible=False)
@@ -3683,7 +3782,7 @@ setp(ax.get_yticklabels(), visible=False)
 vmax = np.abs([np.nanpercentile(basis[1].m,98.),np.nanpercentile(basis[1].m,2.)]).max()
 vmin = -vmax
 
-ax = fig.add_subplot(1,M,2) 
+ax = fig.add_subplot(1,M,2)
 cax = ax.imshow(basis[1].m,cmap=cmap,vmax=vmax,vmin=vmin)
 ax.set_title(basis[1].reduction)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
@@ -3695,19 +3794,19 @@ for l in range(2,Mbasis):
     vmax = np.abs([np.nanpercentile(basis[l].m,98.),np.nanpercentile(basis[l].m,2.)]).max()
     vmin = -vmax
 
-    ax = fig.add_subplot(1,M,l+1)   
+    ax = fig.add_subplot(1,M,l+1)
     cax = ax.imshow(basis[l].m,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(basis[l].reduction)
     # add colorbar
     cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
     setp(ax.get_xticklabels(), visible=False)
     setp(ax.get_yticklabels(), visible=False)
- 
+
 for l in xrange(Mker):
     vmax = np.abs([np.nanpercentile(kernels[l].m,98.),np.nanpercentile(kernels[l].m,2.)]).max()
     vmin = -vmax
 
-    ax = fig.add_subplot(1,M,Mbasis+l+1)    
+    ax = fig.add_subplot(1,M,Mbasis+l+1)
     cax = ax.imshow(kernels[l].m,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(kernels[l].reduction)
     setp(ax.get_xticklabels(), visible=False)
@@ -3717,7 +3816,7 @@ for l in xrange(Mker):
 plt.suptitle('Time series decomposition')
 
 nfigure += 1
-# fig.savefig('inversion.eps', format='EPS',dpi=150)
+fig.savefig('inversion.eps', format='EPS',dpi=150)
 
 if plot=='yes':
     plt.show()
