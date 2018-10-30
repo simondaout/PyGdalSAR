@@ -50,8 +50,8 @@ Postdoctoral Research Fellow, Department of Earth Sciences, University of Oxford
 Collaborators:  
 Louise Maubant: louise.maubant@univ-grenoble-alpes.fr
 Benedetta Dini: benedetta.dini@erdw.ethz.ch
-James Hollongsworth: james.hollingsworth@univ-grenoble-alpes.fr
 Marie-Pierre Doin: marie-pierre.doin@univ-grenoble-alpes.fr
+Henriette Sudhaus: henriette.sudhaus@ifg.uni-kiel.de
 ```
 
 
