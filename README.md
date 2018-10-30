@@ -1,5 +1,6 @@
 # TSdecomp
-Tool package for iterative spatial and temporal decompositions of InSAR or GPS time series written in Python programming. 
+Tool package for iterative spatial and temporal decompositions of Geodetic Time Series (InSAR, GPS or Pixel Offsets) written in Python and Gdal programming language. 
+Additional tools for time series correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/) atmospheric models, plotting, or cleaning before decomposition...
 
 
 To install the package
@@ -19,21 +20,36 @@ leave building
 Organisation
 =============
 This project contains the following folders:
- * src: Main programms for time series decomposition (see doc. bellow)
- * utils: Some additional plotting or cleaning programms for .r4 or georeferenced format (default: .tif)
+ * src: Main programms for time series decomposition (see documantation bellow) and atmospehric corrections.
+ * utils: Some additional plotting or cleaning programms for real4 formats (.r4, .ztd) or georeferenced formats (default: .tif)
  * tutorial: in progress
 
-
- Requirements
+Requirements
 =============
 This project needs the following external components:
  * Python (2.7)
  * NumPy
  * gdal
  * SciPy
- * docopt
+ * docopt 
  * matplotlib
  * datetime
+ * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas
+
+Developpers & Contact
+=============
+```
+Simon Daout: simon.daout@earth.ox.ac.uk
+Postdoctoral Research Fellow, Department of Earth Sciences, University of Oxford
+```
+
+```
+Collaborators:  
+Louise Maubant: louise.maubant@univ-grenoble-alpes.fr
+Benedetta Dini: benedetta.dini@erdw.ethz.ch
+James Hollongsworth: james.hollingsworth@univ-grenoble-alpes.fr
+Marie-Pierre Doin: marie-pierre.doin@univ-grenoble-alpes.fr
+```
 
 
 invers\_disp2coef.py
