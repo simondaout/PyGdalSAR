@@ -2932,119 +2932,125 @@ for ii in xrange(niter):
 
       return ramp, flata, topo, rms, noramps
 
-    # Loop over the dates
+    # if radar file just initialise figure
     if radar is not None:
       nfigure +=1
       fig = plt.figure(nfigure,figsize=(14,10))
-      if (spatialiter=='yes' and ii>0) or (ii==0):
-        for l in xrange((N)):
-         if l is not imref:
-            # first clean los
-            maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l]) - np.matrix.copy(models[ibegref:iendref,jbegref:jendref,l])
+    
+    # if iteration = 0 or spatialiter > 0, then spatial estimation
+    if (ii==0) or (spatialiter=='yes') :
 
-            maxlos,minlos=np.nanpercentile(maps_temp,perc_los),np.nanpercentile(maps_temp,100-perc_los)
-            kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-            maps_temp[kk] = np.float('NaN')
+      # Loop over the dates
+      for l in xrange((N)):
 
-            noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
-            print 'Accepted noise level in the ramp optimisation:', noise_level
+        # no estimation on the ref image set to zero 
+        if l is not imref:
 
-            itemp = ibegref
-            for lign in xrange(ibegref,iendref,10):
-                # find the begining of the image
-                if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
-                    itemp = lign
-                else:
-                    break
+          # first clean los
+          maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l]) - np.matrix.copy(models[ibegref:iendref,jbegref:jendref,l])
 
-            if radar is not None:
-                topo_map_temp = np.matrix.copy(elev[ibegref:iendref,jbegref:jendref])
-                maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc_topo),np.nanpercentile(topo_map_temp,100-perc_topo)
-                # initialize plot
-                ax = fig.add_subplot(4,int(N/4)+1,l+1)
-            else:
-                topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-                maxtopo,mintopo = 2, 0
+          maxlos,minlos=np.nanpercentile(maps_temp,perc_los),np.nanpercentile(maps_temp,100-perc_los)
+          kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
+          maps_temp[kk] = np.float('NaN')
 
-            if rmsf is not None:
-                rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
-            else:
-                rms_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-                seuil_rms = 2
+          noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
+          print 'Accepted noise level in the ramp optimisation:', noise_level
 
-            if maskfile is not None:
-                mask_map_temp = np.matrix.copy(mask_flat[ibegref:iendref,jbegref:jendref])
-            else:
-                mask_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+          itemp = ibegref
+          for lign in xrange(ibegref,iendref,10):
+              # find the begining of the image
+              if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
+                  itemp = lign
+              else:
+                  break
 
-            if aspect is not None:
-                aspect_map = np.matrix.copy(slope[ibegref:iendref,jbegref:jendref])
-            else:
-                aspect_map = np.ones((iendref-ibegref,jendref-jbegref))
+          if radar is not None:
+              topo_map_temp = np.matrix.copy(elev[ibegref:iendref,jbegref:jendref])
+              maxtopo,mintopo = np.nanpercentile(topo_map_temp,perc_topo),np.nanpercentile(topo_map_temp,100-perc_topo)
+              # initialize plot
+              ax = fig.add_subplot(4,int(N/4)+1,l+1)
+          else:
+              topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+              maxtopo,mintopo = 2, 0
 
-            # selection pixels
-            index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
-                np.logical_and(topo_map_temp>mintopo,
-                    np.logical_and(mask_map_temp>seuil,
-                    np.logical_and(~np.isnan(maps_temp),
-                        np.logical_and(~np.isnan(rms_map_temp),
-                        np.logical_and(~np.isnan(topo_map_temp),
-                        np.logical_and(rms_map_temp<seuil_rms,
-                        np.logical_and(~np.isnan(maps_temp),
-                            aspect_map>0.,
-                            ))))))))
-                        )
+          if rmsf is not None:
+              rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
+          else:
+              rms_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
+              seuil_rms = 2
 
-            # extract coordinates for estimation
-            temp = np.array(index).T
-            x = temp[:,0]; y = temp[:,1]
+          if maskfile is not None:
+              mask_map_temp = np.matrix.copy(mask_flat[ibegref:iendref,jbegref:jendref])
+          else:
+              mask_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
 
-            # clean maps
-            los_clean = maps_temp[index].flatten()
-            rms_clean = rms_map_temp[index].flatten()
-            topo_clean = topo_map_temp[index].flatten()
+          if aspect is not None:
+              aspect_map = np.matrix.copy(slope[ibegref:iendref,jbegref:jendref])
+          else:
+              aspect_map = np.ones((iendref-ibegref,jendref-jbegref))
 
-            # print itemp, iendref
-            #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
-            if flat>5 and iendref-itemp < .6*(iendref-ibegref):
-                print 'Image too short in comparison to master, set flat to 5'
-                temp_flat=5
-            # elif flat>5 and iendref-itemp < ncol:
-            #     print 'Lenght image inferior to width, set flat to 5'
-            #     temp_flat=5
-            else:
-                temp_flat=flat
+          # selection pixels
+          index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
+              np.logical_and(topo_map_temp>mintopo,
+                  np.logical_and(mask_map_temp>seuil,
+                  np.logical_and(~np.isnan(maps_temp),
+                      np.logical_and(~np.isnan(rms_map_temp),
+                      np.logical_and(~np.isnan(topo_map_temp),
+                      np.logical_and(rms_map_temp<seuil_rms,
+                      np.logical_and(~np.isnan(maps_temp),
+                          aspect_map>0.,
+                          ))))))))
+                      )
 
-            if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
-              print
-              print 'Image too short in comparison to master, set ivar to 0'
-              ivar_temp=0
-              nfit_temp=0
-            else:
-              ivar_temp=ivar
-              nfit_temp=nfit
+          # extract coordinates for estimation
+          temp = np.array(index).T
+          x = temp[:,0]; y = temp[:,1]
 
-            # call ramp estim
-            los = as_strided(maps[:,:,l]).flatten()
-            samp = 1
+          # clean maps
+          los_clean = maps_temp[index].flatten()
+          rms_clean = rms_map_temp[index].flatten()
+          topo_clean = topo_map_temp[index].flatten()
 
+          # print itemp, iendref
+          #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
+          if flat>5 and iendref-itemp < .6*(iendref-ibegref):
+              print 'Image too short in comparison to master, set flat to 5'
+              temp_flat=5
+          # elif flat>5 and iendref-itemp < ncol:
+          #     print 'Lenght image inferior to width, set flat to 5'
+          #     temp_flat=5
+          else:
+              temp_flat=flat
 
-            # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
-            maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)
+          if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
+            print
+            print 'Image too short in comparison to master, set ivar to 0'
+            ivar_temp=0
+            nfit_temp=0
+          else:
+            ivar_temp=ivar
+            nfit_temp=nfit
 
-            # set ramp to NaN to have ramp of the size of the images
-            kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
-            ramp = as_strided(maps_ramp[:,:,l])
-            ramp[kk] = float('NaN')
-            topo = as_strided(maps_topo[:,:,l])
-            topo[kk] = float('NaN')
+          # call ramp estim
+          los = as_strided(maps[:,:,l]).flatten()
+          samp = 1
 
-            del los_clean
-            del rms_clean
-            del topo_clean
-            del topo_map_temp
-            del rms_map_temp
-            del maps_temp
+          # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
+          maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)
+
+          # set ramp to NaN to have ramp of the size of the images
+          kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
+          ramp = as_strided(maps_ramp[:,:,l])
+          ramp[kk] = float('NaN')
+          topo = as_strided(maps_topo[:,:,l])
+          topo[kk] = float('NaN')
+
+          del los_clean
+          del rms_clean
+          del topo_clean
+          del topo_map_temp
+          del rms_map_temp
+          del maps_temp
 
         # plot corrected ts
         nfigure +=1
@@ -3062,16 +3068,6 @@ for ii in xrange(niter):
         figd.suptitle('Corrected time series maps')
         figd.savefig('maps_flat.eps', format='EPS',dpi=150)
         fig.tight_layout()
-
-        # lmax = np.abs([np.nanmedian(maps_ramp[:,:,-1]) + 2.*np.nanstd(maps_ramp[:,:,-1]),\
-        # np.nanmedian(maps_ramp[:,:,-1]) - 2.*np.nanstd(maps_ramp[:,:,-1])]).max()
-        # lmin = -lmax
-
-
-
-        # lmax = np.abs([np.nanmedian(maps_topo[:,:,-1]) + 2.*np.nanstd(maps_topo[:,:,-1]),\
-        # np.nanmedian(maps_topo[:,:,-1]) - 2.*np.nanstd(maps_topo[:,:,-1])]).max()
-        # lmin = -lmax
 
         if radar is not None:
             fig.savefig('phase-topo.eps', format='EPS',dpi=150)
@@ -3109,116 +3105,25 @@ for ii in xrange(niter):
             figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
             fig.tight_layout()
 
-
         if plot=='yes':
             plt.show()
         plt.close('all')
-    else:
-        for l in xrange((N)):
-         if l is not imref:
-            maps_temp = np.matrix.copy(maps[ibegref:iendref,jbegref:jendref,l])
-
-            maxlos,minlos=np.nanpercentile(maps_temp,98.),np.nanpercentile(maps_temp,2.)
-            kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-            maps_temp[kk] = np.float('NaN')
-
-            itemp = ibegref
-            for lign in xrange(ibegref,iendref,10):
-                    # find the begining of the image
-                if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
-                    itemp = lign
-                else:
-                    break
-            topo_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-            maxtopo,mintopo = 2, 0
-
-            if rmsf is not None:
-                rms_map_temp = np.matrix.copy(rmsmap[ibegref:iendref,jbegref:jendref])
-            else:
-                rms_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-                seuil_rms = 2
-
-            if maskfile is not None:
-                mask_map_temp = np.matrix.copy(mask_flat[ibegref:iendref,jbegref:jendref])
-            else:
-                mask_map_temp = np.ones((iendref-ibegref,jendref-jbegref))
-
-                    # selection pixels
-            index = np.nonzero(np.logical_and(topo_map_temp<maxtopo,
-                np.logical_and(topo_map_temp>mintopo,
-                    np.logical_and(mask_map_temp>seuil,
-                    np.logical_and(~np.isnan(maps_temp),
-                        np.logical_and(~np.isnan(rms_map_temp),
-                        np.logical_and(~np.isnan(topo_map_temp),
-                            rms_map_temp<seuil_rms)))))))
-
-                    # extract coordinates for estimation
-            temp = np.array(index).T
-            x = temp[:,0]; y = temp[:,1]               # clean maps
-            los_clean = maps_temp[index].flatten()
-            rms_clean = rms_map_temp[index].flatten()
-            topo_clean = topo_map_temp[index].flatten()
-
-                    # print itemp, iendref
-                    #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
-            if flat>5 and iendref-itemp < .6*(iendref-ibegref):
-                print 'Image too short in comparison to master, set flat to 5'
-                temp_flat=5
-            # elif flat>5 and iendref-itemp < ncol:
-            #     print 'Lenght image inferior to width, set flat to 5'
-            #     temp_flat=5
-            else:
-                temp_flat=flat
-
-            if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
-              print
-              print 'Image too short in comparison to master, set ivar to 0'
-              ivar_temp=0
-              nfit_temp=0
-            else:
-              ivar_temp=ivar
-              nfit_temp=nfit
-
-                    # call ramp estim
-            los = as_strided(maps[:,:,l]).flatten()
-            samp = 1
-            noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
-            print 'Accepted noise level in the ramp optimisation:', noise_level
-
-                    # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
-            maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp]\
-                ,topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)               # set ramp to NaN to have ramp of the size of the images
-            kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
-            ramp = as_strided(maps_ramp[:,:,l])
-            ramp[kk] = float('NaN')
-            topo = as_strided(maps_topo[:,:,l])
-            topo[kk] = float('NaN')
-        del los_clean
-        del rms_clean
-        del topo_clean
-        del topo_map_temp
-        del rms_map_temp
-        del maps_temp           # create new cube
-        cube_flata = maps_flata.flatten()
-        cube_noramps = maps_noramps.flatten()
-
-
-
-      # save rms
+    
+    # save rms
     if (apsf=='no' and ii==0):
-      # aps from rms
-      print
-      print 'Use RMS empirical estimation as uncertainties for time decomposition'
-      inaps = np.copy(rms)
-      print 'Set very low values to the 2 percentile to avoid overweighting...'
-      # scale between 0 and 1 for threshold_rmsd
-      maxaps = np.nanmax(inaps)
-      inaps = inaps/maxaps
-      minaps= np.nanpercentile(inaps,2)
-      index = flatnonzero(inaps<minaps)
-      inaps[index] = minaps
-      np.savetxt('rms_empcor.txt', inaps.T)
-      del rms
+        # aps from rms
+        print
+        print 'Use RMS empirical estimation as uncertainties for time decomposition'
+        inaps = np.copy(rms)
+        print 'Set very low values to the 2 percentile to avoid overweighting...'
+        # scale between 0 and 1 for threshold_rmsd
+        maxaps = np.nanmax(inaps)
+        inaps = inaps/maxaps
+        minaps= np.nanpercentile(inaps,2)
+        index = flatnonzero(inaps<minaps)
+        inaps[index] = minaps
+        np.savetxt('rms_empcor.txt', inaps.T)
+        del rms
 
     ########################
     # TEMPORAL ITERATION N #
