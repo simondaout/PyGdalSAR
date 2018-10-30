@@ -41,7 +41,10 @@ from nsbas import docopt
 arguments = docopt.docopt(__doc__)
 geotiff = arguments["--geotiff"]
 
+
 ds = gdal.Open(geotiff)
+gt = ds.GetGeoTransform()
+proj = ds.GetProjection()
 nlign,ncol = ds.RasterYSize, ds.RasterXSize
 
 if arguments["--crop"] ==  None:
@@ -53,7 +56,7 @@ ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 band = ds.GetRasterBand(1)
 m = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
 m = m[ibeg:iend,jbeg:jend]
-kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(m), np.abs(m)<999.),m==0.0))
+kk = np.nonzero(np.logical_or(~np.isnan(m), np.abs(m)<999.))
 mprim = m[kk]
 
 if arguments["--vmax"] ==  None:
@@ -70,6 +73,17 @@ if arguments["--wrap"] ==  'yes':
 	m = np.mod(m,2*np.pi)-np.pi 
 	vmax=np.pi
 	vmin=-np.pi
+
+
+# driver = gdal.GetDriverByName('GTiff')
+# ds = driver.Create('mask_landslide_utm.tif', 200, 300, 1, gdal.GDT_Float32)
+# band = ds.GetRasterBand(1)
+# m[np.abs(m)>999.] = np.float('NaN')
+# band.WriteArray(abs(m[550:850,800:1000]))
+# ds.SetGeoTransform(gt)
+# ds.SetProjection(proj)
+# band.FlushCache()
+
 
 # Plot
 fig = plt.figure(0,figsize=(6,4))
