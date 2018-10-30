@@ -79,7 +79,7 @@ import datetime
 import time
 
 # docopt (command line parser)
-from nsbas import docopt
+import docopt
 
 
 ########################################################################

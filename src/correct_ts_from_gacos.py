@@ -42,8 +42,7 @@ import matplotlib.pyplot as plt
 from numpy.lib.stride_tricks import as_strided
 import subprocess
 np.warnings.filterwarnings('ignore')
-
-from nsbas import docopt
+import docopt
 
 # read arguments
 arguments = docopt.docopt(__doc__)

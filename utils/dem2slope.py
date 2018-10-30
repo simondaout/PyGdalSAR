@@ -21,7 +21,7 @@ Options:
 
 import gdal
 import scipy.ndimage
-from nsbas import docopt
+import docopt
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm

@@ -44,7 +44,7 @@ import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.basemap import Basemap
 
-from nsbas import docopt
+import docopt
 arguments = docopt.docopt(__doc__)
 
 infile = arguments["--infile"]

@@ -49,7 +49,7 @@ import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
 
-from nsbas import docopt
+import docopt
 arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
 outfile = arguments["--outfile"]

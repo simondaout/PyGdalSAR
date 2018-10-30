@@ -35,7 +35,7 @@ from pylab import *
 import gdal
 
 # docopt (command line parser)
-from nsbas import docopt
+import docopt
 
 # read arguments
 arguments = docopt.docopt(__doc__)

@@ -110,7 +110,7 @@ from datetime import datetime
 import datetime
 
 # docopt (command line parser)
-from nsbas import docopt
+import docopt
 
 np.warnings.filterwarnings('ignore')
 
