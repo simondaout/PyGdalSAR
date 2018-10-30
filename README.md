@@ -30,12 +30,13 @@ Requirements
 =============
 This project needs the following external components:
  * Python (2.7)
- * NumPy
- * gdal
- * SciPy
- * docopt 
- * matplotlib
- * datetime
+ * py27-gdal
+ * py27-numPy
+ * py27-sciPy
+ * Gdal (https://www.gdal.org)
+ * docopt (Available on https://github.com/docopt/docopt or in ./python/. Copy in your $PYTHONPATH variable).
+ * py27-matplotlib
+ * py27-datetime
  * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas
 
 Developpers & Contact
