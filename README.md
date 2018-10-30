@@ -127,7 +127,7 @@ correct\_ts\_from\_gacos.py
 Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to .tif format, 2) re-project and re-resampel atmospheric models 3) correct data.
 
 ```
-Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] \
+Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] \
 [--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--zone=<values>] [--plot=<yes/no>] [--load=<True/False>]
 
 correct_ts_from_gacos.py -h | --help
@@ -138,13 +138,13 @@ Options:
 --path PATH         Path to .ztd data (default: ./GACOS/)
 --list_images PATH  Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: list_images.txt] 
 --imref VALUE       Reference image number [default: 1]
+--crop VALUES       Crop GACOS data to data extent in the output projection, eg. --crop=xmin,ymin,xmax,ymax [default: None]
 --ref  VALUES       Column and line number for referencing. If None then estimate the best linear relationship between model and data [default: None]. 
 --zone VALUES       Crop option for ramp estimation [default: 0,ncol,0,nlign]
 --proj VALUE        EPSG for projection GACOS map [default: 4326]
 --gacos2data        Scaling value between gacos data (m) and desired output (e.g data in mm) [default: 1000.]
 --plot              Display results [default: yes]   
 --load              If False, do not load data again and directly read cube_gacos [default: True]   
-"""
 ```
 
 
