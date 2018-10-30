@@ -10,9 +10,9 @@ dem2slope.py --infile=DEM_UTM.tif --outfile=DEM_slope_UTM.tif --los=34.5 --headi
 plot_tiff.py --geotiff=DEM_UTM.tif 
 ```
 
-* Correct Data from GACOS atmospheric models: convert .ztd to tif, crop, resample, re-project and correct data
+* Correct Data from GACOS atmospheric models: convert .ztd to tif, crop (xmin,xmax,ymin,ymax in UTM output geometry), resample (take width and lenght data), re-project (UTM, EPSG:32645) and correct data
 ```
-correct_ts_from_gacos.py --crop=714887.000,3049145.000,719887.000,3056645.000  --proj=32645
+correct_ts_from_gacos.py --cube=depl_cumule --crop=714887.000,3049145.000,719887.000,3056645.000  --proj=32645
 ```
 
 * Temporal decomposition of two selected pixels into linear and seasonal fonctions 
