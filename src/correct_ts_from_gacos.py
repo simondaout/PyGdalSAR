@@ -11,7 +11,7 @@ correct_ts_from_gacos.py
 Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to .tif format, 2) re-project and re-resampel atmospheric models
 3) correct data
 
-Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] \
+Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] \
 [--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--zone=<values>] [--plot=<yes/no>] [--load=<True/False>]
 
 correct_ts_from_gacos.py -h | --help
@@ -22,6 +22,7 @@ Options:
 --path PATH         Path to .ztd data (default: ./GACOS/)
 --list_images PATH  Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: list_images.txt] 
 --imref VALUE       Reference image number [default: 1]
+--crop VALUES       Crop GACOS data to data extent in the output projection, eg. --crop=xmin,ymin,xmax,ymax [default: None]
 --ref  VALUES       Column and line number for referencing. If None then estimate the best linear relationship between model and data [default: None]. 
 --zone VALUES       Crop option for ramp estimation [default: 0,ncol,0,nlign]
 --proj VALUE        EPSG for projection GACOS map [default: 4326]
@@ -97,6 +98,11 @@ else:
     #refzone = [col_beg,col_end,line_beg,line_end]
     refzone = map(float,arguments["--clean"].replace(',',' ').split())
 
+if arguments["--crop"] ==  None:
+    crop = False
+else:
+    crop = map(float,arguments["--crop"].replace(',',' ').split())
+
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 N = len(dates)
 
@@ -150,15 +156,34 @@ if load == True:
         band.FlushCache()
         del ds,band
 
-        # re-preoject and resample 
-        if proj:
+        # crop, re-preoject and resample 
+        if proj and crop is not False:
+            print "gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+\
+            " -ts "+str(ncol)+" "+str(nlign)+" -r average -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "\
+            +temp1+" "+outtif+" -of GTiff"
+            r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+\
+                " -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "\
+                +" -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
+            if r != 0:
+                raise Exception("gdalwarp failed")
+
+        elif crop is not False and proj is False:
+            print "gdalwarp -overwrite -s_srs EPSG:4326-ts "+str(ncol)+" "+str(nlign)+" -r average \
+            -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "+temp1+" "+outtif+" -of GTiff"
+            r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -ts "+str(ncol)+" "+str(nlign)+" -r average \
+                -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "+temp1+" "+outtif+" -of GTiff", shell=True)
+            if r != 0:
+                raise Exception("gdalwarp failed")
+
+        elif proj and crop is False:
             print "gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+" -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff"
             r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+" -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
             if r != 0:
                 raise Exception("gdalwarp failed")
+        
         else:
-            print "gdalwarp -overwrite -ts "+str(nlign)+" "+str(ncol)+" -r average "+temp1+" "+outtif+" -of GTiff"
-            r = subprocess.call("gdalwarp -overwrite -ts "+str(nlign)+" "+str(ncol)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
+            print "gdalwarp -overwrite -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff"
+            r = subprocess.call("gdalwarp -overwrite -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
             if r != 0:
                 raise Exception("gdalwarp failed")
 
@@ -171,6 +196,8 @@ if load == True:
         # print ncol, nlign
         # print ds.RasterXSize, ds.RasterYSize
         band = ds.GetRasterBand(1)
+        # plt.imshow(band.ReadAsArray())
+        # plt.show()
         gacos[:,:,i] = band.ReadAsArray()*gacos2data
         del ds,band
 
