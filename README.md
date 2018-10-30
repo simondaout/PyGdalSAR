@@ -1,6 +1,6 @@
 # TSdecomp
 Tool package for iterative spatial and temporal decompositions of Geodetic Time Series (InSAR, GPS or Pixel Offsets) written in Python and Gdal programming language. 
-Additional tools for time series correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/) atmospheric models, plotting, or cleaning before decomposition...
+Additional tools for time series correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/), plotting, or cleaning before decomposition...
 
 
 To install the package
@@ -22,7 +22,9 @@ Organisation
 This project contains the following folders:
  * src: Main programms for time series decomposition (see documantation bellow) and atmospehric corrections.
  * utils: Some additional plotting or cleaning programms for real4 formats (.r4, .ztd) or georeferenced formats (default: .tif)
- * tutorial: in progress
+ * tutorial: 
+ 	* ReversibleDeformation: example GACOS corrections, empirical phase/topo corrections and extraction of reversible derformations with seasonal functions.
+ 	* Vector: in progress
 
 Requirements
 =============
