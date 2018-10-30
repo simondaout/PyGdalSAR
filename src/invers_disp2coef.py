@@ -522,7 +522,7 @@ if maskfile is not None:
     if extension == ".tif":
       ds = gdal.Open(maskfile, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      maski = band.ReadAsArray()*scale
+      maski = band.ReadAsArray().flatten()*scale
       del ds
     else:
       fid = open(maskfile,'r')
@@ -539,12 +539,13 @@ if radar is not None:
     if extension == ".tif":
       ds = gdal.Open(radar, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      elevi = band.ReadAsArray()
+      elevi = band.ReadAsArray().flatten()
       del ds
     else:
       fid = open(radar,'r')
       elevi = np.fromfile(fid,dtype=np.float32)
       fid.close()
+
     elevi = elevi[:nlign*ncol]
     # fig = plt.figure(10)
     # plt.imshow(elevi.reshape(nlign,ncol)[ibeg:iend,jbeg:jend])
@@ -562,7 +563,7 @@ if aspect is not None:
     if extension == ".tif":
       ds = gdal.Open(aspect, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      aspecti = band.ReadAsArray()
+      aspecti = band.ReadAsArray().flatten()
       # print ds.RasterYSize, ds.RasterXSize
       del ds
     else:
@@ -742,7 +743,7 @@ if maskfile is not None:
 
     if plot=='yes':
         plt.show()
-    #sys.exit()
+    # sys.exit()
 
 
 # plot diplacements maps
@@ -1046,7 +1047,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1078,7 +1079,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,b*x+c*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1110,7 +1111,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a + c*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1145,7 +1146,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a + b*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1207,7 +1208,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1242,7 +1243,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1278,7 +1279,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b + d*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1317,7 +1318,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b + c*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1382,7 +1383,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.)
 
             # build total G matrix
@@ -1418,7 +1419,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x + b
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x + d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1454,7 +1455,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x + b + d*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1493,7 +1494,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x + b + c*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1559,7 +1560,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1597,7 +1598,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1635,7 +1636,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1747,7 +1748,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1788,7 +1789,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1829,7 +1830,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1873,7 +1874,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*x*y + d + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1948,7 +1949,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1988,7 +1989,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
 
@@ -2030,7 +2031,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2074,7 +2075,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y**2 + b*y + c*x + d + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2149,7 +2150,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2189,7 +2190,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2229,7 +2230,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2272,7 +2273,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y + d + e*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2348,7 +2349,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2390,7 +2391,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2432,7 +2433,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e + g*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2477,7 +2478,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y + e + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2556,7 +2557,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2600,7 +2601,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2645,7 +2646,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + h*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2692,7 +2693,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + g*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,h*x+i*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2769,7 +2770,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2811,7 +2812,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2854,7 +2855,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + g*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2899,7 +2900,7 @@ for ii in xrange(niter):
                 # plot phase/elev
                 funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + f*topo_clean*x
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
-                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.1, rasterized=True)
+                ax.scatter(topo_clean,los_clean - funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -3052,62 +3053,62 @@ for ii in xrange(niter):
           del rms_map_temp
           del maps_temp
 
-        # plot corrected ts
-        nfigure +=1
-        figd = plt.figure(nfigure,figsize=(14,10))
-        figd.subplots_adjust(hspace=0.001,wspace=0.001)
-        for l in xrange((N)):
-            axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
-            axd.set_title(idates[l],fontsize=6)
-            setp(axd.get_xticklabels(), visible=False)
-            setp(axd.get_yticklabels(), visible=False)
-        setp(axd.get_xticklabels(), visible=False)
-        setp(axd.get_yticklabels(), visible=False)
-        figd.colorbar(caxd, orientation='vertical',aspect=10)
-        figd.suptitle('Corrected time series maps')
-        figd.savefig('maps_flat.eps', format='EPS',dpi=150)
-        fig.tight_layout()
+      # plot corrected ts
+      nfigure +=1
+      figd = plt.figure(nfigure,figsize=(14,10))
+      figd.subplots_adjust(hspace=0.001,wspace=0.001)
+      for l in xrange((N)):
+          axd = figd.add_subplot(4,int(N/4)+1,l+1)
+          caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+          axd.set_title(idates[l],fontsize=6)
+          setp(axd.get_xticklabels(), visible=False)
+          setp(axd.get_yticklabels(), visible=False)
+      setp(axd.get_xticklabels(), visible=False)
+      setp(axd.get_yticklabels(), visible=False)
+      figd.colorbar(caxd, orientation='vertical',aspect=10)
+      figd.suptitle('Corrected time series maps')
+      figd.savefig('maps_flat.eps', format='EPS',dpi=150)
+      fig.tight_layout()
 
-        if radar is not None:
-            fig.savefig('phase-topo.eps', format='EPS',dpi=150)
-            nfigure +=1
-            figtopo = plt.figure(nfigure,figsize=(14,10))
-            figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-            for l in xrange((N)):
-                axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l]+maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
-                axtopo.set_title(idates[l],fontsize=6)
-                setp(axtopo.get_xticklabels(), visible=False)
-                setp(axtopo.get_yticklabels(), visible=False)
-                setp(axtopo.get_xticklabels(), visible=False)
-                setp(axtopo.get_yticklabels(), visible=False)
-            figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-            figtopo.suptitle('Time series RAMPS+TOPO')
-            figtopo.savefig('tropo.eps', format='EPS',dpi=150)
-            fig.tight_layout()
+      if radar is not None:
+          fig.savefig('phase-topo.eps', format='EPS',dpi=150)
+          nfigure +=1
+          figtopo = plt.figure(nfigure,figsize=(14,10))
+          figtopo.subplots_adjust(hspace=.001,wspace=0.001)
+          for l in xrange((N)):
+              axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
+              caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l]+maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+              axtopo.set_title(idates[l],fontsize=6)
+              setp(axtopo.get_xticklabels(), visible=False)
+              setp(axtopo.get_yticklabels(), visible=False)
+              setp(axtopo.get_xticklabels(), visible=False)
+              setp(axtopo.get_yticklabels(), visible=False)
+          figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
+          figtopo.suptitle('Time series RAMPS+TOPO')
+          figtopo.savefig('tropo.eps', format='EPS',dpi=150)
+          fig.tight_layout()
 
-        else:
-            # plot corrected ts
-            nfigure +=1
-            figref = plt.figure(nfigure,figsize=(14,10))
-            figref.subplots_adjust(hspace=0.001,wspace=0.001)
-            for l in xrange((N)):
-                axref = figref.add_subplot(4,int(N/4)+1,l+1)
-                caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
-                axref.set_title(idates[l],fontsize=6)
-                setp(axref.get_xticklabels(), visible=False)
-                setp(axref.get_yticklabels(), visible=False)
-            setp(axref.get_xticklabels(), visible=False)
-            setp(axref.get_yticklabels(), visible=False)
-            figref.suptitle('Time series RAMPS')
-            figref.colorbar(caxref, orientation='vertical',aspect=10)
-            figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
-            fig.tight_layout()
+      else:
+          # plot corrected ts
+          nfigure +=1
+          figref = plt.figure(nfigure,figsize=(14,10))
+          figref.subplots_adjust(hspace=0.001,wspace=0.001)
+          for l in xrange((N)):
+              axref = figref.add_subplot(4,int(N/4)+1,l+1)
+              caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+              axref.set_title(idates[l],fontsize=6)
+              setp(axref.get_xticklabels(), visible=False)
+              setp(axref.get_yticklabels(), visible=False)
+          setp(axref.get_xticklabels(), visible=False)
+          setp(axref.get_yticklabels(), visible=False)
+          figref.suptitle('Time series RAMPS')
+          figref.colorbar(caxref, orientation='vertical',aspect=10)
+          figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
+          fig.tight_layout()
 
-        if plot=='yes':
-            plt.show()
-        plt.close('all')
+      if plot=='yes':
+        plt.show()
+      plt.close('all')
     
     # save rms
     if (apsf=='no' and ii==0):
