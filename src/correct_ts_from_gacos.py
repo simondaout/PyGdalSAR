@@ -107,6 +107,7 @@ N = len(dates)
 
 # Choose plot option
 cmap = cm.gist_rainbow_r
+# cmap = cm.jet
 cmap.set_bad('white')
 
 # Choose referencing between 'pixel' or 'ramp'
@@ -122,11 +123,12 @@ cube = as_strided(cubei[:nlign*ncol*N])
 print 'Number of line in the cube: ', cube.shape
 maps = cube.reshape((nlign,ncol,N))
 
-if load == True:
+
+if load:
     gacos = np.zeros((nlign,ncol,N))
     for i in xrange((N)):
 
-        print 'Read ',idates[i]
+        print 'Read ',idates[i], i
         infile = path+'{}.ztd'.format(int(idates[i]))
         rsc = path+'{}.ztd.rsc'.format(int(idates[i]))
         temp1 = path+'{}_temp1.tif'.format(int(idates[i]))
@@ -207,7 +209,9 @@ if load == True:
         gacos[:,:,l] = gacos[:,:,l] - cst
 
     # Plot
+    nfigure = 0
     fig = plt.figure(0,figsize=(14,10))
+    nfigure += 1
     fig.subplots_adjust(wspace=0.001)
     vmax = np.nanpercentile(gacos[:,:,-1],99)
     vmin = np.nanpercentile(gacos[:,:,-1],1)
@@ -228,11 +232,12 @@ if load == True:
     # save new cube
     fid = open('cube_gacos', 'wb')
     gacos.flatten().astype('float32').tofile(fid)
+    fid.close()
 
 # # load gacos cube
 gcubei = np.fromfile('cube_gacos',dtype=np.float32)
-# gcube = as_strided(gcubei[:nlign*ncol*N])
-gacos = gcubei.reshape((nlign,ncol,N))
+gcube = as_strided(gcubei[:nlign*ncol*N])
+gacos = gcube.reshape((nlign,ncol,N))
 
 # Apply correction
 maps_flat = np.zeros((nlign,ncol,N))
@@ -286,7 +291,8 @@ for i in xrange(1,N):
         vmax = np.nanpercentile(data,98)
         vmin = np.nanpercentile(data,2)
         # initiate figure depl
-        fig = plt.figure(1,figsize=(10,5))
+        fig = plt.figure(nfigure,figsize=(10,5))
+        nfigure += 1
         ax = fig.add_subplot(1,3,1)
         cax = ax.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
         ax.set_title('Data {}'.format(idates[i]),fontsize=6)
@@ -300,8 +306,9 @@ for i in xrange(1,N):
         ax = fig.add_subplot(1,3,3)
         cax = ax.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
         ax.set_title('Correct Data {}'.format(idates[i]),fontsize=6)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-        plt.show()
+        cbar = fig.colorbar(cax,orientation='horizontal')
+        fig.savefig('{}-gacos-cor.eps'.format(idates[i]), format='EPS',dpi=150)
+        # plt.show()
         # sys.exit()
 
 # save new cube
