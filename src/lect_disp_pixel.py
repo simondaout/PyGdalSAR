@@ -10,8 +10,8 @@ lect_disp_pixel.py
 -------------
 Plot time series results obtained with invers_disp2coef.py for given pixels (reqiered image_retenues file)
 
-Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--lectfile=<path>] \
-[--ref=<path>] [--slope=<path>] [--coseismic=<paths>] [--postseismic=<paths>] [--slowslip=<value>] \
+Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--lectfile=<path>] \
+ [--slope=<path>] [--coseismic=<paths>] [--postseismic=<paths>] [--slowslip=<value>] \
  [--cos=<path>] [--sin=<path>] [--dem=<path>] [--aps=<path>] \
  [--rad2mm=<value>] [--plot=<yes/no>] [--name=<value>] [--imref=<value>] \
  [<iref>] [<jref>] [--bounds=<value>] 
@@ -19,27 +19,26 @@ Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--le
 
 Options:
 -h --help           Show this screen
---ncols VALUE       Pixels column numbers (eg. 200,400,450) 
---nligns VALUE      Pixels lign numbers pixel (eg. 1200,1200,3000) 
+--cols VALUE       Pixels column numbers (eg. 200,400,450) 
+--ligns VALUE      Pixels lign numbers pixel (eg. 1200,1200,3000) 
 --cube PATH         Path to displacement file [default: depl_cumul_flat]
+--list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
 --lectfile PATH     Path of the lect.in file [default: lect.in]
---ref PATH          Path to the reference map in r4 format (e.g ref_coeff.r4) [default: ref_coeff.r4]
---slope PATH        Path to velocity map in r4 format (e.g lin_coeff.r4) [default: None]
---cos PATH          Path to cosinus map in r4 format (e.g coswt_coeff.r4) [default: None]
---sin PATH          Path to sinus map in r4 format (e.g sinwt_coeff.r4)  [default: None]
+--slope PATH        Path to velocity map in r4 or tif format (e.g lin_coeff.r4) [default: None]
+--cos PATH          Path to cosinus map in r4 or tif format (e.g coswt_coeff.r4) [default: None]
+--sin PATH          Path to sinus map in r4 or tif format (e.g sinwt_coeff.r4)  [default: None]
 --coseismic         Time of the events (e.g 2013.2,2014.5) [default: None]
 --postseismic       Characteristic time of the transient functions (e.g 1.,0.5) [default: None]
 --slowslip   VALUE  Read slow-slip maps. Indicate median and characteristic time of the events
---ref PATH          Path to reference file (ref_coeff.r4) [default: None]
---dem PATH          Path to dem file error map in r4 format (demerr_coeff.r4) [default: None]
+--dem PATH          Path to dem file error map in r4 or tif format (demerr_coeff.r4) [default: None]
 --aps PATH          Path to aps file: 1 column file given aps for each dates (eg. aps.txt) [default: None]
---rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
---name Value            Name output figures [default: None] 
---plot                  Display results [default: yes]            
+--rad2mm            Scaling value between input data (rad) and desired output [default: -4.4563]
+--name Value        Name output figures [default: None] 
+--plot              Display results [default: yes]            
 --iref              colum numbers of the reference pixel [default: None] 
 --jref              lign number of the reference pixel [default: None]
---imref VALUE           Reference image number [default: 1]
---bounds                Min,Max time series plots 
+--imref VALUE       Reference image number [default: 1]
+--bounds            Min,Max time series plots 
 """
 
 # numpy
@@ -50,6 +49,8 @@ from numpy.lib.stride_tricks import as_strided
 import math,sys,getopt
 from os import path, environ
 import os
+
+import gdal
 
 # plot
 import matplotlib
@@ -65,8 +66,12 @@ from nsbas import docopt
 
 # read arguments
 arguments = docopt.docopt(__doc__)
+if arguments["--list_images"] ==  None:
+    listim = "images_retenues"
+else:
+    listim = arguments["--list_images"]
 if arguments["--cube"] ==  None:
-   cubef = "depl_cumul"
+   cubef = "depl_cumule"
 else:
    cubef = arguments["--cube"]
 if arguments["--lectfile"] ==  None:
@@ -100,11 +105,6 @@ else:
 
 if len(postimes)>0 and len(cotimes) != len(postimes):
     raise Exception("coseimic and postseismic lists are not the same size")
-
-if arguments["--ref"] ==  None:
-   reff = 'ref_coeff.r4'
-else:
-   reff = arguments["--ref"]
 
 if arguments["--dem"] ==  None:
    demf = None
@@ -170,15 +170,16 @@ ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
 nfigure=0
 
 # load images_retenues file
-fimages='images_retenues'
-nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
 N = len(dates)
 base = base - base[imref]
 
 # load
 if apsf is not None:
-    inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*rad2mm
+  inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*rad2mm
+else:
+  inaps = np.ones((N))
 
 # lect cube
 cube = np.fromfile(cubef,dtype=np.float32)*rad2mm
@@ -188,24 +189,49 @@ listplot = [maps[:,:,-1]]
 titles = ['Depl. Cumul.']
 
 if slopef is not None:
-  slopemap = np.fromfile(slopef,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+  extension = os.path.splitext(slopef)[1]
+  if extension == ".tif":
+    ds = gdal.Open(slopef, gdal.GA_ReadOnly)
+    slopemap = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+  else:
+    slopemap = np.fromfile(slopef,dtype=np.float32).reshape((nlign,ncol))*rad2mm
   listplot.append(slopemap)
   titles.append('Slope')
 
-if reff is not None:
-  refmap = np.fromfile(reff,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+try:
+  ds = gdal.Open('ref_coeff.tif', gdal.GA_ReadOnly)
+  band = ds.GetRasterBand(1)
+  refmap =  band.ReadAsArray()*rad2mm
+except:
+  refmap = np.fromfile('ref_coeff.r4',dtype=np.float32).reshape((nlign,ncol))*rad2mm  
 
 if demf is not None:
-  demmap = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+  extension = os.path.splitext(demf)[1]
+  if extension == ".tif":
+    ds = gdal.Open(demf, gdal.GA_ReadOnly)
+    demmap = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+  else:
+    demmap = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))*rad2mm   
 
 if cosf is not None:
-    cosmap = np.fromfile(cosf,dtype=np.float32).reshape((nlign,ncol))*rad2mm
-    listplot.append(cosmap)
-    titles.append('Cosinus')
+  extension = os.path.splitext(cosf)[1]
+  if extension == ".tif":
+    ds = gdal.Open(cosf, gdal.GA_ReadOnly)
+    cosmap = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+  else:
+    cosmap = np.fromfile(cosf,dtype=np.float32).reshape((nlign,ncol))*rad2mm   
+  listplot.append(cosmap)
+  titles.append('Cosinus')
+
 if sinf is not None:
+  extension = os.path.splitext(sinf)[1]
+  if extension == ".tif":
+    ds = gdal.Open(sinf, gdal.GA_ReadOnly)
+    sinmap = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+  else:
     sinmap = np.fromfile(sinf,dtype=np.float32).reshape((nlign,ncol))*rad2mm
-    listplot.append(slopemap)
-    titles.append('Phase')
+  listplot.append(sinmap)
+  titles.append('Phase')
 
 
 M = len(cotimes)
@@ -216,24 +242,39 @@ if len(postimes) == 0:
     postimes = np.ones((M))*-1
 
 for i in xrange(M):
-    coseismaps[i,:,:] = np.fromfile('cos{}_coeff.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))*rad2mm
-    listplot.append(coseismaps[i,:,:])
-    titles.append('Coseism.{}'.format(i))
+  cofile = 'cos{}_coeff.r4'.format(i)
+  try:
+    ds = gdal.Open(cofile, gdal.GA_ReadOnly)
+    coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+  except:
+    coseismaps[i,:,:] = np.fromfile(sinf,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+  listplot.append(coseismaps[i,:,:])
+  titles.append('Coseism.{}'.format(i))
+
 for i in xrange((M)):
-    if postimes[i] > 0:
-        postmaps[i,:,:] = np.fromfile('post{}_coeff.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))*rad2mm
-    else: 
-        postmaps[i,:,:] = np.zeros((nlign,ncol))
+  postfile = 'post{}_coeff.r4'.format(i)
+  if postimes[i] > 0:
+    try:
+      ds = gdal.Open(postfile, gdal.GA_ReadOnly)
+      postmaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+    except:  
+      postmaps[i,:,:] = np.fromfile(postfile,dtype=np.float32).reshape((nlign,ncol))*rad2mm
     listplot.append(postmaps[i,:,:])
     titles.append('Post.{}'.format(i))
-
+  else: 
+      postmaps[i,:,:] = np.zeros((nlign,ncol))
+  
 sse_times = sse[::2]
 sse_car = sse[1::2] 
 
 L = len(sse_times)
 ssemaps=np.zeros((M,nlign,ncol))
 for i in xrange(L):
-    ssemaps[i,:,:] = np.fromfile('sse{}_coeff.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))*rad2mm
+    try:
+      ds = gdal.Open('sse{}_coeff.tif'.format(i), gdal.GA_ReadOnly)
+      ssemaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+    except:
+      ssemaps[i,:,:] = np.fromfile('sse{}_coeff.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))*rad2mm
     listplot.append(ssemaps[i,:,:])
     titles.append('sse.{}'.format(i))
 
@@ -331,11 +372,11 @@ for k in xrange(len(ipix)):
             a,b = cosmap[j,i] - cosmap[jref,iref], sinmap[j,i] - sinmap[jref,iref]
         else:
             a,b = cosmap[j,i], sinmap[j,i]
-    if reff is not None:
-        if iref is not None:
-            ref = refmap[j,i] - refmap[jref,iref]
-        else:
-            ref = refmap[j,i]
+
+    if iref is not None:
+        ref = refmap[j,i] - refmap[jref,iref]
+    else:
+        ref = refmap[j,i]
 
     for l in xrange(len(cotimes)):
         if iref is not None:
@@ -354,9 +395,9 @@ for k in xrange(len(ipix)):
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
     tdec = np.array([float(date.strftime('%Y')) + float(date.strftime('%j'))/365.1 for date in t])
    
-    print
-    print i,j 
-    print  ref, lin, steps, trans
+    # print
+    # print i,j 
+    # print  ref, lin, steps, trans
 
     model = ref + linear(tdec,lin) + seasonal(tdec, a, b) 
     for l in xrange((M)):
