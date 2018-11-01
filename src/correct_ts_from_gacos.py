@@ -123,6 +123,7 @@ cube = as_strided(cubei[:nlign*ncol*N])
 print 'Number of line in the cube: ', cube.shape
 maps = cube.reshape((nlign,ncol,N))
 
+nfigure = 0
 
 if load == 'yes':
     gacos = np.zeros((nlign,ncol,N))
@@ -209,7 +210,6 @@ if load == 'yes':
         gacos[:,:,l] = gacos[:,:,l] - cst
 
     # Plot
-    nfigure = 0
     fig = plt.figure(0,figsize=(14,10))
     nfigure += 1
     fig.subplots_adjust(wspace=0.001)
@@ -310,12 +310,13 @@ for i in xrange(1,N):
         ax.set_title('Correct Data {}'.format(idates[i]),fontsize=6)
         cbar = fig.colorbar(cax,orientation='horizontal')
         fig.savefig('{}-gacos-cor.eps'.format(idates[i]), format='EPS',dpi=150)
-        # plt.show()
+        plt.show()
         # sys.exit()
 
 # save new cube
 fid = open('depl_cumule_gacos', 'wb')
 maps_flat.flatten().astype('float32').tofile(fid)
+
 
 
 
