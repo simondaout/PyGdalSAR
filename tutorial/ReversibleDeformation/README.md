@@ -30,6 +30,11 @@ invers_disp2coef.py --help
 invers_disp2coef.py --cube=depl_cumule_gacos --list_images=list_images.txt --interseismic=yes --seasonal=yes --flat=3 --topofile=DEM_UTM.tif --niter=2 --mask=mask_landslide_utm.tif --threshold_mask=-3 --scale_mask=-1 --nfit=1 --geotiff=DEM_UTM.tif --aspect=DEM_slope_UTM.tif --plot=yes
 ``` 
 
+* display time series output for selected pixels with uncertainties equal to the RMS of the first iteration (aps\_0.txt)
+```
+lect_disp_pixel.py --cols=156,100 --ligns=204,80 --list_images=list_images.txt --cos=coswt_coeff.tif --sin=sinwt_coeff.tif --slope=lin_coeff.tif --aps=aps_0.txt --rad2mm=1
+```
+
 * Visualize amplitude of the seasonal deformation in map view
 ```
 plot_tiff.py --geotiff=ampwt_coeff.tif --vmax=10 --vmin=0
