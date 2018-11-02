@@ -34,7 +34,7 @@ This project needs the following external components:
  * py27-numPy
  * py27-sciPy
  * Gdal (https://www.gdal.org)
- * docopt (Available on https://github.com/docopt/docopt or in ./python/. Copy in your $PYTHONPATH variable).
+ * docopt (Available on https://github.com/docopt/docopt or in ./python/).
  * py27-matplotlib
  * py27-datetime
  * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas

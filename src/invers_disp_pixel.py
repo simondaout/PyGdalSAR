@@ -11,7 +11,7 @@ invers_disp_pixel.py
 Temporal inversions of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
+[--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
 
@@ -27,7 +27,6 @@ Options:
 --windowrefsize VALUE      Number of pixels around the referenced pixel defining the window [default: windowsize]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
---rmspixel PATH         Path to the RMS map giving the error associated to each pixel (e.g RMSpixel, output of invers_pixel) [default: None]        
 --interseismic PATH     Add a linear function to the inversion
 --threshold_rmsd VALUE  If interseismic = yes: first try inversion with ref/interseismic/dem only, if RMDS inversion > threshold_rmsd then add other 
 basis functions [default: 1.] 
@@ -264,10 +263,6 @@ if arguments["--aps"] ==  None:
     apsf = None
 else:
     apsf = arguments["--aps"]
-if arguments["--rmspixel"] ==  None:
-    rmsf = None
-else:
-    rmsf = arguments["--rmspixel"]
 if arguments["--interseismic"] ==  None:
     inter = 'no'
 else:
@@ -402,12 +397,6 @@ if apsf is not None:
     index = flatnonzero(inaps<minaps)
     inaps[index] = minaps
     print 'Output uncertainties for first iteration:', inaps
-
-
-if rmsf is not None:
-    rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlign,ncol))*rad2mm
-    kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap==9999))
-    rmsmap[kk] = float('NaN')
 
 if vect is not None:
     v = np.loadtxt(vect, comments='#', unpack = False, dtype='f')
