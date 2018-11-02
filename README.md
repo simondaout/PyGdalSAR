@@ -130,7 +130,7 @@ Correct InSAR Time Series data from Gacos atmospheric models (data to be downloa
 ```
 Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] 
 [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--ref=<values>] 
-[--zone=<values>] [--plot=<yes/no>] [--load=<True/False>]
+[--zone=<values>] [--plot=<yes/no>] [--load=<yes/no>]
 
 correct_ts_from_gacos.py -h | --help
 
@@ -146,7 +146,7 @@ Options:
 --proj VALUE        EPSG for projection GACOS map [default: 4326]
 --gacos2data        Scaling value between gacos data (m) and desired output (e.g data in mm) [default: 1000.]
 --plot              Display results [default: yes]   
---load              If False, do not load data again and directly read cube_gacos [default: True]   
+--load              If no, do not load data again and directly read cube_gacos [default: True]   
 ```
 
 
