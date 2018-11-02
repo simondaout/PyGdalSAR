@@ -62,12 +62,12 @@ At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in 
 (3) estimation of RMS of each maps that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
 ```
-Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
-[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
-[--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
-[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>]  \
-[--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
-[--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
+Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] 
+[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] 
+[--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] 
+[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>]  
+[--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] 
+[--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] 
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] 
 
 invers_disp2coef.py -h | --help
@@ -128,7 +128,9 @@ correct\_ts\_from\_gacos.py
 Correct InSAR Time Series data from Gacos atmospheric models (data to be download and cited on: ceg-research.ncl.ac.uk/v2/gacos/). 1) Convert .ztd files to .tif format, 2) crop, re-project and re-resample atmospheric models to data geometry 3) correct time series data.
 
 ```
-Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] \ [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--ref=<values>] \ [--zone=<values>] [--plot=<yes/no>] [--load=<True/False>]
+Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] 
+[--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--ref=<values>] 
+[--zone=<values>] [--plot=<yes/no>] [--load=<True/False>]
 
 correct_ts_from_gacos.py -h | --help
 
@@ -153,9 +155,10 @@ invers\_disp\_pixel.py
 Temporal decomposition of the time series delay maps of selected pixels. 
 
 ```
-Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--windowsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
-[--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
+Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--windowsize=<value>]  
+[--lectfile=<path>] [--aps=<path>][--rmspixel=<path>] [--interseismic=<value>] [--threshold_rmsd=<value>] 
+[--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]
+[--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] 
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
 
 invers_disp_pixel.py -h | --help
@@ -199,10 +202,10 @@ lect\_disp\_pixel.py
 Plot time series results obtained with invers_disp2coef.py for given pixels.
 
 ```
-Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--lectfile=<path>] \
-[--ref=<path>] [--slope=<path>] [--coseismic=<paths>] [--postseismic=<paths>] [--slowslip=<value>] \
- [--cos=<path>] [--sin=<path>] [--dem=<path>] [--aps=<path>] \
- [--rad2mm=<value>] [--plot=<yes/no>] [--name=<value>] [--imref=<value>] \
+Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--lectfile=<path>] 
+[--ref=<path>] [--slope=<path>] [--coseismic=<paths>] [--postseismic=<paths>] [--slowslip=<value>] 
+ [--cos=<path>] [--sin=<path>] [--dem=<path>] [--aps=<path>] 
+ [--rad2mm=<value>] [--plot=<yes/no>] [--name=<value>] [--imref=<value>] 
  [<iref>] [<jref>] [--bounds=<value>] 
 
 
@@ -212,15 +215,15 @@ Options:
 --nligns VALUE      Pixels lign numbers pixel (eg. 1200,1200,3000) 
 --cube PATH         Path to displacement file [default: depl_cumul_flat]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
---ref PATH          Path to the reference map in r4 format (e.g ref_coeff.r4) [default: ref_coeff.r4]
---slope PATH        Path to velocity map in r4 format (e.g lin_coeff.r4) [default: None]
+--ref PATH          Path to the reference map in r4 or tif format (e.g ref_coeff.r4) [default: ref_coeff.r4]
+--slope PATH        Path to velocity map in r4 or tif format (e.g lin_coeff.r4) [default: None]
 --cos PATH          Path to cosinus map in r4 format (e.g coswt_coeff.r4) [default: None]
---sin PATH          Path to sinus map in r4 format (e.g sinwt_coeff.r4)  [default: None]
+--sin PATH          Path to sinus map in r4 or tif format (e.g sinwt_coeff.r4)  [default: None]
 --coseismic         Time of the events (e.g 2013.2,2014.5) [default: None]
 --postseismic       Characteristic time of the transient functions (e.g 1.,0.5) [default: None]
 --slowslip   VALUE  Read slow-slip maps. Indicate median and characteristic time of the events
 --ref PATH          Path to reference file (ref_coeff.r4) [default: None]
---dem PATH          Path to dem file error map in r4 format (demerr_coeff.r4) [default: None]
+--dem PATH          Path to dem file error map in r4 or tif format (demerr_coeff.r4) [default: None]
 --aps PATH          Path to aps file: 1 column file given aps for each dates (eg. aps.txt) [default: None]
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
 --name Value            Name output figures [default: None] 
