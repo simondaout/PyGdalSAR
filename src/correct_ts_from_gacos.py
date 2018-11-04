@@ -12,7 +12,7 @@ Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to
 3) correct data
 
 Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] \
-[--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--zone=<values>] [--plot=<yes/no>] [--load=<yes/no>]
+[--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--zone=<values>] [--topofile=<path>] [--plot=<yes/no>] [--load=<yes/no>]
 
 correct_ts_from_gacos.py -h | --help
 
@@ -25,6 +25,7 @@ Options:
 --crop VALUES       Crop GACOS data to data extent in the output projection, eg. --crop=xmin,ymin,xmax,ymax [default: None]
 --ref  VALUES       Column and line number for referencing. If None then estimate the best linear relationship between model and data [default: None]. 
 --zone VALUES       Crop option for ramp estimation [default: 0,ncol,0,nlign]
+--topo Path         Use DEM file to mask very low or high altitude values in the ramp estimation [default: None]
 --proj VALUE        EPSG for projection GACOS map [default: 4326]
 --gacos2data  VALUE Scaling value between gacos data (m) and desired output (e.g data in mm) [default: 1000.]
 --plot  YES/NO      Display results [default: yes]   
@@ -88,6 +89,11 @@ if arguments["--load"] ==  None:
 else:
     load = arguments["--load"] 
 
+if arguments["--topofile"] ==  None:
+   radar = None
+else:
+   radar = arguments["--topofile"]
+
 
 # read lect.in: size maps
 ncol, nlign = map(int, open('lect.in').readline().split(None, 2)[0:2])
@@ -110,12 +116,22 @@ cmap = cm.gist_rainbow_r
 # cmap = cm.jet
 cmap.set_bad('white')
 
-# Choose referencing between 'pixel' or 'ramp'
-# ref_col,ref_line = 910,1180 502540
-# ref_col,ref_line = 271, 1691 503540
 
-# Reprojection option
-# EPSG = 32645
+if radar is not None:
+    extension = os.path.splitext(radar)[1]
+    if extension == ".tif":
+      ds = gdal.Open(radar, gdal.GA_ReadOnly)
+      band = ds.GetRasterBand(1)
+      elev = band.ReadAsArray()
+      del ds
+    else:
+      fid = open(radar,'r')
+      elevi = np.fromfile(fid,dtype=np.float32)
+      elevi = elevi[:nlign*ncol]
+      elev = elevi.reshape((nlign,ncol))
+      fid.close()
+else:
+    elev = np.zeros((nlign,ncol))
 
 # load cube of displacements
 cubei = np.fromfile('depl_cumule',dtype=np.float32)
@@ -195,11 +211,7 @@ if load == 'yes':
 
         # open gacos
         ds = gdal.Open(path+'{}_gacos.tif'.format(int(idates[i])), gdal.GA_ReadOnly)
-        # print ncol, nlign
-        # print ds.RasterXSize, ds.RasterYSize
         band = ds.GetRasterBand(1)
-        # plt.imshow(band.ReadAsArray())
-        # plt.show()
         gacos[:,:,i] = band.ReadAsArray()*gacos2data
         del ds,band
 
@@ -247,6 +259,20 @@ for i in xrange(1,N):
     data_flat = as_strided(maps_flat[:,:,i])
     model = as_strided(gacos[:,:,i])
 
+    losmin,losmax = np.nanpercentile(data,1.),np.nanpercentile(data,99.)
+    gacosmin,gacosmax = np.nanpercentile(model,5),np.nanpercentile(model,95)
+
+    if radar is not None:
+        maxtopo,mintopo = np.nanpercentile(elev,98), np.nanpercentile(elev,2)
+    else:
+        maxtopo,mintopo = 1, -1
+
+    # index = np.nonzero(data>2)
+    # data[index] = np.float('NaN')
+    # plt.imshow(data)
+    # plt.show()
+    # sys.exit()
+
     if ref == 'ramp':
         pix_lin, pix_col = np.indices((nlign,ncol))
         try:
@@ -259,56 +285,105 @@ for i in xrange(1,N):
             np.logical_and(~np.isnan(data),
             np.logical_and(pix_lin>line_beg, 
             np.logical_and(pix_lin<line_end,
+            np.logical_and(data<losmax,
+            np.logical_and(data>losmin,
+            np.logical_and(model<np.nanpercentile(model,98),
+            np.logical_and(model>np.nanpercentile(model,2),
+            np.logical_and(elev<maxtopo,
+            np.logical_and(elev>mintopo,
+            np.logical_and(data!=0.0, 
+            np.logical_and(model!=0.0,   
             np.logical_and(pix_col>col_beg, pix_col<col_end
-            )))))
+            )))))))))))))
 
         temp = np.array(index).T
         x = temp[:,0]; y = temp[:,1]
         los_clean = data[index].flatten()
         model_clean = model[index].flatten()
 
-        G=np.zeros((len(los_clean),2))
+        bins = np.arange(gacosmin,gacosmax,abs(gacosmax-gacosmin)/500.)
+        inds = np.digitize(model_clean,bins)
+        modelbins = []
+        losbins = []
+        losstd = []
+        for j in range(len(bins)-1):
+            uu = np.flatnonzero(inds == j)
+            if len(uu)>1000:
+                modelbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+
+                indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
+                    los_clean[uu],10.),los_clean[uu]<np.percentile(los_clean[uu],90.)))
+
+                losstd.append(np.std(los_clean[uu][indice]))
+                losbins.append(np.median(los_clean[uu][indice]))
+
+        losbins = np.array(losbins)
+        losstd = np.array(losstd)
+        modelbins = np.array(modelbins)
+
+        G=np.zeros((len(losbins),2))
         G[:,0] = 1
-        G[:,1] = model_clean
-        x0 = lst.lstsq(G,los_clean)[0]
-        _func = lambda x: np.sum(((np.dot(G,x)-los_clean))**2)
+        G[:,1] = modelbins
+        x0 = lst.lstsq(G,losbins)[0]
+        # print x0
+        _func = lambda x: np.sum(((np.dot(G,x)-losbins)/losstd)**2)
         pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy').x
         a = pars[0]
         b = pars[1]
-        print 'ref frame %f + %f model for date: %i'%(a,b,idates[i])
-        model = a + b*model
+        print 'ref frame %f + %f gacos for date: %i'%(a,b,idates[i])
 
     elif ref == 'pixel':
         model = model - np.nanmean(model[ref_line-2:ref_line+2,ref_col-2:ref_col+2])
         data = data - np.nanmean(data[ref_line-2:ref_line+2,ref_col-2:ref_col+2])
+        los_clean = data
+        model_clean = model
+        a, b = 0., 1.
 
     # correction
-    model[model==0.] = 0. 
+    model = a + b*model
+    model[model==0.] = 0.
+    model[np.isnan(data)] = np.float('NaN')
+
     data_flat[:,:] = data - model
     data_flat[np.isnan(data)] = np.float('NaN')
 
     if plot == 'yes':
-        vmax = np.nanpercentile(data,98)
-        vmin = np.nanpercentile(data,2)
+        vmax = np.nanpercentile(data_flat,98)
+        vmin = np.nanpercentile(data_flat,2)
         # initiate figure depl
         fig = plt.figure(nfigure,figsize=(10,5))
         nfigure += 1
-        ax = fig.add_subplot(1,3,1)
+        ax = fig.add_subplot(2,2,1)
         cax = ax.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
         ax.set_title('Data {}'.format(idates[i]),fontsize=6)
         cbar = fig.colorbar(cax,orientation='horizontal')
 
         # initiate figure depl
-        ax = fig.add_subplot(1,3,2)
-        cax = ax.imshow(data-data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
+        ax = fig.add_subplot(2,2,2)
+        cax = ax.imshow(model,cmap=cmap)
         ax.set_title('Model {}'.format(idates[i]),fontsize=6)
         cbar = fig.colorbar(cax,orientation='horizontal')
 
         # initiate figure depl
-        ax = fig.add_subplot(1,3,3)
+        ax = fig.add_subplot(2,2,3)
         cax = ax.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
         ax.set_title('Correct Data {}'.format(idates[i]),fontsize=6)
         cbar = fig.colorbar(cax,orientation='horizontal')
+
+        ax = fig.add_subplot(2,2,4)
+
+        cax = ax.scatter(model_clean, los_clean,s=0.005, alpha=0.1, rasterized=True)
+        if ref == 'ramp':
+            x = np.linspace(np.nanmax(model_clean),np.nanmin(model_clean),100)
+            ax.plot(modelbins,losbins,'-r', lw =.5)
+            ax.plot(x, a +b*x,'-r', lw =4.)
+        
+        ax.set_ylim([losmin,losmax])
+        ax.set_xlim([gacosmin,gacosmax])
+        ax.set_xlabel('GACOS ZTD')
+        ax.set_ylabel('LOS delay')
+        ax.set_title('Data/Model')
+
         fig.savefig('{}-gacos-cor.eps'.format(idates[i]), format='EPS',dpi=150)
         plt.show()
         # sys.exit()
