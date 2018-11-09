@@ -27,7 +27,7 @@ Options:
 --zone VALUES       Crop option for ramp estimation [default: 0,ncol,0,nlign]
 --topo Path         Use DEM file to mask very low or high altitude values in the ramp estimation [default: None]
 --proj VALUE        EPSG for projection GACOS map [default: 4326]
---gacos2data  VALUE Scaling value between gacos data (m) and desired output (e.g data in mm) [default: 1000.]
+--gacos2data  VALUE Scaling value between zenithal gacos data (m) and desired output (e.g data in mm and LOS) [default: 1000.]
 --plot  YES/NO      Display results [default: yes]   
 --load YES/no       If no, do not load data again and directly read cube_gacos [default: True]   
 """
@@ -40,6 +40,7 @@ import scipy.optimize as opt
 import scipy.linalg as lst
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.lib.stride_tricks import as_strided
 import subprocess
 np.warnings.filterwarnings('ignore')
@@ -351,24 +352,30 @@ for i in xrange(1,N):
         vmax = np.nanpercentile(data_flat,98)
         vmin = np.nanpercentile(data_flat,2)
         # initiate figure depl
-        fig = plt.figure(nfigure,figsize=(10,5))
+        fig = plt.figure(nfigure,figsize=(14,7))
         nfigure += 1
         ax = fig.add_subplot(2,2,1)
-        cax = ax.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
+        im = ax.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
         ax.set_title('Data {}'.format(idates[i]),fontsize=6)
-        cbar = fig.colorbar(cax,orientation='horizontal')
 
         # initiate figure depl
         ax = fig.add_subplot(2,2,2)
-        cax = ax.imshow(model,cmap=cmap)
+        im = ax.imshow(model,cmap=cmap)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)        
         ax.set_title('Model {}'.format(idates[i]),fontsize=6)
-        cbar = fig.colorbar(cax,orientation='horizontal')
 
         # initiate figure depl
         ax = fig.add_subplot(2,2,3)
-        cax = ax.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
+        im = ax.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
         ax.set_title('Correct Data {}'.format(idates[i]),fontsize=6)
-        cbar = fig.colorbar(cax,orientation='horizontal')
 
         ax = fig.add_subplot(2,2,4)
 
