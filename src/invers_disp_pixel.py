@@ -11,7 +11,7 @@ invers_disp_pixel.py
 Temporal inversions of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>]\
+[--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
 
@@ -38,6 +38,7 @@ of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic func
 --seasonal PATH         If yes, add seasonal terms in the inversion
 --semianual PATH        If yes, add semianual  terms in the inversion
 --vector PATH           Path to the vector text file containing a value for each dates [default: None]
+--info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
@@ -64,6 +65,9 @@ import scipy.linalg as lst
 import math,sys,getopt
 from os import path, environ
 import os
+
+# gdal
+import gdal
 
 # plot
 import matplotlib
@@ -332,6 +336,11 @@ if arguments["--plot"] ==  None:
 else:
     plot = arguments["--plot"]
 
+if arguments["--info"] ==  None:
+   infof = None
+else:
+   infof = arguments["--info"]
+
 if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
 
@@ -400,6 +409,19 @@ if apsf is not None:
 
 if vect is not None:
     v = np.loadtxt(vect, comments='#', unpack = False, dtype='f')
+
+if infof is not None:
+    extension = os.path.splitext(infof)[1]
+    if extension == ".tif":
+      ds = gdal.Open(infof, gdal.GA_ReadOnly)
+      band = ds.GetRasterBand(1)
+      info = band.ReadAsArray()
+      del ds
+    else:
+      fid = open(infof,'r')
+      infoi = np.fromfile(fid,dtype=np.float32)
+      info = infoi[:nlign*ncol].reshape((nlign,ncol))
+      fid.close()
 
 # plot pixels on map
 fig, ax = subplots(1)
@@ -630,6 +652,8 @@ for jj in xrange((Npix)):
 
     # extract data
     wind = as_strided(maps[j-w:j+w+1,i-w:i+w+1,:])
+    if infof is not None:
+      infm = np.nanmean(info[j-w:j+w+1,i-w:i+w+1])
     if iref is not None:
         windref = as_strided(maps[jref-wref:jref+wref+1,iref-wref:iref+wref+1,:])
         dispref = np.nanmean(windref,axis=(0,1))
@@ -730,7 +754,11 @@ for jj in xrange((Npix)):
         lin[k] = np.dot(G[:,indexinter],m[indexinter])
 
     # plot data and model minus dem error
-    ax.plot(x,disp-demerr,'o',label='TS {}: lign: {}-{}, column: {}-{}'.format(jj,i-w,i+w,j-w,j+w))
+    if infof is not None:
+      # print infof, infm
+      ax.plot(x,disp-demerr,'o',label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
+    else:
+      ax.plot(x,disp-demerr,'o',label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
     ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
     # ax.plot(x,mdisp-demerr,'o', label='model',color='red', alpha=0.5)
     
@@ -834,7 +862,7 @@ for jj in xrange((Npix)):
         sine = as_strided(m[indexseas+1])
         amp = np.sqrt(cosine**2+sine**2)
         phi = np.arctan2(sine,cosine)
-        print amp,phi
+        # print amp,phi
 
 if plot == 'yes':
     plt.show()
