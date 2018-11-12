@@ -22,7 +22,7 @@ Options:
 --cols VALUE       Pixels column numbers (eg. 200,400,450) 
 --ligns VALUE      Pixels lign numbers pixel (eg. 1200,1200,3000) 
 --cube PATH         Path to displacement file [default: depl_cumul_flat]
---list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
+--list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --slope PATH        Path to velocity map in r4 or tif format (e.g lin_coeff.r4) [default: None]
 --cos PATH          Path to cosinus map in r4 or tif format (e.g coswt_coeff.r4) [default: None]
