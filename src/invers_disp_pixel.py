@@ -22,7 +22,7 @@ Options:
 --ncols VALUE           Pixel column numbers (eg. 200,400,450) 
 --nligns VALUE          Pixel lign numbers  (eg. 1200,1200,3000) 
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
---list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues] 
+--list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
 --windowrefsize VALUE      Number of pixels around the referenced pixel defining the window [default: windowsize]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
