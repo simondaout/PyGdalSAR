@@ -97,10 +97,7 @@ if arguments["--geocrop"] is not  None:
     geocrop = map(float,arguments["--geocrop"].replace(',',' ').split())
     latbeg,latend,lonbeg,lonend = float(geocrop[0]),float(geocrop[1]),float(geocrop[2]),float(geocrop[3])
 else:
-	latbeg,latend,lonbeg,lonend = minx,maxx,maxy,miny
-	print latbeg,latend,lonbeg,lonend
-	print lat,lon
-	sys.exit()
+    latbeg,latend,lonbeg,lonend = minx,maxx,maxy,miny
 
 kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(los), np.abs(los)<999.),los==0.0))
 mprim = los[kk]
