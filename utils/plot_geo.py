@@ -99,6 +99,7 @@ if arguments["--geocrop"] is not  None:
 else:
     latbeg,latend,lonbeg,lonend = minx,maxx,maxy,miny
 
+los[los==0.]=np.float('NaN')
 kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(los), np.abs(los)<999.),los==0.0))
 mprim = los[kk]
 
@@ -173,15 +174,16 @@ cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
 ax.set_title(basename,fontsize=6)
 
 
+outfile = basename+'.pdf'
+
 del ds, ds_band1, ds_band2
 fig.tight_layout()
-plt.suptitle('Time series maps')
+plt.suptitle(outfile)
 try:
 	fig.colorbar(cax, orientation='vertical',aspect=10)
 except:
 	pass
 
-outfile = basename+'.pdf'
 # fig.savefig(basename+'.tiff', format='tiff',dpi=180)
 fig.savefig(outfile, format='PDF',dpi=180)
 
