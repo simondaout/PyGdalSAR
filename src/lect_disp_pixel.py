@@ -62,7 +62,7 @@ from datetime import datetime
 import datetime
 
 # docopt (command line parser)
-from nsbas import docopt
+import docopt
 
 # read arguments
 arguments = docopt.docopt(__doc__)
