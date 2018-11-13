@@ -12,8 +12,8 @@
 """\
 invert_ramp_topo_unw.py
 -------------
-Removes left over atmospheric phase/elevation correlations or/and azimuthal and range ramps. 
-Reconstruction of the empirical phase correction by time series inversion.
+Removes atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coeffice
+ints on unwrapped interferograms (2 bands file). Reconstruction of the empirical phase correction by time series inversion.
 
 usage: invert_ramp_topo_unw.py --int_list=<path> --int_path=<path> \
 --prefix=<value> --suffix=<value> --rlook=<value> [--dates_list=<path>] [--master=<path>] \
