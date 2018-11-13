@@ -1,9 +1,13 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-
-################################################################################
-# Author        : Simon DAOUT (ISTerre)
-################################################################################
+############################################
+#
+# PyGdalSAR: An InSAR post-processing package 
+# written in Python-Gdal
+#
+############################################
+# Author        : Simon DAOUT (Oxford)
+############################################
 
 """\
 correct_ts_from_gacos.py

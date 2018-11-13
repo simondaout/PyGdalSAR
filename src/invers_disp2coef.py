@@ -1,9 +1,13 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-
-################################################################################
-# Author        : Simon DAOUT (ISTerre)
-################################################################################
+############################################
+#
+# PyGdalSAR: An InSAR post-processing package 
+# written in Python-Gdal
+#
+############################################
+# Author        : Simon DAOUT (Oxford)
+############################################
 
 """\
 invers_disp2coef.py
@@ -26,7 +30,7 @@ Options:
 -h --help               Show this screen
 --cube PATH             Path to displacement file [default: depl_cumul]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
---list_images PATH      Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: images_retenues]
+--list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --aps PATH              Path to the APS file giving an input error to each dates [default: No weigthing if no spatial estimation or misfit spatial estimation used as input uncertianties]
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
