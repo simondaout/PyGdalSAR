@@ -51,7 +51,7 @@ Collaborators:
 Louise Maubant: louise.maubant@univ-grenoble-alpes.fr
 Benedetta Dini: benedetta.dini@erdw.ethz.ch
 Marie-Pierre Doin: marie-pierre.doin@univ-grenoble-alpes.fr
-Henriette Sudhaus: henriette.sudhaus@ifg.uni-kiel.de
+Mathieu Volat: matthieu.volat@univ-lyon1.fr
 ```
 
 
