@@ -9,6 +9,7 @@
 geocode_cube.py 
 -------------
 Geocode cube of cumulative deplacements: create date.unw, geo_date.unw, and geo_date.tiff for each dates
+!!! Need geocode.pl from ROI_PAC
 
 Usage: geocode_cube.py --cube=<path> --geomaptrans=<path> --amp=<path> \
 [--lectfile=<path>] [--rscfile=<path>] 
@@ -32,7 +33,7 @@ from numpy.lib.stride_tricks import as_strided
 
 import subprocess, shutil, sys, os
 
-from nsbas import docopt
+import docopt
 arguments = docopt.docopt(__doc__)
 infile = arguments["--cube"]
 geomapf = arguments["--geomaptrans"]
