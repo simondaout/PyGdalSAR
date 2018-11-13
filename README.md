@@ -20,11 +20,14 @@ leave building
 Organisation
 =============
 This project contains the following folders:
- * src: Main programms for time series decomposition (see documantation bellow) and atmospehric corrections.
- * utils: Some additional plotting or cleaning programms for real4 formats (.r4, .ztd) or georeferenced formats (default: .tif)
+ * timeseries: programms for time series decomposition (see documantation bellow)
+ * atmocorr: programms for atmospehric corrections.
+ * plots: plotting programms for .tiff, .r4, time series or .unw files
+ * utils: additional tools for cleaning .r4 or .unw formats, georeferenced formats (default: .tif), geocoding, conversion dates to decimal dates.
+ * src: fortrtan programms, in progress
  * tutorial: 
- 	* ReversibleDeformation: example GACOS corrections, empirical phase/topo corrections and extraction of reversible derformations with seasonal functions.
- 	* Vector: in progress
+ 	 * ReversibleDeformation: example GACOS corrections, empirical phase/topo corrections and extraction of reversible derformations with seasonal functions.
+ 	 * Vector: in progress
 
 Requirements
 =============
