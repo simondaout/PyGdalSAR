@@ -56,4 +56,9 @@ Benedetta Dini: benedetta.dini@erdw.ethz.ch
 Marie-Pierre Doin: marie-pierre.doin@univ-grenoble-alpes.fr
 Mathieu Volat: matthieu.volat@univ-lyon1.fr
 ```
+ References
+============
 
+* [Daout, Simon, et al. "Strain Partitioning and Present‐Day Fault Kinematics in NW Tibet From Envisat SAR Interferometry." Journal of Geophysical Research: Solid Earth 123.3 (2018): 2462-2483(https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1002/2017JB015020)
+
+* [Daout, Simon, et al. "Large‐scale InSAR monitoring of permafrost freeze‐thaw cycles on the Tibetan Plateau." Geophysical Research Letters 44.2 (2017): 901-909](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1002/2016GL070781)
