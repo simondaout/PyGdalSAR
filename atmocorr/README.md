@@ -1,4 +1,4 @@
-Tools for correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/) or empirical correction on wappred interferograms.
+Tools for correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/) or empirical correction on unwappred interferograms.
 
 correct\_ts\_from\_gacos.py
 ============
