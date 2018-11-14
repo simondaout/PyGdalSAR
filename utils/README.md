@@ -1,6 +1,6 @@
 add\_r4.py
 ============
-Add, substract, compute the amplitude (infile1**2,infile2**2) ar the phase (arctan(infile1/infile2)) from two real4 files.
+Add, substract, compute the amplitude (```infile1**2,infile2**2```) ar the phase (```arctan(infile1/infile2)) from two real4 files.
 
 ```
 Usage: add_r4.py -h | --help
@@ -49,7 +49,7 @@ Usage: date2dec.py -h | --help
 
 dem2slope.py
 ============
-Convert dem to slope file in the LOS geeometry knowing los heading and lattitude mean.
+Convert dem to slope file in the LOS geeometry knowing mean LOS heading and latitudes.
 
 ```
 Usage: dem2slope.py -h | --help
@@ -57,7 +57,7 @@ Usage: dem2slope.py -h | --help
 
 extend\_r4.py
 ============
-Extend real4 file to new number of lines and colums
+Extend real4 file to new number of lines and columns
 
 ```
 Usage: extend_r4.py -h | --help
