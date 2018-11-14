@@ -19,7 +19,7 @@ leave building
 Organisation
 =============
 This project contains the following folders:
- * timeseries: programms for time series decomposition (see documantation bellow)
+ * timeseries: programms for time series decomposition 
  * atmocorr: programms for atmospehric corrections.
  * plots: plotting programms for .tiff, .r4, time series or .unw files
  * utils: additional tools for cleaning .r4 or .unw formats, georeferenced formats (default: .tif), geocoding, conversion dates to decimal dates.
