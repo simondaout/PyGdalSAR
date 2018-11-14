@@ -1,6 +1,6 @@
 # PyGdalSAR
-Post-processing InSAR tool package written in the Python and Gdal programming language.
-Predictives and empirical atmospheric corrections for unwrapped interferograms. Iterative spatial and temporal decompositions of Geodetic Time Series (InSAR, GPS or Pixel Offsets). Additional tools for time series correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/), plotting, cleaning, radar to geographic conversion... 
+Post-processing InSAR tool package written in the Python and Gdal programming language. 
+It can be utilizes for predictives and empirical atmospheric corrections on the unwrapped interferograms, or time series correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/). Additional package for iterative spatial and temporal decompositions of geodetic Time Series (InSAR, GPS or Pixel Offsets), plotting, cleaning of interferograms or time series, radar to geographic conversions, etc... 
 
 
 To install the package
