@@ -4,7 +4,7 @@ Post-processing InSAR tool package written in the Python and Gdal programming la
 
 To install the package
 =============
-```git clone https://github.com/simondaout/TSdecomp.git```
+```git clone https://github.com/simondaout/PyGdalSAR.git```
 
 To update the software: 
 ```git pull```
