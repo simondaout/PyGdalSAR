@@ -1,6 +1,6 @@
 add\_r4.py
 ============
-Add, substract, compute the amplitude (```infile1**2,infile2**2```) ar the phase (```arctan(infile1/infile2)) from two real4 files.
+Add, substract, compute the amplitude (```infile1**2,infile2**2```) ar the phase (```arctan(infile1/infile2```)) from two real4 files.
 
 ```
 Usage: add_r4.py -h | --help
