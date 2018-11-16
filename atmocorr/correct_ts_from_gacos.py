@@ -1,13 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-############################################
-#
-# PyGdalSAR: An InSAR post-processing package 
-# written in Python-Gdal
-#
-############################################
-# Author        : Simon DAOUT (Oxford)
-############################################
+
+################################################################################
+# Author        : Simon DAOUT (ISTerre)
+################################################################################
 
 """\
 correct_ts_from_gacos.py
@@ -16,7 +12,7 @@ Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to
 3) correct data
 
 Usage: correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] \
-[--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--zone=<values>] [--topofile=<path>] [--plot=<yes/no>] [--load=<yes/no>]
+[--gacos2data=<value>] [--proj=<value>] [--ref=<values>] [--ramp=<yes/no>] [--zone=<values>] [--topofile=<path>] [--plot=<yes/no>] [--load=<yes/no>]
 
 correct_ts_from_gacos.py -h | --help
 
@@ -24,12 +20,13 @@ Options:
 -h --help           Show this screen.
 --cube PATH         Path to the cube of TS displacements file to be corrected from atmo models [default: depl_cumul]
 --path PATH         Path to .ztd data (default: ./GACOS/)
---list_images PATH  Path to list images file made of 4 columns containing for each images 1) number 2) date in YYYYMMDD format 3) numerical date 4) perpendicular baseline [default: list_images.txt] 
+--list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --imref VALUE       Reference image number [default: 1]
 --crop VALUES       Crop GACOS data to data extent in the output projection, eg. --crop=xmin,ymin,xmax,ymax [default: None]
 --ref  VALUES       Column and line number for referencing. If None then estimate the best linear relationship between model and data [default: None]. 
---zone VALUES       Crop option for ramp estimation [default: 0,ncol,0,nlign]
---topo Path         Use DEM file to mask very low or high altitude values in the ramp estimation [default: None]
+--ramp  VALUES      If yes, estimate a quadratic ramp in x and y in addition to the los/gacos relationship [default: yes]. 
+--zone VALUES       Crop option for empirical estimation [default: 0,ncol,0,nlign]
+--topo Path         Use DEM file to mask very low or high altitude values in the empirical estimation [default: None]
 --proj VALUE        EPSG for projection GACOS map [default: 4326]
 --gacos2data  VALUE Scaling value between zenithal gacos data (m) and desired output (e.g data in mm and LOS) [default: 1000.]
 --plot  YES/NO      Display results [default: yes]   
@@ -74,7 +71,7 @@ if arguments["--plot"] ==  None:
 else:
     plot = arguments["--plot"]
 if arguments["--ref"] is None:
-    ref = 'ramp'
+    ref = 'emp'
 else:
     ref = 'pixel'
     ref_col,ref_line = map(int,arguments["--ref"].replace(',',' ').split())
@@ -88,6 +85,11 @@ if arguments["--gacos2data"] ==  None:
     gacos2data = 1000.
 else:
     gacos2data = float(arguments["--gacos2data"])
+
+if arguments["--ramp"] ==  None:
+    doramp = 'yes'
+else:
+    doramp = arguments["--ramp"] 
 
 if arguments["--load"] ==  None:
     load = 'yes'
@@ -258,11 +260,11 @@ gacos = gcube.reshape((nlign,ncol,N))
 
 # Apply correction
 maps_flat = np.zeros((nlign,ncol,N))
-for i in xrange(1,N):   
+for l in xrange(1,N):   
 
-    data = as_strided(maps[:,:,i])
-    data_flat = as_strided(maps_flat[:,:,i])
-    model = as_strided(gacos[:,:,i])
+    data = as_strided(maps[:,:,l])
+    data_flat = as_strided(maps_flat[:,:,l])
+    model = as_strided(gacos[:,:,l])
 
     losmin,losmax = np.nanpercentile(data,1.),np.nanpercentile(data,99.)
     gacosmin,gacosmax = np.nanpercentile(model,5),np.nanpercentile(model,95)
@@ -278,42 +280,45 @@ for i in xrange(1,N):
     # plt.show()
     # sys.exit()
 
-    if ref == 'ramp':
-        pix_lin, pix_col = np.indices((nlign,ncol))
-        try:
-            col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
-        except:
-            col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlign
+    funct = 0.
+    pix_lin, pix_col = np.indices((nlign,ncol))
+    try:
+        col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
+    except:
+        col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlign
 
-        # find proportionality between data and model
-        index = np.nonzero(
-            np.logical_and(~np.isnan(data),
-            np.logical_and(pix_lin>line_beg, 
-            np.logical_and(pix_lin<line_end,
-            np.logical_and(data<losmax,
-            np.logical_and(data>losmin,
-            np.logical_and(model<np.nanpercentile(model,98),
-            np.logical_and(model>np.nanpercentile(model,2),
-            np.logical_and(elev<maxtopo,
-            np.logical_and(elev>mintopo,
-            np.logical_and(data!=0.0, 
-            np.logical_and(model!=0.0,   
-            np.logical_and(pix_col>col_beg, pix_col<col_end
-            )))))))))))))
+    # find proportionality between data and model
+    index = np.nonzero(
+        np.logical_and(~np.isnan(data),
+        np.logical_and(pix_lin>line_beg, 
+        np.logical_and(pix_lin<line_end,
+        np.logical_and(data<losmax,
+        np.logical_and(data>losmin,
+        np.logical_and(model<np.nanpercentile(model,98),
+        np.logical_and(model>np.nanpercentile(model,2),
+        np.logical_and(elev<maxtopo,
+        np.logical_and(elev>mintopo,
+        np.logical_and(data!=0.0, 
+        np.logical_and(model!=0.0,   
+        np.logical_and(pix_col>col_beg, pix_col<col_end
+        )))))))))))))
 
-        temp = np.array(index).T
-        x = temp[:,0]; y = temp[:,1]
-        los_clean = data[index].flatten()
-        model_clean = model[index].flatten()
+    temp = np.array(index).T
+    x = temp[:,0]; y = temp[:,1]
+    los_clean = data[index].flatten()
+    model_clean = model[index].flatten()
+
+    if ref == 'emp':
 
         bins = np.arange(gacosmin,gacosmax,abs(gacosmax-gacosmin)/500.)
         inds = np.digitize(model_clean,bins)
         modelbins = []
         losbins = []
         losstd = []
+        xbins, ybins = [], []
         for j in range(len(bins)-1):
             uu = np.flatnonzero(inds == j)
-            if len(uu)>1000:
+            if len(uu)>500:
                 modelbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
 
                 indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
@@ -321,21 +326,65 @@ for i in xrange(1,N):
 
                 losstd.append(np.std(los_clean[uu][indice]))
                 losbins.append(np.median(los_clean[uu][indice]))
+                xbins.append(np.median(x[uu][indice]))
+                ybins.append(np.median(y[uu][indice]))
 
         losbins = np.array(losbins)
         losstd = np.array(losstd)
         modelbins = np.array(modelbins)
+        xbins, ybins = np.array(xbins),np.array(ybins)
 
-        G=np.zeros((len(losbins),2))
-        G[:,0] = 1
-        G[:,1] = modelbins
-        x0 = lst.lstsq(G,losbins)[0]
-        # print x0
-        _func = lambda x: np.sum(((np.dot(G,x)-losbins)/losstd)**2)
-        pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy').x
-        a = pars[0]
-        b = pars[1]
-        print 'ref frame %f + %f gacos for date: %i'%(a,b,idates[i])
+        if doramp == 'yes':
+            G=np.zeros((len(losbins),6))
+            G[:,0] = xbins**2
+            G[:,1] = xbins
+            G[:,2] = ybins**2
+            G[:,3] = ybins
+            G[:,4] = 1
+            G[:,5] = modelbins
+
+            x0 = lst.lstsq(G,losbins)[0]
+            # print x0
+            _func = lambda x: np.sum(((np.dot(G,x)-losbins)/losstd)**2)
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy').x
+            a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+            print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f model for date: %i'%(a,b,c,d,e,f,idates[l])
+            funct = a*x**2 + b*x + c*y**2 + d*y + e
+            functbins = a*xbins**2 + b*xbins + c*ybins**2 + d*ybins + e
+
+            # build total G matrix
+            G=np.zeros((len(data.flatten()),6))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = i**2
+                G[i*ncol:(i+1)*ncol,1] = i
+                G[i*ncol:(i+1)*ncol,2] = np.arange(ncol)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange(ncol)
+            G[:,4] = 1
+            G[:,5] = model.flatten()
+
+            # nparam = G.shape[1]
+            # ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
+            # topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+            model = np.dot(G,pars).reshape(nlign,ncol)
+            model[model==0.] = 0.
+            model[np.isnan(data)] = np.float('NaN')
+
+        
+        else:
+            G=np.zeros((len(losbins),2))
+            G[:,0] = 1
+            G[:,1] = modelbins
+            x0 = lst.lstsq(G,losbins)[0]
+            # print x0
+            _func = lambda x: np.sum(((np.dot(G,x)-losbins)/losstd)**2)
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy').x
+            a = pars[0]
+            b = pars[1]
+            print 'ref frame %f + %f gacos for date: %i'%(a,b,idates[l])
+
+            model = a + b*model
+            model[model==0.] = 0.
+            model[np.isnan(data)] = np.float('NaN')
 
     elif ref == 'pixel':
         model = model - np.nanmean(model[ref_line-2:ref_line+2,ref_col-2:ref_col+2])
@@ -343,12 +392,12 @@ for i in xrange(1,N):
         los_clean = data
         model_clean = model
         a, b = 0., 1.
+        
+        model = a + b*model
+        model[model==0.] = 0.
+        model[np.isnan(data)] = np.float('NaN')
 
     # correction
-    model = a + b*model
-    model[model==0.] = 0.
-    model[np.isnan(data)] = np.float('NaN')
-
     data_flat[:,:] = data - model
     data_flat[np.isnan(data)] = np.float('NaN')
 
@@ -363,15 +412,15 @@ for i in xrange(1,N):
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-        ax.set_title('Data {}'.format(idates[i]),fontsize=6)
+        ax.set_title('Data {}'.format(idates[l]),fontsize=6)
 
         # initiate figure depl
         ax = fig.add_subplot(2,2,2)
-        im = ax.imshow(model,cmap=cmap)
+        im = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)        
-        ax.set_title('Model {}'.format(idates[i]),fontsize=6)
+        ax.set_title('Model {}'.format(idates[l]),fontsize=6)
 
         # initiate figure depl
         ax = fig.add_subplot(2,2,3)
@@ -379,23 +428,30 @@ for i in xrange(1,N):
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-        ax.set_title('Correct Data {}'.format(idates[i]),fontsize=6)
+        ax.set_title('Correct Data {}'.format(idates[l]),fontsize=6)
 
         ax = fig.add_subplot(2,2,4)
 
-        cax = ax.scatter(model_clean, los_clean,s=0.005, alpha=0.1, rasterized=True)
-        if ref == 'ramp':
+        if ref == 'emp':
             x = np.linspace(np.nanmax(model_clean),np.nanmin(model_clean),100)
-            ax.plot(modelbins,losbins,'-r', lw =.5)
-            ax.plot(x, a +b*x,'-r', lw =4.)
+            if doramp == 'yes':
+                ax.scatter(model_clean,los_clean - funct, s=0.005, alpha=0.1, rasterized=True)
+                ax.plot(modelbins,losbins - functbins,'-r', lw =.5)
+                ax.plot(x,f*x,'-r', lw =4.)
+            else:
+                cax = ax.scatter(model_clean, los_clean,s=0.005, alpha=0.1, rasterized=True)
+                ax.plot(modelbins,losbins,'-r', lw =.5)
+                ax.plot(x, a +b*x,'-r', lw =4.)
+        else:
+            cax = ax.scatter(model_clean, los_clean,s=0.05, alpha=0.1, rasterized=True)
         
-        ax.set_ylim([losmin,losmax])
-        ax.set_xlim([gacosmin,gacosmax])
+        ax.set_ylim([(los_clean-funct).min(),(los_clean-funct).max()])
+        ax.set_xlim([model_clean.min(),model_clean.max()])
         ax.set_xlabel('GACOS ZTD')
         ax.set_ylabel('LOS delay')
         ax.set_title('Data/Model')
 
-        fig.savefig('{}-gacos-cor.eps'.format(idates[i]), format='EPS',dpi=150)
+        fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
         plt.show()
         # sys.exit()
 
