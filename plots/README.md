@@ -46,8 +46,4 @@ Display and Cut image file
 Usage: plot_image.py -h | --help
 ```
 
-```
-Usage: plot_tiff.py -h | --help
-```
-
 

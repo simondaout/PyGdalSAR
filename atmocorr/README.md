@@ -1,4 +1,4 @@
-Tools for correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/) or empirical correction on wappred interferograms.
+Tools for correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/) or empirical correction on unwappred interferograms.
 
 correct\_ts\_from\_gacos.py
 ============
@@ -10,7 +10,7 @@ Usage: correct_ts_from_gacos.py -h | --help
 
 invert\_ramp\_topo\_unw.py
 ============
-Removes atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coefficeints on unwrapped interferograms (2 bands BIL format). Reconstruction of the empirical phase correction by time series inversion.
+Removes atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coefficeints on unwrapped interferograms (2 bands BIL format). Possibility to include cross-dependent polynomial functions of range, azimuth and topography, use masks based on additional file or amplide of the RMG interferogram. Reconstruction of the empirical phase correction by time series inversion and impose time series closure of all coefficients.
 
 ```
 Usage: invert_ramp_topo_unw.py
