@@ -12,6 +12,7 @@
 """\
 histo_r4.py
 -------------
+Compute histogram distribution of a real4 file
 
 Usage: histo_r4.py --infile=<path> --coeffile=<path> --threshold=<value> 
 histo_r4.py -h | --help

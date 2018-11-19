@@ -12,6 +12,7 @@
 """\
 geo2r4.py
 -------------
+Convert geotiff or any raster made of 1 band into real4 format.
 
 Usage: geo2r4.py --infile=<path> 
 geo2r4.py -h | --help

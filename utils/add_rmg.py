@@ -12,7 +12,7 @@
 """\
 add_rmg.py
 -------------
-add/remove unw to input interferogram
+Add, substract, and plot RMG (BIL) unwrapped files.
 
 Usage: add_rmg.py --infile=<path> --outfile=<path> [--add=<path>] [--remove=<path>] [--plot=<yes/no>]
 

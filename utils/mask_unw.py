@@ -11,7 +11,7 @@
 """\
 mask_unw.py
 -------------
-mask unw int 
+Mask unwrapped interferogram (BIL format) given a mask file in real4 format.
 
 Usage: mask_unw.py --infile=<path> --maskfile=<path> --outfile=<path> --threshold=<value> --plot=<yes/no>
 

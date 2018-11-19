@@ -12,7 +12,7 @@
 """\
 cut_r4.py
 -------------
-Cut r4 file 
+Crop r4 file   
 
 Usage: cut_r4.py --infile=<path> --outfile=<path> [--lectfile=<path>] [<ibeg>] [<iend>] [<jbeg>] [<jend>]
 

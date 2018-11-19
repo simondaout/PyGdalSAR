@@ -12,7 +12,7 @@
 """\
 extend_r4.py
 -------------
-Cut r4 file 
+Extend real4 file to new number of lines and colums
 
 Usage: extend_r4.py --infile=<path> --outfile=<path> [<ibeg>] [<iend>] [<jbeg>] [<jend>] [--lectfile=<path>]
 

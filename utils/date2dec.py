@@ -12,7 +12,7 @@
 """\
 date2dec.py
 -------------
-convert date to decimal time
+convert dates in YYYYMMDD format to numerical format
 
 Usage: date2dec.py [--dates=<values>] [--datefile=<path>] [--outfile=<path>]
 

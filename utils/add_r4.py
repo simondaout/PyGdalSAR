@@ -12,6 +12,7 @@
 """\
 add_r4.py
 -------------
+Add, substract, compute the amplitude (infile1**2,infile2**2) ar the phase (arctan(infile1/infile2)) from two real4 files.
 
 Usage: add_r4.py --infile1=<path> --infile2=<path> --outfile=<path> --nlign=<value> --ncol=<value> --sign=<+/-/amp/dphi> 
 add_r4.py -h | --help
