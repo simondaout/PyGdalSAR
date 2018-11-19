@@ -770,6 +770,7 @@ for l in xrange((N)):
 
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
+fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
 
 # plt.show()
@@ -3071,8 +3072,8 @@ for ii in xrange(niter):
       setp(axd.get_yticklabels(), visible=False)
       figd.colorbar(caxd, orientation='vertical',aspect=10)
       figd.suptitle('Corrected time series maps')
-      figd.savefig('maps_flat.eps', format='EPS',dpi=150)
       fig.tight_layout()
+      figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
       if radar is not None:
           fig.savefig('phase-topo.eps', format='EPS',dpi=150)
@@ -3089,8 +3090,9 @@ for ii in xrange(niter):
               setp(axtopo.get_yticklabels(), visible=False)
           figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
           figtopo.suptitle('Time series RAMPS+TOPO')
-          figtopo.savefig('tropo.eps', format='EPS',dpi=150)
           fig.tight_layout()
+          figtopo.savefig('tropo.eps', format='EPS',dpi=150)
+          
 
       else:
           # plot corrected ts
@@ -3107,8 +3109,9 @@ for ii in xrange(niter):
           setp(axref.get_yticklabels(), visible=False)
           figref.suptitle('Time series RAMPS')
           figref.colorbar(caxref, orientation='vertical',aspect=10)
-          figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
           fig.tight_layout()
+          figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
+          
 
       if plot=='yes':
         plt.show()
@@ -3297,20 +3300,22 @@ fid = open('depl_cumule_flat', 'wb')
 cube_flata.flatten().astype('float32').tofile(fid)
 fid.close()
 
-fid = open('depl_cumule_noramps', 'wb')
-cube_noramps.flatten().astype('float32').tofile(fid)
-fid.close()
-
 if fulloutput=='yes':
     if (seasonal=='yes' or semianual=='yes') and (vect != None or inter=='yes'):
         fid = open('depl_cumule_dseas', 'wb')
         (maps_flata - models_trends).flatten().astype('float32').tofile(fid)
         fid.close()
 
-if inter=='yes':
-    fid = open('depl_cumule_dtrend', 'wb')
-    (maps_flata - models_detrends).flatten().astype('float32').tofile(fid)
-    fid.close()
+    if inter=='yes':
+        fid = open('depl_cumule_dtrend', 'wb')
+        (maps_flata - models_detrends).flatten().astype('float32').tofile(fid)
+        fid.close()
+
+    if flat>0:
+        fid = open('depl_cumule_noramps', 'wb')
+        cube_noramps.flatten().astype('float32').tofile(fid)
+        fid.close()
+
 # # save APS
 # print
 # print 'Saving APS in liste_images_aps.txt'
@@ -3726,6 +3731,7 @@ for l in xrange(Mker):
 plt.suptitle('Time series decomposition')
 
 nfigure += 1
+fig.tight_layout()
 fig.savefig('inversion.eps', format='EPS',dpi=150)
 
 if plot=='yes':

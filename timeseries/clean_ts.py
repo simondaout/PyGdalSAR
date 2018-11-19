@@ -12,7 +12,7 @@
 """\
 clean_ts.py
 -------------
-Clean a ts file given an r4 file (mask) and a threshold on this mask
+Clean a time series file (cube in binary format) given an other real4 file (mask) and a threshold on this mask
 
 Usage: clean_ts.py --infile=<path> --mask=<path> --threshold=<value> --outfile=<path> \
 [--perc=<value>] [--vmin=<value>] [--vmax=<value>] [--rampmask=<yes/no>] \

@@ -362,9 +362,6 @@ for l in xrange(1,N):
             G[:,4] = 1
             G[:,5] = model.flatten()
 
-            # nparam = G.shape[1]
-            # ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-            # topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
             model = np.dot(G,pars).reshape(nlign,ncol)
             model[model==0.] = 0.
             model[np.isnan(data)] = np.float('NaN')
@@ -451,6 +448,7 @@ for l in xrange(1,N):
         ax.set_ylabel('LOS delay')
         ax.set_title('Data/Model')
 
+        fig.tight_layout()
         fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
         plt.show()
         # sys.exit()
