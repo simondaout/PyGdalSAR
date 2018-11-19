@@ -1,0 +1,7 @@
+EraDir=./EraT2m/
+grid_limits_ecmwf = 27.25/89.10/28.25/90.00
+dates_list_ecmwf = 20070101/to/20101231
+param_ecmwf = 167.128 # temperature 2m
+#param_ecmwf = 228.128 # precipitation
+grid_step_ecmwf = 0.75/0.75
+time_steps_ecmwf = 0/6/12/18
