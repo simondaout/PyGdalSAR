@@ -12,7 +12,7 @@
 """\
 plot_geots.py
 -------------
-Plot georeferenced ts 
+Plot georeferenced time series maps additional cropping, conversion options 
 
 Usage: plot_geots.py --vmin=<value> --vmax=<value> [--lectfile=<path>] \
 [--images=<path>]  [--crop=<values>] [--geocrop=<values>] [--dem=<values>] \
@@ -165,7 +165,7 @@ for l in xrange((N)):
         vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
     cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-        vmax=vmax,vmin=vmin,alpha=0.45, zorder=3)    
+        vmax=vmax,vmin=vmin,alpha=1, zorder=3)    
     ax.set_title(idates[l],fontsize=6)
 
     del ds, ds_band1, ds_band2

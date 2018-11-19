@@ -10,11 +10,11 @@
 ############################################
 
 """\
-myshowimage.py
+plot\_image.py
 -------------
 Display and Cut image file 
 
-Usage: myshowimage.py --infile=<path> [<ibeg>] [<iend>] [<jbeg>] [<jend>]
+Usage: plot\_image.py --infile=<path> [<ibeg>] [<iend>] [<jbeg>] [<jend>]
 Options:
 -h --help           Show this screen.
 --infile PATH       File to be cut
