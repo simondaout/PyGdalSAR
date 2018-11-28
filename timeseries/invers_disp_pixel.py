@@ -644,7 +644,7 @@ for jj in xrange((Npix)):
     x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
     dmin = str(datemin) + '0101'
     # hardcoding for my plots
-    # dmin= 20030101
+    dmin= 20030101
     dmax = str(datemax) + '0101'
     xmin = datetime.datetime.strptime('{}'.format(dmin),'%Y%m%d')
     xmax = datetime.datetime.strptime('{}'.format(dmax),'%Y%m%d')
