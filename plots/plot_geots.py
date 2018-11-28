@@ -33,7 +33,7 @@ Options:
 """
 
 # gdal
-import gdal
+import gdal,osr
 gdal.UseExceptions()
 
 # numpy
@@ -101,9 +101,17 @@ print 'Number images: ', N
 fig = plt.figure(1,figsize=(18,16))
 fig.subplots_adjust(wspace=0.001)
 
-# for l in xrange((1)): 
-#     l=26
+
+# LOOK for Nan on the last date
+infile = 'geo_'+str(idates[-1])+'_'+str(N-1)+'.unw'
+ds = gdal.Open(infile, gdal.GA_ReadOnly)
+ds_band2 = ds.GetRasterBand(2)
+los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
+index = np.nonzero(los==0)
+
 for l in xrange((N)):  
+#for l in xrange((1)): 
+#    l=26
 
     infile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw'
     rscfile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw.rsc'
@@ -113,7 +121,7 @@ for l in xrange((N)):
     ds_band2 = ds.GetRasterBand(2)
     los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
     amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    los[los==0] = np.float('NaN')
+    los[index] = np.float('NaN')
 
     ds_geo=ds.GetGeoTransform()
     print 'Read infile:', infile
@@ -127,15 +135,21 @@ for l in xrange((N)):
     masked_array = np.ma.array(los, mask=np.isnan(los))
     # cmap.set_bad('white')
     # cmap[...,-1] = 0
-
     cdem = cm.Greys
     cdem.set_bad('white')
-
     
     if arguments["--geocrop"] is not None:
+        
+        # check if proejected
+        prj = ds.GetProjection()
+        srs=osr.SpatialReference(wkt=prj)
+        if srs.GetAttrValue('projcs') is not None:
+            projection = 'tmerc'
+        else:
+            projection = 'cyl'
 
         m = Basemap(
-            projection='cyl',\
+            projection=projection,\
             llcrnrlon=lonbeg, \
             llcrnrlat=latbeg, \
             urcrnrlon=lonend, \
@@ -144,11 +158,6 @@ for l in xrange((N)):
             ax=ax,
             )
 
-        # m.drawparallels(np.arange(latbeg,latend,0.25),linewidth=0.25)
-        # m.drawmeridians(np.arange(lonbeg,lonend,0.25),linewidth=0.25)
-        # m.drawparallels(np.arange(latbeg,latend,0.5),labels=[1,0,0,0],zorder=1)
-        # m.drawmeridians(np.arange(lonbeg,lonend,1.),labels=[0,0,0,1],zorder=1)
-        m.fillcontinents(color='white',lake_color='lightblue',zorder=1)
 
     if arguments["--dem"] is not None:
         ds2 = gdal.Open(arguments["--dem"], gdal.GA_ReadOnly)
@@ -161,11 +170,17 @@ for l in xrange((N)):
         hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
         vmax=np.nanpercentile(dem,98),vmin=np.nanpercentile(dem,2),zorder=1)
     else:
-        hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
-        vmax=4500,vmin=2000,alpha=1.,zorder=1)
+        #hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
+        #vmax=4500,vmin=2000,alpha=1.,zorder=3)
+        m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=1)
+        
 
     cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-        vmax=vmax,vmin=vmin,alpha=1, zorder=3)    
+        vmax=vmax,vmin=vmin,alpha=1, zorder=2)    
+    m.drawparallels(np.arange(latbeg,latend,.5),linewidth=0.05,dashes=[1, 0],zorder=3)
+    m.drawmeridians(np.arange(lonbeg,lonend,.5),linewidth=0.05,dashes=[1, 0],zorder=3)
+    #m.drawparallels(np.arange(latbeg,latend,.5),labels=[1,0,0,0],zorder=3)
+    #m.drawmeridians(np.arange(lonbeg,lonend,.5),labels=[0,0,0,1],zorder=3)
     ax.set_title(idates[l],fontsize=6)
 
     del ds, ds_band1, ds_band2
@@ -173,7 +188,7 @@ for l in xrange((N)):
 fig.tight_layout()
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
-fig.savefig('geots.pdf', format='PDF',dpi=180)
+fig.savefig('geots.pdf', format='PDF',dpi=300)
 
 if plot == 'yes':
     plt.show()
