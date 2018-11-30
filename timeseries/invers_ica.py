@@ -232,7 +232,7 @@ if __name__ == "__main__":
     crop = map(float,arguments["--crop"].replace(',',' ').split())
     docrop = 'yes'
   ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-  print 'Compute ICA between ibeg:{} - iend{} and jbeg:{} - jend:{} '.format(ibeg,iend,jbeg,jend)
+  print 'Compute ICA between ibeg:{} - iend:{} and jbeg:{} - jend:{} '.format(ibeg,iend,jbeg,jend)
   
   if arguments["--plot"] ==  None:
     plot = 'yes'
@@ -450,7 +450,7 @@ fig_perc = plt.figure(500)
 plt.bar((range(len(perc))), perc_2)
 plt.xlabel('n compo', fontsize=18)
 plt.ylabel("percentage", fontsize=16)
-fig_perc.suptitle('percentage total for {} componante = {}'.format(n_comp, pourcentage_tot))
+fig_perc.suptitle('total percentag for {} component = {}'.format(n_comp, pourcentage_tot))
 fig_perc.savefig(outdir+'percentil_{}_{}.pdf'.format(type_decomp, n_comp), format='PDF')
 
 plt.show()
