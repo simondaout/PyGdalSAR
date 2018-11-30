@@ -251,7 +251,7 @@ for i in xrange(M):
     ds = gdal.Open(cofile, gdal.GA_ReadOnly)
     coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
   except:
-    coseismaps[i,:,:] = np.fromfile(sinf,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+    coseismaps[i,:,:] = np.fromfile(cofile,dtype=np.float32).reshape((nlign,ncol))*rad2mm
   listplot.append(coseismaps[i,:,:])
   titles.append('Coseism.{}'.format(i))
 
@@ -298,6 +298,7 @@ for l in xrange(len(listplot)):
   ax.set_title(titles[l],fontsize=6)
   setp(ax.get_xticklabels(), visible=False)
   setp(ax.get_yticklabels(), visible=False)
+fig.savefig('Map_model_{}.pdf'.format(output), format='PDF', dpi=150)
 # plt.show()
 # sys.exit()
 
@@ -421,7 +422,7 @@ for k in xrange(len(ipix)):
 fig.autofmt_xdate()
 plt.xlabel('Time (Year/month/day)')
 plt.ylabel('Displacements')
-fig.savefig('Model_{}.eps'.format(output), format='EPS', dpi=150)
+fig.savefig('Model_{}.pdf'.format(output), format='PDF', dpi=150)
 
 if plot == 'yes':
     plt.show()
