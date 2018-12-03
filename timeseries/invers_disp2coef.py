@@ -508,8 +508,7 @@ print 'Reshape cube: ', maps.shape
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     d = as_strided(maps[:,:,l])
-    # d[kk] = np.float('NaN')
-    maps[:,:,l] = maps[:,:,l] - cst
+    d = d - cst
     if l != imref:
         index = np.nonzero(d==0.0)
         d[index] = np.float('NaN')

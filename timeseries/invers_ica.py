@@ -7,14 +7,14 @@
 # written in Python-Gdal
 #
 ############################################
-# Author        :    Louise Mauband (Grenoble) 
+# Author        :    Louise Mauband (Grenoble)
 ############################################
 
 """\
 invers_ica.py
 InSAR Time Series ICA decomposition 
 
-Usage: invers_ica.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--imref=<value>]  [--n_comp=<values>]  [--crop=<values>] [--resize=<values>] [--type=<space/time>] [--events=<values>] [--save_resize=<yes/no>] [--save_matrix=<yes/no>] [--smooth=<yes/no>] [--plot=<yes/no>]
+Usage: invers_ica.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--imref=<value>]  [--n_comp=<values>]  [--crop=<values>] [--resize=<values>] [--type=<space/time>] [--demfile=<path>] [--events=<values>] [--save_resize=<yes/no>] [--save_matrix=<yes/no>] [--smooth=<yes/no>] [--plot=<yes/no>] [--outdir=<path>]
 
 invers_ica.py -h | --help
 
@@ -27,12 +27,14 @@ Options:
 --n_comp VALUE          Number of eigenvector 
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --type space/time       Space or time decomposition [default:space]
+--demfile               Optinal DEM error coefficient to be removed before ICA decomposition [default: no] 
 --events VALUES         List of event dates 
 --resize VALUE          Integer resize factor [default: 0]
 --save_resize YES/NO    Save the resized cube [default:no]
 --save_matrix YES/NO    Save the A and S matrix for each components [default:no] 
 --smooth YES/NO         Smooth the vector [default:no]
 --plot YES/NO           Display plots [default: yes]
+--outdir PATH           Path to output dir [default: ICA]
 
 """
 
@@ -50,6 +52,8 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
 from matplotlib.dates import date2num
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from datetime import datetime
 import sys, os
 
@@ -133,15 +137,14 @@ def resize_2d_nonan(array,factor):
         # to the standard values of new_array
     return new_array
 #========================
-def ica_spatial(cube, ncol, nrow, ncompo, nbr_dates):
-    print('Decomposition spatiale, {} components'.format(ncompo))
+def ica_spatial(cube, ncol, nrow, ncomp, nbr_dates):
+    print('Decomposition spatiale, {} components'.format(ncomp))
     N = nbr_dates
     d = cube.reshape(((nrow)*(ncol)), N)
     #c.reshape((N3570,N))
-    n_comp = ncompo
+    n_comp = ncomp
     nrow = nrow
     ncol = ncol
-
 
     ica = FastICA(n_components=n_comp, max_iter=10000, tol=0.0001)
 
@@ -159,11 +162,11 @@ def ica_spatial(cube, ncol, nrow, ncompo, nbr_dates):
 
     return S, m
 
-def ica_temporel(cube, ncol, nrow, ncompo, nbr_dates):
-    print('Decomposition temporelle, {} components'.format(ncompo))
+def ica_temporel(cube, ncol, nrow, ncomp, nbr_dates):
+    print('Decomposition temporelle, {} components'.format(ncomp))
     N = nbr_dates
     d = cube.reshape(((nrow)*(ncol)), N)
-    n_comp = ncompo
+    n_comp = ncomp
     nrow = nrow
     ncol = ncol
     ica = FastICA(n_components=n_comp, max_iter=10000, tol=0.0001)
@@ -261,10 +264,26 @@ if __name__ == "__main__":
   else:
       events = arguments["--events"].replace(',',' ').split()
 
+  if arguments["--demfile"] ==  None:
+    demf = 'no'
+    dem = np.zeros((nlign,ncol))
+  else:
+    demf = arguments["--demfile"]
+    extension = os.path.splitext(demf)[1]
+    if extension == ".tif":
+        ds = gdal.Open(demf, gdal.GA_ReadOnly)
+        dem = ds.GetRasterBand(1).ReadAsArray()
+    else:
+        dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
+  
+  if arguments["--outdir"] ==  None:
+    outdir = './ICA/'
+  else:
+    outdir = './' + arguments["--outdir"] + '/'
+
 #====================================
 #========= Code =====================
 
-outdir = './ICA/'
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
@@ -278,11 +297,7 @@ print 'Reshape cube: ', maps.shape
 # ref
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
-    d = as_strided(maps[:,:,l])
-    maps[:,:,l] = maps[:,:,l] - cst
-    if l != imref:
-        index = np.nonzero(d==0.0)
-        d[index] = np.float('NaN')
+    maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l] - base[imref])
  
 if resize !=0:
   maps_liss = np.zeros((np.int(nlign/resize), np.int(ncol/resize), N))
@@ -305,20 +320,20 @@ if docrop == 'yes':
     crop_maps = np.zeros((nlign,ncol,N))
     for j in xrange((N)):
         crop_maps[:,:,j] = maps[jbeg:jend,ibeg:iend,j]
-    
-    maps = crop_maps.flatten()
+    maps = np.copy(crop_maps)
+    print 'Crop cube: ', maps.shape
     
 # remove NaN
 maps[np.isnan(maps)] = 0.
 
 if type_decomp =='space':
-   S, m = ica_spatial(maps, ncol, nlign, n_comp, N)
+   S, m = ica_spatial(maps.flatten(), ncol, nlign, n_comp, N)
 
 if type_decomp =='time':
    print('decomposition temporelle')
-   S, m = ica_temporel(maps, ncol, nlign, n_comp, N)
+   S, m = ica_temporel(maps.flatten(), ncol, nlign, n_comp, N)
 
-fig=plt.figure(1,figsize=(16,12))
+fig=plt.figure(1,figsize=(14,12))
 for i in range(n_comp):
     ax = fig.add_subplot(2,int(n_comp/2)+1,1+i)
     vmax = np.nanpercentile(S[:,:,i], 98)
@@ -326,9 +341,11 @@ for i in range(n_comp):
     c = ax.imshow(S[:,:,i], vmax=vmax, vmin=vmin, cmap=cm.jet)
     plt.setp(ax.get_xticklabels(), visible=False)
     plt.setp(ax.get_yticklabels(), visible=False)
-    cbar = fig.colorbar(c, orientation='vertical',shrink=0.5)
-fig.suptitle('Decomposition {}, components'.format(type_decomp))
-fig.savefig(outdir+'decompo_{}_{}.pdf'.format(n_comp,type_decomp), format='PDF')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(c, cax=cax)
+fig.suptitle('Spatial Eigenvectors')
+fig.savefig(outdir+'decomp_{}_{}.pdf'.format(n_comp,type_decomp), format='PDF')
 
 dates_sar = []
 for i in range((N)):
@@ -345,7 +362,7 @@ xmin = datetime.strptime('{}'.format(dmin),'%Y%m%d')
 xmax = datetime.strptime('{}'.format(dmax),'%Y%m%d')
 xlim=date2num(np.array([xmin,xmax]))
 
-fig=plt.figure(2,figsize=(12,18))
+fig=plt.figure(2,figsize=(14,18))
 fig.autofmt_xdate()
 for i in range(n_comp):
     ax = fig.add_subplot(n_comp,1,i+1)
@@ -356,10 +373,9 @@ for i in range(n_comp):
         ax.axvline(x=x_eq[j],linestyle='--', color = 'r', linewidth = 1)
     ax.set_xlim(xlim)
 fig.autofmt_xdate()
-fig.suptitle('Decomposition {}'.format(type_decomp))
-fig.savefig(outdir+'decompo_{}_{}_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
+fig.suptitle('Temporal eigenvectors'.format(type_decomp))
+fig.savefig(outdir+'decomp_{}_{}_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
 
-print S.shape
 fid = open(outdir+'matrix_ica_{}_{}_{}'.format(cube, n_comp, type_decomp), 'wb')
 S.flatten().astype('float32').tofile(fid)
 fid.close()
@@ -367,7 +383,7 @@ fid.close()
 S2 = S.reshape((nlign*ncol,n_comp))
 S2 = S2[~np.any(np.isnan(S2), axis=1)]
 
-fig=plt.figure(3,figsize=(16,2))
+fig=plt.figure(3,figsize=(8,4))
 for i in range(n_comp):
     ax = fig.add_subplot(1,n_comp,1+i)
     xmin = np.nanpercentile(S[:,i], 1)
@@ -375,9 +391,8 @@ for i in range(n_comp):
     plt.xlim(xmin= xmin, xmax = xmax)
     ax.hist(S2[:,i], 200,density=True)
 
-fig.suptitle('Decomposition {}, PDF'.format(type_decomp))
+fig.suptitle('PDFs eigenvectors'.format(type_decomp))
 fig.savefig(outdir+'PDF_{}_{}.pdf'.format(n_comp, type_decomp), format='PDF')
-
 
 if smooth == 'yes':
         m_smooth =np.zeros((N, n_comp))
@@ -398,160 +413,158 @@ if smooth == 'yes':
             ax.set_xlim(xlim)
         fig.autofmt_xdate()
         fig.suptitle('Decomposition {}'.format(type_decomp))
-        fig.savefig(outdir+'decompo_{}_{}_smooth_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
+        fig.savefig(outdir+'decomp_{}_{}_smooth_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
 else:
     m_smooth = m
 np.savetxt(outdir+'vector_smooth_ica_{}_{}.txt'.format(type_decomp,n_comp),  np.column_stack((idates,m)))
-
 
 if save_matrix == 'yes':
     fid = open(outdir+'maps_ica_{}_{}.r4'.format(type_decomp,n_comp), 'wb')
     S.flatten().astype('float32').tofile(fid)
     fid.close()
-
     np.savetxt(outdir+'vector_ica_{}_{}.txt'.format(type_decomp,n_comp),  np.column_stack((idates,m)))
 
+###### Compute RMS 
+depl_cumule_ica = np.dot(S, m.T).flatten()
+models = as_strided(depl_cumule_ica.reshape((nlign, ncol, N)))
+res = as_strided(maps) - as_strided(models)
+res_ts = maps.reshape((nlign*ncol,N)) - depl_cumule_ica.reshape((nlign*ncol,N))
 
-###### Calcul du RMS et du pourcentage d'explication du signal
-depl_cumule_ica = np.dot(S, m.T).reshape((nlign, ncol, N))
-data = maps.reshape((nlign, ncol, N))
-cube_rms = data - depl_cumule_ica
-rms = maps.reshape((nlign*ncol,N)) - depl_cumule_ica.reshape((nlign*ncol,N))
-
-rms_pixel = np.sqrt(np.nansum(rms**2, axis=1)/N)
-rms_pixel = rms_pixel.reshape((nlign,ncol))
-rmsd = np.sqrt(np.nansum((rms)**2)/((nlign)*(ncol)))
+rms_pixel = np.sqrt(np.nansum(res_ts**2, axis=1)/N).reshape((nlign,ncol))
+rmsd = np.sqrt(np.nansum((res_ts)**2)/((nlign)*(ncol)))
 print('RMS : {}'.format(rmsd))
-
-
-pourcentage_tot = (1 - np.nansum((cube_rms)**2)/np.nansum((data)**2))*100
-print(np.nansum(pourcentage_tot))
+perc_tot = (1 - np.nansum((res)**2)/np.nansum((maps)**2))*100
 
 S_reshape = S.reshape((nlign*ncol,n_comp))
 perc = np.array(range(n_comp))
 for i in range((n_comp)):
-    compo = np.array([m[:,i]])
+    comp = np.array([m[:,i]])
     S_def = np.array([S_reshape[:,i]]).T
-    cube_def = np.dot(S_def, compo)
+    cube_def = np.dot(S_def, comp)
     cube_def = cube_def.reshape((nlign, ncol, len(m[:,0])))
-    pourcentage = (1 - np.nansum((data - cube_def)**2)/np.nansum((data)**2))*100
-    perc[i] = pourcentage
-
+    perc[i] = (1 - np.nansum((maps - cube_def)**2)/np.nansum(maps**2))*100
 
 sum = np.sum(perc)
 perc_2 = np.array(range(n_comp))
-
 for i in range(len(perc)):
     perc_2[i] = (perc[i]/sum)*100
-
-    print('pour la composante {} le pourcentage est de {}'.format(i, perc_2[i]))
+    print('Percentile {}th component: {}'.format(i, perc_2[i]))
 
 fig_perc = plt.figure(500)
 plt.bar((range(len(perc))), perc_2)
-plt.xlabel('n compo', fontsize=18)
-plt.ylabel("percentage", fontsize=16)
-fig_perc.suptitle('total percentag for {} component = {}'.format(n_comp, pourcentage_tot))
+plt.xlabel('n comp', fontsize=18)
+plt.ylabel("Percentile", fontsize=16)
+fig_perc.suptitle('Tot. percentile for {} components: {:.3f}'.format(n_comp, perc_tot))
 fig_perc.savefig(outdir+'percentil_{}_{}.pdf'.format(type_decomp, n_comp), format='PDF')
 
-plt.show()
-sys.exit()
 
 ######### Calcule l'amplitude de chaque eigenvector et le multiplie a la matrice S
-compo_ampli = np.zeros((S_reshape.shape))
-compo_norm = np.zeros((m.shape))
+comp_ampli = np.zeros((S_reshape.shape))
+comp_norm = np.zeros((m.shape))
 for i in range((n_comp)):
     amplitude = ((np.nanmax(m[:,i]))-(np.nanmin(m[:,i])))
-    compo_ampli[:,i] = S_reshape[:,i]*amplitude
-    compo_norm[:,i] = m[:,i]/amplitude
-compo_ampli = compo_ampli.reshape((nlign, ncol, n_comp))
+    comp_ampli[:,i] = S_reshape[:,i]*amplitude
+    comp_norm[:,i] = m[:,i]/amplitude
+comp_ampli = comp_ampli.reshape((nlign, ncol, n_comp))
 
-fig_ampli=plt.figure(31)
+fig_ampli=plt.figure(31,figsize=(14,12))
 for i in range(n_comp):
     ax_norm_2 = fig_ampli.add_subplot(2,int(n_comp/2)+1,1+i)
-    vmax = np.nanpercentile(compo_ampli[:,:,i], 98)
+    vmax = np.nanpercentile(comp_ampli[:,:,i], 98)
     vmin = -vmax
-    c = ax_norm_2.imshow(compo_ampli[:,:,i], vmax=vmax, vmin=vmin, cmap=cm.jet)
+    c = ax_norm_2.imshow(comp_ampli[:,:,i], vmax=vmax, vmin=vmin, cmap=cm.jet)
     plt.setp(ax_norm_2.get_xticklabels(), visible=False)
     plt.setp(ax_norm_2.get_yticklabels(), visible=False)
     ax_norm_2.set_title('IC{}'.format(i+1),fontsize=20)
-    cbar = fig_ampli.colorbar(c, orientation='vertical',shrink=0.5)
-fig_ampli.suptitle('Decomposition {}, components'.format(type_decomp))
-fig_ampli.savefig(outdir+'decompo_norm_carte_{}_{}.pdf'.format(n_comp,type_decomp), format='PDF')
+    divider = make_axes_locatable(ax_norm_2)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(c, cax=cax)
+fig_ampli.suptitle('Normalised spatial eigenvectors')
+fig_ampli.savefig(outdir+'decomp_norm_carte_{}_{}.pdf'.format(n_comp,type_decomp), format='PDF')
 
 # plt.show()
 
-#fig=plt.figure(28,figsize=(10,4))
-fig = plt.figure(figsize=(4,3))
+fig = plt.figure(figsize=(14,8))
 ax_n = fig.add_subplot(111)
 fig.autofmt_xdate()
 for i in range(n_comp):
     #ax_n = fig.add_subplot(n_comp,1,1)
     ax_n.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-    ax_n.plot(x_d, compo_norm[:,i], label='IC{}'.format(i+1))
+    ax_n.plot(x_d, comp_norm[:,i], label='IC{}'.format(i+1))
     for j in xrange(len(x_eq)):
         ax.axvline(x=x_eq[j],linestyle='--', color = 'r', linewidth = 1) 
     ax_n.legend()
 fig.autofmt_xdate()
-fig.suptitle('Decomposition {}'.format(type_decomp))
-fig.savefig(outdir+'decompo_norm_{}_{}_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
+fig.suptitle('Normalised temporal eigenvectors')
+fig.savefig(outdir+'decomp_norm_{}_{}_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
 
 for i in range(n_comp):
     fid = open(outdir+'IC{}_{}_{}.r4'.format(i+1, type_decomp, n_comp), 'wb')
-    compo_ampli[:,:,i].flatten().astype('float32').tofile(fid)
+    comp_ampli[:,:,i].flatten().astype('float32').tofile(fid)
     fid.close()
 
 fig_rms = plt.figure(112)
 vmax = np.nanpercentile(rms_pixel, 98)
 vmin = np.nanpercentile(rms_pixel, 2)
-#print(vmax, vmin)
 c = plt.imshow(rms_pixel[:,:], vmax=vmax, vmin = vmin, cmap=cm.jet)
 cbar = fig_rms.colorbar(c, orientation='vertical',aspect=10)
-fig_rms.suptitle('RMS total = {}'.format(rmsd))
+fig_rms.suptitle('Tot. RMS: {}'.format(rmsd))
 fig_rms.savefig(outdir+'RMS_pixel_ica_{}_{}.pdf'.format(type_decomp, n_comp), format='PDF')
 
-
-depl_cumule_ica = np.dot(S.reshape((nlign*ncol, n_comp)), m.T)
-depl_cumule_ica = depl_cumule_ica.reshape((nlign, ncol, N))
+# save foward model
 fid = open(outdir+'{}_ica_{}'.format(cube, n_comp), 'wb')
 depl_cumule_ica.flatten().astype('float32').tofile(fid)
 fid.close()
 
-
 figd = plt.figure(4,figsize=(14,10))
-vmax = np.nanpercentile(depl_cumule_ica[:,:,:], 98)
+vmax = np.nanpercentile(depl_cumule_ica, 98)
 for l in range((N)):
     axd = figd.add_subplot(4,int(N/4)+1,l+1)
-    axd.set_title(date[l],fontsize=6)
-    caxd = axd.imshow(depl_cumule_ica[:,:,l],cmap=cm.jet,vmax=vmax,vmin=-vmax)
+    axd.set_title(idates[l],fontsize=6)
+    caxd = axd.imshow(maps[:,:,l],cmap=cm.jet,vmax=vmax,vmin=-vmax)
     plt.setp(axd.get_xticklabels(), visible=False)
     plt.setp(axd.get_yticklabels(), visible=False)
 cbar =figd.colorbar(caxd, orientation='vertical',aspect=10)
-figd.suptitle('Decomposition spatiale cube')
+figd.tight_layout()
+figd.suptitle('Time series displacement maps')
+figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cube, type_decomp, n_comp), format='PDF')
+
+figd = plt.figure(5,figsize=(14,10))
+for l in range((N)):
+    axd = figd.add_subplot(4,int(N/4)+1,l+1)
+    axd.set_title(idates[l],fontsize=6)
+    caxd = axd.imshow(models[:,:,l],cmap=cm.jet,vmax=vmax,vmin=-vmax)
+    plt.setp(axd.get_xticklabels(), visible=False)
+    plt.setp(axd.get_yticklabels(), visible=False)
+cbar =figd.colorbar(caxd, orientation='vertical',aspect=10)
+figd.tight_layout()
+figd.suptitle('Time series displacement models')
 figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cube, type_decomp, n_comp), format='PDF')
 
 
-figd = plt.figure(5,figsize=(14,10))
-vmax = np.nanpercentile(cube_rms[:,:,:], 98)
+figd = plt.figure(6,figsize=(14,10))
+vmax = np.nanpercentile(res[:,:,:], 98)
 for l in range((N)):
     axd = figd.add_subplot(4,int(N/4)+1,l+1)
-    axd.set_title(date[l],fontsize=6)
-    caxd = axd.imshow(cube_rms[:,:,l],cmap=cm.jet,vmax=vmax,vmin=-vmax)
+    axd.set_title(idates[l],fontsize=6)
+    caxd = axd.imshow(res[:,:,l],cmap=cm.jet,vmax=vmax,vmin=-vmax)
     plt.setp(axd.get_xticklabels(), visible=False)
     plt.setp(axd.get_yticklabels(), visible=False)
 cbar =figd.colorbar(caxd, orientation='vertical',aspect=10)
-figd.suptitle('Decomposition spatiale cube RMS')
+figd.tight_layout()
+figd.suptitle('RMS time series')
 figd.savefig(outdir+'{}_ica_{}_{}_rms.pdf'.format(cube, type_decomp, n_comp), format='PDF')
 
 fid = open(outdir+'{}_rms_ica_{}'.format(cube, n_comp), 'wb')
-cube_rms.flatten().astype('float32').tofile(fid)
+res.flatten().astype('float32').tofile(fid)
 fid.close()
 
 if plot == 'yes':
     plt.show()
 
-# S_compo = S.reshape((nlign*ncol, n_comp))
+# S_comp = S.reshape((nlign*ncol, n_comp))
 # for i in range(n_comp):
-#     X = np.dot(np.array([S_compo[:,i]]).T, np.array([m[:,i]]))
+#     X = np.dot(np.array([S_comp[:,i]]).T, np.array([m[:,i]]))
 #     X = X.reshape((nlign, ncol, N))
 #     figd = plt.figure(220+i,figsize=(14,10))
 #     vmax = np.nanpercentile(X, 98)

@@ -11,8 +11,6 @@ invers_pixel_ica.py should run before
 """
 
 
-
-
 from sklearn.decomposition import FastICA, PCA
 
 import matplotlib
