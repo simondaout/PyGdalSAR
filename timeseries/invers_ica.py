@@ -7,7 +7,7 @@
 # written in Python-Gdal
 #
 ############################################
-# Author        :    Louise Mauband (Grenoble)
+# Author        :    Louise Maubant (Grenoble)
 ############################################
 
 """\
