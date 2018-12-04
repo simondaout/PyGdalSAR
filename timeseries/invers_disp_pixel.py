@@ -41,8 +41,8 @@ of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic func
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]
---cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
---ineq VALUE            If yes, add inequqlity constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the 
+--cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: None]
+--ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the 
 same sign than coseismic [default: no].       
 --name Value            Name output figures [default: None] 
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
@@ -59,7 +59,7 @@ from numpy.lib.stride_tricks import as_strided
 # scipy
 import scipy
 import scipy.optimize as opt
-import scipy.linalg as lst
+import numpy.linalg as lst
 
 # basic
 import math,sys,getopt
@@ -240,7 +240,7 @@ if arguments["--ineq"] ==  None:
 else:
     ineq = arguments["--ineq"] 
 if arguments["--cond"] ==  None:
-    rcond = 1.0e-10
+    rcond = None
 else:
     rcond = float(arguments["--cond"]) 
 if arguments["--imref"] ==  None:
@@ -496,11 +496,13 @@ if dem=='yes':
    index = index + 1
 
 if vectf != None:
+  indexvect = np.zeros(len(vectf))
   fig = plt.figure(100,figsize=(12,8))
   for i in xrange(len(vectf)):
     kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v[i]))
     ax = fig.add_subplot(len(vectf),1,i+1)
     ax.plot(dates,kernels[-1].g(~np.isnan(dates)))
+    indexvect[i] = index
     index = index + 1
 
 indexpo = indexpo.astype(int)
@@ -540,15 +542,13 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
         # build Cov matrix
         Cd = np.diag(sigmad**2,k=0)
         Cov = (np.linalg.inv(Cd))
-        # fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
         try:
             fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
         except:
-            fsoln = lst.lstsq(A,b,cond=cond)[0]
+            fsoln = lst.lstsq(A,b,rcond=cond)[0]
         print 'least-square solution:'
         print fsoln
         print 
-            # fsoln = np.ones((A.shape[1]))*float('NaN')
 
     else:
 
@@ -801,9 +801,9 @@ for jj in xrange((Npix)):
     for l in xrange((Mbasis)):
         G[:,l]=basis[l].g(tdec)
     for l in xrange((Mker)):
-        G[:,Mbasis+l]=np.interp(tdec,dates,kernels[l].g(np.arange(len(tabx))))
-       
+        G[:,Mbasis+l]=np.interp(tdec,tabx,kernels[l].g(k))
     model = np.dot(G,m)
+    
     if inter=='yes':
         model_lin = np.dot(G[:,indexinter],m[indexinter])
     if dem=='yes':
@@ -812,7 +812,8 @@ for jj in xrange((Npix)):
         model_dem = np.zeros((N))
 
     # plot model
-    ax.plot(t,model,'-r')
+    ax.plot(t,model-model_dem,'-r')
+    
     if inter=='yes':
         ax3.plot(t,model-model_lin-model_dem,'-r')
         

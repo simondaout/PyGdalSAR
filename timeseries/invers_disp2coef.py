@@ -909,15 +909,10 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         # build Cov matrix
         Cd = np.diag(sigmad**2,k=0)
         Cov = (np.linalg.inv(Cd))
-        # fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
         try:
             fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
         except:
             fsoln = lst.lstsq(A,b,cond=cond)[0]
-        # print 'least-square solution:'
-        # print fsoln
-        # print
-            # fsoln = np.ones((A.shape[1]))*float('NaN')
 
     else:
 
@@ -957,9 +952,6 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)
         fsoln = res[0]
-        # print 'optimization:'
-        # print fsoln
-        # print
 
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
