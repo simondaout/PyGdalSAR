@@ -890,7 +890,6 @@ else:
     print 'Output uncertainties for first iteration:', inaps
     print
 
-
 ## inversion procedure
 def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
     '''Solves the constrained inversion problem.
@@ -3208,7 +3207,7 @@ for ii in xrange(niter):
                     G[:,Mbasis+l]=kernels[l].g(k)
 
                 # if only ref + seasonal: ref + cos + sin
-                print rmsd
+                #print rmsd
                 if rmsd >= maxrmsd or inter!='yes':
                     mt,sigmamt = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
 
