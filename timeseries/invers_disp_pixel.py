@@ -213,7 +213,7 @@ class vector(pattern):
     def __init__(self,name,reduction,vect):
         self.name = name
         self.reduction = reduction
-        self.func=vect
+        self.func = vect
 
     def info(self):
         print self.name
@@ -300,9 +300,9 @@ sse_time = sse[::2]
 sse_car = sse[1::2]  
 
 if arguments["--vector"] != None:
-    vect = arguments["--vector"]
+    vectf = arguments["--vector"].replace(',',' ').split()
 else:
-    vect = None
+    vectf = None
 
 if arguments["--bounds"] is not  None:
     ylim = map(float,arguments["--bounds"].replace(',',' ').split())
@@ -407,8 +407,10 @@ if apsf is not None:
     inaps[index] = minaps
     print 'Output uncertainties for first iteration:', inaps
 
-if vect is not None:
-    v = np.loadtxt(vect, comments='#', unpack = False, dtype='f')
+if vectf is not None:
+    v = np.zeros((len(vectf),N))
+    for i in xrange(len(vectf)):
+        v[i,:] = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
 
 if infof is not None:
     extension = os.path.splitext(infof)[1]
@@ -493,10 +495,13 @@ if dem=='yes':
    indexdem = index
    index = index + 1
 
-if vect != None:
-   kernels.append(vector(name='vector',reduction='vector',vect=v))
-   indexvect = index
-   index = index + 1
+if vectf != None:
+  fig = plt.figure(100,figsize=(12,8))
+  for i in xrange(len(vectf)):
+    kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v[i]))
+    ax = fig.add_subplot(len(vectf),1,i+1)
+    ax.plot(dates,kernels[-1].g(~np.isnan(dates)))
+    index = index + 1
 
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
@@ -729,8 +734,11 @@ for jj in xrange((Npix)):
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
-        demerr[k] =  np.dot(G[:,Mbasis:],m[Mbasis:])
-
+        if dem=='yes':
+            demerr[k] =  np.dot(G[:,indexdem],m[indexdem])
+        else:
+            demerr = np.zeros((N))
+        
         print
         print 'computation time:', time.time() - t
         print
@@ -760,13 +768,11 @@ for jj in xrange((Npix)):
     else:
       ax.plot(x,disp-demerr,'o',label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
     ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
-    # ax.plot(x,mdisp-demerr,'o', label='model',color='red', alpha=0.5)
     
     # plot data and model minus dem error and linear term
     if inter=='yes':
         ax3.plot(x,disp-demerr-lin,'o',label='detrended data')
         ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
-        # ax3.plot(x,mdisp-demerr-lin,'o', label='detrended model',color='red', alpha=0.5)
     
     # plot data and model minus dem error and seasonal terms
     if seasonal=='yes':
@@ -786,7 +792,6 @@ for jj in xrange((Npix)):
         # ax2.plot(x,mdisp-disp_seas-demerr,'o',color='red',alpha=0.5,label='model -seasonal')
         ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.3)
 
-
     # create synthetic time
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
     tdec = np.array([float(date.strftime('%Y')) + float(date.strftime('%j'))/365.1 for date in t])
@@ -795,16 +800,21 @@ for jj in xrange((Npix)):
     G=np.zeros((len(tdec),M))
     for l in xrange((Mbasis)):
         G[:,l]=basis[l].g(tdec)
+    for l in xrange((Mker)):
+        G[:,Mbasis+l]=np.interp(tdec,dates,kernels[l].g(np.arange(len(tabx))))
        
-    # correct ??
-    model = np.dot(G[:,:Mbasis],m[:Mbasis])
+    model = np.dot(G,m)
     if inter=='yes':
         model_lin = np.dot(G[:,indexinter],m[indexinter])
+    if dem=='yes':
+        model_dem = np.dot(G[:,indexdem],m[indexdem])
+    else:
+        model_dem = np.zeros((N))
 
     # plot model
     ax.plot(t,model,'-r')
     if inter=='yes':
-        ax3.plot(t,model-model_lin,'-r')
+        ax3.plot(t,model-model_lin-model_dem,'-r')
         
     if seasonal=='yes':
         G=np.zeros((len(tdec),2))
@@ -819,7 +829,7 @@ for jj in xrange((Npix)):
         mseas = mseas + np.dot(G[:,:],m[indexsemi:indexsemi+2])
             
     if seasonal=='yes' or semianual=='yes':
-        ax2.plot(t,model-mseas,'-r')
+        ax2.plot(t,model-mseas-model_dem,'-r')
         ax2.legend(loc='best',fontsize='x-small')
         ax2.set_xlim(xlim)
         if arguments["--bounds"] is not  None:
@@ -839,23 +849,19 @@ for jj in xrange((Npix)):
     fig.autofmt_xdate()
     ax.set_xlabel('Time (Year/month/day)')
     ax.set_ylabel('Displacements (mm)')
-    # fig.savefig('Disp_{}.eps'.format(output), format='EPS')
     fig.savefig('Disp_{}.pdf'.format(output), format='PDF')
 
     if inter=='yes':    
         fig3.autofmt_xdate()
         ax3.set_xlabel('Time (Year/month/day)')
         ax3.set_ylabel('Displacements (mm)')
-        # fig3.savefig('Disp_{}_detrended.eps'.format(output), format='EPS')
         fig3.savefig('Disp_{}_detrended.pdf'.format(output), format='PDF')
 
     if seasonal == 'yes' or semianual =='yes':
         fig2.autofmt_xdate()
         ax2.set_xlabel('Time (Year/month/day)')
         ax2.set_ylabel('Displacements (mm)')
-        # fig2.savefig('Disp_{}_deseas.eps'.format(output), format='EPS')
         fig2.savefig('Disp_{}_deseas.pdf'.format(output), format='PDF')
-
 
     if seasonal == 'yes':
         cosine = as_strided(m[indexseas])
