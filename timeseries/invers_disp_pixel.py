@@ -37,7 +37,7 @@ of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic func
 (e.g. 2004.,1,2006,0.5), default: None 
 --seasonal PATH         If yes, add seasonal terms in the inversion
 --semianual PATH        If yes, add semianual  terms in the inversion
---vector PATH           Path to the vector text file containing a value for each dates [default: None]
+--vector PATH           Path to the vector text files containing a value for each dates [default: None]
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]

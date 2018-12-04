@@ -40,7 +40,7 @@ Options:
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None
---vector PATH           Path to the vector text file containing a value for each dates [default: None]
+--vector PATH           Path to the vector text files containing a value for each dates [default: None]
 --seasonal YES/NO       If yes, add seasonal terms in the inversion
 --semianual YES/NO      If yes, add semianual terms in the inversion
 --dem Yes/No            If yes, add term proportional to the perpendicular baseline in the inversion
@@ -65,7 +65,7 @@ while for the next itarations, uncertainties are equals to the global RMS of the
 --perc_los VALUE        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:98.]
 --perc_topo VALUE       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:90.]
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
---cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
+--cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: None]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
 as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
 --fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
@@ -93,7 +93,7 @@ from numpy.lib.stride_tricks import as_strided
 # scipy
 import scipy
 import scipy.optimize as opt
-import scipy.linalg as lst
+import numpy.linalg as lst
 
 # from nsbas import gdal, osr
 import gdal, osr
@@ -313,7 +313,7 @@ sse_time = sse[::2]
 sse_car = sse[1::2]
 
 if arguments["--vector"] != None:
-    vect = arguments["--vector"]
+    vectf = arguments["--vector"].replace(',',' ').split()
 else:
     vect = None
 
@@ -403,7 +403,7 @@ else:
     jendref = int(arguments["<jend>"])
 
 if arguments["--cond"] ==  None:
-    rcond = 1.0e-10
+    rcond = None
 else:
     rcond = float(arguments["--cond"])
 if arguments["--rmspixel"] ==  None:
@@ -841,9 +841,11 @@ if dem=='yes':
    index = index + 1
 
 if vect != None:
-   kernels.append(vector(name='vector',reduction='vector',vect=v))
-   indexvect = index
-   index = index + 1
+   indexvect = np.zeros(len(vectf))
+   for i in xrange(len(vectf)):
+     kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v[i]))
+     indexvect[i] = index
+     index = index + 1
 
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
@@ -912,7 +914,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         try:
             fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
         except:
-            fsoln = lst.lstsq(A,b,cond=cond)[0]
+            fsoln = lst.lstsq(A,b,rcond=cond)[0]
 
     else:
 
@@ -924,7 +926,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         for i in xrange(len(indexco)):
             if pos[i] > 0.:
                 Ain[:,indexpo[i]] = 0
-        minit = lst.lstsq(Ain,bin,cond=cond)[0]
+        minit = lst.lstsq(Ain,bin,rcond=cond)[0]
 
         # # initialize bounds
         mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf
@@ -3206,6 +3208,7 @@ for ii in xrange(niter):
                     G[:,Mbasis+l]=kernels[l].g(k)
 
                 # if only ref + seasonal: ref + cos + sin
+                print rmsd
                 if rmsd >= maxrmsd or inter!='yes':
                     mt,sigmamt = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
 
@@ -3216,8 +3219,6 @@ for ii in xrange(niter):
                 else:
                     sigmam[:mt.shape[0]] = sigmamt
                     m[:mt.shape[0]] = mt
-                # print m
-                # print
 
                 # save m
                 for l in xrange((Mbasis)):
