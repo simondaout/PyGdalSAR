@@ -415,7 +415,7 @@ if smooth == 'yes':
         fig.suptitle('Decomposition {}'.format(type_decomp))
         fig.savefig(outdir+'decomp_{}_{}_smooth_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
 else:
-    m_smooth = m
+        m_smooth = m
 np.savetxt(outdir+'vector_smooth_ica_{}_{}.txt'.format(type_decomp,n_comp),  np.column_stack((idates,m)))
 
 if save_matrix == 'yes':
