@@ -324,7 +324,7 @@ if docrop == 'yes':
     print 'Crop cube: ', maps.shape
     
 # remove NaN
-maps[np.isnan(maps)] = 0.
+#maps[np.isnan(maps)] = 0.
 
 if type_decomp =='space':
    S, m = ica_spatial(maps.flatten(), ncol, nlign, n_comp, N)
