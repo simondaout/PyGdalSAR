@@ -27,7 +27,7 @@ Options:
 --n_comp VALUE          Number of eigenvector 
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --type space/time       Space or time decomposition [default:space]
---demfile               Optinal DEM error coefficient to be removed before ICA decomposition [default: no] 
+--demfile               Optional DEM error coefficient to be removed before ICA decomposition [default: no] 
 --events VALUES         List of event dates 
 --resize VALUE          Integer resize factor [default: 0]
 --save_resize YES/NO    Save the resized cube [default:no]

@@ -35,8 +35,7 @@ Options:
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
 --interseismic YES/NO   Add a linear function in the inversion
---threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic,
-: if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
+--threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None
@@ -50,8 +49,7 @@ Options:
 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
 4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e,
 8: ay**2+by+cx**3+dx**2+ex+f, 9: ax+by+cxy**2+dxy+e
---niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration,
-while for the next itarations, uncertainties are equals to the global RMS of the previous iteration for each map [default: 1]
+--niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, while for the next itarations, uncertainties are equals to the global RMS of the previous iteration for each map [default: 1]
 --spatialiter  YES/NO   If yes iterate the spatial estimations at each iterations (defined by niter) on the maps minus the temporal terms (ie. interseismic, coseismic...) [default: no]
 --sampling VALUE        Downsampling factor [default: 1]
 --imref VALUE           Reference image number [default: 1]
@@ -65,9 +63,8 @@ while for the next itarations, uncertainties are equals to the global RMS of the
 --perc_los VALUE        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:98.]
 --perc_topo VALUE       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:90.]
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
---cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: None]
---ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions
-as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
+--cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
+--ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
 --fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
 --plot YES/NO           Display plots [default: yes]
@@ -89,20 +86,16 @@ print
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-
+import numpy.linalg as lst
 # scipy
 import scipy
 import scipy.optimize as opt
-import numpy.linalg as lst
-
 # from nsbas import gdal, osr
 import gdal, osr
-
 # basic
 import math,sys,getopt
 from os import path, environ
 import os
-
 # plot
 import matplotlib
 #matplotlib.use('TkAgg') # Must be before importing matplotlib.pyplot or pylab!
@@ -403,7 +396,7 @@ else:
     jendref = int(arguments["<jend>"])
 
 if arguments["--cond"] ==  None:
-    rcond = None
+    rcond = 1e-3
 else:
     rcond = float(arguments["--cond"])
 if arguments["--rmspixel"] ==  None:
@@ -819,12 +812,13 @@ for i in xrange(len(cos)):
     index = index + 1
     iteration=True
 
-indexpo = np.zeros(len(pos))
+indexpo = []
 for i in xrange(len(pos)):
     if pos[i] > 0. :
         basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
-        indexpo[i] = index
+        indexpo.append(int(index))
         index = index + 1
+indexpo = np.array(indexpo)
 
 indexsse = np.zeros(len(sse_time))
 for i in xrange(len(sse_time)):
@@ -890,12 +884,26 @@ else:
     print 'Output uncertainties for first iteration:', inaps
     print
 
-## inversion procedure
-def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
+# SVD inversion with cut-off eigenvalues
+def invSVD(A,b,cond):
+    try:
+        U,eignv,V = lst.svd(A, full_matrices=False)
+        s = np.diag(eignv)
+        index = np.nonzero(s<cond)
+        inv = lst.inv(s)
+        inv[index] = 0.
+        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+    except:
+        fsoln = lst.lstsq(A,b,rcond=cond)[0]
+    
+    return fsoln
+
+## inversion procedure 
+def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
     '''Solves the constrained inversion problem.
 
     Minimize:
-
+    
     ||Ax-b||^2
 
     Subject to:
@@ -906,54 +914,44 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-
-        # build Cov matrix
-        Cd = np.diag(sigmad**2,k=0)
-        Cov = (np.linalg.inv(Cd))
-        try:
-            fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
-        except:
-            fsoln = lst.lstsq(A,b,rcond=cond)[0]
-
+        
+        fsoln = invSVD(A,b,cond)
+        
     else:
 
-        Ain = np.copy(A)
-        bin = np.copy(b)
-
-        ## We here want a solution as much conservatif as possible, ie only coseismic steps
-        ## least-squqre solution without post-seismic
-        for i in xrange(len(indexco)):
-            if pos[i] > 0.:
-                Ain[:,indexpo[i]] = 0
-        minit = lst.lstsq(Ain,bin,rcond=cond)[0]
+        # prior solution without postseismic 
+        Ain = np.delete(A,indexpo,1)
+        mtemp = invSVD(Ain,b,cond)
+        #print mtemp
+        
+        # rebuild full vector
+        for z in xrange(len(indexpo)):
+            mtemp = np.insert(mtemp,indexpo[z],0)
+        minit = np.copy(mtemp)
 
         # # initialize bounds
-        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf
+        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
 
         # We here define bounds for postseismic to be the same sign than coseismic
-        # and coseisnic inferior or egal to the coseimic initial
+        # and coseismic inferior or egual to the coseimic initial 
         for i in xrange(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])]
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])]
-                if minit[int(indexpo[i])] < 0 :
-                    minit[int(indexpo[i])] = 0.
+                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, np.inf 
+                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = minit[int(indexco[i])] , 0
+                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-                if minit[int(indexpo[i])] > 0 :
-                    minit[int(indexpo[i])] = 0.
-
+        
         # print mmin,mmax
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-
+        
         bounds=zip(mmin,mmax)
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-            iter=iter,full_output=True,iprint=0,acc=acc)
+            iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
-
+	
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
     # sigma m **2 =  misfit**2 * diag([G.TG]-1)
@@ -961,7 +959,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-10):
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
        scale = 1./(A.shape[0]-A.shape[1])
-       #scale = 1./A.shape[0]
+       # scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')

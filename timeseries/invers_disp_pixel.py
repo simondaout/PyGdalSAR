@@ -13,7 +13,7 @@ Temporal inversions of the time series delays of selected pixels (used depl_cumu
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
-[--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] 
+[--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
 
 invers_disp_pixel.py -h | --help
 Options:
@@ -31,35 +31,33 @@ Options:
 --threshold_rmsd VALUE  If interseismic = yes: first try inversion with ref/interseismic/dem only, if RMDS inversion > threshold_rmsd then add other 
 basis functions [default: 1.] 
 --coseismic PATH        Add heaviside functions to the inversion .Indicate coseismic time (e.g 2004.,2006.)
---postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values 
-of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
---slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events
-(e.g. 2004.,1,2006,0.5), default: None 
+--postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
+--slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
 --seasonal PATH         If yes, add seasonal terms in the inversion
 --semianual PATH        If yes, add semianual  terms in the inversion
 --vector PATH           Path to the vector text files containing a value for each dates [default: None]
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]
---cond VALUE            Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: None]
---ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the 
-same sign than coseismic [default: no].       
+--cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1.e-3]
+--ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than coseismic [default: no].       
 --name Value            Name output figures [default: None] 
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
 --plot                  Display results [default: yes]            
 --iref                  colum numbers of the reference pixel [default: None] 
 --jref                  lign number of the reference pixel [default: None]
 --bounds                Min,Max time series plots 
+--datelim               datemin,datemax time series plots 
 """
 
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+import numpy.linalg as lst
 
 # scipy
 import scipy
 import scipy.optimize as opt
-import numpy.linalg as lst
 
 # basic
 import math,sys,getopt
@@ -240,7 +238,7 @@ if arguments["--ineq"] ==  None:
 else:
     ineq = arguments["--ineq"] 
 if arguments["--cond"] ==  None:
-    rcond = None
+    rcond = 1e-3
 else:
     rcond = float(arguments["--cond"]) 
 if arguments["--imref"] ==  None:
@@ -474,19 +472,21 @@ for i in xrange(len(cos)):
    index = index + 1
    iteration=True
 
-indexpo = np.zeros(len(pos))
-for i in xrange(len(pos)):
-   if pos[i] > 0. :
-      basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
-      indexpo[i] = int(index)
-      index = index + 1
-
 indexsse = np.zeros(len(sse_time))
 for i in xrange(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
     indexsse[i] = int(index)
     index = index + 1
     iteration=True
+
+indexpo = []
+for i in xrange(len(pos)):
+   if pos[i] > 0. :
+      basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
+      indexpo.append(int(index))
+      index = index + 1
+indexpo = np.array(indexpo)
+
 
 kernels=[]
 
@@ -509,6 +509,7 @@ indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
 
+
 # define size G matrix
 print
 Mbasis=len(basis)
@@ -519,11 +520,8 @@ M = Mbasis + Mker
 for i in xrange((Mbasis)):
     basis[i].info()
 
-#print indexco, cos
-#print indexpo, pos
-
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
+def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -539,31 +537,37 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
 
     if ineq == 'no':
         
-        # build Cov matrix
-        Cd = np.diag(sigmad**2,k=0)
-        Cov = (np.linalg.inv(Cd))
-        try:
-            fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
-        except:
-            fsoln = lst.lstsq(A,b,rcond=cond)[0]
-        print 'least-square solution:'
-        print fsoln
+        U,eignv,V = lst.svd(A, full_matrices=False)
+        s = np.diag(eignv)
         print 
+        print 'Eigenvalues:', eignv
+        index = np.nonzero(s<cond)
+        inv = lst.inv(s)
+        inv[index] = 0.
+        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+        print 'SVD solution:', fsoln
+        print
 
     else:
 
-        Ain = np.copy(A)
-        bin = np.copy(b)
-
-        ## We here want a solution as much conservatif as possible, ie only coseismic steps 
-        ## least-squqre solution without post-seismic
-        for i in xrange(len(indexco)):
-            if pos[i] > 0.:
-                Ain[:,indexpo[i]] = 0
-        minit = lst.lstsq(Ain,bin,cond=cond)[0]
+        Ain = np.delete(A,indexpo,1)
+        U,eignv,V = lst.svd(Ain, full_matrices=False)
+        s = np.diag(eignv)
+        print 
+        print 'Eigenvalues:', eignv
+        index = np.nonzero(s<cond)
+        inv = lst.inv(s)
+        inv[index] = 0.
+        mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+        #print mtemp
+        #print indexpo
+        # rebuild full vector
+        for z in xrange(len(indexpo)):
+                mtemp = np.insert(mtemp,indexpo[z],0)
+        #        print mtemp
+        minit = np.copy(mtemp)
+        print 'Prior model:', minit
         print
-        print minit
-
         # # initialize bounds
         mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
 
@@ -571,15 +575,11 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
         # and coseisnic inferior or egal to the coseimic initial 
         for i in xrange(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])] 
+                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, np.inf 
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
-                if minit[int(indexpo[i])] < 0 :
-                    minit[int(indexpo[i])] = 0.
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = minit[int(indexco[i])] , 0
+                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-                if minit[int(indexpo[i])] > 0 :
-                    minit[int(indexpo[i])] = 0.
         
         # print mmin,mmax
         ####Objective function and derivative
@@ -590,11 +590,9 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
-
-        print 'optimization:'
-        print fsoln
+	
+        print 'Optimization:', fsoln
         print
-        # sys.exit()
 
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
@@ -647,10 +645,13 @@ for jj in xrange((Npix)):
     print 
 
     x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-    dmin = str(datemin) + '0101'
-    # hardcoding for my plots
-    dmin= 20030101
-    dmax = str(datemax) + '0101'
+    #hardcoding for my plots
+    #dmin= 20030101
+    if arguments["--dateslim"] is not  None:
+        dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+    else:
+        dmax = str(datemax) + '0101'
+        dmin = str(datemin) + '0101'
     xmin = datetime.datetime.strptime('{}'.format(dmin),'%Y%m%d')
     xmax = datetime.datetime.strptime('{}'.format(dmax),'%Y%m%d')
     xlim=date2num(np.array([xmin,xmax]))
@@ -677,12 +678,8 @@ for jj in xrange((Npix)):
     tabx = dates[k]
     taby = disp[k] 
     bp = base[k]
-    # sigmad = aps
-    sigmad = aps  # I don't want zero uncertainties
+    sigmad = aps  
     print 'data uncertainties', sigmad    
-
-    # initialize new aps for each images to 1
-    aps = np.ones((N))
 
     # do only this if more than N/2 points left
     if kk > N/6:
@@ -809,7 +806,7 @@ for jj in xrange((Npix)):
     if dem=='yes':
         model_dem = np.dot(G[:,indexdem],m[indexdem])
     else:
-        model_dem = np.zeros((N))
+        model_dem = np.zeros(len(model))
 
     # plot model
     ax.plot(t,model-model_dem,'-r')
