@@ -14,9 +14,9 @@ plot_geots.py
 -------------
 Plot georeferenced time series maps additional cropping, conversion options 
 
-Usage: plot_geots.py --vmin=<value> --vmax=<value> [--lectfile=<path>] \
+Usage: plot_geots.py [--vmin=<value>] [--vmax=<value>] [--wrap=<values>] [--lectfile=<path>] \
 [--images=<path>]  [--crop=<values>] [--geocrop=<values>] [--dem=<values>] \
-[--cpt=<values>] [--plot=<yes/no>] [--rad2mm=<value>]
+[--cpt=<values>] [--plot=<yes/no>] [--rad2mm=<value>] [--clean_demerr=<path>] [--imref=<value>]
 
 Options:
 -h --help           Show this screen.
@@ -26,14 +26,17 @@ Options:
 --crop VALUE        Crop in geo coordiantes [default: 0,nlign,0,ncol]
 --vmax              Max colorscale 
 --vmin              Min colorscale 
+--wrap  VALUE       Wrapped phase between value [default: no]
 --cpt               Indicate colorscale
 --dem               path to DEM file
---rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
---plot              Display results [default: yes] 
+--rad2mm            Scaling value between input data (rad) and desired output [default: -4.4563]
+--plot              Display results [default: yes]
+--clean_demerr      Path to dem error file
+--imref             Ref image for corrdem
 """
 
-# gdal
-import gdal,osr
+
+import gdal,osr,os
 gdal.UseExceptions()
 
 # numpy
@@ -74,8 +77,18 @@ if arguments["--rad2mm"] ==  None:
 else:
     rad2mm = float(arguments["--rad2mm"])
 
-vmin = np.float(arguments["--vmin"])
-vmax = np.float(arguments["--vmax"])
+if arguments["--imref"] ==  None:
+    imref = 0
+elif arguments["--imref"] < 1:
+    print '--imref must be between 1 and Nimages'
+else:
+    imref = int(arguments["--imref"]) - 1
+
+if arguments["--vmax"] is not  None:
+    vmax = np.float(arguments["--vmax"])
+
+if arguments["--vmin"] is not  None:
+    vmin = np.float(arguments["--vmin"])
 
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
@@ -89,6 +102,21 @@ else:
 if arguments["--geocrop"] is not  None:
     geocrop = map(float,arguments["--geocrop"].replace(',',' ').split())
     latbeg,latend,lonbeg,lonend = float(geocrop[0]),float(geocrop[1]),float(geocrop[2]),float(geocrop[3])
+
+if arguments["--clean_demerr"] ==  None:
+    demf = 'no'
+else:
+    demf = arguments["--clean_demerr"]
+    print demf
+    extension = os.path.splitext(demf)[1]
+    if extension == ".tif":
+        ds = gdal.Open(demf, gdal.GA_ReadOnly)
+        dem = ds.GetRasterBand(1).ReadAsArray()
+    elif extension == ".unw":
+        ds = gdal.Open(demf, gdal.GA_ReadOnly)
+        dem = ds.GetRasterBand(2).ReadAsArray()*rad2mm
+    else:
+        dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
 
 # load images_retenues file
 nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
@@ -120,8 +148,17 @@ for l in xrange((N)):
     ds_band1 = ds.GetRasterBand(1)
     ds_band2 = ds.GetRasterBand(2)
     los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
+    # correct dem error:
+    if demf is not 'no':
+        los = los - dem*(base[l]-base[imref])
+
     amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
     los[index] = np.float('NaN')
+
+    if arguments["--wrap"] is not None:
+        los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
+        vmax=float(arguments["--wrap"])
+        vmin=-vmax
 
     ds_geo=ds.GetGeoTransform()
     print 'Read infile:', infile
