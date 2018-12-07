@@ -17,7 +17,7 @@ Clean a time series file (cube in binary format) given an other real4 file (mask
 Usage: clean_ts.py --infile=<path> --mask=<path> --threshold=<value> --outfile=<path> \
 [--perc=<value>] [--vmin=<value>] [--vmax=<value>] [--rampmask=<yes/no>] \
 [--flatten_mask=<path>] [--lectfile=<path>] [--scale=<value>] [--imref=<value>] \
-[--images=<path>] [--clean=<values>]  [--crop=<values>] 
+[--images=<path>] [--clean=<values>]  [--crop=<values>] [--clean_demerr=<path>] 
 
 Options:
 -h --help           Show this screen.
@@ -36,13 +36,14 @@ Options:
 --vmax              Max colorscale [default: 98th percentile]
 --vmin              Min colorscale [default: 2th percentile]
 --perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
+--clean_demerr      Path to dem error file
 """
 
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 
-
+import os
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
@@ -98,6 +99,18 @@ if arguments["--perc"] ==  None:
     perc = 99.9
 else:
     perc = float(arguments["--perc"])
+
+if arguments["--clean_demerr"] ==  None:
+    demf = 'no'
+    dem = np.zeros((nlign,ncol))
+else:
+    demf = arguments["--clean_demerr"]
+    extension = os.path.splitext(demf)[1]
+    if extension == ".tif":
+        ds = gdal.Open(demf, gdal.GA_ReadOnly)
+        dem = ds.GetRasterBand(1).ReadAsArray()
+    else:
+        dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
 
 # load images_retenues file
 fimages='images_retenues'
@@ -218,7 +231,8 @@ cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     d = as_strided(maps[:,:,l])
     d[kk] = np.float('NaN')
-    maps[:,:,l] = maps[:,:,l] - cst
+    # carefull stupid unit MP
+    maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l]-base[imref])/100.
     if l != imref:
         index = np.nonzero(d==0.0)
         d[index] = np.float('NaN')

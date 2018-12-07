@@ -231,6 +231,7 @@ if __name__ == "__main__":
     imref = int(arguments["--imref"]) - 1
   if arguments["--crop"] ==  None:
     crop = [0,nlign,0,ncol]
+    docrop = 'no'
   else:
     crop = map(float,arguments["--crop"].replace(',',' ').split())
     docrop = 'yes'

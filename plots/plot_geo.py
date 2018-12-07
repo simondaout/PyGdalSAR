@@ -16,7 +16,7 @@ plot_geo.py
 Plot georeferenced file in RMG or Tif format with optional DEM or ARCGISIMAGE
 
 Usage: plot_geots.py --infile=<value> [--vmin=<value>] [--vmax=<value>] \
-[--geocrop=<values>] [--wrap=<yes/no>] [--cpt=<values>] [--dem=<values>] \
+[--geocrop=<values>] [--wrap=<values>] [--cpt=<values>] [--dem=<values>] \
 [--coeff=<values>] [--plot=<yes/no>] [--rad2mm=<value>]
 
 Options:
@@ -25,10 +25,10 @@ Options:
 --geocrop VALUE     Crop in geo coordiantes [default: latmin,latmax,lonmin,lonmax]
 --vmax              Max colorscale [default: 90th percentile]
 --vmin              Min colorscale [default: 10th percentile]
---cpt				Indicate colorscale
---wrap 	VALUE		Wrapped phase between value [default: no]
---dem 				path to DEM file
---coeff				optional value to scale data 
+--cpt		    Indicate colorscale
+--wrap 	VALUE	    Wrapped phase between value [default: no]
+--dem 		    Path to DEM file
+--coeff		    Optional value to scale data 
 --plot              Display results [default: yes] 
 --rad2mm            Scaling value between input data (rad) and desired output [default: -4.4563]
 """

@@ -18,7 +18,7 @@ Usage: lect_cube_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--li
  [--slope=<path>] [--coseismic=<paths>] [--postseismic=<paths>] [--slowslip=<value>] \
  [--cos=<path>] [--sin=<path>] [--dem=<path>] [--aps=<path>] \
  [--rad2mm=<value>] [--plot=<yes/no>] [--name=<value>] [--imref=<value>] \
- [<iref>] [<jref>] [--bounds=<value>] 
+ [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
 
 
 Options:
@@ -42,7 +42,8 @@ Options:
 --iref              colum numbers of the reference pixel [default: None] 
 --jref              lign number of the reference pixel [default: None]
 --imref VALUE       Reference image number [default: 1]
---bounds            Min,Max time series plots 
+--bounds            yMin,yMax time series plots
+--dateslim          Datemin,Datemax time series plots
 """
 
 # numpy
@@ -166,6 +167,10 @@ if len(jpix) != len(ipix):
     raise Exception("ncols and nligns lists are not the same size")
 # number of pixels
 Npix = len(ipix)
+# bounds plots
+istart,iend = np.min(ipix) - 100, np.max(ipix) + 100
+jstart,jend = np.min(jpix) - 100, np.max(jpix) + 100
+
 
 # read lect.in 
 ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
@@ -288,13 +293,18 @@ fig = plt.figure(0,figsize=(10,8))
 
 for l in xrange(len(listplot)):
   ax = fig.add_subplot(2,int(len(listplot)/2)+1,l+1)
-  vmax = np.nanpercentile(listplot[l],98)
-  vmin = np.nanpercentile(listplot[l],2)
-  ax.imshow(listplot[l], vmax=vmax, vmin= vmin, alpha=0.6)
-  ax.scatter(ipix,jpix,marker='x',color='black',s=15.)
-  ax.scatter(iref,jref,marker='x',color='red',s=20.)
+  if arguments["--bounds"] is not  None:
+      vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
+  else:
+    vmax = np.nanpercentile(listplot[l],90)
+    vmin = np.nanpercentile(listplot[l],10)
+  
+  ax.imshow(listplot[l][jstart:jend,istart:iend], vmax=vmax, vmin= vmin, alpha=0.6)
+  ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
+  if iref is not None and jref is not None:
+    ax.scatter(iref-istart,jref-jstart,marker='x',color='red',s=20.)
   for i in xrange((Npix)):
-      ax.text(ipix[i],jpix[i],i)
+      ax.text(ipix[i]-istart,jpix[i]-jstart,i)
   ax.set_title(titles[l],fontsize=6)
   setp(ax.get_xticklabels(), visible=False)
   setp(ax.get_yticklabels(), visible=False)
@@ -336,8 +346,11 @@ for k in xrange(len(ipix)):
 
     ax = fig.add_subplot(Npix,1,k+1)
     x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-    dmin = str(datemin) + '0101'
-    dmax = str(datemax) + '0101'
+    if arguments["--dateslim"] is not  None:
+        dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+    else:
+        dmax = str(datemax) + '0101'
+        dmin = str(datemin) + '0101'
     xmin = datetime.datetime.strptime('{}'.format(dmin),'%Y%m%d') 
     xmax = datetime.datetime.strptime('{}'.format(dmax),'%Y%m%d')
     xlim=date2num(np.array([xmin,xmax]))

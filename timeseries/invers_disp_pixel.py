@@ -46,8 +46,8 @@ basis functions [default: 1.]
 --plot                  Display results [default: yes]            
 --iref                  colum numbers of the reference pixel [default: None] 
 --jref                  lign number of the reference pixel [default: None]
---bounds                Min,Max time series plots 
---datelim               datemin,datemax time series plots 
+--bounds                yMin,yMax time series plots 
+--dateslim              Datemin,Datemax time series plots 
 """
 
 # numpy
@@ -349,6 +349,9 @@ if len(jpix) != len(ipix):
    raise Exception("ncols and nligns lists are not the same size")
 # number of pixels
 Npix = len(ipix)
+# bounds plots
+istart,iend = np.min(ipix) - 100, np.max(ipix) + 100
+jstart,jend = np.min(jpix) - 100, np.max(jpix) + 100
 
 # read lect.in 
 ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
@@ -425,13 +428,17 @@ if infof is not None:
 
 # plot pixels on map
 fig, ax = subplots(1)
-vmax = np.nanmean(maps[:,:,-1]) + 1.*np.nanstd(maps[:,:,-1])
-vmin = np.nanmean(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])
-ax.imshow(maps[:,:,-1], vmax=vmax, vmin=vmin, alpha=0.6)
-ax.scatter(ipix,jpix,marker='x',color='black',s=15.)
-ax.scatter(iref,jref,marker='x',color='red',s=20.)
+if arguments["--bounds"] is not  None:
+    vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
+else:
+    vmax = np.nanmean(maps[:,:,-1]) + 2.*np.nanstd(maps[:,:,-1])
+    vmin = np.nanmean(maps[:,:,-1]) - 2.*np.nanstd(maps[:,:,-1])
+ax.imshow(maps[jstart:jend,istart:iend,-1], vmax=vmax, vmin=vmin, alpha=0.6)
+ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
+if iref is not None and jref is not None:
+    ax.scatter(iref-istart,jref-jstart,marker='x',color='red',s=20.)
 for i in xrange((Npix)):
-    ax.text(ipix[i],jpix[i],i)
+    ax.text(ipix[i]-istart,jpix[i]-jstart,i)
 plt.suptitle('Black cross: pixels, red cross: reference point')
 # plt.savefig('Map_{}.eps'.format(output), format='EPS')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
