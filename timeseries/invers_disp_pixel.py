@@ -486,14 +486,17 @@ for i in xrange(len(sse_time)):
     index = index + 1
     iteration=True
 
-indexpo = []
+indexpo,indexpofull = [],[]
 for i in xrange(len(pos)):
-   if pos[i] > 0. :
-      basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
-      indexpo.append(int(index))
-      index = index + 1
+  if pos[i] > 0. :
+    basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
+    indexpo.append(int(index))
+    indexpofull.append(int(index))
+    index = index + 1
+  else:
+    indexpofull.append(0)
 indexpo = np.array(indexpo)
-
+indexpofull = np.array(indexpofull)
 
 kernels=[]
 
@@ -566,12 +569,12 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         inv = lst.inv(s)
         inv[index] = 0.
         mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-        #print mtemp
-        #print indexpo
+        # print mtemp
+        # print indexpo
         # rebuild full vector
         for z in xrange(len(indexpo)):
-                mtemp = np.insert(mtemp,indexpo[z],0)
-        #        print mtemp
+            mtemp = np.insert(mtemp,indexpo[z],0)
+            # print mtemp
         minit = np.copy(mtemp)
         print 'Prior model:', minit
         print
@@ -582,10 +585,10 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         # and coseisnic inferior or egal to the coseimic initial 
         for i in xrange(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, np.inf 
+                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
-                mmin[int(indexpo[i])], mmax[int(indexpo[i])] = -np.inf , 0
+                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
         
         # print mmin,mmax
