@@ -547,28 +547,36 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
 
     if ineq == 'no':
         
-        U,eignv,V = lst.svd(A, full_matrices=False)
-        s = np.diag(eignv)
-        print 
-        print 'Eigenvalues:', eignv
-        index = np.nonzero(s<cond)
-        inv = lst.inv(s)
-        inv[index] = 0.
-        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-        print 'SVD solution:', fsoln
-        print
+        try:
+          U,eignv,V = lst.svd(A, full_matrices=False)
+          s = np.diag(eignv)
+          print 
+          print 'Eigenvalues:', eignv
+          index = np.nonzero(s<cond)
+          inv = lst.inv(s)
+          inv[index] = 0.
+          fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+          print 'SVD solution:', fsoln
+          print
+        except:
+          fsoln = lst.lstsq(A,b,rcond=cond)[0]
+
 
     else:
 
         Ain = np.delete(A,indexpo,1)
-        U,eignv,V = lst.svd(Ain, full_matrices=False)
-        s = np.diag(eignv)
-        print 
-        print 'Eigenvalues:', eignv
-        index = np.nonzero(s<cond)
-        inv = lst.inv(s)
-        inv[index] = 0.
-        mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+        try:
+          U,eignv,V = lst.svd(Ain, full_matrices=False)
+          s = np.diag(eignv)
+          print 
+          print 'Eigenvalues:', eignv
+          index = np.nonzero(s<cond)
+          inv = lst.inv(s)
+          inv[index] = 0.
+          mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+        except:
+          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+          
         # print mtemp
         # print indexpo
         # rebuild full vector
