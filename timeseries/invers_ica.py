@@ -3,7 +3,7 @@
 
 ############################################
 #
-# PyGdalSAR: An InSAR post-processing package 
+# PyGdalSAR: An InSAR post-processing package
 # written in Python-Gdal
 #
 ############################################
@@ -12,7 +12,7 @@
 
 """\
 invers_ica.py
-InSAR Time Series ICA decomposition 
+InSAR Time Series ICA decomposition
 
 Usage: invers_ica.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--imref=<value>]  [--n_comp=<values>]  [--crop=<values>] [--resize=<values>] [--type=<space/time>] [--demfile=<path>] [--events=<values>] [--save_resize=<yes/no>] [--save_matrix=<yes/no>] [--smooth=<yes/no>] [--plot=<yes/no>] [--outdir=<path>]
 
@@ -24,14 +24,14 @@ Options:
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --imref VALUE           Reference image number [default: 1]
---n_comp VALUE          Number of eigenvector 
+--n_comp VALUE          Number of eigenvector
 --crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --type space/time       Space or time decomposition [default:space]
---demfile               Optional DEM error coefficient to be removed before ICA decomposition [default: no] 
---events VALUES         List of event dates 
+--demfile               Optional DEM error coefficient to be removed before ICA decomposition [default: no]
+--events VALUES         List of event dates
 --resize VALUE          Integer resize factor [default: 0]
 --save_resize YES/NO    Save the resized cube [default:no]
---save_matrix YES/NO    Save the A and S matrix for each components [default:no] 
+--save_matrix YES/NO    Save the A and S matrix for each components [default:no]
 --smooth YES/NO         Smooth the vector [default:no]
 --plot YES/NO           Display plots [default: yes]
 --outdir PATH           Path to output dir [default: ICA]
@@ -61,7 +61,7 @@ import scipy.signal
 
 import argparse
 # docopt (command line parser)
-import docopt
+from nsbas import docopt
 
 #====================
 def date2dec(date):
@@ -150,6 +150,7 @@ def ica_spatial(cube, ncol, nrow, ncomp, nbr_dates):
 
     ##### Remove les nans values
     X = d[~np.any(np.isnan(d), axis=1)]
+    print "Number of keept pixel: {}".format(X.size)
     Snew_ = ica.fit_transform(X)
     m = ica.mixing_
     #mT_, STnew_ = ica.fit_transform(X.T)
@@ -195,7 +196,7 @@ def smooth(y, box_pts):
 ################ Load arguments
 
 if __name__ == "__main__":
-  
+
   arguments = docopt.docopt(__doc__)
   if arguments["--list_images"] ==  None:
     listim = "images_retenues"
@@ -204,21 +205,21 @@ if __name__ == "__main__":
   if arguments["--lectfile"] ==  None:
     infile = "lect.in"
   else:
-    infile = arguments["--lectfile"] 
-  
-  ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2]) 
+    infile = arguments["--lectfile"]
+
+  ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
   nb,idates,dt,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
   N=len(dt)
   print 'Number images: ', N
-  
+
   if arguments["--resize"] ==  None:
     resize = 0
   else:
-    resize = np.int(arguments["--resize"])   
+    resize = np.int(arguments["--resize"])
   if arguments["--n_comp"] ==  None:
     n_comp = 3
   else:
-    n_comp = np.int(arguments["--n_comp"])   
+    n_comp = np.int(arguments["--n_comp"])
   if arguments["--type"] ==  None:
       type_decomp = 'space'
   else:
@@ -237,7 +238,7 @@ if __name__ == "__main__":
     docrop = 'yes'
   ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
   print 'Compute ICA between ibeg:{} - iend:{} and jbeg:{} - jend:{} '.format(ibeg,iend,jbeg,jend)
-  
+
   if arguments["--plot"] ==  None:
     plot = 'yes'
   else:
@@ -246,7 +247,7 @@ if __name__ == "__main__":
     cubef = "depl_cumule"
   else:
     cubef = arguments["--cube"]
-   
+
   if arguments["--save_resize"] ==  None:
     save_resize = 'no'
   else:
@@ -276,7 +277,7 @@ if __name__ == "__main__":
         dem = ds.GetRasterBand(1).ReadAsArray()
     else:
         dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
-  
+
   if arguments["--outdir"] ==  None:
     outdir = './ICA/'
   else:
@@ -290,7 +291,7 @@ if not os.path.exists(outdir):
 
 cubei = np.fromfile(cubef,dtype=np.float32)
 cube = as_strided(cubei[:nlign*ncol*N])
-print 'Number of line in the cube: ', cube.shape 
+print 'Number of line in the cube: ', cube.shape
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
 maps = cube.reshape((nlign,ncol,N))
@@ -299,7 +300,7 @@ print 'Reshape cube: ', maps.shape
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l] - base[imref])
- 
+
 if resize !=0:
   maps_liss = np.zeros((np.int(nlign/resize), np.int(ncol/resize), N))
   for i in range(N):
@@ -323,7 +324,7 @@ if docrop == 'yes':
         crop_maps[:,:,j] = maps[jbeg:jend,ibeg:iend,j]
     maps = np.copy(crop_maps)
     print 'Crop cube: ', maps.shape
-    
+
 # remove NaN
 #maps[np.isnan(maps)] = 0.
 
@@ -377,14 +378,14 @@ fig.autofmt_xdate()
 fig.suptitle('Temporal eigenvectors'.format(type_decomp))
 fig.savefig(outdir+'decomp_{}_{}_mixing.pdf'.format(type_decomp,n_comp), format='PDF')
 
-fid = open(outdir+'matrix_ica_{}_{}_{}'.format(cube, n_comp, type_decomp), 'wb')
+fid = open(outdir+'matrix_ica_{}_{}_{}'.format(cubef, n_comp, type_decomp), 'wb')
 S.flatten().astype('float32').tofile(fid)
 fid.close()
 
 S2 = S.reshape((nlign*ncol,n_comp))
 S2 = S2[~np.any(np.isnan(S2), axis=1)]
 
-fig=plt.figure(3,figsize=(8,4))
+fig=plt.figure(3,figsize=(12,5))
 for i in range(n_comp):
     ax = fig.add_subplot(1,n_comp,1+i)
     xmin = np.nanpercentile(S[:,i], 1)
@@ -425,7 +426,7 @@ if save_matrix == 'yes':
     fid.close()
     np.savetxt(outdir+'vector_ica_{}_{}.txt'.format(type_decomp,n_comp),  np.column_stack((idates,m)))
 
-###### Compute RMS 
+###### Compute RMS
 depl_cumule_ica = np.dot(S, m.T).flatten()
 models = as_strided(depl_cumule_ica.reshape((nlign, ncol, N)))
 res = as_strided(maps) - as_strided(models)
@@ -493,7 +494,7 @@ for i in range(n_comp):
     ax_n.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
     ax_n.plot(x_d, comp_norm[:,i], label='IC{}'.format(i+1))
     for j in xrange(len(x_eq)):
-        ax.axvline(x=x_eq[j],linestyle='--', color = 'r', linewidth = 1) 
+        ax.axvline(x=x_eq[j],linestyle='--', color = 'r', linewidth = 1)
     ax_n.legend()
 fig.autofmt_xdate()
 fig.suptitle('Normalised temporal eigenvectors')
@@ -513,7 +514,7 @@ fig_rms.suptitle('Tot. RMS: {}'.format(rmsd))
 fig_rms.savefig(outdir+'RMS_pixel_ica_{}_{}.pdf'.format(type_decomp, n_comp), format='PDF')
 
 # save foward model
-fid = open(outdir+'{}_ica_{}'.format(cube, n_comp), 'wb')
+fid = open(outdir+'{}_ica_{}'.format(cubef, n_comp), 'wb')
 depl_cumule_ica.flatten().astype('float32').tofile(fid)
 fid.close()
 
@@ -526,9 +527,9 @@ for l in range((N)):
     plt.setp(axd.get_xticklabels(), visible=False)
     plt.setp(axd.get_yticklabels(), visible=False)
 cbar =figd.colorbar(caxd, orientation='vertical',aspect=10)
-figd.tight_layout()
+#figd.tight_layout()
 figd.suptitle('Time series displacement maps')
-figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cube, type_decomp, n_comp), format='PDF')
+figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cubef, type_decomp, n_comp), format='PDF')
 
 figd = plt.figure(5,figsize=(14,10))
 for l in range((N)):
@@ -538,9 +539,9 @@ for l in range((N)):
     plt.setp(axd.get_xticklabels(), visible=False)
     plt.setp(axd.get_yticklabels(), visible=False)
 cbar =figd.colorbar(caxd, orientation='vertical',aspect=10)
-figd.tight_layout()
+#figd.tight_layout()
 figd.suptitle('Time series displacement models')
-figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cube, type_decomp, n_comp), format='PDF')
+figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cubef, type_decomp, n_comp), format='PDF')
 
 
 figd = plt.figure(6,figsize=(14,10))
@@ -552,30 +553,13 @@ for l in range((N)):
     plt.setp(axd.get_xticklabels(), visible=False)
     plt.setp(axd.get_yticklabels(), visible=False)
 cbar =figd.colorbar(caxd, orientation='vertical',aspect=10)
-figd.tight_layout()
+#figd.tight_layout()
 figd.suptitle('RMS time series')
-figd.savefig(outdir+'{}_ica_{}_{}_rms.pdf'.format(cube, type_decomp, n_comp), format='PDF')
+figd.savefig(outdir+'{}_ica_{}_{}_rms.pdf'.format(cubef, type_decomp, n_comp), format='PDF')
 
-fid = open(outdir+'{}_rms_ica_{}'.format(cube, n_comp), 'wb')
+fid = open(outdir+'{}_rms_ica_{}'.format(cubef, n_comp), 'wb')
 res.flatten().astype('float32').tofile(fid)
 fid.close()
 
 if plot == 'yes':
     plt.show()
-
-# S_comp = S.reshape((nlign*ncol, n_comp))
-# for i in range(n_comp):
-#     X = np.dot(np.array([S_comp[:,i]]).T, np.array([m[:,i]]))
-#     X = X.reshape((nlign, ncol, N))
-#     figd = plt.figure(220+i,figsize=(14,10))
-#     vmax = np.nanpercentile(X, 98)
-#     for l in range((N)):
-#         axd = figd.add_subplot(4,int(N/4)+1,l+1)
-#         axd.set_title(date[l],fontsize=6)
-#         caxd = axd.imshow(X[:,:,l],cmap=cm.jet,vmax=vmax,vmin=-vmax)
-#         plt.setp(axd.get_xticklabels(), visible=False)
-#         plt.setp(axd.get_yticklabels(), visible=False)
-#     cbar = figd.colorbar(caxd, orientation='vertical',aspect=10)
-#     figd.suptitle('Decomposition spatiale cube')
-#     figd.savefig(outdir+'{}_ica_{}_{}.pdf'.format(cube, type_decomp, i), format='PDF')
-#     plt.close()
