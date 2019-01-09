@@ -1623,13 +1623,13 @@ if tsinv=='yes':
     sig_ = 1./w1 + 1./w2
 
     
-    for j in xrange((12)):
+    for j in xrange(3,len(spint_inv)):
         
         d = np.zeros(((kmax+1)))
         sig = np.ones(((kmax+1)))
         G = np.zeros(((kmax+1),nmax))
     
-        d[:kmax] = as_strided(spint[:,j+3])
+        d[:kmax] = as_strided(spint[:,j])
         G[:kmax,:nmax] = G_ 
         G[-1,0] = 1 # ini phi first image to 0
         sig[:kmax] = sig_
@@ -1641,7 +1641,7 @@ if tsinv=='yes':
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=500,full_output=True,iprint=0)[0]
 
             # reconstruct corr for selected int
-            spint_inv[:,j+3] = np.dot(G,pars)[:kmax]
+            spint_inv[:,j] = np.dot(G,pars)[:kmax]
             # print 
             # print spint_inv[:,j+3] - spint[:,j+3]
             # print
@@ -1651,7 +1651,7 @@ if tsinv=='yes':
 
     spint_inv[:,:3] = spint[:,:3]
     # I dont think the cst should be inverted ??
-    spint_inv[:,8] = spint[:,8]
+    # spint_inv[:,8] = spint[:,8]
 
 
 #####################################################################################
