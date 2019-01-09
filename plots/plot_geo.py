@@ -47,6 +47,8 @@ from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.basemap import Basemap
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -192,7 +194,10 @@ del ds, ds_band1
 # fig.tight_layout()
 plt.suptitle(outfile)
 try:
-	fig.colorbar(cax, orientation='vertical',aspect=10)
+  divider = make_axes_locatable(ax)
+  c = divider.append_axes("right", size="5%", pad=0.05)
+  plt.colorbar(cax, cax=c)
+	# fig.colorbar(cax, orientation='vertical',aspect=10)
 except:
 	pass
 

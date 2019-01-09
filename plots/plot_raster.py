@@ -14,7 +14,7 @@ plot\_image.py
 -------------
 Display and Cut image file 
 
-Usage: plot\_image.py --infile=<path> [<ibeg>] [<iend>] [<jbeg>] [<jend>]
+Usage: plot\_image.py --infile=<path> [--cpt=<values>] [--wrap=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>]
 Options:
 -h --help           Show this screen.
 --infile PATH       File to be cut
@@ -22,6 +22,8 @@ Options:
 --iend VALUE        Ligne numbers bounded the cutting zone [default: nlign]
 --jbeg VALUE        Column numbers bounded the cutting zone [default: 0]
 --jend VALUE        Column numbers bounded the cutting zone [default: ncol]
+--cpt               Indicate colorscale for phase
+--wrap  VALUE       Wrapped phase between value for unwrapped files [default: no]
 """
 
 from __future__ import print_function
@@ -37,15 +39,22 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from pylab import setp
 from osgeo import gdal
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Initialize a matplotlib figure
-fig, ax = plt.subplots(1,figsize=(10,11))
+fig, ax = plt.subplots(1,figsize=(8,10))
 
 # read arguments
 arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
 # Open phiset (image)
 ds = gdal.Open(infile, gdal.GA_ReadOnly)
+
+if arguments["--cpt"] is  None:
+    # cmap=cm.jet 
+    cmap=cm.rainbow
+else:
+    cmap=arguments["--cpt"]
 
 # Ok, assume this is a roipac image, so we can rely on the file extension
 # to know how to display the phi (in the real world, we would probably write
@@ -57,7 +66,7 @@ if ds_extension == ".unw":
     phase_band = ds.GetRasterBand(2)
     amp_band = ds.GetRasterBand(1)
 else:
-	phase_band = ds.GetRasterBand(1)
+    phase_band = ds.GetRasterBand(1)
 
 # Attributes
 print("> Driver:   ", ds.GetDriver().ShortName)
@@ -85,63 +94,64 @@ else:
 #   Resampling is nearest neighbour with that function: hardly acceptable,
 #   but easy for a simple demo!
 if ds_extension == ".unw":
-	phi = phase_band.ReadAsArray(0, 0,
+    phi = phase_band.ReadAsArray(0, 0,
                            ds.RasterXSize, ds.RasterYSize,
                            ds.RasterXSize, ds.RasterYSize)
-	amp = amp_band.ReadAsArray(0, 0,
+    amp = amp_band.ReadAsArray(0, 0,
                            ds.RasterXSize, ds.RasterYSize,
                            ds.RasterXSize, ds.RasterYSize)
-	
-	# cut image
-	cutphi = as_strided(phi[ibeg:iend,jbeg:jend])
-	cutamp = as_strided(amp[ibeg:iend,jbeg:jend])
+    
+    # cut image
+    cutphi = as_strided(phi[ibeg:iend,jbeg:jend])
+    cutamp = as_strided(amp[ibeg:iend,jbeg:jend])
+
+    # Unwrapped inteferogram
+    #hax = ax.imshow(cutamp, cm.Greys,vmax=1,vmin=0.)
+    hax = ax.imshow(cutamp, cm.Greys,vmax=np.percentile(cutamp, 95))
+
+    if arguments["--wrap"] is not None:
+        cutphi =  np.mod(cutphi+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
+        vmax=float(arguments["--wrap"])
+        vmin = -vmax 
+    else:
+        vmax=np.nanmean(cutphi)+2*np.nanstd(cutphi)
+        vmin=np.nanmean(cutphi)-2*np.nanstd(cutphi)
+
+    cax = ax.imshow(cutphi, cmap, interpolation='bicubic',vmax=vmax,vmin=vmin,alpha=0.5)
 
 else:
-	phase = phase_band.ReadAsArray(0, 0,
+
+    phase = phase_band.ReadAsArray(0, 0,
                            ds.RasterXSize, ds.RasterYSize,
                            ds.RasterXSize, ds.RasterYSize)
-	
-	cutphi = as_strided(phase[ibeg:iend,jbeg:jend])	
+    
+    cutphi = as_strided(phase[ibeg:iend,jbeg:jend]) 
+  
+    if ds_extension == ".hgt":
+        # DEM in radar geometry
+        cax = ax.imshow(cutphi, cmap, vmax=np.percentile(cutphi, 95))
+    elif ds_extension == ".slc":
+        # SLC, display amplitude
+        cutphi = np.absolute(phi)
+        cax = ax.imshow(cutphi, cm.Greys_r, vmax=np.percentile(cutphi, 95))
+    elif ds_extension in [".int", ".flat"]:
+        # Wrapped interferogram, display computed phase
+        cutamp = np.absolute(cutphi)
+        cutphi = np.angle(cutphi)
+        hax = ax.imshow(cutamp, cm.Greys_r,vmax=np.percentile(cutamp, 95))
+        cax = ax.imshow(cutphi, cmap,alpha=0.8)
+        # hax = ax.imshow(cutamp, cm.Greys,vmax=1,vmin=0.)
+    elif ds_extension ==  ".trans":
+        # Geocoding lookup table
+        cax = ax.imshow(cutphi)
 
-#phi = np.nan_to_num(phi)
-#amp = np.nan_to_num(amp)
-#kk = np.flatnonzero(phi==0)
-#phi[kk] = np.float('NaN')
+    # cbar = fig.colorbar(hax, orientation='vertical',aspect=9,fraction=0.02,pad=0.06)
 
-
-if ds_extension == ".slc":
-    # SLC, display amplitude
-    cutphi = np.absolute(phi)
-    cax = ax.imshow(cutphi, cm.Greys_r, vmax=np.percentile(cutphi, 95))
-elif ds_extension in [".int", ".flat"]:
-    # Wrapped interferogram, display computed phase
-    cutamp = np.absolute(cutphase)
-    cutphi = np.angle(cutphase)
-    # hax = ax.imshow(cutamp, cm.Greys_r,vmax=np.percentile(cutamp, 90))
-    hax = ax.imshow(cutamp, cm.Greys,vmax=1,vmin=0.)
-    # cax = ax.imshow(cutphi, cm.gist_rainbow, interpolation='bicubic',alpha=0.8)
-
-elif ds_extension == ".hgt":
-    # DEM in radar geometry
-    cax = ax.imshow(cutphi, cm.Greys_r, vmax=np.percentile(cutphi, 95))
-elif ds_extension == ".unw":
-    # Unwrapped inteferogram
-    # hax = ax.imshow(cutamp, cm.Greys,vmax=1,vmin=0.)
-    #hax = ax.imshow(cutamp, cm.Greys,vmax=np.percentile(cutamp, 95))
-    vmax=np.nanmean(cutphi)+2*np.nanstd(cutphi)
-    vmin=np.nanmean(cutphi)-2*np.nanstd(cutphi)
-    vmax=8
-    vmin=-8
-    cutwrap = np.mod(cutphi,2*np.pi)-np.pi
-    cax = ax.imshow(cutphi, cm.gist_rainbow, interpolation='bicubic',vmax=vmax,vmin=vmin,alpha=0.5)
-    # cax = ax.imshow(cutwrap, cm.gist_rainbow, interpolation='bicubic',alpha=0.7,vmax=np.pi,vmin=-np.pi)
-elif ds_extension ==  ".trans":
-    # Geocoding lookup table
-    cax = ax.imshow(cutphi)
-
-setp( ax.get_xticklabels(), visible=False)
-cbar = fig.colorbar(cax, orientation='vertical',aspect=9,fraction=0.02,pad=0.06)
-# cbar = fig.colorbar(hax, orientation='vertical',aspect=10,fraction=0.02,pad=0.01)
+# setp( ax.get_xticklabels(), visible=False)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+# cbar = fig.colorbar(cax, orientation='vertical',aspect=9,fraction=0.02,pad=0.06)
 
 # Close dataset (if this was a new image, it would be written at this moment)
 # This will free memory for the display stuff

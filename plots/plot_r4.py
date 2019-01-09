@@ -34,6 +34,7 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from pylab import *
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # docopt (command line parser)
 import docopt
@@ -79,12 +80,14 @@ if arguments["--wrap"] !=  None:
 	vmin=-np.pi
 
 # Plot
-fig = plt.figure(0,figsize=(6,4))
+fig = plt.figure(0,figsize=(8,10))
 ax = fig.add_subplot(1,1,1)
 cax = ax.imshow(m,cmap=cm.jet,vmax=vmax,vmin=vmin)
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
-cbar = fig.colorbar(cax, orientation='vertical',aspect=5)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 
 fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
 plt.show()
