@@ -427,12 +427,13 @@ if infof is not None:
       fid.close()
 
 # plot pixels on map
-fig, ax = subplots(1)
+fig = plt.figure(1,figsize=(12,8))
 if arguments["--bounds"] is not  None:
     vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
 else:
     vmax = np.nanmean(maps[:,:,-1]) + 2.*np.nanstd(maps[:,:,-1])
     vmin = np.nanmean(maps[:,:,-1]) - 2.*np.nanstd(maps[:,:,-1])
+ax = fig.add_subplot(1,2,1)
 ax.imshow(maps[jstart:jend,istart:iend,-1], vmax=vmax, vmin=vmin, alpha=0.6)
 ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
 if iref is not None and jref is not None:
@@ -440,10 +441,17 @@ if iref is not None and jref is not None:
 for i in xrange((Npix)):
     ax.text(ipix[i]-istart,jpix[i]-jstart,i)
 plt.suptitle('Black cross: pixels, red cross: reference point')
-# plt.savefig('Map_{}.eps'.format(output), format='EPS')
+
+ax = fig.add_subplot(1,2,2)
+ax.imshow(maps[:,:,-1], vmax=vmax, vmin=vmin, alpha=0.6)
+ax.scatter(ipix,jpix,marker='x',color='black',s=15.)
+ax.scatter(iref,jref,marker='x',color='red',s=20.)
+for i in xrange((Npix)):
+    ax.text(ipix[i],jpix[i],i)
+plt.suptitle('Black cross: pixels, red cross: reference point')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
-# plt.show()
-# sys.exit()
+#plt.show()
+#sys.exit()
 
 # 0
 basis=[

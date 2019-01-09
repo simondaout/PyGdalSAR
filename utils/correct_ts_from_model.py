@@ -62,8 +62,8 @@ infile = 'post0_coeff_clean.r4'
 post0 = np.fromfile(infile,dtype=np.float32).reshape((nlign,ncol))
 infile = 'cos0_coeff_clean.r4'
 cos0 = np.fromfile(infile,dtype=np.float32).reshape((nlign,ncol))
-infile = 'cos1_coeff_clean.r4'
-cos1 = np.fromfile(infile,dtype=np.float32).reshape((nlign,ncol))
+#infile = 'cos1_coeff_clean.r4'
+#cos1 = np.fromfile(infile,dtype=np.float32).reshape((nlign,ncol))
 infile = 'ref_coeff.r4'
 ref = np.fromfile(infile,dtype=np.float32).reshape((nlign,ncol))
 
@@ -73,6 +73,8 @@ ref = np.fromfile(infile,dtype=np.float32).reshape((nlign,ncol))
 
 ibeg,iend = 0,nlign
 jbeg,jend = 0,ncol
+
+cos1=np.zeros((nlign,ncol))
 
 model = np.zeros((nlign,ncol,N))
 for i in xrange(ibeg,iend):
