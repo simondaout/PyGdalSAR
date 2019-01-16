@@ -14,9 +14,9 @@ Removes atmospheric phase/elevation correlations or/and azimuthal and range ramp
 ints on unwrapped interferograms (2 bands file). Reconstruction of the empirical phase correction by time series inversion.
 
 usage: invert_ramp_topo_unw.py --int_list=<path> --int_path=<path> \
---prefix=<value> --suffix=<value> --rlook=<value>  [--dates_list=<path>] [--ref=<path>] \
+[--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
-[--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>] \
+[--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
 [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
 [--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
@@ -24,10 +24,9 @@ usage: invert_ramp_topo_unw.py --int_list=<path> --int_path=<path> \
 
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Absolute path to interferograms directory
---dates_list PATH     Path to baseline.rsc file [default: baseline.rsc]
---prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw
---suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw
---rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw
+--prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
+--suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
+--rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
 --ref PATH            Path to reference image to define format and size. Necessary if topofile is None [default:None]     
 --flat PATH           Remove a spatial ramp.If short acquisition, short is automatically set to 3.
 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 
@@ -57,6 +56,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --mask PATH           Mask in .r4 format. Keep only values > threshold_mask. [default:None]
 --threshold_mask      Threshold on mask: take only values > threshold_mask [default: -1]
 --cohpixel  yes/no    If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
+--format VALUE        Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --threshold_coh VALUE Threshold on cohpixel file [default:0]
 --ibeg_mask VALUE     Line number bounding an other mask of estimation zone [default: None]
 --iend_mask VALUE     Line number bounding an other mask of estimation zone [default: None]  
@@ -101,6 +101,7 @@ import scipy.optimize as opt
 import scipy.linalg as lst
 
 import docopt
+import gamma as gm
 
 import shutil
 
@@ -109,10 +110,19 @@ arguments = docopt.docopt(__doc__)
 
 int_list=arguments["--int_list"]
 int_path=arguments["--int_path"]
-baseline=arguments["--dates_list"]
-prefix=arguments["--prefix"]
-suffix=arguments["--suffix"]
-rlook=arguments["--rlook"]
+
+if arguments["--prefix"] == None:
+    prefix = ''
+else:
+    prefix=arguments["--prefix"]
+if arguments["--suffix"] == None:
+    suffix = ''
+else:
+    suffix=arguments["--suffix"]
+if arguments["--rlook"] == None:
+    rlook = ''
+else:
+    rlook = '_' + arguments["--rlook"] + 'rlks'
 
 if arguments["--flat"] == None:
     flat = 0
@@ -159,7 +169,7 @@ if arguments["--topofile"] ==  None or not os.path.exists(arguments["--topofile"
 else:
    radar = arguments["--topofile"]
 
-if arguments["--ref"] ==  None or not os.path.exists(arguments["--ref"]):
+if arguments["--ref"] ==  None :
    ref = None
 else:
    ref = arguments["--ref"]
@@ -171,6 +181,11 @@ if arguments["--tsinv"] ==  None:
     tsinv = 'no'
 else:
     tsinv = arguments["--tsinv"]
+
+if arguments["--format"] ==  None:
+    sformat = 'ROI_PAC'
+else:
+    sformat = arguments["--format"]
 
 if arguments["--estim"] ==  None:
     estim = 'yes'
@@ -208,10 +223,11 @@ date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')
 kmax=len(date_1)
 print "number of interferogram: ",kmax
 
-# open baseline.rsc
-source2=file(baseline,'r')
-im,bp,bt,imd=np.loadtxt(source2,comments="#",usecols=(0,1,2,4),unpack=True,dtype='i,f,f,f')
-print "image list=",baseline
+# list dates
+imd = []
+for date1,date2 in zip(date_1,date_2):
+    if date1 not in imd: imd.append(date1)
+    if date2 not in imd: imd.append(date2)
 nmax=len(imd)
 print "number of image: ",nmax
 
@@ -231,38 +247,51 @@ nfigure=0
 # load ref to define nlign, ncol and format
 if ref is not None:
     ds_extension = os.path.splitext(ref)[1]
-    if ds_extension == '.tiff':
+    if sformat == 'GTIFF':
         geotiff = arguments["--geotiff"]
         georef = gdal.Open(ref)
         gt = georef.GetGeoTransform()
         proj = georef.GetProjection()
         driver = gdal.GetDriverByName('GTiff')
-    elif ds_extension == '.unw':
+        ds = gdal.Open(ref, gdal.GA_ReadOnly)
+        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+    elif sformat == 'ROI_PAC':
         driver = gdal.GetDriverByName("roi_pac")
-    
-    ds = gdal.Open(ref, gdal.GA_ReadOnly)
-    nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        ds = gdal.Open(ref, gdal.GA_ReadOnly)
+        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+    elif sformat == 'GAMMA':
+        par_file = ref + '.par'
+        nlign,ncol = gm.readpar(par_file)
 
 # laod elevation map
 if radar is not None:
-    ds_extension = os.path.splitext(radar)[1]
-    if ds_extension == '.tiff':
+
+    if sformat == 'GTIFF':
         geotiff = arguments["--geotiff"]
         georef = gdal.Open(radar)
         gt = georef.GetGeoTransform()
         proj = georef.GetProjection()
         driver = gdal.GetDriverByName('GTiff')
-    elif ds_extension == '.unw':
-        driver = gdal.GetDriverByName("roi_pac")
+        ds = gdal.Open(radar, gdal.GA_ReadOnly)
+        ds_band2 = ds.GetRasterBand(2)
+        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        del ds
 
-    ds = gdal.Open(radar, gdal.GA_ReadOnly)
-    # Get the band that have the data we want
-    ds_band2 = ds.GetRasterBand(2)
-    nlign,ncol = ds.RasterYSize, ds.RasterXSize
-    ds_band2 = ds.GetRasterBand(2)
-    elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    elif sformat == 'ROI_PAC':
+        driver = gdal.GetDriverByName("roi_pac")
+        ds = gdal.Open(radar, gdal.GA_ReadOnly)
+        ds_band2 = ds.GetRasterBand(2)
+        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        del ds
+    
+    elif sformat == 'GAMMA':
+        par_file = ref + '.par'
+        elev_map = gm.readgamma(radar,par_file)
+
     maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
-    del ds
+    
 else:
     maxelev,minelev = 1.,-1
     elev_map = np.zeros((nlign,ncol))
@@ -276,7 +305,6 @@ if maskfile is not None:
     k = np.nonzero(mask<threshold_mask)
     spacial_mask = np.copy(mask)
     spacial_mask[k] = float('NaN')
-
 
     if plot=='yes':
 
@@ -1347,30 +1375,46 @@ if estim=='yes':
 
     for kk in xrange((kmax)):
         date1, date2 = date_1[kk], date_2[kk]
+        idate = str(date1) + '-' + str(date2) 
+        folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
+        os.makedirs(folder)
 
-        if ds_extension == '.unw':
-            idate = str(date1) + '-' + str(date2) 
-            folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
-            rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix + '_' + rlook + 'rlks.unw.rsc'
-            infile=folder + prefix + str(date1) + '-' + str(date2) + suffix + '_' + rlook + 'rlks.unw'
+        if sformat == 'ROI_PAC':
+            rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
+            infile=folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
 
             ds = gdal.Open(infile, gdal.GA_ReadOnly)
             # Get the band that have the data we want
             ds_band1 = ds.GetRasterBand(1)
             ds_band2 = ds.GetRasterBand(2)
 
-        if ds_extension == '.tiff':
-            infile = prefix + str(date1) + '-' + str(date2) + suffix + '_' + rlook + 'rlks.tiff'
+            los_map = np.zeros((nlign,ncol))
+            los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
+            # los_map[los_map==0] = np.float('NaN')
+            print 
+            print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
+
+        elif sformat == 'GTIFF':
+            infile = prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
 
             ds = gdal.Open(infile, gdal.GA_ReadOnly)
             # Get the band that have the data we want
             ds_band2 = ds.GetRasterBand(1)
+            nlign, ncol = ds.RasterYSize, ds.RasterXSize
 
-        los_map = np.zeros((nlign,ncol))
-        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
-        # los_map[los_map==0] = np.float('NaN')
-        print 
-        print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
+            los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
+            # los_map[los_map==0] = np.float('NaN')
+            print 
+            print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
+
+        elif sformat == 'GAMMA':
+            # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
+            par_file = ref + '.par'
+            lines,cols = gm.readpar(par_file)
+            infile=prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.unw'
+            los_map = gm.readgamma(infile,par_file)
+            print 
+            print 'Nlign:{}, Ncol:{}, int:{}:'.format(lines, cols, idate)
 
         # load coherence or whatever
         spacial_mask = np.ones((nlign,ncol))*np.float('NaN')
@@ -1697,14 +1741,14 @@ print
 for kk in xrange((kmax)):
     date1, date2 = date_1[kk], date_2[kk]
 
-    if ds_extension == '.unw':
+    if sformat == 'ROI_PAC':
 
         idate = str(date1) + '-' + str(date2) 
         folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
-        rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix + '_' + rlook + 'rlks.unw.rsc'
-        infile=folder + prefix + str(date1) + '-' + str(date2) + suffix + '_' + rlook + 'rlks.unw'
-        outfile = folder + prefix + str(date1) + '-' + str(date2) + suffix + '_' + suffout + '_' + rlook + 'rlks.unw'  
-        outrsc = folder + prefix + str(date1) + '-' + str(date2) + suffix + '_' + suffout + '_' + rlook + 'rlks.unw.rsc' 
+        rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw.rsc'
+        infile=folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw'
+        outfile = folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout + '_' + rlook + '.unw'  
+        outrsc = folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout + '_' + rlook + '.unw.rsc' 
         
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         # Get the band that have the data we want
@@ -1712,15 +1756,26 @@ for kk in xrange((kmax)):
         ds_band2 = ds.GetRasterBand(2)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         rms_map = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        lines, cols = ds.RasterYSize, ds.RasterXSize
 
-    elif ds_extension == '.tiff':
+    elif sformat == 'GTIFF':
 
-        infile = prefix + str(date1) + '-' + str(date2) + suffix + '_' + rlook + 'rlks.tiff'
-        outfile = prefix + str(date1) + '-' + str(date2) + suffix + '_' + suffout + '_' + rlook + 'rlks.tiff' 
+        infile = prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
+        outfile = prefix + str(date1) + '-' + str(date2) + suffix + suffout + '_' + rlook + '.tiff' 
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(1)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         rms_map = np.zeros((ds.RasterYSize,ds.RasterXSize))
+        lines, cols = ds.RasterYSize, ds.RasterXSize
+
+    elif sformat == 'GAMMA':
+
+        infile = prefix + str(date1) + '_' + str(date2) + suffix +  rlook + '.unw'
+        outfile = prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
+        par_file = ref + '.par'
+        lines,cols = gm.readpar(par_file)
+        los_map = gm.readgamma(infile,par_file)
+        rms_map = np.zeros((lines,cols))
 
     # rms_map = np.zeros((nlign,ncol))
     # print 'Apply correction and clean coh < 0.03....'
@@ -1728,14 +1783,13 @@ for kk in xrange((kmax)):
     # rms_map[rms_map<0.03] = 0.0
 
     print 
-    print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
+    print 'Nlign:{}, Ncol:{}, int:{}:'.format(lines, cols, idate)
 
     # compute correction
-    rg = np.tile(np.arange(ds.RasterXSize), (ds.RasterYSize,1))
-    az = np.tile(np.arange(ds.RasterYSize), (ds.RasterXSize,1)).T
-
-    z = np.zeros((ds.RasterYSize, ds.RasterXSize))
-    z = elev_map[:ds.RasterYSize,:ds.RasterXSize]
+    rg = np.tile(np.arange(ncols), (nlines,1))
+    az = np.tile(np.arange(nlines), (ncols,1)).T
+    z = np.zeros((nlines, ncols))
+    z = elev_map[:nlines,:ncols]
 
     # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
     if tsinv=='yes':
@@ -1770,8 +1824,9 @@ for kk in xrange((kmax)):
     # create new GDAL image with driver ROI_PAC
     # drv = gdal.GetDriverByName("roi_pac")
     
-    dst_ds = driver.Create(outfile, ncol, nlign, 2, gdal.GDT_Float32)
-    if ds_extension == '.unw':
+    
+    if sformat == 'ROI_PAC':
+        dst_ds = driver.Create(outfile, ncol, nlign, 2, gdal.GDT_Float32)
         dst_band1 = dst_ds.GetRasterBand(1)
         dst_band2 = dst_ds.GetRasterBand(2)
         dst_band1.WriteArray(rms_map,0,0)
@@ -1779,13 +1834,18 @@ for kk in xrange((kmax)):
         shutil.copy(rscfile,outrsc)
         dst_band1.FlushCache()
         dst_band2.FlushCache()
-    elif ds_extension == '.tiff':
+
+    elif sformat == 'GTIFF':
+        dst_ds = driver.Create(outfile, ncol, nlign, 1, gdal.GDT_Float32)
         dst_band2 = dst_ds.GetRasterBand(1)
         dst_band2.WriteArray(flatlos,0,0)
         dst_ds.SetGeoTransform(gt)
         dst_ds.SetProjection(proj)
         dst_band2.FlushCache()
-    
+
+    elif sformat == 'GAMMA':
+        fid = open(outfile, 'wb')
+        flatlos.flatten().astype('>f4').tofile(fid)
 
     nfigure=nfigure+1
     fig = plt.figure(nfigure,figsize=(9,4))
