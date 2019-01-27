@@ -86,10 +86,11 @@ print
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-import numpy.linalg as lst
+# import numpy.linalg as lst
 # scipy
-import scipy
+import scipy as sp
 import scipy.optimize as opt
+import scipy.linalg as lst
 # from nsbas import gdal, osr
 import gdal, osr
 # basic
@@ -552,7 +553,7 @@ if radar is not None:
     # fig = plt.figure(11)
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
     # plt.show()
-
+    # sys.exit()
 
 if aspect is not None:
     extension = os.path.splitext(aspect)[1]
@@ -1525,6 +1526,8 @@ for ii in xrange(niter):
 
             # ramp inversion
             x0 = lst.lstsq(G,los_clean)[0]
+            # print x0
+            # x0 = np.zeros((3))
             _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
             pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
             a = pars[0]; b = pars[1]; c = pars[2]
@@ -1591,6 +1594,7 @@ for ii in xrange(niter):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,los_clean)[0]
+
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy',f_scale=noise_level).x
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
