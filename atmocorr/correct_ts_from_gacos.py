@@ -45,8 +45,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.lib.stride_tricks import as_strided
 import subprocess
 np.warnings.filterwarnings('ignore')
-import docopt
 
+try:
+    from nsbas import docopt
+except:
+    import docopt
 # read arguments
 arguments = docopt.docopt(__doc__)
 
@@ -334,7 +337,35 @@ for l in xrange(1,N):
         modelbins = np.array(modelbins)
         xbins, ybins = np.array(xbins),np.array(ybins)
 
-        if doramp == 'yes':
+	flat='lin'
+	fitmodel='no'
+        if doramp == 'yes' and (flat=='lin' and fitmodel=='no'):
+            G=np.zeros((len(losbins),3))
+            G[:,1] = xbins
+            G[:,3] = ybins
+            G[:,4] = 1
+
+            x0 = lst.lstsq(G,losbins)[0]
+            # print x0
+            _func = lambda x: np.sum(((np.dot(G,x)-losbins)/losstd)**2)
+            pars = opt.least_squares(_func,x0,jac='3-point',loss='cauchy').x
+            a = pars[0]; b = pars[1]; c = pars[2]
+            print 'Remove ramp  %f az  ++ %f r + %f for date: %i'%(a,b,c,idates[l])
+            funct = a*x + b*y + c
+            functbins = a*xbins + b*ybins+c
+
+            # build total G matrix
+            G=np.zeros((len(data.flatten()),3))
+            for i in xrange(nlign):
+                G[i*ncol:(i+1)*ncol,0] = i
+                G[i*ncol:(i+1)*ncol,1] = np.arange(ncol)
+            G[:,2] = 1
+
+            model = np.dot(G,pars).reshape(nlign,ncol)
+            model[model==0.] = 0.
+            model[np.isnan(data)] = np.float('NaN')
+
+        if doramp == 'yes' and (flat=='quad' and fitmodel==yes):
             G=np.zeros((len(losbins),6))
             G[:,0] = xbins**2
             G[:,1] = xbins
@@ -397,7 +428,7 @@ for l in xrange(1,N):
     # correction
     data_flat[:,:] = data - model
     data_flat[np.isnan(data)] = np.float('NaN')
-
+    data_flat[data_flat>999.]= np.float('NaN')
     if plot == 'yes':
         vmax = np.nanpercentile(data_flat,98)
         vmin = np.nanpercentile(data_flat,2)
