@@ -49,7 +49,7 @@ def _getParameters(path, log=False):
                     'Parameter file does not hold required parameters')             
 
 
-def readpar(par_file):
+def readpar(par_file='./'):
         """
         :params filename: Gamma software parameter file
         :type filename: str
@@ -66,7 +66,7 @@ def readpar(par_file):
         nlines = int(params['azimuth_lines'][0])
         return nlines,nrows
 
-def readgamma(filename,par_file):
+def readgamma(filename,par_file='./'):
 
         params = _getParameters(par_file, log=True)
         nrows = int(params['range_samples'][0]) 
