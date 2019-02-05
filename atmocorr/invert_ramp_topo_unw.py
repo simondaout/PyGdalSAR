@@ -64,9 +64,9 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
 --ibeg VALUE          Line number bounding the estimation zone [default: 0]
---iend VALUE          Line number bounding the estimation zone [default: nlign]
+--iend VALUE          Line number bounding the estimation zone [default: mlines]
 --jbeg VALUE          Column numbers bounding the estimation zone [default: 0]
---jend VALUE          Column numbers bounding the estimation zone [default: ncol] 
+--jend VALUE          Column numbers bounding the estimation zone [default: mcols] 
 """
 
 
@@ -88,7 +88,6 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 from datetime import datetime
-import datetime
 import time
 
 # numpy
@@ -109,7 +108,7 @@ import shutil
 arguments = docopt.docopt(__doc__)
 
 int_list=arguments["--int_list"]
-int_path=arguments["--int_path"]
+int_path=arguments["--int_path"] + '/'
 
 if arguments["--prefix"] == None:
     prefix = ''
@@ -214,6 +213,24 @@ else:
     suffout = arguments["--suffix_output"]
 
 
+# A more predictable makedirs
+def makedirs(name):
+    if os.path.exists(name):
+        return
+    os.makedirs(name)
+
+def date2dec(dates):
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetime.strptime('{}'.format(date),'%Y%m%d')
+        #x = datetime.strptime('{}'.format(date),'%Y-%m-%dT%H:%M:%S.%fZ')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        # print date,dec,year
+        times.append(year + dec)
+    return times
+
 
 #####################################################################################
 
@@ -224,17 +241,19 @@ kmax=len(date_1)
 print "number of interferogram: ",kmax
 
 # list dates
-imd = []
+imd = []; bt = []
 for date1,date2 in zip(date_1,date_2):
     if date1 not in imd: imd.append(date1)
     if date2 not in imd: imd.append(date2)
 nmax=len(imd)
 print "number of image: ",nmax
+bt = date2dec(imd)
+
 
 # initialise number of figure
 nfigure=0
 # fig, ax = plt.subplots(1)
-# x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in im]
+# x = [date2num(datetime.strptime('{}'.format(d),'%Y%m%d')) for d in im]
 # ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
 # ax.plot(x,bp,"ro",label='acquistions')
 # ax.plot(x,,"green")
@@ -244,7 +263,7 @@ nfigure=0
 # plt.legend(loc=2)
 # plt.show()
 
-# load ref to define nlign, ncol and format
+# load ref to define mlines, mcols and format
 if ref is not None:
     ds_extension = os.path.splitext(ref)[1]
     if sformat == 'GTIFF':
@@ -254,14 +273,14 @@ if ref is not None:
         proj = georef.GetProjection()
         driver = gdal.GetDriverByName('GTiff')
         ds = gdal.Open(ref, gdal.GA_ReadOnly)
-        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'ROI_PAC':
         driver = gdal.GetDriverByName("roi_pac")
         ds = gdal.Open(ref, gdal.GA_ReadOnly)
-        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'GAMMA':
         par_file = ref + '.par'
-        nlign,ncol = gm.readpar(par_file)
+        mlines,mcols = gm.readpar(par_file)
 
 # laod elevation map
 if radar is not None:
@@ -274,7 +293,7 @@ if radar is not None:
         driver = gdal.GetDriverByName('GTiff')
         ds = gdal.Open(radar, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(2)
-        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        mlines,mcols = ds.RasterYSize, ds.RasterXSize
         elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         del ds
 
@@ -282,26 +301,27 @@ if radar is not None:
         driver = gdal.GetDriverByName("roi_pac")
         ds = gdal.Open(radar, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(2)
-        nlign,ncol = ds.RasterYSize, ds.RasterXSize
+        mlines,mcols = ds.RasterYSize, ds.RasterXSize
         elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         del ds
     
     elif sformat == 'GAMMA':
         par_file = ref + '.par'
+        mlines,mcols = gm.readpar(par_file)
         elev_map = gm.readgamma(radar,par_file)
 
     maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
     
 else:
     maxelev,minelev = 1.,-1
-    elev_map = np.zeros((nlign,ncol))
+    elev_map = np.zeros((mlines,mcols))
 
 
 # open mask file
 if maskfile is not None:
     fid = open(maskfile,'r')
-    maski = np.fromfile(fid,dtype=np.float32)[:ncol*nlign]
-    mask = maski.reshape((nlign,ncol))
+    maski = np.fromfile(fid,dtype=np.float32)[:mcols*mlines]
+    mask = maski.reshape((mlines,mcols))
     k = np.nonzero(mask<threshold_mask)
     spacial_mask = np.copy(mask)
     spacial_mask[k] = float('NaN')
@@ -319,7 +339,7 @@ if maskfile is not None:
       fid.close()
 
 else:
-    mask = np.zeros((nlign,ncol))
+    mask = np.zeros((mlines,mcols))
     threshold_mask = -1
 
 # define estimation area
@@ -328,7 +348,7 @@ if arguments["<ibeg>"] ==  None:
 else:
   ibeg = int(arguments["<ibeg>"])
 if arguments["<iend>"] ==  None:
-  iend = nlign
+  iend = mlines
 else:
   iend = int(arguments["<iend>"])
 if arguments["<jbeg>"] ==  None:
@@ -336,12 +356,12 @@ if arguments["<jbeg>"] ==  None:
 else:
   jbeg = int(arguments["<jbeg>"])
 if arguments["<jend>"] ==  None:
-  jend = ncol
+  jend = mcols
 else:
   jend = int(arguments["<jend>"])
 
 # extract range and azimuth coordinates from ref or radar file
-pix_az, pix_rg = np.indices((nlign,ncol))
+pix_az, pix_rg = np.indices((mlines,mcols))
 # print np.shape(pix_az)
 # print np.shape(mask)
 # sys.exit()
@@ -354,7 +374,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
     # initialize correction
-    corr = np.zeros((nlign,ncol))
+    corr = np.zeros((mlines,mcols))
 
     if order==0:  
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -448,8 +468,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,0] = 1
                 G[:,1] = elev_map.flatten()
                 G[:,2] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,2] *= i
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,2] *= i
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(los_clean),4))
@@ -475,9 +495,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,1] = elev_map.flatten()
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,2] *= i
-                    G[i*ncol:(i+1)*ncol,3] *= i**2
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,2] *= i
+                    G[i*mcols:(i+1)*mcols,3] *= i**2
 
 
     elif order==1: # Remove a range ramp ay+b for each maps (y = col)
@@ -500,8 +520,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
             # build total G matrix
             G=np.zeros((len(los),2))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
+            for i in xrange(mlines):
+                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
             G[:,1] = 1
 
 
@@ -525,8 +545,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
 
@@ -550,8 +570,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
@@ -580,9 +600,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                    G[i*ncol:(i+1)*ncol,3] *= i
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,3] *= i
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(los_clean),4))
@@ -610,10 +630,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                    G[i*ncol:(i+1)*ncol,3] *= i
-                    G[i*ncol:(i+1)*ncol,4] *= i**2
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,3] *= i
+                    G[i*mcols:(i+1)*mcols,4] *= i**2
 
         
     elif order==2: # Remove an azimutal ramp ax+b for each maps (x is lign)
@@ -637,8 +657,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
             # build total G matrix
             G=np.zeros((len(los),2))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = i  
+            for i in xrange(mlines):
+                G[i*mcols:(i+1)*mcols,0] = i  
             G[:,1] = 1
 
         else:
@@ -661,8 +681,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = i 
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
 
@@ -686,8 +706,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = i 
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
@@ -715,9 +735,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i
-                    G[i*ncol:(i+1)*ncol,3] *= i
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = i
+                    G[i*mcols:(i+1)*mcols,3] *= i
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(los_clean),5))
@@ -744,10 +764,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i
-                    G[i*ncol:(i+1)*ncol,3] *= i
-                    G[i*ncol:(i+1)*ncol,4] *= i**2
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = i
+                    G[i*mcols:(i+1)*mcols,3] *= i
+                    G[i*mcols:(i+1)*mcols,4] *= i**2
 
     elif order==3: # Remove a ramp ay+bx+c for each maps
     #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2
@@ -771,9 +791,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
             # build total G matrix
             G=np.zeros((len(los),3))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                G[i*ncol:(i+1)*ncol,1] = i 
+            for i in xrange(mlines):
+                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                G[i*mcols:(i+1)*mcols,1] = i 
             G[:,2] = 1
 
 
@@ -798,9 +818,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                    G[i*ncol:(i+1)*ncol,1] = i    
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,1] = i    
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
 
@@ -825,9 +845,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                    G[i*ncol:(i+1)*ncol,1] = i    
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,1] = i    
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
@@ -856,10 +876,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                    G[i*ncol:(i+1)*ncol,1] = i
-                    G[i*ncol:(i+1)*ncol,4] *= i   
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,1] = i
+                    G[i*mcols:(i+1)*mcols,4] *= i   
             
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(los_clean),6))
@@ -888,11 +908,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) 
-                    G[i*ncol:(i+1)*ncol,1] = i
-                    G[i*ncol:(i+1)*ncol,4] *= i   
-                    G[i*ncol:(i+1)*ncol,5] *= i**2
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,1] = i
+                    G[i*mcols:(i+1)*mcols,4] *= i   
+                    G[i*mcols:(i+1)*mcols,5] *= i**2
 
 
     elif order==4:
@@ -918,10 +938,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
-                G[i*ncol:(i+1)*ncol,1] = i 
-                G[i*ncol:(i+1)*ncol,2] = (i) * (np.arange((ncol)))    
+            for i in xrange(mlines):
+                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
+                G[i*mcols:(i+1)*mcols,1] = i 
+                G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))    
             G[:,3] = 1
 
         else:
@@ -946,10 +966,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
-                    G[i*ncol:(i+1)*ncol,1] = i
-                    G[i*ncol:(i+1)*ncol,2] = (i) * (np.arange((ncol)))
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
+                    G[i*mcols:(i+1)*mcols,1] = i
+                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
 
@@ -975,10 +995,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
-                    G[i*ncol:(i+1)*ncol,1] = i
-                    G[i*ncol:(i+1)*ncol,2] = (i) * (np.arange((ncol)))
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
+                    G[i*mcols:(i+1)*mcols,1] = i
+                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
@@ -1008,11 +1028,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
-                    G[i*ncol:(i+1)*ncol,1] = i
-                    G[i*ncol:(i+1)*ncol,2] = (i) * (np.arange((ncol)))
-                    G[i*ncol:(i+1)*ncol,5] *= i
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
+                    G[i*mcols:(i+1)*mcols,1] = i
+                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
+                    G[i*mcols:(i+1)*mcols,5] *= i
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(los_clean),7))
@@ -1041,12 +1061,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()
                 G[:,6] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
-                    G[i*ncol:(i+1)*ncol,1] = i
-                    G[i*ncol:(i+1)*ncol,2] = (i) * (np.arange((ncol)))
-                    G[i*ncol:(i+1)*ncol,5] *= i
-                    G[i*ncol:(i+1)*ncol,6] *= i**2
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
+                    G[i*mcols:(i+1)*mcols,1] = i
+                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
+                    G[i*mcols:(i+1)*mcols,5] *= i
+                    G[i*mcols:(i+1)*mcols,6] *= i**2
 
     elif order==5:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1070,9 +1090,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
             # build total G matrix
             G=np.zeros((len(los),3))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)))**2
-                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) 
+            for i in xrange(mlines):
+                G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
+                G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) 
             G[:,2] = 1
 
         else:
@@ -1096,9 +1116,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)))**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) 
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
 
@@ -1123,9 +1143,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)))**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) 
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
@@ -1154,10 +1174,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)))**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
-                    G[i*ncol:(i+1)*ncol,4] *= i
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols))
+                    G[i*mcols:(i+1)*mcols,4] *= i
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(los_clean),6))
@@ -1185,11 +1205,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)))**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
-                    G[i*ncol:(i+1)*ncol,4] *= i
-                    G[i*ncol:(i+1)*ncol,5] *= i**2
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols))
+                    G[i*mcols:(i+1)*mcols,4] *= i
+                    G[i*mcols:(i+1)*mcols,5] *= i**2
 
     elif order==6:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1213,9 +1233,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
             # build total G matrix
             G=np.zeros((len(los),3))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (i)**2
-                G[i*ncol:(i+1)*ncol,1] = (i) 
+            for i in xrange(mlines):
+                G[i*mcols:(i+1)*mcols,0] = (i)**2
+                G[i*mcols:(i+1)*mcols,1] = (i) 
             G[:,2] = 1
 
         else:
@@ -1239,9 +1259,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i)**2
-                    G[i*ncol:(i+1)*ncol,1] = i 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (i)**2
+                    G[i*mcols:(i+1)*mcols,1] = i 
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
 
@@ -1266,9 +1286,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i)**2
-                    G[i*ncol:(i+1)*ncol,1] = i 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (i)**2
+                    G[i*mcols:(i+1)*mcols,1] = i 
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
@@ -1297,9 +1317,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i)**2
-                    G[i*ncol:(i+1)*ncol,1] = i 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (i)**2
+                    G[i*mcols:(i+1)*mcols,1] = i 
                     G[:,4] *= i 
 
             elif ivar==1 and nfit==1:
@@ -1329,18 +1349,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
-                for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i)**2
-                    G[i*ncol:(i+1)*ncol,1] = i 
+                for i in xrange(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (i)**2
+                    G[i*mcols:(i+1)*mcols,1] = i 
                     G[:,4] *= i 
                     G[:,5] *= i**2 
 
 
-    corr = np.dot(G,pars).reshape(nlign,ncol)
+    corr = np.dot(G,pars).reshape(mlines,mcols)
     res = los - np.dot(G,pars)
     rms = np.sqrt(np.nanmean(res**2))
 
-    # plt.imshow(los.reshape(nlign,ncol))
+    # plt.imshow(los.reshape(mlines,mcols))
     # plt.show()
     # plt.imshow(corr)
     # plt.show()
@@ -1351,7 +1371,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 #####################################################################################
 
 # initialise full vector correction 
-# 16 values: date1 dates2  nlign y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2 
+# 16 values: date1 dates2  mlines y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2 
 spint = np.zeros((kmax,16))
 M = 13
 
@@ -1359,7 +1379,7 @@ M = 13
 spint[:,0],spint[:,1] = date_1,date_2 
 
 # initilise correction cube
-corr_maps = np.zeros((nlign,ncol,kmax))
+# corr_maps = np.zeros((mlines,mcols,kmax))
 rms = np.zeros((kmax,3))
 rms[:,0],rms[:,1] = date_1,date_2 
 
@@ -1377,7 +1397,6 @@ if estim=='yes':
         date1, date2 = date_1[kk], date_2[kk]
         idate = str(date1) + '-' + str(date2) 
         folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
-        os.makedirs(folder)
 
         if sformat == 'ROI_PAC':
             rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
@@ -1388,11 +1407,11 @@ if estim=='yes':
             ds_band1 = ds.GetRasterBand(1)
             ds_band2 = ds.GetRasterBand(2)
 
-            los_map = np.zeros((nlign,ncol))
-            los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
+            los_map = np.zeros((mlines,mcols))
+            los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
             # los_map[los_map==0] = np.float('NaN')
-            print 
-            print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
+            lines, cols = ds.RasterYSize, ds.RasterXSize
+
 
         elif sformat == 'GTIFF':
             infile = prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
@@ -1400,35 +1419,34 @@ if estim=='yes':
             ds = gdal.Open(infile, gdal.GA_ReadOnly)
             # Get the band that have the data we want
             ds_band2 = ds.GetRasterBand(1)
-            nlign, ncol = ds.RasterYSize, ds.RasterXSize
+            lines, cols = ds.RasterYSize, ds.RasterXSize
 
-            los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
+            los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
             # los_map[los_map==0] = np.float('NaN')
-            print 
-            print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
 
         elif sformat == 'GAMMA':
             # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
             par_file = ref + '.par'
             lines,cols = gm.readpar(par_file)
-            infile=prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.unw'
+            infile=int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.unw'
             los_map = gm.readgamma(infile,par_file)
-            print 
-            print 'Nlign:{}, Ncol:{}, int:{}:'.format(lines, cols, idate)
+
+        print 
+        print 'mlines:{}, mcols:{}, int:{}:'.format(lines, cols, idate)
 
         # load coherence or whatever
-        spacial_mask = np.ones((nlign,ncol))*np.float('NaN')
+        spacial_mask = np.ones((mlines,mcols))*np.float('NaN')
 
-        rms_map = np.ones((nlign,ncol))
+        rms_map = np.ones((mlines,mcols))
         try:
             if rmsf=='yes':
-                rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
+                rms_map[:lines,:cols] = ds_band1.ReadAsArray(0, 0, lines, cols)[:mlines,:mcols]
                 # rmsi = np.fromfile(folder + 'cor',dtype=np.float32)
                 # _rms_map = rmsi.reshape(len(rmsi)/1420,1420)
-                # if len(rmsi)/1420 < nlign:
+                # if len(rmsi)/1420 < mlines:
                 #     rms_map[:len(rmsi)/1420,:1420] = _rms_map
                 # else:
-                #     rms_map = _rms_map[:nlign,:ncol]
+                #     rms_map = _rms_map[:mlines,:mcols]
                 k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
                 rms_map[k] = float('NaN')
             else:
@@ -1436,21 +1454,11 @@ if estim=='yes':
         except:
             threshold_rms = -1
 
-        # print maxelev,minelev
-        # print threshold_rms
-        # print rms_map
-        # print ibeg_mask, iend_mask
-        # print pix_az
-        # print pix_rg
-        # print ibeg, iend, jbeg, jend
-        # print mask
-        # print threshold_mask
-
         # time.sleep(1.)
         # clean for estimation
         _los_map = np.copy(los_map)
         _los_map[los_map==0] = np.float('NaN')
-        maxlos,minlos=np.nanpercentile(_los_map,perc),np.nanpercentile(_los_map,(100-perc))
+        maxlos,minlos = np.nanpercentile(_los_map,perc),np.nanpercentile(_los_map,(100-perc))
         # print maxlos,minlos
 
 
@@ -1518,7 +1526,7 @@ if estim=='yes':
           print
           print 'Int. too short in comparison to ref, set flat to 5'
           temp_flat=5
-        elif flat>5 and iend-itemp < .9*ncol:
+        elif flat>5 and iend-itemp < .9*mcols:
           print
           print 'Lenght int. inferior to width, set flat to 5 and nfit to 0'
           temp_flat=5
@@ -1548,7 +1556,7 @@ if estim=='yes':
         # clean corr : non car il faut extrapoler pour l'inversion ens erie temp
         # k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
         # corr[k] = 0.
-        corr_maps[:,:,kk] = np.copy(corr)
+        # corr_maps[:,:,kk] = np.copy(corr)
 
         # print sol
         # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1572,50 +1580,50 @@ if estim=='yes':
            ax.set_xlabel('Elevation (m)')
            ax.set_ylabel('LOS (rad)')
            plt.legend(loc='best')
-           fig2.savefig(folder+'phase-topo.eps', format='EPS',dpi=150)
+           fig2.savefig(folder+'phase-topo.png', format='PNG')
 
         #corected map
         vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
 
-        nfigure=nfigure+1
-        fig = plt.figure(nfigure,figsize=(11,4))
-
-        ax = fig.add_subplot(1,4,1)
-        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation='bilinear',alpha=1.)
-        ax.set_title('LOS')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-
-        ax = fig.add_subplot(1,4,2)
-        cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
-        ax.set_title('LOS ESTIMATION')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-
-        ax = fig.add_subplot(1,4,3)
-        cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
-        ax.set_title('RAMP+TOPO')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-
-        # for plot we can clean
-        k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
-        corr[k] = 0.
-
-        ax = fig.add_subplot(1,4,4)
-        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation='bilinear')
-        ax.set_title('CORR LOS')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-        fig.tight_layout()
-
-        fig.savefig(folder + prefix +'corrections' + suffix+ '.eps', format='EPS',dpi=150)
-
         if plot=='yes':
+
+            nfigure=nfigure+1
+            fig = plt.figure(nfigure,figsize=(11,4))
+
+            ax = fig.add_subplot(1,4,1)
+            hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+            cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation=None,alpha=1.)
+            ax.set_title('LOS')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
+
+            ax = fig.add_subplot(1,4,2)
+            cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+            ax.set_title('LOS ESTIMATION')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
+
+            ax = fig.add_subplot(1,4,3)
+            cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+            ax.set_title('RAMP+TOPO')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
+
+            # for plot we can clean
+            k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
+            corr[k] = 0.
+
+            ax = fig.add_subplot(1,4,4)
+            hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+            cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
+            ax.set_title('CORR LOS')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
+            fig.tight_layout()
+
+            fig.savefig(folder + prefix +'corrections' + suffix+ '.png', format='PNG')
             plt.show()
-        
+
         # fill correction matrix
         spint[kk,3:] = sol
 
@@ -1624,7 +1632,11 @@ if estim=='yes':
         del los_clean, rms_clean
         del elev_clean
         del az, rg
-        del ds 
+        try:
+            del ds
+        except:
+            pass
+
 
     # save spint 
     np.savetxt('liste_coeff_ramps.txt', spint , header='#date1   |   dates2   |   Lenght   |   y**3   |   y**2   |   y\
@@ -1651,7 +1663,7 @@ spint = np.vstack([date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m]).T
 rec_spint = np.copy(spint)
 
 # # # load correction matrix
-# corr_maps = np.fromfile("corection_matrix",dtype=np.float32).reshape((nlign,ncol,kmax))
+# corr_maps = np.fromfile("corection_matrix",dtype=np.float32).reshape((mlines,mcols,kmax))
 
 ####################################################################################
 
@@ -1671,10 +1683,10 @@ if tsinv=='yes':
     deltat = np.zeros((kmax))
     for k in xrange((kmax)):
       for n in xrange((nmax)):
-        if (date_1[k]==im[n]): 
+        if (date_1[k]==imd[n]): 
           G_[k,n]=-1
           t1 = bt[n]
-        elif (date_2[k]==im[n]):
+        elif (date_2[k]==imd[n]):
           G_[k,n]=1
           t2 = bt[n]
       deltat[k] = abs(t2 -t1)
@@ -1688,14 +1700,13 @@ if tsinv=='yes':
 
     # 2) create a weight based on the size of the int: give a stronger weight to long interferograms
     # print length
-    w2 = length/nlign
+    w2 = length/mlines
     # print w2
     # sys.exit()
     sig_ = 1./w1 + 1./w2
 
-    
-    for j in xrange(3,len(spint_inv)):
-        
+    for j in xrange(3,shape(spint_inv)[1]):
+
         d = np.zeros(((kmax+1)))
         sig = np.ones(((kmax+1)))
         G = np.zeros(((kmax+1),nmax))
@@ -1740,11 +1751,12 @@ print
 # apply correction
 for kk in xrange((kmax)):
     date1, date2 = date_1[kk], date_2[kk]
+    folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
+    idate = str(date1) + '-' + str(date2) 
+    makedirs(folder)
 
     if sformat == 'ROI_PAC':
-
-        idate = str(date1) + '-' + str(date2) 
-        folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
+        
         rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw.rsc'
         infile=folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw'
         outfile = folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout + '_' + rlook + '.unw'  
@@ -1760,8 +1772,8 @@ for kk in xrange((kmax)):
 
     elif sformat == 'GTIFF':
 
-        infile = prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
-        outfile = prefix + str(date1) + '-' + str(date2) + suffix + suffout + '_' + rlook + '.tiff' 
+        infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
+        outfile = folder + prefix + str(date1) + '-' + str(date2) + suffix + suffout + '_' + rlook + '.tiff' 
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(1)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
@@ -1770,26 +1782,26 @@ for kk in xrange((kmax)):
 
     elif sformat == 'GAMMA':
 
-        infile = prefix + str(date1) + '_' + str(date2) + suffix +  rlook + '.unw'
-        outfile = prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
+        infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix +  rlook + '.unw'
+        outfile = folder + prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
         par_file = ref + '.par'
         lines,cols = gm.readpar(par_file)
         los_map = gm.readgamma(infile,par_file)
         rms_map = np.zeros((lines,cols))
 
-    # rms_map = np.zeros((nlign,ncol))
+    # rms_map = np.zeros((mlines,mcols))
     # print 'Apply correction and clean coh < 0.03....'
     # los_map[rms_map<0.03] = 0.0
     # rms_map[rms_map<0.03] = 0.0
 
     print 
-    print 'Nlign:{}, Ncol:{}, int:{}:'.format(lines, cols, idate)
+    print 'mlines:{}, mcols:{}, int:{}:'.format(lines, cols, idate)
 
     # compute correction
-    rg = np.tile(np.arange(ncols), (nlines,1))
-    az = np.tile(np.arange(nlines), (ncols,1)).T
-    z = np.zeros((nlines, ncols))
-    z = elev_map[:nlines,:ncols]
+    rg = np.tile(np.arange(cols), (lines,1))
+    az = np.tile(np.arange(lines), (cols,1)).T
+    z = np.zeros((lines, cols))
+    z = elev_map[:lines,:cols]
 
     # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
     if tsinv=='yes':
@@ -1820,13 +1832,9 @@ for kk in xrange((kmax)):
     flatlos[isnan(flatlos)],rms_map[isnan(flatlos)] = 0.0, 0.0
     flatlos[isnan(los_map)],rms_map[isnan(los_map)] = 0.0, 0.0
     rms_map[isnan(rms_map)],flatlos[isnan(rms_map)] = 0.0, 0.0
-
-    # create new GDAL image with driver ROI_PAC
-    # drv = gdal.GetDriverByName("roi_pac")
-    
     
     if sformat == 'ROI_PAC':
-        dst_ds = driver.Create(outfile, ncol, nlign, 2, gdal.GDT_Float32)
+        dst_ds = driver.Create(outfile, cols, lines, 2, gdal.GDT_Float32)
         dst_band1 = dst_ds.GetRasterBand(1)
         dst_band2 = dst_ds.GetRasterBand(2)
         dst_band1.WriteArray(rms_map,0,0)
@@ -1836,7 +1844,7 @@ for kk in xrange((kmax)):
         dst_band2.FlushCache()
 
     elif sformat == 'GTIFF':
-        dst_ds = driver.Create(outfile, ncol, nlign, 1, gdal.GDT_Float32)
+        dst_ds = driver.Create(folder + outfile, cols, lines, 1, gdal.GDT_Float32)
         dst_band2 = dst_ds.GetRasterBand(1)
         dst_band2.WriteArray(flatlos,0,0)
         dst_ds.SetGeoTransform(gt)
@@ -1857,35 +1865,37 @@ for kk in xrange((kmax)):
     # vmax = np.percentile(los_map, 98)
 
     ax = fig.add_subplot(1,4,1)
-    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation='bilinear')
+    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
     ax.set_title('LOS')
     setp( ax.get_xticklabels(), visible=None)
 
     ax = fig.add_subplot(1,4,2)
-    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation='bilinear')
+    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
     ax.set_title('RAMP+TOPO ORIG')
     setp( ax.get_xticklabels(), visible=None)
 
     ax = fig.add_subplot(1,4,3)
-    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation='bilinear')
+    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
     ax.set_title('RAMP+TOPO RECONST.')
     setp( ax.get_xticklabels(), visible=None)
 
     ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation='bilinear')
+    cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
     ax.set_title('CORR LOS RECONST.')
     setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.tight_layout()
 
-
-    fig.savefig(folder + prefix + 'reconstruc_corrections' + suffix + '.eps', format='EPS',dpi=150)
+    fig.savefig(folder + prefix + 'reconstruc_corrections' + suffix + '.png', format='PNG')
 
     if plot=='yes':
         plt.show()
 
     plt.close('all')
 
-    del dst_ds, ds, drv
+    try:
+        del dst_ds, ds, drv
+    except:
+        pass
     del los_map, rms_map
 
