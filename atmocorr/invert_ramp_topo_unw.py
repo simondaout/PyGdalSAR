@@ -13,7 +13,7 @@ invert_ramp_topo_unw.py
 Removes atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coeffice
 ints on unwrapped interferograms (2 bands file). Reconstruction of the empirical phase correction by time series inversion.
 
-usage: invert_ramp_topo_unw.py --int_list=<path> --int_path=<path> \
+usage: invert_ramp_topo_unw.py --int_list=<path> [--int_path=<path>] [--out_path=<path>] \
 [--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
@@ -23,7 +23,8 @@ usage: invert_ramp_topo_unw.py --int_list=<path> --int_path=<path> \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] 
 
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
---int_path PATh       Absolute path to interferograms directory
+--int_path PATh       Relative path to input interferograms directory
+--int_path PATh       Relative path to output interferograms directory
 --prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
@@ -58,8 +59,8 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --cohpixel  yes/no    If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
 --format VALUE        Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --threshold_coh VALUE Threshold on cohpixel file [default:0]
---ibeg_mask VALUE     Line number bounding an other mask of estimation zone [default: None]
---iend_mask VALUE     Line number bounding an other mask of estimation zone [default: None]  
+--ibeg_mask VALUE     Start line number mask [default: None]
+--iend_mask VALUE     Strop line number mask [default: None]  
 --perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
@@ -101,14 +102,45 @@ import scipy.linalg as lst
 
 import docopt
 import gamma as gm
-
 import shutil
+
+# import shutil
+
+# A more predictable makedirs
+def makedirs(name):
+    if os.path.exists(name):
+        return
+    os.makedirs(name)
+
+def date2dec(dates):
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetime.strptime('{}'.format(date),'%Y%m%d')
+        #x = datetime.strptime('{}'.format(date),'%Y-%m-%dT%H:%M:%S.%fZ')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        # print date,dec,year
+        times.append(year + dec)
+    return times
+
 
 # read arguments
 arguments = docopt.docopt(__doc__)
 
 int_list=arguments["--int_list"]
-int_path=arguments["--int_path"] + '/'
+
+if arguments["--int_path"] == None:
+    int_path='./'
+else:
+    int_path=arguments["--int_path"] + '/'
+
+if arguments["--out_path"] == None:
+    out_path=np.copy(int_path)
+else:
+    out_path=arguments["--out_path"] + '/'
+
+makedirs(out_path)
 
 if arguments["--prefix"] == None:
     prefix = ''
@@ -213,25 +245,6 @@ else:
     suffout = arguments["--suffix_output"]
 
 
-# A more predictable makedirs
-def makedirs(name):
-    if os.path.exists(name):
-        return
-    os.makedirs(name)
-
-def date2dec(dates):
-    dates  = np.atleast_1d(dates)
-    times = []
-    for date in dates:
-        x = datetime.strptime('{}'.format(date),'%Y%m%d')
-        #x = datetime.strptime('{}'.format(date),'%Y-%m-%dT%H:%M:%S.%fZ')
-        dec = float(x.strftime('%j'))/365.1
-        year = float(x.strftime('%Y'))
-        # print date,dec,year
-        times.append(year + dec)
-    return times
-
-
 #####################################################################################
 
 print
@@ -241,14 +254,23 @@ kmax=len(date_1)
 print "number of interferogram: ",kmax
 
 # list dates
-imd = []; bt = []
+im = []; bt = []
 for date1,date2 in zip(date_1,date_2):
-    if date1 not in imd: imd.append(date1)
-    if date2 not in imd: imd.append(date2)
-nmax=len(imd)
+    if date1 not in im: im.append(date1)
+    if date2 not in im: im.append(date2)
+nmax=len(im)
 print "number of image: ",nmax
-bt = date2dec(imd)
+imd = date2dec(im)
+cst = np.copy(imd[0])
+for i in xrange((nmax)):
+    bt.append(imd[i]-cst)
 
+# # Now, write list_pair
+# wf = open("list_dates", "w")
+# for i in xrange((nmax)):
+#     wf.write("%i %.6f %.6f\n" % (im[i], imd[i], bt[i]))
+# wf.close()
+# sys.exit()
 
 # initialise number of figure
 nfigure=0
@@ -279,8 +301,8 @@ if ref is not None:
         ds = gdal.Open(ref, gdal.GA_ReadOnly)
         mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'GAMMA':
-        par_file = ref + '.par'
-        mlines,mcols = gm.readpar(par_file)
+        # par_file = ref 
+        mlines,mcols = gm.readpar(int_path)
 
 # laod elevation map
 if radar is not None:
@@ -306,9 +328,9 @@ if radar is not None:
         del ds
     
     elif sformat == 'GAMMA':
-        par_file = ref + '.par'
-        mlines,mcols = gm.readpar(par_file)
-        elev_map = gm.readgamma(radar,par_file)
+        # par_file = ref 
+        mlines,mcols = gm.readpar()
+        elev_map = gm.readgamma(radar)
 
     maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
     
@@ -432,7 +454,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 
@@ -456,7 +478,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
 
@@ -483,7 +505,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[8] = pars[0]; sol[9] = pars[1]; sol[11] = pars[2];sol[12] = pars[3]
@@ -512,7 +534,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
             try:
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
             sol[2] = pars[0]; sol[8] = pars[1]
@@ -537,7 +559,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]
@@ -562,7 +584,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[10] = pars[3]
@@ -589,7 +611,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[11] = pars[3]
@@ -618,7 +640,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[11] = pars[3]; sol[12] = pars[4]
@@ -649,7 +671,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
             try:
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
             sol[5] = pars[0]; sol[8] = pars[1]
@@ -673,7 +695,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[5] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]
@@ -698,7 +720,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[5] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[10] = pars[-1]
@@ -724,7 +746,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[5] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[11] = pars[3]
@@ -752,7 +774,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[5] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[11] = pars[3]; sol[12] = pars[4]
@@ -783,7 +805,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
             try:
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
             sol[2] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]
@@ -810,7 +832,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:    
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]
@@ -837,7 +859,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[-2]; sol[10] = pars[-1]
@@ -865,7 +887,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]
@@ -895,7 +917,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2    
@@ -930,7 +952,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
             try:
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
             sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2]; sol[8] = pars[3]
@@ -958,7 +980,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2] = pars[3]; sol[9] = pars[4]
@@ -987,7 +1009,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[10] = pars[-1]
@@ -1017,7 +1039,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[11] = pars[5]
@@ -1049,7 +1071,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[11] = pars[5]; sol[12] = pars[6]
@@ -1082,7 +1104,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
             try:
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
             sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]
@@ -1108,7 +1130,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]
@@ -1135,7 +1157,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[10] = pars[-1]
@@ -1163,7 +1185,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]
@@ -1193,7 +1215,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]; sol[12] = pars[5]
@@ -1225,7 +1247,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
             try:
                 _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
             sol[4] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]
@@ -1251,7 +1273,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[4] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]
@@ -1278,7 +1300,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[4] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[10] = pars[4]
@@ -1306,7 +1328,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 sol[4] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4];
@@ -1336,7 +1358,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 try:
                     _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
                 #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1396,11 +1418,11 @@ if estim=='yes':
     for kk in xrange((kmax)):
         date1, date2 = date_1[kk], date_2[kk]
         idate = str(date1) + '-' + str(date2) 
-        folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
 
         if sformat == 'ROI_PAC':
-            rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
-            infile=folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
+            folder =  'int_'+ str(date1) + '_' + str(date2) 
+            rscfile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
+            infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
 
             ds = gdal.Open(infile, gdal.GA_ReadOnly)
             # Get the band that have the data we want
@@ -1414,7 +1436,7 @@ if estim=='yes':
 
 
         elif sformat == 'GTIFF':
-            infile = prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
+            infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
 
             ds = gdal.Open(infile, gdal.GA_ReadOnly)
             # Get the band that have the data we want
@@ -1426,13 +1448,13 @@ if estim=='yes':
 
         elif sformat == 'GAMMA':
             # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
-            par_file = ref + '.par'
-            lines,cols = gm.readpar(par_file)
-            infile=int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.unw'
-            los_map = gm.readgamma(infile,par_file)
+            # par_file = ref 
+            lines,cols = gm.readpar(int_path)
+            infile= int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.unw'
+            los_map = gm.readgamma(infile,int_path)
 
         print 
-        print 'mlines:{}, mcols:{}, int:{}:'.format(lines, cols, idate)
+        print 'lines:{}, cols:{}, int:{}:'.format(lines, cols, idate)
 
         # load coherence or whatever
         spacial_mask = np.ones((mlines,mcols))*np.float('NaN')
@@ -1580,48 +1602,51 @@ if estim=='yes':
            ax.set_xlabel('Elevation (m)')
            ax.set_ylabel('LOS (rad)')
            plt.legend(loc='best')
-           fig2.savefig(folder+'phase-topo.png', format='PNG')
+           fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
 
         #corected map
         vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
 
+        nfigure=nfigure+1
+        fig = plt.figure(nfigure,figsize=(11,4))
+
+        ax = fig.add_subplot(1,4,1)
+        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+        cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation=None,alpha=1.)
+        ax.set_title('LOS')
+        setp( ax.get_xticklabels(), visible=None)
+        fig.colorbar(cax, orientation='vertical',aspect=10)
+
+        ax = fig.add_subplot(1,4,2)
+        cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+        ax.set_title('LOS ESTIMATION')
+        setp( ax.get_xticklabels(), visible=None)
+        fig.colorbar(cax, orientation='vertical',aspect=10)
+
+        ax = fig.add_subplot(1,4,3)
+        cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+        ax.set_title('RAMP+TOPO')
+        setp( ax.get_xticklabels(), visible=None)
+        fig.colorbar(cax, orientation='vertical',aspect=10)
+
+        # for plot we can clean
+        k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
+        corr[k] = 0.
+
+        ax = fig.add_subplot(1,4,4)
+        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+        cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
+        ax.set_title('CORR LOS')
+        setp( ax.get_xticklabels(), visible=None)
+        fig.colorbar(cax, orientation='vertical',aspect=10)
+        fig.tight_layout()
+
+        if sformat == 'ROI_PAC':
+            fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
+        else:
+            fig.savefig(out_path + idate +'corrections.png', format='PNG')
+
         if plot=='yes':
-
-            nfigure=nfigure+1
-            fig = plt.figure(nfigure,figsize=(11,4))
-
-            ax = fig.add_subplot(1,4,1)
-            hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-            cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation=None,alpha=1.)
-            ax.set_title('LOS')
-            setp( ax.get_xticklabels(), visible=None)
-            fig.colorbar(cax, orientation='vertical',aspect=10)
-
-            ax = fig.add_subplot(1,4,2)
-            cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
-            ax.set_title('LOS ESTIMATION')
-            setp( ax.get_xticklabels(), visible=None)
-            fig.colorbar(cax, orientation='vertical',aspect=10)
-
-            ax = fig.add_subplot(1,4,3)
-            cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
-            ax.set_title('RAMP+TOPO')
-            setp( ax.get_xticklabels(), visible=None)
-            fig.colorbar(cax, orientation='vertical',aspect=10)
-
-            # for plot we can clean
-            k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
-            corr[k] = 0.
-
-            ax = fig.add_subplot(1,4,4)
-            hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-            cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
-            ax.set_title('CORR LOS')
-            setp( ax.get_xticklabels(), visible=None)
-            fig.colorbar(cax, orientation='vertical',aspect=10)
-            fig.tight_layout()
-
-            fig.savefig(folder + prefix +'corrections' + suffix+ '.png', format='PNG')
             plt.show()
 
         # fill correction matrix
@@ -1683,10 +1708,10 @@ if tsinv=='yes':
     deltat = np.zeros((kmax))
     for k in xrange((kmax)):
       for n in xrange((nmax)):
-        if (date_1[k]==imd[n]): 
+        if (date_1[k]==im[n]): 
           G_[k,n]=-1
           t1 = bt[n]
-        elif (date_2[k]==imd[n]):
+        elif (date_2[k]==im[n]):
           G_[k,n]=1
           t2 = bt[n]
       deltat[k] = abs(t2 -t1)
@@ -1751,16 +1776,15 @@ print
 # apply correction
 for kk in xrange((kmax)):
     date1, date2 = date_1[kk], date_2[kk]
-    folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
+    folder = 'int_'+ str(date1) + '_' + str(date2) 
     idate = str(date1) + '-' + str(date2) 
-    makedirs(folder)
 
     if sformat == 'ROI_PAC':
         
-        rscfile=folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw.rsc'
-        infile=folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw'
-        outfile = folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout + '_' + rlook + '.unw'  
-        outrsc = folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout + '_' + rlook + '.unw.rsc' 
+        rscfile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw.rsc'
+        infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw'
+        outfile = int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout +  rlook + '.unw'  
+        outrsc = int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout +  rlook + '.unw.rsc' 
         
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         # Get the band that have the data we want
@@ -1773,7 +1797,7 @@ for kk in xrange((kmax)):
     elif sformat == 'GTIFF':
 
         infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
-        outfile = folder + prefix + str(date1) + '-' + str(date2) + suffix + suffout + '_' + rlook + '.tiff' 
+        outfile = out_path + prefix + str(date1) + '-' + str(date2) + suffix + suffout +  rlook + '.tiff' 
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(1)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
@@ -1783,10 +1807,10 @@ for kk in xrange((kmax)):
     elif sformat == 'GAMMA':
 
         infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix +  rlook + '.unw'
-        outfile = folder + prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
-        par_file = ref + '.par'
-        lines,cols = gm.readpar(par_file)
-        los_map = gm.readgamma(infile,par_file)
+        outfile = out_path + prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
+        # par_file = ref 
+        lines,cols = gm.readpar(int_path)
+        los_map = gm.readgamma(infile,int_path)
         rms_map = np.zeros((lines,cols))
 
     # rms_map = np.zeros((mlines,mcols))
@@ -1833,6 +1857,10 @@ for kk in xrange((kmax)):
     flatlos[isnan(los_map)],rms_map[isnan(los_map)] = 0.0, 0.0
     rms_map[isnan(rms_map)],flatlos[isnan(rms_map)] = 0.0, 0.0
     
+    # print(suffout, rlook)
+    # print(outfile)
+    # print(outrsc)
+
     if sformat == 'ROI_PAC':
         dst_ds = driver.Create(outfile, cols, lines, 2, gdal.GDT_Float32)
         dst_band1 = dst_ds.GetRasterBand(1)
@@ -1844,7 +1872,7 @@ for kk in xrange((kmax)):
         dst_band2.FlushCache()
 
     elif sformat == 'GTIFF':
-        dst_ds = driver.Create(folder + outfile, cols, lines, 1, gdal.GDT_Float32)
+        dst_ds = driver.Create(outfile, cols, lines, 1, gdal.GDT_Float32)
         dst_band2 = dst_ds.GetRasterBand(1)
         dst_band2.WriteArray(flatlos,0,0)
         dst_ds.SetGeoTransform(gt)
@@ -1886,7 +1914,10 @@ for kk in xrange((kmax)):
     fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.tight_layout()
 
-    fig.savefig(folder + prefix + 'reconstruc_corrections' + suffix + '.png', format='PNG')
+    if sformat == 'ROI_PAC':
+        fig.savefig( int_path + folder + idate + '_reconstruc_corrections.png', format='PNG')
+    else:
+        fig.savefig( out_path + idate + '_reconstruc_corrections.png', format='PNG')
 
     if plot=='yes':
         plt.show()
