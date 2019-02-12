@@ -1,0 +1,12 @@
+#%Module
+set prefix ~/PyGdalSAR/
+set exec_prefix ${prefix}
+
+prepend-path PYTHONPATH  $prefix/parsers
+prepend-path PYTHONPATH  $prefix/python
+
+prepend-path PATH  $prefix/timeseries
+prepend-path PATH  $prefix/utils
+prepend-path PATH  $prefix/atmocorr
+prepend-path PATH  $prefix/plots
+prepend-path PATH  $prefix/bin
