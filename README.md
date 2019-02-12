@@ -2,7 +2,7 @@
 Post-processing InSAR tool package written in the Python and Gdal programming language. It can be utilizes for predictives and empirical atmospheric corrections on the unwrapped interferograms, or time series correction from the GACOS atmospheric models (ceg-research.ncl.ac.uk/v2/gacos/). Additional package for iterative spatial and temporal decompositions of geodetic Time Series (InSAR, GPS or Pixel Offsets), plotting, cleaning of interferograms or time series, radar to geographic conversions, etc...
 
 
-To install the package
+To download the package
 =============
 ```git clone https://github.com/simondaout/PyGdalSAR.git```
 
@@ -16,6 +16,34 @@ git push
 leave building
 ```
 
+Requirements
+=============
+This project needs the following external components:
+ * CMake
+ * Python (2.7)
+ * py27-gdal
+ * py27-numPy
+ * py27-sciPy
+ * Gdal (https://www.gdal.org)
+ * docopt (Available on https://github.com/docopt/docopt or in ./python/).
+ * py27-matplotlib
+ * py27-datetime
+ * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas
+
+
+Installation
+=============
+* The majortiy of the scripts are written in python and do not need installation. Just add them to your PATH. If you are using module, an example of modulefile is available in /contrib/modulefile/pygdalsar
+* Some C and Fortran components can be installed with CMake (<http://www.cmake.org>). To build and install:
+cmake -S . -B bin
+cmake --build bin
+
+Setting specific compilers is also done the usual CMake way, for example to
+use gcc, gfortran and python2.7 as C, Fortran, an python compilers, do:
+
+  $ cmake -DPYTHON\_EXECUTABLE=/opt/local/bin/python2.7 -DCMAKE\_C\_COMPILER=gcc -DCMAKE\_Fortran\_COMPILER=gfortran -S . -B bin
+
+
 Organisation
 =============
 This project contains the following folders:
@@ -27,19 +55,6 @@ This project contains the following folders:
  * tutorial: 
  	 * ReversibleDeformation: example GACOS corrections, empirical phase/topo corrections and extraction of reversible derformations with seasonal functions.
  	 * Vector: in progress
-
-Requirements
-=============
-This project needs the following external components:
- * Python (2.7)
- * py27-gdal
- * py27-numPy
- * py27-sciPy
- * Gdal (https://www.gdal.org)
- * docopt (Available on https://github.com/docopt/docopt or in ./python/).
- * py27-matplotlib
- * py27-datetime
- * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas
 
 Developpers & Contact
 =============
