@@ -1,0 +1,3 @@
+[submodule "contrib/nsbas-playground"]
+	path = contrib/nsbas-playground
+	url = https://gitlab.com/mazhe/nsbas-playground
