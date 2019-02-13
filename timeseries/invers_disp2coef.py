@@ -16,7 +16,7 @@ Spatial and temporal inversions of the time series delay maps (used depl_cumule 
 At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal),
 (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
-Usage: invers_disp2coef.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--jstart=<value>] [--jend=<value>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
@@ -31,6 +31,8 @@ Options:
 --cube PATH             Path to displacement file [default: depl_cumul]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
+--jstart VALUE          Stating line number of the area where phase is set to zero [default: 0]
+--jend VALUE            Ending line number of the area where phase is set to zero [default: 200]
 --aps PATH              Path to the APS file giving an input error to each dates [default: No weigthing if no spatial estimation or misfit spatial estimation used as input uncertianties]
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
@@ -310,6 +312,16 @@ if arguments["--vector"] != None:
     vectf = arguments["--vector"].replace(',',' ').split()
 else:
     vect = None
+
+if arguments["--jstart"] == None:
+    jstart = 0
+else:
+    jstart = int(arguments["--jstart"])
+
+if arguments["--jend"] == None:
+    jstart = 0
+else:
+    jstart = int(arguments["--jend"])
 
 # read lect.in
 ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
@@ -3050,6 +3062,17 @@ for ii in xrange(niter):
           ramp[kk] = float('NaN')
           topo = as_strided(maps_topo[:,:,l])
           topo[kk] = float('NaN')
+
+          ## Refer data 
+          zone = np.copy(maps_flata[jstart:jend,:,l])
+          minlos, maxlos = np.nanpercentile(zone,2.), np.nanpercentile(zone,98.)
+          index = np.nonzero(
+              np.logical_and(zone>minlos,
+              zone<maxlos
+          ))
+          cst = np.nanmedian(zone[index])
+          # print(cst,np.nanmedian(zone))
+          maps_ramp[:,:,l], maps_flata[:,:,l] = maps_ramp[:,:,l] + cst, maps_flata[:,:,l] - cst 
 
           del los_clean
           del rms_clean
