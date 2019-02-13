@@ -10,10 +10,11 @@
 """\
 invert_ramp_topo_unw.py
 -------------
-Removes atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coeffice
-ints on unwrapped interferograms (2 bands file). Reconstruction of the empirical phase correction by time series inversion.
+Estimates atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coefficients
+on unwrapped interferograms (ROI_PAC/GAMMA/GTIFF). Temporal inversion of all coeffient with a strong weight for
+small temporal baselines and lage cover interferograms. Reconstruction of the empirical phase correction.
 
-usage: invert_ramp_topo_unw.py --int_list=<path> [--int_path=<path>] [--out_path=<path>] \
+usage: invert_ramp_topo_unw.py --int_list=<path> [--jstart=<value>] [--jend=<value>] [--int_path=<path>] [--out_path=<path>] \
 [--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
@@ -25,6 +26,8 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--int_path=<path>] [--out_path
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
 --int_path PATh       Relative path to output interferograms directory
+--jstart VALUE        Stating line number of the area where phase is set to zero [default: 0]
+--jend VALUE          Ending line number of the area where phase is set to zero [default: 200]
 --prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
@@ -59,8 +62,8 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --cohpixel  yes/no    If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
 --format VALUE        Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --threshold_coh VALUE Threshold on cohpixel file [default:0]
---ibeg_mask VALUE     Start line number mask [default: None]
---iend_mask VALUE     Strop line number mask [default: None]  
+--ibeg_mask VALUE     Start line number for the mask [default: None]
+--iend_mask VALUE     Stop line number for the mask [default: None]  
 --perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
@@ -131,7 +134,7 @@ arguments = docopt.docopt(__doc__)
 int_list=arguments["--int_list"]
 
 if arguments["--int_path"] == None:
-    int_path='./'
+    int_path='.'
 else:
     int_path=arguments["--int_path"] + '/'
 
@@ -141,6 +144,16 @@ else:
     out_path=arguments["--out_path"] + '/'
 
 makedirs(out_path)
+
+if arguments["--jstart"] == None:
+    jstart = 0
+else:
+    jstart = int(arguments["--jstart"])
+
+if arguments["--jend"] == None:
+    jstart = 0
+else:
+    jstart = int(arguments["--jend"])
 
 if arguments["--prefix"] == None:
     prefix = ''
@@ -192,7 +205,7 @@ if arguments["--cohpixel"] ==  None:
 else:
     rmsf = arguments["--cohpixel"]
 if arguments["--threshold_coh"] ==  None:
-    threshold_rms = 0.
+    threshold_rms = -1
 else:
     threshold_rms = float(arguments["--threshold_coh"])
 if arguments["--topofile"] ==  None or not os.path.exists(arguments["--topofile"]):
@@ -249,7 +262,7 @@ else:
 
 print
 # read int
-date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')
+date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
 kmax=len(date_1)
 print "number of interferogram: ",kmax
 
@@ -306,33 +319,41 @@ if ref is not None:
 
 # laod elevation map
 if radar is not None:
+    extension = os.path.splitext(radar)[1]
 
-    if sformat == 'GTIFF':
-        geotiff = arguments["--geotiff"]
-        georef = gdal.Open(radar)
-        gt = georef.GetGeoTransform()
-        proj = georef.GetProjection()
-        driver = gdal.GetDriverByName('GTiff')
-        ds = gdal.Open(radar, gdal.GA_ReadOnly)
-        ds_band2 = ds.GetRasterBand(2)
-        mlines,mcols = ds.RasterYSize, ds.RasterXSize
-        elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        del ds
+    if extension == '.r4':  
+      fid = open(radar,'r')
+      elevi = np.fromfile(fid,dtype=np.float32)
+      elev_map = elevi.reshape(mlines,mcols)
+      fid.close()
 
-    elif sformat == 'ROI_PAC':
-        driver = gdal.GetDriverByName("roi_pac")
-        ds = gdal.Open(radar, gdal.GA_ReadOnly)
-        ds_band2 = ds.GetRasterBand(2)
-        mlines,mcols = ds.RasterYSize, ds.RasterXSize
-        elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        del ds
-    
-    elif sformat == 'GAMMA':
-        # par_file = ref 
-        mlines,mcols = gm.readpar()
-        elev_map = gm.readgamma(radar)
+    else:
+        if sformat == 'GTIFF':
+            geotiff = arguments["--geotiff"]
+            georef = gdal.Open(radar)
+            gt = georef.GetGeoTransform()
+            proj = georef.GetProjection()
+            driver = gdal.GetDriverByName('GTiff')
+            ds = gdal.Open(radar, gdal.GA_ReadOnly)
+            ds_band2 = ds.GetRasterBand(2)
+            mlines,mcols = ds.RasterYSize, ds.RasterXSize
+            elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+            del ds
 
-    maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
+        elif sformat == 'ROI_PAC':
+            driver = gdal.GetDriverByName("roi_pac")
+            ds = gdal.Open(radar, gdal.GA_ReadOnly)
+            ds_band2 = ds.GetRasterBand(2)
+            mlines,mcols = ds.RasterYSize, ds.RasterXSize
+            elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+            del ds
+        
+        elif sformat == 'GAMMA':
+            # par_file = ref 
+            mlines,mcols = gm.readpar()
+            elev_map = gm.readgamma(radar)
+
+        maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
     
 else:
     maxelev,minelev = 1.,-1
@@ -1405,6 +1426,8 @@ spint[:,0],spint[:,1] = date_1,date_2
 rms = np.zeros((kmax,3))
 rms[:,0],rms[:,1] = date_1,date_2 
 
+date1_err, date2_err = [], []
+
 if estim=='yes':
 
     print 
@@ -1420,7 +1443,7 @@ if estim=='yes':
         idate = str(date1) + '-' + str(date2) 
 
         if sformat == 'ROI_PAC':
-            folder =  'int_'+ str(date1) + '_' + str(date2) 
+            folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
             rscfile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
             infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
 
@@ -1458,23 +1481,21 @@ if estim=='yes':
 
         # load coherence or whatever
         spacial_mask = np.ones((mlines,mcols))*np.float('NaN')
-
+        
         rms_map = np.ones((mlines,mcols))
-        try:
-            if rmsf=='yes':
-                rms_map[:lines,:cols] = ds_band1.ReadAsArray(0, 0, lines, cols)[:mlines,:mcols]
-                # rmsi = np.fromfile(folder + 'cor',dtype=np.float32)
-                # _rms_map = rmsi.reshape(len(rmsi)/1420,1420)
-                # if len(rmsi)/1420 < mlines:
-                #     rms_map[:len(rmsi)/1420,:1420] = _rms_map
-                # else:
-                #     rms_map = _rms_map[:mlines,:mcols]
-                k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
-                rms_map[k] = float('NaN')
-            else:
-                threshold_rms = -1
-        except:
-            threshold_rms = -1
+        if rmsf=='yes':
+            try:
+                if sformat == 'ROI_PAC':
+                    rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
+                    k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
+                    rms_map[k] = float('NaN')
+                elif sformat == 'GAMMA':
+                    rmsfile=  int_path + str(date1) + '_' + str(date2) + '.filt.cc'
+                    rms_map = gm.readgamma(rmsfile,int_path)
+                # plt.imshow(rms_map,vmax=1,vmin=0.5)
+                # plt.show()
+            except:
+                print 'Coherence file cannot be read'
 
         # time.sleep(1.)
         # clean for estimation
@@ -1482,7 +1503,6 @@ if estim=='yes':
         _los_map[los_map==0] = np.float('NaN')
         maxlos,minlos = np.nanpercentile(_los_map,perc),np.nanpercentile(_los_map,(100-perc))
         # print maxlos,minlos
-
 
         # print np.shape(los_map), np.shape(elev_map), np.shape(rms_map), np.shape(pix_az)
         ## CRITICAL STEP ####
@@ -1569,91 +1589,108 @@ if estim=='yes':
 
         # hard-coding subsample 
         samp = 1
-        sol, corr, rms[kk,2] = estim_ramp(los_map.flatten(),
-        los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
-        temp_flat,rms_clean[::samp],nfit_temp,ivar_temp)
+        try:
+            sol, corr, rms[kk,2] = estim_ramp(los_map.flatten(),
+            los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
+            temp_flat,rms_clean[::samp],nfit_temp,ivar_temp)
 
-        print 'RMS: ',rms[kk,2]
+            print 'RMS: ',rms[kk,2]
 
-        # clean corr : non car il faut extrapoler pour l'inversion ens erie temp
-        # k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
-        # corr[k] = 0.
-        # corr_maps[:,:,kk] = np.copy(corr)
+            # clean corr : non car il faut extrapoler pour l'inversion ens erie temp
+            # k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
+            # corr[k] = 0.
+            # corr_maps[:,:,kk] = np.copy(corr)
 
-        # print sol
-        # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
-        func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
-        + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
-        sol[12]*((az*elev_clean)**2)
+            # print sol
+            # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
+            func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
+            + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
+            sol[12]*((az*elev_clean)**2)
 
-        if radar is not None: 
-           # plot phase/elevation
-           nfigure=nfigure+1
-           fig2 = plt.figure(nfigure,figsize=(9,4))
-           ax = fig2.add_subplot(1,1,1)
-           z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
-           ax.scatter(elev_clean,los_clean - func, s=0.005, alpha=0.05,rasterized=True)
+            if radar is not None: 
+               # plot phase/elevation
+               nfigure=nfigure+1
+               fig2 = plt.figure(nfigure,figsize=(9,4))
+               ax = fig2.add_subplot(1,1,1)
+               z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
+               ax.scatter(elev_clean[::10],los_clean[::10] - func[::10], s=0.005, alpha=0.05,rasterized=True)
 
-           # if nfit==0:
-           ax.plot(z,sol[8]+sol[9]*z, '-r', lw =3.,label='{1:6f}*z + {1:.3f}'.format(sol[9],sol[8])) 
-           # else:
-           #      ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{1:6f}*z**2 + {1:6f}*z + {1:.3f}'.format(sol[10],sol[9],sol[8]))
+               if nfit==0:
+                    ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{}*z + {}'.format(sol[9],sol[8])) 
+               else:
+                    ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{}*z**2 + {}*z + \
+                        {1:.3f}'.format(sol[10],sol[9],sol[8]))
 
-           ax.set_xlabel('Elevation (m)')
-           ax.set_ylabel('LOS (rad)')
-           plt.legend(loc='best')
-           fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
+               ax.set_xlabel('Elevation (m)')
+               ax.set_ylabel('LOS (rad)')
+               plt.legend(loc='best')
+               if sformat == 'ROI_PAC':
+                  fig2.savefig( int_path + folder + idate+'phase-topo.png', format='PNG')
+               else:
+                  fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
 
-        #corected map
-        vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
+            #corected map
+            vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
 
-        nfigure=nfigure+1
-        fig = plt.figure(nfigure,figsize=(11,4))
+            nfigure=nfigure+1
+            fig = plt.figure(nfigure,figsize=(11,4))
 
-        ax = fig.add_subplot(1,4,1)
-        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation=None,alpha=1.)
-        ax.set_title('LOS')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
+            ax = fig.add_subplot(1,4,1)
+            hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+            cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation=None,alpha=1.)
+            ax.set_title('LOS')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
 
-        ax = fig.add_subplot(1,4,2)
-        cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
-        ax.set_title('LOS ESTIMATION')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
+            ax = fig.add_subplot(1,4,2)
+            cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+            ax.set_title('LOS ESTIMATION')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
 
-        ax = fig.add_subplot(1,4,3)
-        cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
-        ax.set_title('RAMP+TOPO')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
+            ax = fig.add_subplot(1,4,3)
+            cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+            ax.set_title('RAMP+TOPO')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
 
-        # for plot we can clean
-        k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
-        corr[k] = 0.
+            # for plot we can clean
+            k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
+            corr[k] = 0.
 
-        ax = fig.add_subplot(1,4,4)
-        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
-        ax.set_title('CORR LOS')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-        fig.tight_layout()
+            ax = fig.add_subplot(1,4,4)
+            hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+            cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
+            ax.set_title('CORR LOS')
+            setp( ax.get_xticklabels(), visible=None)
+            fig.colorbar(cax, orientation='vertical',aspect=10)
+            fig.tight_layout()
 
-        if sformat == 'ROI_PAC':
-            fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
-        else:
-            fig.savefig(out_path + idate +'corrections.png', format='PNG')
+            # print sformat
+            if sformat == 'ROI_PAC':
+                fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
+            else:
+                fig.savefig(out_path + idate +'corrections.png', format='PNG')
 
-        if plot=='yes':
-            plt.show()
+            if plot=='yes':
+                plt.show()
+
+            plt.close('all')
+            del corr
+
+        except:
+            print 'Impossible estimation on int:', idate
+            sol = np.zeros((13))
+            rms[kk,2] = 10e6
+            date1_err.append(date1)
+            date2_err.append(date2)
+            print int_errors
 
         # fill correction matrix
         spint[kk,3:] = sol
 
-        plt.close('all')
-        del corr, los_map, rms_map
+        
+        los_map, rms_map
         del los_clean, rms_clean
         del elev_clean
         del az, rg
@@ -1661,7 +1698,6 @@ if estim=='yes':
             del ds
         except:
             pass
-
 
     # save spint 
     np.savetxt('liste_coeff_ramps.txt', spint , header='#date1   |   dates2   |   Lenght   |   y**3   |   y**2   |   y\
@@ -1674,7 +1710,10 @@ if estim=='yes':
     # fid.close()
 
     # save rms
-    np.savetxt('rms_unwcor.txt', rms, header='#date1   |   dates2   |   RMS', fmt=('%i','%i','%.8f'))
+    np.savetxt('rms_unwcor.txt', rms, header='# date1   |   dates2   |   RMS', fmt=('%i','%i','%.8f'))
+
+    # save rms
+    np.savetxt('list_pair_errors.txt', np.vstack([date1_err, date2_err]), header='# date1   |   dates2  ', fmt=('%i','%i'))
 
 #####################################################################################
 
@@ -1686,6 +1725,9 @@ print
 date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m=np.loadtxt('liste_coeff_ramps.txt',comments="#",unpack=True,dtype='i,i,f,f,f,f,f,f,f,f,f,f,f,f,f,f')
 spint = np.vstack([date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m]).T
 rec_spint = np.copy(spint)
+
+# load rms
+rms = np.loadtxt('rms_unwcor.txt',comments="#")
 
 # # # load correction matrix
 # corr_maps = np.fromfile("corection_matrix",dtype=np.float32).reshape((mlines,mcols,kmax))
@@ -1728,7 +1770,12 @@ if tsinv=='yes':
     w2 = length/mlines
     # print w2
     # sys.exit()
-    sig_ = 1./w1 + 1./w2
+
+    # 3) rms weight
+    w3 =  np.exp(-rms[:,2]/np.percentile(rms[:,2],80))
+
+    # compute summ of weights
+    sig_ = 1./w1 + 1./w2 + 1./w3
 
     for j in xrange(3,shape(spint_inv)[1]):
 
@@ -1749,9 +1796,6 @@ if tsinv=='yes':
 
             # reconstruct corr for selected int
             spint_inv[:,j] = np.dot(G,pars)[:kmax]
-            # print 
-            # print spint_inv[:,j+3] - spint[:,j+3]
-            # print
 
         except:
             pass
@@ -1776,7 +1820,7 @@ print
 # apply correction
 for kk in xrange((kmax)):
     date1, date2 = date_1[kk], date_2[kk]
-    folder = 'int_'+ str(date1) + '_' + str(date2) 
+    folder = 'int_'+ str(date1) + '_' + str(date2) + '/'
     idate = str(date1) + '-' + str(date2) 
 
     if sformat == 'ROI_PAC':
@@ -1850,6 +1894,8 @@ for kk in xrange((kmax)):
 
             corr = corr_inv
 
+    
+
     # reset to 0 areas where no data (might change after time series inversion?)
     flatlos = los_map - corr_inv
     flatlos[los_map==0], rms_map[los_map==0] = 0.0, 0.0
@@ -1857,6 +1903,19 @@ for kk in xrange((kmax)):
     flatlos[isnan(los_map)],rms_map[isnan(los_map)] = 0.0, 0.0
     rms_map[isnan(rms_map)],flatlos[isnan(rms_map)] = 0.0, 0.0
     
+    # Refer data 
+    zone = np.copy(flatlos[jstart:jend,:])
+    minlos, maxlos = np.nanpercentile(zone,2.), np.nanpercentile(zone,98.)
+    index = np.nonzero(
+        np.logical_and(zone>minlos,
+        np.logical_and(zone<maxlos,
+        rms_map[jstart:jend,:]>threshold_rms,  
+    )))
+    cst = np.nanmedian(zone[index])
+
+    print(cst,np.nanmedian(zone))
+    flatlos = flatlos - cst
+
     # print(suffout, rlook)
     # print(outfile)
     # print(outrsc)
