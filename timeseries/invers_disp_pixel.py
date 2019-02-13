@@ -431,8 +431,8 @@ fig = plt.figure(1,figsize=(12,8))
 if arguments["--bounds"] is not  None:
     vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
 else:
-    vmax = np.nanmean(maps[:,:,-1]) + 2.*np.nanstd(maps[:,:,-1])
-    vmin = np.nanmean(maps[:,:,-1]) - 2.*np.nanstd(maps[:,:,-1])
+    vmax = np.nanpercentile(maps[:,:,-1],80)
+    vmin = np.nanpercentile(maps[:,:,-1],10)
 ax = fig.add_subplot(1,2,1)
 ax.imshow(maps[jstart:jend,istart:iend,-1], vmax=vmax, vmin=vmin, alpha=0.6)
 ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
@@ -835,10 +835,11 @@ for jj in xrange((Npix)):
         model_dem = np.zeros(len(model))
 
     # plot model
-    ax.plot(t,model-model_dem,'-r')
-    
     if inter=='yes':
+        ax.plot(t,model-model_dem,'-r',label='{} mm/yr'.format(m[indexinter]))
         ax3.plot(t,model-model_lin-model_dem,'-r')
+    else:
+        ax.plot(t,model-model_dem,'-r')
         
     if seasonal=='yes':
         G=np.zeros((len(tdec),2))
