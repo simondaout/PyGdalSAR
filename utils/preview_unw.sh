@@ -24,12 +24,15 @@ min_cb=-$7
 max_cb=$7
 outdir=$home/$8
 
+clean
+rm -f $outdir/${prefix}????????-????????${suffix}_${rlook}rlks.jpeg
+
 cat < $list_int | while true
 do
    read ligne
    if [ "$ligne" = "" ]; then break; fi
    set -- $ligne ; image1=$1 ; image2=$2 ;
-   cd int_$1_$2/
+   cd ${home}/int/int_$1_$2
    echo $1 $2
 	
    #length.pl ${prefix}$1-$2${suffix}_${rlook}rlks.unw    
@@ -39,5 +42,5 @@ do
    cd ..
 done
 
-mkdir $outdir
-mv int_*/*jpeg $outdir/.
+# mkdir $outdir
+mv ${home}/int/int_*/${prefix}????????-????????${suffix}_${rlook}rlks.jpeg $outdir/.
