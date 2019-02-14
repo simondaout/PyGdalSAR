@@ -1684,11 +1684,9 @@ if estim=='yes':
             rms[kk,2] = 10e6
             date1_err.append(date1)
             date2_err.append(date2)
-            print int_errors
 
         # fill correction matrix
         spint[kk,3:] = sol
-
         
         los_map, rms_map
         del los_clean, rms_clean
@@ -1713,7 +1711,12 @@ if estim=='yes':
     np.savetxt('rms_unwcor.txt', rms, header='# date1   |   dates2   |   RMS', fmt=('%i','%i','%.8f'))
 
     # save rms
-    np.savetxt('list_pair_errors.txt', np.vstack([date1_err, date2_err]), header='# date1   |   dates2  ', fmt=('%i','%i'))
+    date1_err = np.array(date1_err)
+    date2_err = np.array(date2_err)
+    wf = open('list_pair_errors.txt',"w")
+    for p in xrange(len(date1_err)):
+       wf.write("%i %i\n" % (date_1[p], date_2[p]))
+    wf.close()
 
 #####################################################################################
 
@@ -1772,10 +1775,17 @@ if tsinv=='yes':
     # sys.exit()
 
     # 3) rms weight
-    w3 =  np.exp(-rms[:,2]/np.percentile(rms[:,2],80))
-
+    w3 =  np.exp(-rms[:,2]/np.nanpercentile(rms[:,2],80)) + 0.01
+  
+    wf = open('list_weigths.txt',"w")
+    print 'Weigths for temporal inversion:' 
+    for i in xrange(len(w3)):
+        print int(rms[i,0]), int(rms[i,1]) , rms[i,2], w1[i], w2[i], w3[i]
+        wf.write("%i %i %f %f %f %f\n" % (int(rms[i,0]), int(rms[i,1]) , rms[i,2], w1[i], w2[i], w3[i]))
+    wf.close() 
+    
     # compute summ of weights
-    sig_ = 1./w1 + 1./w2 + 1./w3
+    sig_ = 1./w1 + 1./w2 + 1./w3 
 
     for j in xrange(3,shape(spint_inv)[1]):
 
@@ -1894,7 +1904,6 @@ for kk in xrange((kmax)):
 
             corr = corr_inv
 
-    
 
     # reset to 0 areas where no data (might change after time series inversion?)
     flatlos = los_map - corr_inv
@@ -1911,10 +1920,13 @@ for kk in xrange((kmax)):
         np.logical_and(zone<maxlos,
         rms_map[jstart:jend,:]>threshold_rms,  
     )))
+    
     cst = np.nanmedian(zone[index])
-
-    print(cst,np.nanmedian(zone))
-    flatlos = flatlos - cst
+    if isnan(cst):
+        print(cst,np.nanmedian(zone))
+        pass
+    else:
+        flatlos = flatlos - cst
 
     # print(suffout, rlook)
     # print(outfile)
