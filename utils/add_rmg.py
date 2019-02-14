@@ -54,9 +54,9 @@ if arguments["--plot"] == None:
 else:
     plot = arguments["--plot"]
 
-print infile
-print add
-print remove
+# print infile
+# print add
+# print remove
 
 gdal.UseExceptions()
 # Open int
@@ -64,11 +64,11 @@ ds = gdal.Open(infile,gdal.GA_ReadOnly)
 ds_band1 = ds.GetRasterBand(1)
 ds_band2 = ds.GetRasterBand(2)
 
-# Attributes
-print("> Driver:   ", ds.GetDriver().ShortName)
-print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
-print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
-print
+# # Attributes
+# print("> Driver:   ", ds.GetDriver().ShortName)
+# print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
+# print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
+# print
 
 amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
 phi = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
@@ -81,10 +81,10 @@ del ds
 
 if remove is not "no":
     ds = gdal.Open(remove,gdal.GA_ReadOnly)
-    print("> Driver:   ", ds.GetDriver().ShortName)
-    print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
-    print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
-    print
+    # print("> Driver:   ", ds.GetDriver().ShortName)
+    # print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
+    # print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
+    # print
     ds_band2 = ds.GetRasterBand(2)
     remphi = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
     temp -= remphi
@@ -93,10 +93,10 @@ if remove is not "no":
 #Open new model
 if add is not "no":
     ds = gdal.Open(add,gdal.GA_ReadOnly)
-    print("> Driver:   ", ds.GetDriver().ShortName)
-    print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
-    print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
-    print
+    # print("> Driver:   ", ds.GetDriver().ShortName)
+    # print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
+    # print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
+    # print
     ds_band2 = ds.GetRasterBand(2)
     addphi = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlign,:ncol]
     temp += addphi
