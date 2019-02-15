@@ -7,21 +7,21 @@ prep_invers_pixel.py
 This script prepares a work directory and input files for invers_pixel.
 
 Usage:
-  prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] \
-          [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--sigma=<path>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] 
+        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--sigma=<path>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--Bc=<values>]
 
 Options:
-  --int_path PATH     Absolute path to interferograms directory 
-  --outputdir=<arg>   Output directory [default: ./ts]
-  --dates_list PATH   Path to text file containing date,bp,bt,doppler_frq,date_dec [default: baseline.rsc]
-  --int_list PATH     Text file containing list of interferograms dates in two colums, $data1 $date2 [default: interf_pair.rsc]
+  --int_path=<dir>    Absolute path to interferograms directory 
+  --outputdir=<dir>   Output directory [default: ./ts]
+  --dates_list=<file>   Path to text file containing date,bp,bt,doppler_frq,date_dec [default: baseline.rsc]
+  --int_list=<file>     Text file containing list of interferograms dates in two colums, $data1 $date2 [default: interf_pair.rsc]
   --prefix=<value>    Prefix name $prefix$date1-$date2$suffix.unw [default: '']
   --suffix=<vaue>     Suffix name $prefix$date1-$date2$suffix.unw [default: '']
-  --format VALUE      Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
-  --sigma PATH       Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) 
-                      If not None, create a third column in list_pair file corresponding to int weight in the TS analysis [default: None]
+  --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
+  --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
+  --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 2,100) 
   -h --help           Show this screen
-
 """
 
 from __future__ import print_function
@@ -55,16 +55,21 @@ if arguments["--suffix"] == None:
 else:
   suffix=arguments["--suffix"]
 
-print(prefix,suffix)
-
 if arguments["--format"] ==  None:
     sformat = 'ROI_PAC'
 else:
     sformat = arguments["--format"]
+
 if arguments["--sigma"] == None:
     sigmaf = None
 else:
     sigmaf=arguments["--sigma"]
+
+if (arguments["--Bc"] == None):
+   weight = None
+else:
+   bc = map(float,arguments["--Bc"].replace(',',' ').split())
+   btc, bpc = bc[0], bc[1]
 
 # A more predictable makedirs
 def makedirs(name):
@@ -108,10 +113,11 @@ lndatadir = os.path.join(tsdir, "LN_DATA/")
 makedirs(lndatadir)
 
 # create list_pair
-if sigmaf is None:
+if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None): 
+    print(arguments["--sigma"])
     shutil.copy(int_list,os.path.join(tsdir, "list_pair"))
     do_sig = int(1)
-else:
+elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
     weight = np.exp(-sigma/np.percentile(sigma,80))
@@ -125,7 +131,18 @@ else:
       for i in xrange((kmax)):
         wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
       wf.close()
-
+elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
+     print('Weigth interferograms based on their baselines with Btc:{} and Bpc:{}'.format(btc,bpc))
+     do_sig = int(0)
+     weight=np.zeros((kmax))
+     for i in xrange((kmax)):
+     	deltat = (abs(bt[im==date_1[i]] - bt[im==date_2[i]]))/btc
+     	deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
+        weight[i] = np.float(np.exp(-(deltap+deltat)))
+     wf = open(os.path.join(tsdir, "list_pair"), "w")
+     for i in xrange((kmax)):
+          wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
+     wf.close()
 
 if sformat == 'ROI_PAC':
   iformat = int(0)
@@ -138,11 +155,15 @@ if sformat == 'ROI_PAC':
       infile=os.path.abspath(folder + prefix + str(date1) + '-' + str(date2) + suffix + '.unw')
       outint=os.path.abspath(lndatadir + str(date1)  + '-' + str(date2) + '_pre_inv.unw')
       if os.path.exists(infile):
-        print(infile)
-        os.symlink(infile,outint)
-        os.symlink(rscfile,outrsc)    
+        print('Create link:',infile )
       else:
         print('Can not find:', infile)
+	
+      try:  
+	os.symlink(infile,outint)
+        os.symlink(rscfile,outrsc)    
+      except:
+        pass
 
 else:
   iformat = int(1)
