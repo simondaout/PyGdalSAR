@@ -211,13 +211,13 @@ for kk in xrange((kmax)):
 
     ax = fig.add_subplot(2,3,3)
     cax = ax.imshow(np.angle(flatwrap),cmap=cm.gist_rainbow,vmax=np.pi,vmin=-np.pi)
-    ax.set_title('Check: Wrapped phase+Ramp')
+    ax.set_title('Wrapped phase+Ramp')
     setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(2,3,4)
-    cax = ax.imshow(corwrapphi,cmap=cm.gist_rainbow,vmax=np.pi,vmin=-np.pi)
-    ax.set_title('Cor wrapped phase')
+    cax = ax.imshow(corwrapphi-np.angle(flatwrap),cmap=cm.gist_rainbow,vmax=np.pi,vmin=-np.pi)
+    ax.set_title('Check null')
     setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
 
