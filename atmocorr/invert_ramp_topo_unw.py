@@ -14,7 +14,7 @@ Estimates atmospheric phase/elevation correlations or/and azimuthal and range ra
 on unwrapped interferograms (ROI_PAC/GAMMA/GTIFF). Temporal inversion of all coeffient with a strong weight for
 small temporal baselines and lage cover interferograms. Reconstruction of the empirical phase correction.
 
-usage: invert_ramp_topo_unw.py --int_list=<path> [--jstart=<value>] [--jend=<value>] [--int_path=<path>] [--out_path=<path>] \
+usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=<value>] [--int_path=<path>] [--out_path=<path>] \
 [--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
@@ -26,8 +26,8 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--jstart=<value>] [--jend=<val
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
 --int_path PATh       Relative path to output interferograms directory
---jstart VALUE        Stating line number of the area where phase is set to zero [default: 0]
---jend VALUE          Ending line number of the area where phase is set to zero [default: 200]
+--refstart VALUE      Stating line number of the area where phase is set to zero [default: 0]
+--refend VALUE        Ending line number of the area where phase is set to zero [default: 200]
 --prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
@@ -145,15 +145,15 @@ else:
 
 makedirs(out_path)
 
-if arguments["--jstart"] == None:
-    jstart = 0
+if arguments["--refstart"] == None:
+    refstart = 0
 else:
-    jstart = int(arguments["--jstart"])
+    refstart = int(arguments["--refstart"])
 
-if arguments["--jend"] == None:
-    jstart = 0
+if arguments["--refend"] == None:
+    refend = 0
 else:
-    jstart = int(arguments["--jend"])
+    refend = int(arguments["--refend"])
 
 if arguments["--prefix"] == None:
     prefix = ''
@@ -409,9 +409,7 @@ pix_az, pix_rg = np.indices((mlines,mcols))
 # print np.shape(mask)
 # sys.exit()
 
-def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
-
-
+def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
     # initialise full vector 
     sol = np.zeros((13))
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -419,18 +417,23 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     # initialize correction
     corr = np.zeros((mlines,mcols))
 
+    # create new data matrix with cst    
+    data = np.hstack([los_clean,los_ref])
+    # give a strong weigth for the ref 
+    rms = np.hstack([rms,1e-3])  
+
     if order==0:  
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
         if radar is None:
-            G=np.zeros((len(los_clean),1))
+            G=np.zeros((len(data),1))
             G[:,0] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
+            x0 = lst.lstsq(G,data)[0]
             try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -443,15 +446,15 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
         else:
             if ivar==0 & nfit==0:
-                G=np.zeros((len(los_clean),2))
+                G=np.zeros((len(data),2))
                 G[:,0] = 1
-                G[:,1] = topo_clean
+                G[:-1,1] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=50,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -465,16 +468,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,1] = elev_map.flatten()
 
             elif ivar==0 & nfit==1:
-                G=np.zeros((len(los_clean),3))
+                G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = topo_clean**2
+                G[:-1,1] = topo_clean
+                G[:-1,2] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -489,16 +492,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = elev_map.flatten()**2
             
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),3))
+                G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = x*topo_clean
+                G[:-1,1] = topo_clean
+                G[:-1,2] = x*topo_clean
 
                 # ramp inversion 
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -515,17 +518,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[i*mcols:(i+1)*mcols,2] *= i
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),4))
+                G=np.zeros((len(data),4))
                 G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = x*topo_clean
-                G[:,3] = (x*topo_clean)**2
+                G[:-1,1] = topo_clean
+                G[:-1,2] = x*topo_clean
+                G[:-1,3] = (x*topo_clean)**2
 
                 # ramp inversion 
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -546,15 +549,15 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     elif order==1: # Remove a range ramp ay+b for each maps (y = col)
 
         if radar is None:
-            G=np.zeros((len(los_clean),2))
-            G[:,0] = y
-            G[:,1] = 1
+            G=np.zeros((len(data),2))
+            G[:-1,0] = y
+            G[:-1,1] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
+            x0 = lst.lstsq(G,data)[0]
             try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -570,16 +573,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
         else:
             if ivar==0 & nfit==0:
-                G=np.zeros((len(los_clean),3))
+                G=np.zeros((len(data),3))
                 G[:,0] = y
-                G[:,1] = 1
-                G[:,2] = topo_clean
+                G[:-1,1] = 1
+                G[:-1,2] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -594,17 +597,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = elev_map.flatten()
 
             if ivar==0 & nfit==1:
-                G=np.zeros((len(los_clean),4))
+                G=np.zeros((len(data),4))
                 G[:,0] = y
-                G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
+                G[:-1,1] = 1
+                G[:-1,2] = topo_clean
+                G[:-1,3] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -620,18 +623,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()**2
             
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y
+                G=np.zeros((len(data),4))
+                G[:-1,0] = y
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
+                G[:-1,2] = topo_clean
+                G[:-1,3] = topo_clean*x
 
                 # ramp inversion
                 #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 yz yz**2 
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -648,19 +651,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[i*mcols:(i+1)*mcols,3] *= i
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y
+                G=np.zeros((len(data),4))
+                G[:-1,0] = y
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
-                G[:,4] = (topo_clean*x)**2
+                G[:-1,2] = topo_clean
+                G[:-1,3] = topo_clean*x
+                G[:-1,4] = (topo_clean*x)**2
 
                 # ramp inversion
                 #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 yz yz**2 
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -683,15 +686,15 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2
 
         if radar is None:
-            G=np.zeros((len(los_clean),2))
-            G[:,0] = x
+            G=np.zeros((len(data),2))
+            G[:-1,0] = x
             G[:,1] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
+            x0 = lst.lstsq(G,data)[0]
             try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -706,16 +709,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
         else:
             if ivar==0 & nfit==0:
-                G=np.zeros((len(los_clean),3))
-                G[:,0] = x
+                G=np.zeros((len(data),3))
+                G[:-1,0] = x
                 G[:,1] = 1
-                G[:,2] = topo_clean
+                G[:-1,2] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -730,17 +733,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,2] = elev_map.flatten()
 
             if ivar==0 & nfit==1:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = x
+                G=np.zeros((len(data),4))
+                G[:-1,0] = x
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
+                G[:-1,2] = topo_clean
+                G[:-1,3] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -756,17 +759,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()**2
             
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = x
+                G=np.zeros((len(data),4))
+                G[:-1,0] = x
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
+                G[:-1,2] = topo_clean
+                G[:-1,3] = topo_clean*x
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -783,18 +786,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[i*mcols:(i+1)*mcols,3] *= i
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = x
+                G=np.zeros((len(data),5))
+                G[:-1,0] = x
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
-                G[:,4] = (topo_clean*x)**2
+                G[:-1,2] = topo_clean
+                G[:-1,3] = topo_clean*x
+                G[:-1,4] = (topo_clean*x)**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -816,16 +819,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2
 
         if radar is None:
-            G=np.zeros((len(los_clean),3))
-            G[:,0] = y
-            G[:,1] = x
+            G=np.zeros((len(data),3))
+            G[:-1,0] = y
+            G[:-1,1] = x
             G[:,2] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
-            try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+            x0 = lst.lstsq(G,data)[0]
+	    try:
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -839,20 +842,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[i*mcols:(i+1)*mcols,1] = i 
             G[:,2] = 1
 
-
         else:
             if ivar==0 and nfit==0:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y
-                G[:,1] = x
+                G=np.zeros((len(data),4))
+                G[:-1,0] = y
+                G[:-1,1] = x
                 G[:,2] = 1
-                G[:,3] = topo_clean
+                G[:-1,3] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:    
                     pars = x0
@@ -868,18 +870,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()
 
             if ivar==0 and nfit==1:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = x
+                G=np.zeros((len(data),5))
+                G[:-1,0] = y
+                G[:-1,1] = x
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -896,18 +898,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,4] = elev_map.flatten()**2
             
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = x
+                G=np.zeros((len(data),5))
+                G[:-1,0] = y
+                G[:-1,1] = x
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean*x
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -925,19 +927,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[i*mcols:(i+1)*mcols,4] *= i   
             
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
+                G=np.zeros((len(data),6))
+                G[:-1,0] = y
+                G[:-1,1] = x
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
-                G[:,5] = (topo_clean*x)**2
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean*x
+                G[:-1,5] = (topo_clean*x)**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -962,17 +964,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2
 
         if radar is None:
-            G=np.zeros((len(los_clean),4))
-            G[:,0] = y
-            G[:,1] = x
-            G[:,2] = y*x
+            G=np.zeros((len(data),4))
+            G[:-1,0] = y
+            G[:-1,1] = x
+            G[:-1,2] = y*x
             G[:,3] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
+            x0 = lst.lstsq(G,data)[0]
             try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -989,18 +991,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
         else:
             if ivar==0 and nfit==0:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G=np.zeros((len(data),5))
+                G[:-1,0] = y
+                G[:-1,1] = x
+                G[:-1,2] = y*x
                 G[:,3] = 1
-                G[:,4] = topo_clean
+                G[:-1,4] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1017,19 +1019,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,4] = elev_map.flatten()
 
             if ivar==0 and nfit==1:
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G=np.zeros((len(data),6))
+                G[:-1,0] = y
+                G[:-1,1] = x
+                G[:-1,2] = y*x
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
+                G[:-1,4] = topo_clean
+                G[:-1,5] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1047,19 +1049,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,5] = elev_map.flatten()**2
 
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G=np.zeros((len(data),6))
+                G[:-1,0] = y
+                G[:-1,1] = x
+                G[:-1,2] = y*x
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
+                G[:-1,4] = topo_clean
+                G[:-1,5] = topo_clean*x
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1078,20 +1080,20 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[i*mcols:(i+1)*mcols,5] *= i
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),7))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G=np.zeros((len(data),7))
+                G[:-1,0] = y
+                G[:-1,1] = x
+                G[:-1,2] = y*x
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
-                G[:,6] = (topo_clean*x)**2
+                G[:-1,4] = topo_clean
+                G[:-1,5] = topo_clean*x
+                G[:-1,6] = (topo_clean*x)**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1115,16 +1117,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
         if radar is None:
-            G=np.zeros((len(los_clean),3))
-            G[:,0] = y**2
-            G[:,1] = y
-            G[:,2] = 1
+            G=np.zeros((len(data),3))
+            G[:-1,0] = y**2
+            G[:-1,1] = y
+            G[:-1,2] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
+            x0 = lst.lstsq(G,data)[0]
             try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -1140,17 +1142,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
         else:
             if ivar==0 and nfit==0:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = y**2
-                G[:,1] = y
+                G=np.zeros((len(data),4))
+                G[:-1,0] = y**2
+                G[:-1,1] = y
                 G[:,2] = 1
-                G[:,3] = topo_clean
+                G[:-1,3] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1166,18 +1168,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()
 
             elif ivar==0 and nfit==1:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y**2
-                G[:,1] = y
+                G=np.zeros((len(data),5))
+                G[:-1,0] = y**2
+                G[:-1,1] = y
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1194,18 +1196,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,4] = elev_map.flatten()**2
             
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = y**2
-                G[:,1] = y
+                G=np.zeros((len(data),5))
+                G[:-1,0] = y**2
+                G[:-1,1] = y
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean*x
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1223,19 +1225,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[i*mcols:(i+1)*mcols,4] *= i
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = y**2
-                G[:,1] = y
+                G=np.zeros((len(data),6))
+                G[:-1,0] = y**2
+                G[:-1,1] = y
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
-                G[:,5] = (topo_clean*x)**2
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean*x
+                G[:-1,5] = (topo_clean*x)**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1258,16 +1260,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
         if radar is None:
-            G=np.zeros((len(los_clean),3))
-            G[:,0] = x**2
-            G[:,1] = x
+            G=np.zeros((len(data),3))
+            G[:-1,0] = x**2
+            G[:-1,1] = x
             G[:,2] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,los_clean)[0]
+            x0 = lst.lstsq(G,data)[0]
             try:
-                _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
@@ -1283,17 +1285,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
 
         else:
             if ivar==0 and nfit==0:
-                G=np.zeros((len(los_clean),4))
-                G[:,0] = x**2
-                G[:,1] = x
+                G=np.zeros((len(data),4))
+                G[:-1,0] = x**2
+                G[:-1,1] = x
                 G[:,3] = 1
-                G[:,4] = topo_clean
+                G[:-1,4] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1309,18 +1311,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,3] = elev_map.flatten()
 
             elif ivar==0 and nfit==1:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = x**2
-                G[:,1] = x
+                G=np.zeros((len(data),5))
+                G[:-1,0] = x**2
+                G[:-1,1] = x
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
+                G[:-1,4] = topo_clean
+                G[:-1,5] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1337,18 +1339,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                 G[:,4] = elev_map.flatten()**2
             
             elif ivar==1 and nfit==0:
-                G=np.zeros((len(los_clean),5))
-                G[:,0] = x**2
-                G[:,1] = x
+                G=np.zeros((len(data),5))
+                G[:-1,0] = x**2
+                G[:-1,1] = x
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean*x
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1366,19 +1368,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
                     G[:,4] *= i 
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(los_clean),6))
-                G[:,0] = x**2
-                G[:,1] = x
+                G=np.zeros((len(data),6))
+                G[:-1,0] = x**2
+                G[:-1,1] = x
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
-                G[:,5] = (topo_clean*x)**2
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean*x
+                G[:-1,5] = (topo_clean*x)**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,los_clean)[0]
+                x0 = lst.lstsq(G,data)[0]
                 try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-los_clean)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-los_clean)/rms)
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
@@ -1532,9 +1534,37 @@ if estim=='yes':
         )
         )
         )
+        ))
+        
+        indexref = np.nonzero(
+        np.logical_and(elev_map<maxelev,
+        np.logical_and(elev_map>minelev,    
+        np.logical_and(los_map!=0, 
+        np.logical_and(los_map>minlos,
+        np.logical_and(los_map<maxlos,
+        np.logical_and(rms_map>threshold_rms, 
+        np.logical_and(pix_az>refstart,
+        np.logical_and(pix_az<refend,
+        np.logical_and(pix_rg>jbeg,
+        np.logical_and(pix_rg<jend,
+        np.logical_and(mask>threshold_mask,
+        np.logical_and(~np.isnan(los_map),
+        np.logical_or(pix_az<ibeg_mask,pix_az>iend_mask)
+        )
+        )
+        )
+        )
+        )
+        )
+        )
+        )
+        )
+        )
+        )
         )
         )
 
+	print 'Ref area set to zero:', refstart,refend
         spacial_mask[index] = np.copy(los_map[index])
 
         # extract range and azimuth coordinates
@@ -1545,9 +1575,13 @@ if estim=='yes':
 
         # clean maps
         los_temp = np.matrix.copy(los_map)
-        elev_temp = np.matrix.copy(elev_map)
+	elev_temp = np.matrix.copy(elev_map)
         los_clean = los_temp[index].flatten()
-        elev_clean = elev_temp[index].flatten()
+	los_ref = los_temp[indexref].flatten()
+        rms_ref = rms_map[indexref].flatten()
+	cst = np.nansum(los_ref*rms_ref) / np.nansum(rms_ref)
+	print 'Average phase within ref area:', cst
+	elev_clean = elev_temp[index].flatten()
         rms_clean = rms_map[index].flatten()
         del los_temp, elev_temp
 
@@ -1592,14 +1626,9 @@ if estim=='yes':
         try:
             sol, corr, rms[kk,2] = estim_ramp(los_map.flatten(),
             los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
-            temp_flat,rms_clean[::samp],nfit_temp,ivar_temp)
+            temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst)
 
             print 'RMS: ',rms[kk,2]
-
-            # clean corr : non car il faut extrapoler pour l'inversion ens erie temp
-            # k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
-            # corr[k] = 0.
-            # corr_maps[:,:,kk] = np.copy(corr)
 
             # print sol
             # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1616,9 +1645,9 @@ if estim=='yes':
                ax.scatter(elev_clean[::10],los_clean[::10] - func[::10], s=0.005, alpha=0.05,rasterized=True)
 
                if nfit==0:
-                    ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{}*z + {}'.format(sol[9],sol[8])) 
+                    ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
                else:
-                    ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{}*z**2 + {}*z + \
+                    ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{0:.3f}*z**2 + {1:.3f}*z + \
                         {1:.3f}'.format(sol[10],sol[9],sol[8]))
 
                ax.set_xlabel('Elevation (m)')
@@ -1855,7 +1884,7 @@ for kk in xrange((kmax)):
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(1)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        rms_map = np.zeros((ds.RasterYSize,ds.RasterXSize))
+        rms_map = np.ones((ds.RasterYSize,ds.RasterXSize))
         lines, cols = ds.RasterYSize, ds.RasterXSize
 
     elif sformat == 'GAMMA':
@@ -1865,7 +1894,12 @@ for kk in xrange((kmax)):
         # par_file = ref 
         lines,cols = gm.readpar(int_path)
         los_map = gm.readgamma(infile,int_path)
-        rms_map = np.zeros((lines,cols))
+        
+        if rmsf == 'yes':
+          rmsfile=  int_path + str(date1) + '_' + str(date2) + '.filt.cc'
+          rms_map = gm.readgamma(rmsfile,int_path)
+        else:
+          rms_map = np.ones((lines,cols))
 
     # rms_map = np.zeros((mlines,mcols))
     # print 'Apply correction and clean coh < 0.03....'
@@ -1912,22 +1946,27 @@ for kk in xrange((kmax)):
     flatlos[isnan(los_map)],rms_map[isnan(los_map)] = 0.0, 0.0
     rms_map[isnan(rms_map)],flatlos[isnan(rms_map)] = 0.0, 0.0
     
-    # Refer data 
-    zone = np.copy(flatlos[jstart:jend,:])
-    minlos, maxlos = np.nanpercentile(zone,2.), np.nanpercentile(zone,98.)
+    # Refer data
+    #print refstart,refend 
+    zone = as_strided(flatlos[refstart:refend,:])
+    amp = as_strided(rms_map[refstart:refend,:])
+    minlos, maxlos = np.nanpercentile(zone[abs(zone)>1.e-6],5.), np.nanpercentile(zone[abs(zone)>1.e-6],95.)
     index = np.nonzero(
         np.logical_and(zone>minlos,
         np.logical_and(zone<maxlos,
-        rms_map[jstart:jend,:]>threshold_rms,  
+        amp>threshold_rms,  
     )))
     
-    cst = np.nanmedian(zone[index])
+    # give small weights to small uncoherent vectors
+    cst = np.nansum(zone[index]*amp[index]) / np.nansum(amp[index])
+    
     if isnan(cst):
-        print(cst,np.nanmedian(zone))
         pass
     else:
         flatlos = flatlos - cst
-
+        corr_inv = corr_inv + cst
+    print(cst,np.nanmean(zone))
+    
     # print(suffout, rlook)
     # print(outfile)
     # print(outrsc)
