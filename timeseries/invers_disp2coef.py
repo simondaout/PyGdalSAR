@@ -3049,6 +3049,7 @@ for ii in xrange(niter):
                       np.logical_and(~np.isnan(rmsmap),
                       np.logical_and(~np.isnan(elev),
                       np.logical_and(rmsmap<seuil_rms,
+                      np.logical_and(rmsmap>1.e-6,
                       np.logical_and(~np.isnan(maps_temp),
 		      np.logical_and(pix_az>ibeg,
 		      np.logical_and(pix_az<iend,
@@ -3056,7 +3057,7 @@ for ii in xrange(niter):
 	              np.logical_and(pix_rg<jend,	
                           slope>0.,
                           ))))))))
-                      )))))
+                      ))))))
 
           indexref = np.nonzero(np.logical_and(elev<maxtopo,
               np.logical_and(elev>mintopo,
@@ -3065,6 +3066,7 @@ for ii in xrange(niter):
                       np.logical_and(~np.isnan(rmsmap),
                       np.logical_and(~np.isnan(elev),
                       np.logical_and(rmsmap<seuil_rms,
+                      np.logical_and(rmsmap>1.e-6,
                       np.logical_and(~np.isnan(maps_temp),
 		      np.logical_and(pix_az>refstart,
 		      np.logical_and(pix_az<refend,
@@ -3072,7 +3074,7 @@ for ii in xrange(niter):
 	              np.logical_and(pix_rg<jend,	
                           slope>0.,
                           ))))))))
-                      )))))
+                      ))))))
 
 
           # extract coordinates for estimation
@@ -3094,7 +3096,8 @@ for ii in xrange(niter):
 	 	print 'Average phase within ref area:', cst
 	  except:
 		cst = 0.
-          # print itemp, iendref
+          
+	  # print itemp, iendref
           #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
           if flat>5 and iendref-itemp < .6*(iendref-ibegref):
               print 'Image too short in comparison to master, set flat to 5'
