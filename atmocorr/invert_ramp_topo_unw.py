@@ -515,7 +515,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,1] = elev_map.flatten()
                 G[:,2] = elev_map.flatten()
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,2] *= i
+                    G[i*mcols:(i+1)*mcols,2] *= i - ibeg
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),4))
@@ -542,8 +542,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,2] *= i
-                    G[i*mcols:(i+1)*mcols,3] *= i**2
+                    G[i*mcols:(i+1)*mcols,2] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,3] *= (i-ibeg)**2
 
 
     elif order==1: # Remove a range ramp ay+b for each maps (y = col)
@@ -567,7 +567,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             # build total G matrix
             G=np.zeros((len(los),2))
             for i in xrange(mlines):
-                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))  - jbeg
             G[:,1] = 1
 
 
@@ -592,7 +592,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
 
@@ -617,7 +617,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg 
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
@@ -647,8 +647,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                    G[i*mcols:(i+1)*mcols,3] *= i
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg 
+                    G[i*mcols:(i+1)*mcols,3] *= i - ibeg
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),4))
@@ -677,9 +677,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                    G[i*mcols:(i+1)*mcols,3] *= i
-                    G[i*mcols:(i+1)*mcols,4] *= i**2
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,3] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,4] *= (i - ibeg)**2 
 
         
     elif order==2: # Remove an azimutal ramp ax+b for each maps (x is lign)
@@ -728,7 +728,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = i 
+                    G[i*mcols:(i+1)*mcols,0] = i - ibeg 
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
 
@@ -753,7 +753,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = i 
+                    G[i*mcols:(i+1)*mcols,0] = i - ibeg
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
@@ -782,8 +782,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,2] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = i
-                    G[i*mcols:(i+1)*mcols,3] *= i
+                    G[i*mcols:(i+1)*mcols,0] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,3] *= i - ibeg
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),5))
@@ -811,9 +811,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,3] = elev_map.flatten()
                 G[:,3] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = i
-                    G[i*mcols:(i+1)*mcols,3] *= i
-                    G[i*mcols:(i+1)*mcols,4] *= i**2
+                    G[i*mcols:(i+1)*mcols,0] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,3] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,4] *= (i-ibeg)**2
 
     elif order==3: # Remove a ramp ay+bx+c for each maps
     #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2
@@ -838,8 +838,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             # build total G matrix
             G=np.zeros((len(los),3))
             for i in xrange(mlines):
-                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                G[i*mcols:(i+1)*mcols,1] = i 
+                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg 
+                G[i*mcols:(i+1)*mcols,1] = i - ibeg
             G[:,2] = 1
 
         else:
@@ -864,8 +864,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                    G[i*mcols:(i+1)*mcols,1] = i    
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
 
@@ -891,8 +891,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                    G[i*mcols:(i+1)*mcols,1] = i    
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg 
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg   
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
@@ -922,9 +922,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                    G[i*mcols:(i+1)*mcols,1] = i
-                    G[i*mcols:(i+1)*mcols,4] *= i   
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg 
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
             
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),6))
@@ -954,10 +954,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) 
-                    G[i*mcols:(i+1)*mcols,1] = i
-                    G[i*mcols:(i+1)*mcols,4] *= i   
-                    G[i*mcols:(i+1)*mcols,5] *= i**2
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,5] *= (i - ibeg)**2
 
 
     elif order==4:
@@ -984,9 +984,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             # build total G matrix
             G=np.zeros((len(los),4))
             for i in xrange(mlines):
-                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
-                G[i*mcols:(i+1)*mcols,1] = i 
-                G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))    
+                G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                G[i*mcols:(i+1)*mcols,1] = i - ibeg 
+                G[i*mcols:(i+1)*mcols,2] = (i - ibeg) * (np.arange((mcols))-jbeg)    
             G[:,3] = 1
 
         else:
@@ -1012,9 +1012,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
-                    G[i*mcols:(i+1)*mcols,1] = i
-                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,2] = (i - ibeg) * (np.arange((mcols))-jbeg)
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
 
@@ -1041,9 +1041,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
-                    G[i*mcols:(i+1)*mcols,1] = i
-                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,2] = (i - ibeg) * (np.arange((mcols)) - jbeg)
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
@@ -1107,11 +1107,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,5] = elev_map.flatten()
                 G[:,6] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols))
-                    G[i*mcols:(i+1)*mcols,1] = i
-                    G[i*mcols:(i+1)*mcols,2] = (i) * (np.arange((mcols)))
-                    G[i*mcols:(i+1)*mcols,5] *= i
-                    G[i*mcols:(i+1)*mcols,6] *= i**2
+                    G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,2] = (i - ibeg) * (np.arange((mcols)) - jbeg)
+                    G[i*mcols:(i+1)*mcols,5] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,6] *= (i - ibeg)**2
 
     elif order==5:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1136,8 +1136,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             # build total G matrix
             G=np.zeros((len(los),3))
             for i in xrange(mlines):
-                G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
-                G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) 
+                G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
+                G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg 
             G[:,2] = 1
 
         else:
@@ -1162,8 +1162,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
-                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
 
@@ -1189,8 +1189,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
-                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) 
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg 
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
@@ -1220,9 +1220,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
-                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols))
-                    G[i*mcols:(i+1)*mcols,4] *= i
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)) - jbeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),6))
@@ -1251,10 +1251,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)))**2
-                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols))
-                    G[i*mcols:(i+1)*mcols,4] *= i
-                    G[i*mcols:(i+1)*mcols,5] *= i**2
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)) - jbeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,5] *= (i-ibeg)**2
 
     elif order==6:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1305,8 +1305,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (i)**2
-                    G[i*mcols:(i+1)*mcols,1] = i 
+                    G[i*mcols:(i+1)*mcols,0] = (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg 
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
 
@@ -1332,8 +1332,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (i)**2
-                    G[i*mcols:(i+1)*mcols,1] = i 
+                    G[i*mcols:(i+1)*mcols,0] = (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()**2
@@ -1363,8 +1363,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,3] = elev_map.flatten()
                 G[:,4] = elev_map.flatten()
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (i)**2
-                    G[i*mcols:(i+1)*mcols,1] = i 
+                    G[i*mcols:(i+1)*mcols,0] = (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = i - ibeg
                     G[:,4] *= i 
 
             elif ivar==1 and nfit==1:
@@ -1395,10 +1395,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
                 for i in xrange(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (i)**2
-                    G[i*mcols:(i+1)*mcols,1] = i 
-                    G[:,4] *= i 
-                    G[:,5] *= i**2 
+                    G[i*mcols:(i+1)*mcols,0] = (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = i -ibeg
+                    G[:,4] *= i -ibeg
+                    G[:,5] *= (i-ibeg)**2 
 
 
     corr = np.dot(G,pars).reshape(mlines,mcols)
