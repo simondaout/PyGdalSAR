@@ -112,6 +112,11 @@ wf.close()
 lndatadir = os.path.join(tsdir, "LN_DATA/")
 makedirs(lndatadir)
 
+# remove old links
+unw_files = glob.glob('{0}/*_pre_inv.unw*'.format(lndatadir))
+for f in unw_files:
+   os.remove(f)	
+
 # create list_pair
 if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None): 
     print(arguments["--sigma"])
