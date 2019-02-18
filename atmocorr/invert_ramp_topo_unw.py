@@ -151,7 +151,7 @@ else:
     refstart = int(arguments["--refstart"])
 
 if arguments["--refend"] == None:
-    refend = 0
+    refend = 200
 else:
     refend = int(arguments["--refend"])
 
