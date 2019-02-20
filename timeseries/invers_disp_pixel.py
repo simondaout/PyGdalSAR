@@ -433,6 +433,7 @@ if arguments["--bounds"] is not  None:
 else:
     vmax = np.nanpercentile(maps[:,:,-1],80)
     vmin = np.nanpercentile(maps[:,:,-1],10)
+    
 ax = fig.add_subplot(1,2,1)
 ax.imshow(maps[jstart:jend,istart:iend,-1], vmax=vmax, vmin=vmin, alpha=0.6)
 ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
