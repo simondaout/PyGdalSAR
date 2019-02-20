@@ -513,15 +513,19 @@ print 'Reshape cube: ', maps.shape
 # ref displacements to ref date
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
-    d = as_strided(maps[:,:,l])
-    d = d - cst
+    maps[:,:,l] = maps[:,:,l] - cst
     if l != imref:
-        index = np.nonzero(d==0.0)
-        d[index] = np.float('NaN')
+        index = np.nonzero(maps[:,:,l]==0.0)
+        maps[:,:,l][index] = np.float('NaN')
 
-# plt.imshow(maps[ibeg:iend,jbeg:jend,-1])
-# fig = plt.figure(12)
+# fig = plt.figure(0)
+# plt.imshow(cst,vmax=1,vmin=-1)
+# fig = plt.figure(1)
+# plt.imshow(maps[ibeg:iend,jbeg:jend,imref],vmax=1,vmin=-1)
+# plt.show()
+# sys.exit()
 
+fig = plt.figure(12)
 nfigure=0
 
 # open mask file
@@ -977,7 +981,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
-	
+  
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
     # sigma m **2 =  misfit**2 * diag([G.TG]-1)
@@ -1026,15 +1030,15 @@ for ii in xrange(niter):
         # calc elevi as los
         elev_temp = np.matrix.copy(elevi)
       
-      # create new data matrix with cst	
+      # create new data matrix with cst 
       data = np.hstack([los_clean,los_ref])
       rms = np.hstack([rms,1e-3])
-		
+    
       if order==0:
 
         if radar is None:
             
- 	    a = cst
+            a = cst
             print 'Remove ref frame %f  for date: %i'%(a,idates[l])
             ramp = np.ones((nlign,ncol))*a
             rms = np.sqrt(np.nanmean((los-a)**2))
@@ -1051,8 +1055,8 @@ for ii in xrange(niter):
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-	        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-		a = pars[0]; b = pars[1]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+                a = pars[0]; b = pars[1]
                 print 'Remove ref frame %f + %f z for date: %i'%(a,b,idates[l])
 
                 # plot phase/elev
@@ -1083,7 +1087,7 @@ for ii in xrange(niter):
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-		pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print 'Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l])
 
@@ -1114,7 +1118,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l])
@@ -1149,7 +1153,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
@@ -1185,7 +1189,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]
             print 'Remove ramp %f r + %f for date: %i'%(a,b,idates[l])
@@ -1213,7 +1217,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l])
@@ -1249,7 +1253,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
@@ -1286,7 +1290,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
@@ -1326,7 +1330,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
@@ -1365,7 +1369,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]
             print 'Remove ramp %f az + %f for date: %i'%(a,b,idates[l])
@@ -1393,7 +1397,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print 'Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l])
@@ -1404,7 +1408,7 @@ for ii in xrange(niter):
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,c*x,'-r', lw =4.)
 
-            # build total G matrix
+                # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
@@ -1430,7 +1434,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
@@ -1467,7 +1471,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
@@ -1507,7 +1511,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
@@ -1548,7 +1552,7 @@ for ii in xrange(niter):
             # print x0
             # x0 = np.zeros((3))
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]
             print 'Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l])
@@ -1577,7 +1581,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print 'Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l])
@@ -1617,7 +1621,7 @@ for ii in xrange(niter):
                 x0 = lst.lstsq(G,data)[0]
 
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
@@ -1655,15 +1659,15 @@ for ii in xrange(niter):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
-	        print x0
+                # print x0
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-                print pars - x0
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-	        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-	        print pars - x0
-		a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
+                # print pars - x0
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+                # print pars - x0
+                a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
                 print 'Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
@@ -1703,7 +1707,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
                 print 'Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -1744,7 +1748,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print 'Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l])
@@ -1775,7 +1779,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
 
@@ -1817,7 +1821,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
@@ -1859,7 +1863,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
@@ -1904,7 +1908,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
@@ -1948,7 +1952,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print 'Remove ramp %f r**2 %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l])
@@ -1982,7 +1986,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
@@ -2023,7 +2027,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -2066,7 +2070,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -2111,7 +2115,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
@@ -2156,7 +2160,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print 'Remove ramp %f az**2 %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l])
@@ -2188,7 +2192,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
@@ -2229,7 +2233,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -2270,7 +2274,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -2314,7 +2318,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
@@ -2358,7 +2362,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print 'Remove ramp %f az**2 %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l])
@@ -2392,7 +2396,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -2435,7 +2439,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
@@ -2478,7 +2482,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
@@ -2524,7 +2528,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
@@ -2569,7 +2573,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
             print 'Remove ramp %f az**3 %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l])
@@ -2605,7 +2609,7 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
@@ -2650,7 +2654,7 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
@@ -2696,7 +2700,7 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
@@ -2744,7 +2748,7 @@ for ii in xrange(niter):
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,i,idates[l])
@@ -2789,7 +2793,7 @@ for ii in xrange(niter):
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-	    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print 'Remove ramp %f r %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l])
@@ -2822,7 +2826,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
@@ -2865,7 +2869,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
@@ -2909,7 +2913,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
 
@@ -2955,7 +2959,7 @@ for ii in xrange(niter):
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-		_fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
 
@@ -3008,7 +3012,7 @@ for ii in xrange(niter):
 
       # Loop over the dates
       for l in xrange((N)):
-	print
+        print
 
         # no estimation on the ref image set to zero 
         if l is not imref:
@@ -3051,10 +3055,10 @@ for ii in xrange(niter):
                       np.logical_and(rmsmap<seuil_rms,
                       np.logical_and(rmsmap>1.e-6,
                       np.logical_and(~np.isnan(maps_temp),
-		      np.logical_and(pix_az>ibeg,
-		      np.logical_and(pix_az<iend,
-		      np.logical_and(pix_rg>jbeg,
-	              np.logical_and(pix_rg<jend,	
+                      np.logical_and(pix_az>ibeg,
+                      np.logical_and(pix_az<iend,
+                      np.logical_and(pix_rg>jbeg,
+                      np.logical_and(pix_rg<jend, 
                           slope>0.,
                           ))))))))
                       ))))))
@@ -3068,10 +3072,10 @@ for ii in xrange(niter):
                       np.logical_and(rmsmap<seuil_rms,
                       np.logical_and(rmsmap>1.e-6,
                       np.logical_and(~np.isnan(maps_temp),
-		      np.logical_and(pix_az>refstart,
-		      np.logical_and(pix_az<refend,
-		      np.logical_and(pix_rg>jbeg,
-	              np.logical_and(pix_rg<jend,	
+                      np.logical_and(pix_az>refstart,
+                      np.logical_and(pix_az<refend,
+                      np.logical_and(pix_rg>jbeg,
+                      np.logical_and(pix_rg<jend, 
                           slope>0.,
                           ))))))))
                       ))))))
@@ -3083,21 +3087,24 @@ for ii in xrange(niter):
 
           # clean maps
           los_clean = maps_temp[index].flatten()
-	  topo_clean = elev[index].flatten()
+          topo_clean = elev[index].flatten()
           rms_clean = rmsmap[index].flatten()
           
-	  try:
-	  	los_ref = maps_temp[indexref].flatten()
-	  	rms_ref = rmsmap[indexref].flatten()
-	  	amp_ref = 1./rms_ref
-	  	amp_ref = amp_ref/np.nanmax(amp_ref)
-          	print 'Ref area set to zero:', refstart,refend
-          	cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
-	 	print 'Average phase within ref area:', cst
-	  except:
-		cst = 0.
+          try:
+            los_ref = maps_temp[indexref].flatten()
+            rms_ref = rmsmap[indexref].flatten()
+            amp_ref = 1./rms_ref
+            amp_ref = amp_ref/np.nanmax(amp_ref)
+            print 'Ref area set to zero:', refstart,refend
+            cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
+            print 'Average phase within ref area:', cst
+            if np.isnan(cst):
+              cst = 0
+
+          except:
+            cst = 0.
           
-	  # print itemp, iendref
+          # print itemp, iendref
           #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
           if flat>5 and iendref-itemp < .6*(iendref-ibegref):
               print 'Image too short in comparison to master, set flat to 5'
@@ -3132,15 +3139,17 @@ for ii in xrange(niter):
           topo[kk] = float('NaN')
           
           ## Refer data again 
-	  zone = as_strided(maps_flata[:,:,l])
+          zone = as_strided(maps_flata[:,:,l])
           los_ref2 = zone[indexref]
           
-	  # weigth avera of the phase
+          # weigth avera of the phase
           cst = np.nansum(los_ref2*amp_ref) / np.nansum(amp_ref)
           print 'Average phase within ref area, iter=2:', cst
-	  maps_ramp[:,:,l], maps_flata[:,:,l], maps_noramps[:,:,l] = maps_ramp[:,:,l] + cst, maps_flata[:,:,l] - cst, maps_noramps[:,:,l] - cst 
-	  
-	  del zone
+          if np.isnan(cst):
+            cst = 0.
+          maps_ramp[:,:,l], maps_flata[:,:,l], maps_noramps[:,:,l] = maps_ramp[:,:,l] + cst, maps_flata[:,:,l] - cst, maps_noramps[:,:,l] - cst 
+    
+          del zone
           del los_clean
           del rms_clean
           del topo_clean
@@ -3200,9 +3209,9 @@ for ii in xrange(niter):
           figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
           
 
-      if plot=='yes':
+    if plot=='yes':
         plt.show()
-      plt.close('all')
+    plt.close('all')
     
     # save rms
     if (apsf=='no' and ii==0):
