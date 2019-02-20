@@ -53,7 +53,7 @@ from numpy.lib.stride_tricks import as_strided
 # basic
 import math,sys,getopt
 from os import path, environ
-import os
+import os, glob
 
 import gdal
 
@@ -76,7 +76,7 @@ if arguments["--list_images"] ==  None:
 else:
     listim = arguments["--list_images"]
 if arguments["--cube"] ==  None:
-   cubef = "depl_cumule"
+   cubef = "depl_cumule_flat"
 else:
    cubef = arguments["--cube"]
 if arguments["--lectfile"] ==  None:
@@ -251,23 +251,23 @@ if len(postimes) == 0:
     postimes = np.ones((M))*-1
 
 for i in xrange(M):
-  cofile = 'cos{}_coeff.r4'.format(i)
+  cofile = glob.glob('cos{}_coeff.*'.format(i))
   try:
-    ds = gdal.Open(cofile, gdal.GA_ReadOnly)
+    ds = gdal.Open(cofile[0], gdal.GA_ReadOnly)
     coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
   except:
-    coseismaps[i,:,:] = np.fromfile(cofile,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+    coseismaps[i,:,:] = np.fromfile(cofile[0],dtype=np.float32).reshape((nlign,ncol))*rad2mm
   listplot.append(coseismaps[i,:,:])
   titles.append('Coseism.{}'.format(i))
 
 for i in xrange((M)):
-  postfile = 'post{}_coeff.r4'.format(i)
+  postfile = glob.glob('post{}_coeff.*'.format(i))
   if postimes[i] > 0:
     try:
-      ds = gdal.Open(postfile, gdal.GA_ReadOnly)
+      ds = gdal.Open(postfile[0], gdal.GA_ReadOnly)
       postmaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
     except:  
-      postmaps[i,:,:] = np.fromfile(postfile,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+      postmaps[i,:,:] = np.fromfile(postfile[0],dtype=np.float32).reshape((nlign,ncol))*rad2mm
     listplot.append(postmaps[i,:,:])
     titles.append('Post.{}'.format(i))
   else: 
@@ -340,6 +340,7 @@ def slowslip(time,to,tcar):
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(12,8))
+
 
 for k in xrange(len(ipix)):
     i, j = ipix[k], jpix[k]
@@ -424,6 +425,10 @@ for k in xrange(len(ipix)):
     for l in xrange((L)):
         model = model + sse[l]*slowslip(tdec,sse_times[l],sse_car[l])
 
+    print i,j
+    print coseismic(dates, cotimes[0], steps[0])
+    print postseismic(dates, cotimes[0],postimes[0],trans[0])
+    print 
     if np.std(model) > 0:
         plt.plot(t,model,'-r')
 
