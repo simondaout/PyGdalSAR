@@ -231,7 +231,7 @@ cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     d = as_strided(maps[:,:,l])
     d[kk] = np.float('NaN')
-    # carefull stupid unit MP
+    # carefull stupid unit 
     maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l]-base[imref])/100.
     if l != imref:
         index = np.nonzero(d==0.0)
