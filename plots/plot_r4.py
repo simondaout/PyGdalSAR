@@ -13,14 +13,16 @@
 plot_r4.py
 -------------
 
-Usage: plot_r4.py --infile=<path> [--lectfile=<path>] [--vmin=<value>] [--vmax=<value>] [--wrap=<yes/no>] [--rad2mm=<value>] [--crop=<values>] [--title=<value>]
+Usage: 	plot_r4.py --infile=<path>
+		plot_r4.py --infile=<path> [--lectfile=<path>] [--vmin=<value>] [--vmax=<value>] \
+[--wrap=<yes/no>] [--rad2mm=<value>] [--crop=<values>] [--title=<value>]
 
 Options:
 -h --help             Show this screen.
 --infile=<file>       File to be cut
 --lectfile=<file>     Path of the lect.in file [default: lect.in]
---vmax=<value> 	      Max colorscale [default: 90th percentile]
---vmin=<value>        Min colorscale [default: 10th percentile]
+--vmax=<value> 	      Max colorscale (default: 90th percentile)
+--vmin=<value>        Min colorscale (default: 10th percentile)
 --wrap=<value> 	      Wrapped phase [default: no]
 --rad2mm=<value>      Convert data [default: 1]
 --tile=<value>        Title plot 
@@ -61,19 +63,19 @@ ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 # Program
 fid = open(infile, 'r')
 m = np.fromfile(fid,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))[ibeg:iend,jbeg:jend]
-kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(m), np.abs(m)<999.),m==0.0))
+kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(m), np.abs(m)<999.),m!=0.0))
 mprim = m[kk]
 
 if arguments["--vmax"] ==  None:
-	vmax = np.nanpercentile(mprim, 98)
+	vmax = np.nanpercentile(mprim, 99)
 else:
 	vmax = np.float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
-	vmin = np.nanpercentile(mprim, 2)
+	vmin = np.nanpercentile(mprim, 1)
 else:
 	vmin = np.float(arguments["--vmin"])
-print vmax,vmin
+# print vmax,vmin
 
 if arguments["--wrap"] !=  None:	
 	m = np.mod(m,2*np.pi)-np.pi 

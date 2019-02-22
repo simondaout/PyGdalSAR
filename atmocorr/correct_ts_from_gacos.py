@@ -27,13 +27,13 @@ Options:
 --proj=<value>        EPSG for projection GACOS map [default: 4326]
 --crop=<values>       Crop GACOS data to data extent in the output projection, eg. --crop=xmin,ymin,xmax,ymax 
 --refstart=<value>    Stating line number of the area where phase is set to zero [default: 0] 
---refend=<value>      Ending line number of the area where phase is set to zero [default: 200]
+--refend=<value>      Ending line number of the area where phase is set to zero [default: length]
 --ramp=<cst|lin|quad> Estimate a constant, linear or quadratic ramp in x and y in addition to the los/gacos relationship [default: cst].
 --zone=<value>        Crop option for empirical estimation (eg: 0,ncol,0,nlign)
 --topo=<file>         Use DEM file to mask very low or high altitude values in the empirical estimation 
 --gacos2data=<value>  Scaling value between zenithal gacos data (m) and desired output (e.g data in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504) [default: -920.504]
 --rmspixel=<file>     Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel)
---threshold_rms=<value>	 Thresold on rmspixel for ramp estimation [default: 2.]   
+--threshold_rms=<value>  Thresold on rmspixel for ramp estimation [default: 2.]   
 --plot=<yes|no>      Display results [default: yes]
 --load=<file>        If a file is given, load directly GACOS cube 
 --fitmodel=<yes|no>  If yes, then estimate the proportionlality between gacos and data in addition to a polynomial ramp
@@ -79,14 +79,6 @@ if arguments["--plot"] ==  None:
     plot = 'yes'
 else:
     plot = arguments["--plot"]
-if arguments["--refstart"] == None:
-    refstart = 0
-else:
-    refstart = int(arguments["--refstart"])
-if arguments["--refend"] == None:
-    refend = 200
-else:
-    refend = int(arguments["--refend"])
 if arguments["--proj"] ==  None:
     proj = False
     EPSG = 4326
@@ -118,7 +110,16 @@ if arguments["--zone"] ==  None:
     col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlign
 else:
     refzone = map(float,arguments["--clean"].replace(',',' ').split())
-    col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
+
+if arguments["--refstart"] == None:
+    refstart = 0
+else:
+    refstart = int(arguments["--refstart"])
+if arguments["--refend"] == None:
+    refend = nlign
+else:
+    refend = int(arguments["--refend"])
+   col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
 
 if arguments["--rmspixel"] ==  None:
     rms = np.ones((nlign,ncol))
@@ -332,8 +333,8 @@ for l in xrange((N)):
         np.logical_and(pix_lin<line_end,
         np.logical_and(data<losmax,
         np.logical_and(data>losmin,
-	np.logical_and(rms<threshold_rms,
-	np.logical_and(rms>1.e-6,
+        np.logical_and(rms<threshold_rms,
+        np.logical_and(rms>1.e-6,
         np.logical_and(model<gacosmax,
         np.logical_and(model>gacosmin,
         np.logical_and(elev<maxtopo,
@@ -349,8 +350,8 @@ for l in xrange((N)):
         np.logical_and(pix_lin<refend,
         np.logical_and(data<losmax,
         np.logical_and(data>losmin,
-	np.logical_and(rms<threshold_rms,
-	np.logical_and(rms>1.e-6,
+        np.logical_and(rms<threshold_rms,
+        np.logical_and(rms>1.e-6,
         np.logical_and(model<gacosmax,
         np.logical_and(model>gacosmin,
         np.logical_and(elev<maxtopo,
@@ -402,119 +403,119 @@ for l in xrange((N)):
     xbins, ybins = np.array(xbins),np.array(ybins)
 
     if (ramp == 'cst' and  fitmodel=='no'):
-	    
-	    a = cst
-            print 'Remove cst: %f for date: %i'%(a,idates[l])
+        
+        a = cst
+        print 'Remove cst: %f for date: %i'%(a,idates[l])
 
-            remove_ramp = np.ones((nlign,ncol)).reshape((nlign,ncol))*cst
-            remove_ramp[model==0.] = 0.
-            remove_ramp[np.isnan(data)] = np.float('NaN')
-	    
-	    # data = gacos + cst
-	    remove = remove_ramp + model
-	   
-	    # Compute ramp for data = f(model) 
-	    functbins = a
-	    funct = a
-	    # set coef gacos to 1
-	    f = 1
+        remove_ramp = np.ones((nlign,ncol)).reshape((nlign,ncol))*cst
+        remove_ramp[model==0.] = 0.
+        remove_ramp[np.isnan(data)] = np.float('NaN')
+        
+        # data = gacos + cst
+        remove = remove_ramp + model
+       
+        # Compute ramp for data = f(model) 
+        functbins = a
+        funct = a
+        # set coef gacos to 1
+        f = 1
 
     elif (ramp == 'lin' and  fitmodel=='no'):
-	    # here we want to minimize data-gacos = ramp
-	    # invers both digitized data and ref frame together
-	    d = np.hstack([losbins-modelbins,cst])
-	    # give a strong weigth to ref frame
-	    sigmad = np.hstack([losstd,1e-3])	    
+        # here we want to minimize data-gacos = ramp
+        # invers both digitized data and ref frame together
+        d = np.hstack([losbins-modelbins,cst])
+        # give a strong weigth to ref frame
+        sigmad = np.hstack([losstd,1e-3])       
 
-            G=np.zeros((len(d),3))
-            G[:-1,0] = xbins
-            G[:-1,1] = ybins
-            G[:,2] = 1
+        G=np.zeros((len(d),3))
+        G[:-1,0] = xbins
+        G[:-1,1] = ybins
+        G[:,2] = 1
 
-            x0 = lst.lstsq(G,d)[0]
-            # print x0
-            _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
-            _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
-	    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-	    a = pars[0]; b = pars[1]; c = pars[2]
-            print 'Remove ramp  %f az  + %f r + %f for date: %i'%(a,b,c,idates[l])
+        x0 = lst.lstsq(G,d)[0]
+        # print x0
+        _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
+        _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]
+        print 'Remove ramp  %f az  + %f r + %f for date: %i'%(a,b,c,idates[l])
             
-	    # Compute ramp for data = f(model)
-	    functbins = a*xbins + b*ybins + c
-            funct = a*x + b*y + c
-	    # set coef gacos to 1
-	    f = 1
+        # Compute ramp for data = f(model)
+        functbins = a*xbins + b*ybins + c
+        funct = a*x + b*y + c
+        # set coef gacos to 1
+        f = 1
 
-            # build total G matrix
-            G=np.zeros((len(data.flatten()),3))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = i - line_beg 
-                G[i*ncol:(i+1)*ncol,1] = np.arange(ncol) - col_beg
-            G[:,2] = 1
+        # build total G matrix
+        G=np.zeros((len(data.flatten()),3))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = i - line_beg 
+            G[i*ncol:(i+1)*ncol,1] = np.arange(ncol) - col_beg
+        G[:,2] = 1
 
-	    # compute ramp
-            remove_ramp = np.dot(G,pars).reshape(nlign,ncol)
-            remove_ramp[model==0.] = 0.
-            remove_ramp[np.isnan(data)] = np.float('NaN')
-	    
-	    # data = gacos + (a*rg + b*az + cst) 
-	    remove = model + remove_ramp
+        # compute ramp
+        remove_ramp = np.dot(G,pars).reshape(nlign,ncol)
+        remove_ramp[model==0.] = 0.
+        remove_ramp[np.isnan(data)] = np.float('NaN')
+        
+        # data = gacos + (a*rg + b*az + cst) 
+        remove = model + remove_ramp
 
     elif fitmodel=='yes':
-	    # invers both digitized data and ref frame together
-	    # here we invert data = a*gacos + ramp
-	    d = np.hstack([losbins,cst])
-	    # give a strong weigth to ref frame
-	    sigmad = np.hstack([losstd,1e-3])	    
+        # invers both digitized data and ref frame together
+        # here we invert data = a*gacos + ramp
+        d = np.hstack([losbins,cst])
+        # give a strong weigth to ref frame
+        sigmad = np.hstack([losstd,1e-3])       
             
-	    G=np.zeros((len(d),6))
-            G[:-1,0] = xbins**2
-            G[:-1,1] = xbins
-            G[:-1,2] = ybins**2
-            G[:-1,3] = ybins
-            G[:,4] = 1
-            G[:-1,5] = modelbins
+        G=np.zeros((len(d),6))
+        G[:-1,0] = xbins**2
+        G[:-1,1] = xbins
+        G[:-1,2] = ybins**2
+        G[:-1,3] = ybins
+        G[:,4] = 1
+        G[:-1,5] = modelbins
 
-            x0 = lst.lstsq(G,d)[0]
-            # print x0
-            _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
-            _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-	    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-            print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f model for date: %i'%(a,b,c,d,e,f,idates[l])
+        x0 = lst.lstsq(G,d)[0]
+        # print x0
+        _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
+        _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+        print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f model for date: %i'%(a,b,c,d,e,f,idates[l])
 
-	    #Compute ramp for data = f(model)
-            funct = a*x**2 + b*x + c*y**2 + d*y + e
-            functbins = a*xbins**2 + b*xbins + c*ybins**2 + d*ybins + e
+        #Compute ramp for data = f(model)
+        funct = a*x**2 + b*x + c*y**2 + d*y + e
+        functbins = a*xbins**2 + b*xbins + c*ybins**2 + d*ybins + e
 
-            # build total G matrix
-            G=np.zeros((len(data.flatten()),6))
-            for i in xrange(nlign):
+        # build total G matrix
+        G=np.zeros((len(data.flatten()),6))
+        for i in xrange(nlign):
                 G[i*ncol:(i+1)*ncol,0] = (i - line_beg)**2
                 G[i*ncol:(i+1)*ncol,1] = i - line_beg
                 G[i*ncol:(i+1)*ncol,2] = np.arange((ncol - col_beg))**2
                 G[i*ncol:(i+1)*ncol,3] = np.arange(ncol - col_beg)
-            G[:,4] = 1
-            G[:,5] = model.flatten()
+        G[:,4] = 1
+        G[:,5] = model.flatten()
 
-	    # data = a*gacos + ramp
-            remove = np.dot(G,pars).reshape(nlign,ncol)
-            remove[model==0.] = 0.
-            remove[np.isnan(data)] = np.float('NaN')
-    
-            # build total G matrix
-            G=np.zeros((len(data.flatten()),5))
-            for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (i - line_beg)**2
-                G[i*ncol:(i+1)*ncol,1] = i - line_beg
-                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol - col_beg))**2
-                G[i*ncol:(i+1)*ncol,3] = np.arange(ncol - col_beg)
-            G[:,4] = 1
+        # data = a*gacos + ramp
+        remove = np.dot(G,pars).reshape(nlign,ncol)
+        remove[model==0.] = 0.
+        remove[np.isnan(data)] = np.float('NaN')
 
-	    # ramp only
-            remove_ramp = np.dot(G,pars[:-1]).reshape(nlign,ncol)
-            remove_ramp[model==0.] = 0.
-            remove_ramp[np.isnan(data)] = np.float('NaN')
+        # build total G matrix
+        G=np.zeros((len(data.flatten()),5))
+        for i in xrange(nlign):
+            G[i*ncol:(i+1)*ncol,0] = (i - line_beg)**2
+            G[i*ncol:(i+1)*ncol,1] = i - line_beg
+            G[i*ncol:(i+1)*ncol,2] = np.arange((ncol - col_beg))**2
+            G[i*ncol:(i+1)*ncol,3] = np.arange(ncol - col_beg)
+        G[:,4] = 1
+
+        # ramp only
+        remove_ramp = np.dot(G,pars[:-1]).reshape(nlign,ncol)
+        remove_ramp[model==0.] = 0.
+        remove_ramp[np.isnan(data)] = np.float('NaN')
     
     # correction
     # data_flat = data - (gacos + ramp)
@@ -556,9 +557,9 @@ for l in xrange((N)):
         plt.colorbar(im, cax=cax)
         ax.set_title('Model {}'.format(idates[l]),fontsize=6)
         
-	# initiate figure depl
+        # initiate figure depl
         ax = fig.add_subplot(3,2,3)
-        im = ax.imshow(model_flat[:,:,l],cmap=cmap,vmax=losmax,vmin=losmin)
+        im = ax.imshow(model_flat[:,:,l],cmap=cmap)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)

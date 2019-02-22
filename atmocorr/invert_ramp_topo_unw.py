@@ -826,7 +826,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
-	    try:
+            try:
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
@@ -1564,7 +1564,7 @@ if estim=='yes':
         )
         )
 
-	print 'Ref area set to zero:', refstart,refend
+        print 'Ref area set to zero:', refstart,refend
         spacial_mask[index] = np.copy(los_map[index])
 
         # extract range and azimuth coordinates
@@ -1575,13 +1575,13 @@ if estim=='yes':
 
         # clean maps
         los_temp = np.matrix.copy(los_map)
-	elev_temp = np.matrix.copy(elev_map)
+        elev_temp = np.matrix.copy(elev_map)
         los_clean = los_temp[index].flatten()
-	los_ref = los_temp[indexref].flatten()
+        los_ref = los_temp[indexref].flatten()
         rms_ref = rms_map[indexref].flatten()
-	cst = np.nansum(los_ref*rms_ref) / np.nansum(rms_ref)
-	print 'Average phase within ref area:', cst
-	elev_clean = elev_temp[index].flatten()
+        cst = np.nansum(los_ref*rms_ref) / np.nansum(rms_ref)
+        print 'Average phase within ref area:', cst
+        elev_clean = elev_temp[index].flatten()
         rms_clean = rms_map[index].flatten()
         del los_temp, elev_temp
 

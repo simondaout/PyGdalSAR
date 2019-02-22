@@ -433,7 +433,7 @@ if arguments["--bounds"] is not  None:
 else:
     vmax = np.nanpercentile(maps[:,:,-1],80)
     vmin = np.nanpercentile(maps[:,:,-1],10)
-    
+
 ax = fig.add_subplot(1,2,1)
 ax.imshow(maps[jstart:jend,istart:iend,-1], vmax=vmax, vmin=vmin, alpha=0.6)
 ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
@@ -788,14 +788,14 @@ for jj in xrange((Npix)):
     # plot data and model minus dem error
     if infof is not None:
       # print infof, infm
-      ax.plot(x,disp-demerr,'o',label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
+      ax.plot(x,disp-demerr,'o',markersize=4,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
     else:
-      ax.plot(x,disp-demerr,'o',label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
+      ax.plot(x,disp-demerr,'o',markersize=4,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
     ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
     
     # plot data and model minus dem error and linear term
     if inter=='yes':
-        ax3.plot(x,disp-demerr-lin,'o',label='detrended data')
+        ax3.plot(x,disp-demerr-lin,'o',markersize=4,label='detrended data')
         ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
     
     # plot data and model minus dem error and seasonal terms

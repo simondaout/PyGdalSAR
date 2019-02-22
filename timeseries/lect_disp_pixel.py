@@ -252,24 +252,28 @@ if len(postimes) == 0:
 
 for i in xrange(M):
   cofile = glob.glob('cos{}_coeff.*'.format(i))
-  try:
-    ds = gdal.Open(cofile[0], gdal.GA_ReadOnly)
-    coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
-  except:
-    coseismaps[i,:,:] = np.fromfile(cofile[0],dtype=np.float32).reshape((nlign,ncol))*rad2mm
-  listplot.append(coseismaps[i,:,:])
-  titles.append('Coseism.{}'.format(i))
+  for f in cofile:
+    extension = os.path.splitext(f)[1]
+    if extension == ".tif":
+      ds = gdal.Open(f, gdal.GA_ReadOnly)
+      coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+    elif extension == ".r4":
+      coseismaps[i,:,:] = np.fromfile(f,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+    listplot.append(coseismaps[i,:,:])
+    titles.append('Coseism.{}'.format(i))
 
 for i in xrange((M)):
   postfile = glob.glob('post{}_coeff.*'.format(i))
   if postimes[i] > 0:
-    try:
-      ds = gdal.Open(postfile[0], gdal.GA_ReadOnly)
-      postmaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
-    except:  
-      postmaps[i,:,:] = np.fromfile(postfile[0],dtype=np.float32).reshape((nlign,ncol))*rad2mm
-    listplot.append(postmaps[i,:,:])
-    titles.append('Post.{}'.format(i))
+    for f in postfile:
+      extension = os.path.splitext(f)[1]
+      if extension == ".tif":
+        ds = gdal.Open(f, gdal.GA_ReadOnly)
+        postmaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
+      elif extension == ".r4": 
+        postmaps[i,:,:] = np.fromfile(f,dtype=np.float32).reshape((nlign,ncol))*rad2mm
+      listplot.append(postmaps[i,:,:])
+      titles.append('Post.{}'.format(i))
   else: 
       postmaps[i,:,:] = np.zeros((nlign,ncol))
   
@@ -374,7 +378,7 @@ for k in xrange(len(ipix)):
         dispref = np.zeros((N))
     disp = disp - dispref
 
-    ax.plot(x,disp-demcor,'o',label='TS {}: lign: {}, column: {}'.format(k,i,j))
+    ax.plot(x,disp-demcor,'o',markersize=4,label='TS {}: lign: {}, column: {}'.format(k,i,j))
     ax.errorbar(x,disp-demcor,yerr = inaps, ecolor='blue',fmt='none', alpha=0.5)
 
     # extract model
@@ -425,10 +429,10 @@ for k in xrange(len(ipix)):
     for l in xrange((L)):
         model = model + sse[l]*slowslip(tdec,sse_times[l],sse_car[l])
 
-    print i,j
-    print coseismic(dates, cotimes[0], steps[0])
-    print postseismic(dates, cotimes[0],postimes[0],trans[0])
-    print 
+    # print i,j
+    # print coseismic(dates, cotimes[0], steps[0])
+    # print postseismic(dates, cotimes[0],postimes[0],trans[0])
+    # print 
     if np.std(model) > 0:
         plt.plot(t,model,'-r')
 

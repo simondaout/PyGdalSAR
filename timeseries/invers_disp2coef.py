@@ -769,9 +769,11 @@ if maskfile is not None:
 nfigure+=1
 fig = plt.figure(nfigure,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
-vmax = np.abs([np.nanmedian(maps[:,:,-1]) + 1.*np.nanstd(maps[:,:,-1]),\
-    np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
-vmin = -vmax
+vmax = np.nanpercentile(maps[:,:,-1],98.)
+vmin = np.nanpercentile(maps[:,:,-1],2.)
+# vmax = np.abs([np.nanmedian(maps[:,:,-1]) + 1.*np.nanstd(maps[:,:,-1]),\
+#     np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
+# vmin = -vmax
 
 for l in xrange((N)):
     d = as_strided(maps[ibeg:iend,jbeg:jend,l])
@@ -3212,7 +3214,7 @@ for ii in xrange(niter):
     if plot=='yes':
         plt.show()
     plt.close('all')
-    
+
     # save rms
     if (apsf=='no' and ii==0):
         # aps from rms
@@ -3516,10 +3518,6 @@ for l in xrange((N)):
 
     fig.tight_layout()
 
-    if plot=='yes':
-       plt.show()
-    plt.close('all')
-
     # ############
     # # SAVE .R4 #
     # ############
@@ -3585,8 +3583,9 @@ figall.suptitle('Time series inversion')
 fig.savefig('models.eps', format='EPS',dpi=150)
 figres.savefig('residuals.eps', format='EPS',dpi=150)
 figall.savefig('timeseries.eps', format='EPS',dpi=150)
-#plt.show()
-
+if plot=='yes':
+    plt.show()
+plt.close('all')
 
 #######################################################
 # Save functions in binary file
