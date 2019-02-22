@@ -872,6 +872,7 @@ if arguments["--vector"] != None:
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
+indexvect = indexvect.astype(int)
 
 Mbasis=len(basis)
 print 'Number of basis functions:', Mbasis
