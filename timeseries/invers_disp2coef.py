@@ -41,7 +41,7 @@ Options:
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None
---vector PATH           Path to the vector text files containing a value for each dates [default: None]
+--vector PATH           Path to the vector text files containing a value for each dates
 --seasonal YES/NO       If yes, add seasonal terms in the inversion
 --semianual YES/NO      If yes, add semianual terms in the inversion
 --dem Yes/No            If yes, add term proportional to the perpendicular baseline in the inversion
@@ -69,7 +69,7 @@ Options:
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
 --fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
---plot YES/NO           Display plots [default: no]
+--plot YES/NO           Display plots [default: yes]
 --ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
 --iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
 --jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
@@ -311,6 +311,7 @@ sse_car = sse[1::2]
 if arguments["--vector"] != None:
     vectf = arguments["--vector"].replace(',',' ').split()
 else:
+    vectf = []
     vect = None
 
 if arguments["--refstart"] == None:
@@ -430,7 +431,7 @@ else:
     fulloutput = arguments["--fulloutput"]
 
 if arguments["--plot"] ==  None:
-    plot = 'no'
+    plot = 'yes'
 else:
     plot = arguments["--plot"]
 
@@ -656,18 +657,6 @@ plt.legend(loc='best')
 fig.savefig('baseline.eps', format='EPS',dpi=150)
 np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
 
-if vect is not None:
-    v = np.loadtxt(vect, comments='#', unpack = False, dtype='f')
-    fig = plt.figure(nfigure,figsize=(6,4))
-    nfigure = nfigure + 1
-    ax = fig.add_subplot(1,1,1)
-    ax.plot(v,label='Vector')
-    plt.legend(loc='best')
-    if plot=='yes':
-        plt.show()
-    # sys.exit()
-
-
 if maskfile is not None:
     print
     print 'Flatten mask...'
@@ -763,7 +752,6 @@ if maskfile is not None:
     if plot=='yes':
         plt.show()
     # sys.exit()
-
 
 # plot diplacements maps
 nfigure+=1
@@ -865,12 +853,21 @@ if dem=='yes':
    indexdem = index
    index = index + 1
 
-if vect != None:
-   indexvect = np.zeros(len(vectf))
-   for i in xrange(len(vectf)):
-     kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v[i]))
-     indexvect[i] = index
-     index = index + 1
+if arguments["--vector"] != None:
+    fig = plt.figure(nfigure,figsize=(6,4))
+    nfigure = nfigure + 1
+    indexvect = np.zeros(len(vectf))
+    for i in xrange(len(vectf)):
+      ax = fig.add_subplot(i+1,1,len(vectf))
+      v = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
+      kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v))
+      ax.plot(v,label='Vector')
+      plt.legend(loc='best')
+      indexvect[i] = index
+      index = index + 1    
+    if plot=='yes':
+      plt.show()
+    # sys.exit()
 
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
@@ -3363,7 +3360,7 @@ for ii in xrange(niter):
 
                 if inter=='yes':
                     models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
-                if vect != None:
+                if arguments["--vector"] != None:
                     models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexvect],m[indexvect])
 
     # convert aps in rad
