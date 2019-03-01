@@ -85,29 +85,24 @@ print '#'                                                                 '#'
 print '# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #'
 print
 
-# numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-# import numpy.linalg as lst
-# scipy
 import scipy as sp
 import scipy.optimize as opt
 import scipy.linalg as lst
-# from nsbas import gdal, osr
 import gdal, osr
-# basic
 import math,sys,getopt
 from os import path, environ
 import os
-# plot
 import matplotlib
+if environ["TERM"].startswith("screen"):
+    matplotlib.use('Agg')
 #matplotlib.use('TkAgg') # Must be before importing matplotlib.pyplot or pylab!
 from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
 from datetime import datetime
-import datetime
 
 # docopt (command line parser)
 import docopt
@@ -638,7 +633,7 @@ fig = plt.figure(nfigure,figsize=(10,4))
 nfigure = nfigure + 1
 ax = fig.add_subplot(1,2,1)
 # convert idates to num
-x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
+x = [date2num(datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
 # format the ticks
 ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
 ax.plot(x,base,"ro",label='Baseline history of the {} images'.format(N))
@@ -658,12 +653,10 @@ fig.savefig('baseline.eps', format='EPS',dpi=150)
 np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
 
 if maskfile is not None:
-    print
-    print 'Flatten mask...'
-    print
     los_temp = as_strided(mask[ibegref:iendref,jbegref:jendref]).flatten()
 
     if rampmask=='yes':
+        print 'Flatten mask...'
         temp = [(i,j) for i in xrange(iendref-ibegref) for j in xrange(jendref-jbegref) \
         if np.logical_and((math.isnan(los_temp[i*(jendref-jbegref)+j]) is False), \
             (los_temp[i*(jendref-jbegref)+j]>seuil))]
@@ -865,6 +858,7 @@ if arguments["--vector"] != None:
       plt.legend(loc='best')
       indexvect[i] = index
       index = index + 1    
+    indexvect = indexvect.astype(int)
     if plot=='yes':
       plt.show()
     # sys.exit()
@@ -872,7 +866,6 @@ if arguments["--vector"] != None:
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
-indexvect = indexvect.astype(int)
 
 Mbasis=len(basis)
 print 'Number of basis functions:', Mbasis

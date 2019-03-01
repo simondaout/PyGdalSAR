@@ -1,12 +1,17 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
+
+############################################
+# Author        : Simon DAOUT (Oxford)
+############################################
+
 """
 preview_unw.py
 ========================
 This script plot jpeg file for a list of interferograms
 
 Usage:
-  preview_unw.py  --outputdir=<path>  --radar=<path> [--homedir=<path>] [--int_list=<path>] [--int_path=<path>] [--prefix=<value>] [--suffix=<value>] [--rlook=<value>] [--wrap=<path>]
+  preview_unw.py  --outputdir=<path>  --radar=<path> [--homedir=<path>] [--int_list=<path>] [--int_path=<path>] [--prefix=<value>] [--suffix=<value>] [--rlook=<value>] [--wrap=<path>] [--nproc=<value>]
 
 Options:
   --outputdir PATH    Output directory where .jpeg are saved
@@ -18,12 +23,14 @@ Options:
   --suffix=<vaue>     Suffix name ${prefix}$date1-$date2${suffix}_${rlook}.unw  [default: '']
   --rlook VALUE       Multilook number ${prefix}$date1-$date2${suffix}_${rlook}.unw [default: 2]
   --wrap VALUE        Wrapped cycle of the phase [default: 8]
+  --nproc Value       Number of processor [default: 4]
   -h --help           Show this screen
 """
 
 import docopt
 import numpy as np
 import os, subprocess, glob, sys, shutil
+import multiprocessing
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -61,6 +68,11 @@ if arguments["--wrap"] == None:
     wrap = 8
 else:
     wrap = int(arguments["--wrap"])
+if arguments["--nproc"] == None:
+  nproc = 4
+else:
+  nproc = int(arguments["--nproc"])
+
 
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
 kmax=len(date_1)
@@ -73,7 +85,7 @@ if os.path.exists(outputdir):
 else:
   os.makedirs(outputdir)
 
-for kk in xrange((kmax)):
+def preview(kk):
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
     folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
@@ -90,6 +102,10 @@ for kk in xrange((kmax)):
             print 'Create: ', jpeg
     except:
       pass
+
+pool = multiprocessing.Pool(nproc)
+work = [(kk) for kk in xrange(kmax)]
+pool.map(preview, work)
 
 # print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
 jpeg_files = glob.glob('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))

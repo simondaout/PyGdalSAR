@@ -1,10 +1,8 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 ############################################
-#
-# PyGdalSAR: An InSAR post-processing package 
-# written in Python-Gdal
-#
+
+
 ############################################
 # Author        : Simon DAOUT (Oxford)
 ############################################

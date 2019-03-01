@@ -1,5 +1,10 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
+
+############################################
+# Author        : Simon DAOUT (Oxford)
+############################################
+
 """
 preview_int.py
 ========================
@@ -7,7 +12,7 @@ This script plot jpeg file for a list of interferograms
 
 Usage:
   preview_int.py  --outputdir=<path>  --radar=<path> [--homedir=<path>] [--int_list=<path>] [--int_path=<path>] \
-  [--prefix=<value>] [--suffix=<value>] [--rlook=<value>] [--dlook=<value>] 
+  [--prefix=<value>] [--suffix=<value>] [--rlook=<value>] [--dlook=<value>] [--nproc=<value>]
 
 Options:
   --outputdir PATH    Output directory where .jpeg are saved
@@ -19,12 +24,14 @@ Options:
   --suffix=<vaue>     Suffix name ${prefix}$date1-$date2${suffix}_${rlook}.int  [default: '']
   --rlook VALUE       Multilook number ${prefix}$date1-$date2${suffix}_${rlook}.int [default: 2]
   --dlook VALUE       downsample look of the output jpeg [default: 1]
+  --nproc Value       Number of processor [default: 4]
   -h --help           Show this screen
 """
 
 import docopt
 import numpy as np
 import os, subprocess, glob, sys, shutil
+import multiprocessing
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -62,6 +69,13 @@ if arguments["--dlook"] == None:
     dlook = 1
 else:
     dlook = int(arguments["--dlook"])
+
+if arguments["--nproc"] == None:
+  nproc = 4
+else:
+  nproc = int(arguments["--nproc"])
+
+    
 outlook = str(int(rlook)+int(dlook))
 rlook = str('_' + str(rlook) + 'rlks')
 
@@ -76,7 +90,7 @@ if os.path.exists(outputdir):
 else:
   os.makedirs(outputdir)
 
-for kk in xrange((kmax)):
+def preview(kk):
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
     folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
@@ -93,6 +107,10 @@ for kk in xrange((kmax)):
             print 'Create: ', jpeg
     except:
       pass
+
+pool = multiprocessing.Pool(nproc)
+work = [(kk) for kk in xrange(kmax)]
+pool.map(preview, work)
 
 # print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
 jpeg_files = glob.glob('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))
