@@ -47,7 +47,6 @@ if arguments["--int_path"] == None:
 else:
     int_path=os.path.join(homedir, arguments["--int_path"]) + '/'
 
-
 if arguments["--int_list"] == None:
   int_list = os.path.join(homedir,'interf_pair.rsc')
 else:
