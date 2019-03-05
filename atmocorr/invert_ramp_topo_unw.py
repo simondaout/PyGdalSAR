@@ -103,10 +103,7 @@ import scipy.optimize as opt
 import scipy.linalg as lst
 
 import docopt
-import gamma as gm
 import shutil
-
-# import shutil
 
 # A more predictable makedirs
 def makedirs(name):
@@ -125,7 +122,6 @@ def date2dec(dates):
         # print date,dec,year
         times.append(year + dec)
     return times
-
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -313,6 +309,7 @@ if ref is not None:
         ds = gdal.Open(ref, gdal.GA_ReadOnly)
         mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'GAMMA':
+        import gamma as gm
         # par_file = ref 
         mlines,mcols = gm.readpar(int_path)
 
@@ -348,6 +345,7 @@ if radar is not None:
             del ds
         
         elif sformat == 'GAMMA':
+            import gamma as gm
             # par_file = ref 
             mlines,mcols = gm.readpar()
             elev_map = gm.readgamma(radar)
