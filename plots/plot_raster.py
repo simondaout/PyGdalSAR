@@ -51,7 +51,6 @@ import matplotlib.cm as cm
 from pylab import setp
 from osgeo import gdal
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import gamma as gm
 
 # Initialize a matplotlib figure
 fig, ax = plt.subplots(1,figsize=(8,10))
@@ -119,6 +118,7 @@ elif sformat == "GTIFF":
     nlines, ncols = ds.RasterYSize, ds.RasterXSize
 
 elif sformat == 'GAMMA':
+    import gamma as gm
     par_file =  '.par'
     nlines,ncols = gm.readpar()
     phi = gm.readgamma(infile)
