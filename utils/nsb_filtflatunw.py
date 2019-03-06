@@ -418,8 +418,8 @@ class FiltFlatUnw:
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flatz'
         self.stack.updatefix(kk,prefix,newsuffix)
-        outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
-        filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+        outfile = self.stack.getname(kk)
+        filtout = self.stack.getfilt(kk)
 
         # look dem
         rscin = self.dem + '.rsc'
