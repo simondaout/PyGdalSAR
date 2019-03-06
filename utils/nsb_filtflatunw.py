@@ -349,6 +349,7 @@ class FiltFlatUnw:
         outfile = self.stack.getname(kk)
         outrsc = outfile + '.rsc'
         filtout = self.stack.getfilt(kk)
+        print(inrsc,outrsc)
         shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
