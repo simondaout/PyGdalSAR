@@ -12,7 +12,7 @@ from __future__ import print_function
 import gdal, shutil
 gdal.UseExceptions()
 # system
-from os import path, environ, system, chdir, remove
+from os import path, environ, system, chdir, remove, getcwd
 # plot
 import subprocess
 import matplotlib
@@ -402,6 +402,7 @@ class FiltFlatUnw:
     def flat_topo(self, kk):
         ''' Faltten topo function '''
         chdir(self.stack.getpath(kk))
+        getcwd()
 
         infile = self.stack.getname(kk)
         corfile = self.stack.getcor(kk)
