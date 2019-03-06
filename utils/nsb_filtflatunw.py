@@ -370,6 +370,7 @@ class FiltFlatUnw:
     def flat_az(self,kk):
         ''' Faltten Azimuth function '''
         infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        inrsc = infile + '.rsc'
         corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
         filtfile = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
 
@@ -379,6 +380,7 @@ class FiltFlatUnw:
         self.stack.updatefix(kk,prefix,newsuffix)
         outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+        outrsc = outfile + '.rsc'
 
         if path.exists(filtfile) == False:
             logger.debug('{0} does not exist'.format(filtfile))
@@ -392,7 +394,7 @@ class FiltFlatUnw:
             if r != 0:
                 logger.warning("Flatten azimuth failed for int. {0}-{1}".format(date1,date2))
             else:
-                shutil.copy(rscfile,outrsc)
+                shutil.copy(inrsc,outrsc)
         else:
             logger.debug('Flatten azimuth on IFG: {0} already done'.format(infile))
 
@@ -428,8 +430,7 @@ class FiltFlatUnw:
         if path.exists(outfile) == False:
             logger.debug('Flatten topo on IFG: {0}'.format(infile))
             r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
-                +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile), shell=True)
-
+                +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile)+" >> log_flattopo.txt", shell=True)
             if r != 0:
                 logger.warning("Flatten topo failed for int. {0}".format(infile))
             else:
@@ -502,7 +503,7 @@ class FiltFlatUnw:
                 remove(stratfile)
                 logger.debub("Create stratified file {0}: ".format(strat))
                 r = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(self.dem)+" "+str(stratfile)\
-                        +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(8000), shell=True)
+                        +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(self.z_ref)+" >> log_flattopo.txt", shell=True)
                 if r != 0:
                     logger.warning("Failed creating stratified file: {0}".format(stratfile))
                 outrsc = stratfile + '.rsc'
