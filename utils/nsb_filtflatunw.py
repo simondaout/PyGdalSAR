@@ -402,7 +402,7 @@ class FiltFlatUnw:
     def flat_topo(self, kk):
         ''' Faltten topo function '''
         chdir(self.stack.getpath(kk))
-        getcwd()
+        print(getcwd())
 
         infile = self.stack.getname(kk)
         corfile = self.stack.getcor(kk)
