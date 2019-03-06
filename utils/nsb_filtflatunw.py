@@ -28,8 +28,6 @@ from datetime import datetime
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 # scipy
-import scipy.optimize as opt
-import scipy.linalg as lst
 import logging
 
 
@@ -47,7 +45,6 @@ nfigure = 0
 # init collections 
 import collections
 Process = collections.namedtuple('Process', 'name  do', rename=True)
-Param = collections.namedtuple('Param', 'name', rename=True)
 IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix', rename=True)
 Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline', rename=True)
 
@@ -89,11 +86,10 @@ class Job:
         return self._processes[post].name()
 
     def add_job(self,job):
-        self._processes._make(job)
+        self._processes = self._processes._make(job)
 
     def replace_job(self,pos,value):
-        self._processes[pos]._replace(value)
-
+        self._processes = self._processes[pos]._replace(value)
 
 class PileInt:
     def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
@@ -137,6 +133,10 @@ class PileInt:
     def getpath(self,kk):
         ''' Return path ifg dir '''
         return  self.dir + 'int_' + str(self.dates1[kk]) + '_' + str(self.dates2[kk]) 
+
+    def getstratfile(self,kk):
+        ''' Return stratified file name '''
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks.unw'
 
     def updatelook(self,kk,newlook):
         self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
@@ -190,13 +190,13 @@ class FiltFlatUnw:
     nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim,
     seedx, seedy """
 
-    def __init__(self, params):
+    def __init__(self, params, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, self.prefix, self.suffix, 
         self.nfit_range, self.thresh_amp_range,
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
-        self.nfit_topo,self.thresh_amp_topo, self.ivar,
+        self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref,
         self.seedx, self.seedy,
         ) = map(str, params)
 
@@ -206,6 +206,9 @@ class FiltFlatUnw:
 
         # initilise radar file
         self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_int + 'rlks.hgt'
+
+        # mask empirical estimations
+        self.ibeg_mask, self.iend_mask, self.jbeg_mask, self.jend_mask = ibeg_mask, iend_mask, jbeg_mask, jend_mask
 
         # define list of interferograms
         dates1,dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
@@ -319,11 +322,11 @@ class FiltFlatUnw:
         filtrsc = filtfile + '.rsc'
         filtbase = path.splitext(filtfile)[0]
 
-        logger.debug('Filter filter {0} with {1} filter type'.format(infile,self.filterstyle))
-        try:
-            system("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)+" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle))
-        except:
-            logger.warning('Cant filter {0} with {1} filter type'.format(infile,self.filterstyle))
+        logger.debug('Filter {0} with {1} filter type'.format(infile,self.filterstyle))
+        r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
+                +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle), shell=True)
+        if r != 0:
+            logger.warning('Failed filtering {0} with {1} filter type'.format(infile,self.filterstyle))
 
         if path.exists(filtrsc) == False:
             shutil.copy(inrsc,filtrsc)
@@ -395,9 +398,12 @@ class FiltFlatUnw:
 
     def flat_topo(self, kk):
         ''' Faltten topo function '''
-        infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
-        corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
-        filtfile = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+        chdir(self.stack.getpath(kk))
+
+        infile = self.stack.getname(kk)
+        corfile = self.stack.getcor(kk)
+        filtfile = self.stack.getfilt(kk)
+        stratfile = self.stack.getstratfile(kk)
 
         # update names
         prefix, suffix = self.stack.getfix(kk)
@@ -408,11 +414,9 @@ class FiltFlatUnw:
 
         # look dem
         rscin = self.dem + '.rsc'
-        print(rscin)
-        self.look_file(self.dem)
+        eval(self.look_file(self.dem))
         self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
         rscout = self.dem + '.rsc'
-        print(rscout)
         shutil.copy(rscin,rscout)
         del rscin,rscout
 
@@ -424,24 +428,134 @@ class FiltFlatUnw:
         if path.exists(outfile) == False:
             logger.debug('Flatten topo on IFG: {0}'.format(infile))
             r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
-                +" "+str(nfit_topo)+" "+str(ivar)+" "+str(8000)+" "+str(thresh_amp_topo), shell=True)
+                +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile), shell=True)
 
             if r != 0:
                 logger.warning("Flatten topo failed for int. {0}".format(infile))
             else:
-                shutil.copy(rscfile,outrsc)
+                inrsc = infile + '.rsc'
+                outrsc = outfile + '.rsc'
+                filtrsc = filtout + '.rsc'
+                shutil.copy(inrsc,outrsc)
+                shutil.copy(inrsc,filtrsc)
+
+            # select points
+            i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
+            z = z - self.z_ref
+            phi = phi*0.00020944
+
+            topfile = path.splitext(infile)[0] + '.top'
+            b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
+
+            if ((self.jend_mask > self.jbeg_mask) or (self.iend_mask > self.ibeg_mask)) and self.ivar<2 :
+                b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
+
+                index = np.nonzero(
+                np.logical_and(coh>self.thresh_amp_atmo,
+                np.logical_and(deltaz>75.,
+                np.logical_and(np.logical_or(i<self.ibeg_mask,pix_az>self.iend_mask),
+                np.logical_or(j<self.jbeg_mask,j>self.jend_mask),
+                ))))
+
+                phi_select = phi[index]
+                z_select = z[index]
+
+                if self.nfit_atmo == -1:
+                    b1 = np.nanmedian(phi_select)
+                    fit = z_select*b1
+                elif self.nfit_atmo == 0:
+                    b1 = np.nanmean(phi_select)
+                    fit = z_select*b1
+                elif self.nfit_atmo == 1:
+                    from sklearn.linear_model import LinearRegression
+                    model = LinearRegression()
+                    model.fit(z_select, phi_select)
+                    fit = model.predict(z_select)
+                else:
+                    from sklearn.preprocessing import PolynomialFeatures
+                    polynomial_features= PolynomialFeatures(degree=self.nfit_atmo)
+                    x_poly = polynomial_features.fit_transform(z_select)
+                    model = LinearRegression()
+                    model.fit(x_poly, phi_select)
+                    fit = model.predict(x_poly)
+                
+                # save median phase/topo
+                strattxt = path.splitext(infile)[0] + '_strat.top'
+                np.savetxt(strattxt, median, fmt=('%.8f'))
+
+                ax.plot(z_select,phi_selct*z_select,'.r',label='selected points')
+                av = np.median(phi_select*z_select)
+                
+                # clean and prepare for write strat
+                infileunw = path.splitext(infile)[0] + '.unw'
+                remove(infileunw)
+
+                logger.debub("Convert {0} to .unw".format(infile))
+                r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
+                if r != 0:
+                    logger.warning("Failed to convert {0} to .unw".format(infile))
+                inrsc = infile + '.rsc'
+                outrsc = infileunw + '.rsc'
+                shutil.copy(inrsc,outrsc)
+
+                # remove strat file created by flatten_topo and write
+                remove(stratfile)
+                logger.debub("Create stratified file {0}: ".format(strat))
+                r = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(self.dem)+" "+str(stratfile)\
+                        +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(8000), shell=True)
+                if r != 0:
+                    logger.warning("Failed creating stratified file: {0}".format(stratfile))
+                outrsc = stratfile + '.rsc'
+                shutil.copy(inrsc,outrsc)
+
+                # remove model created by flatten_topo and run
+                remove(outfile)
+                remove(filtout)
+                logger.debub("Remove stratified file {0} from IFG {1}: ".format(stratfile,infile))
+                r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
+                if r != 0:
+                    logger.warning("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
+
+                corfile = self.stack.getcor(kk)
+                corbase = path.splitext(corfile)[0]
+                logger.debub("Filter IFG {0}: ".format(outfile))
+                r = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
+                    +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle))
+                if r != 0:
+                    logger.warning("Failed filtering IFG {0}: ".format(outfile))
+            else:
+                z_select = z; phi_select = phi
+                # I dont understand ivar=0
+                if self.ivar == 1:
+                    fit = b1*z_select + (b2/2.)*z_select**2 + (b3/3.)*z_select**2 + (b4/4.)*z_select**2
+
+            # plot phase/topo
+            fig = plt.figure(nfigure)
+            nfigure =+ 1
+            ax = fig.add_subplot(1,1,1)
+            # lets not plot dphi but phi
+            ax.plot(z,phi*z,'.',alpha=.6)
+            ax.plot(z_select,fit,'-r',lw=4,label='Fit: {0:.3f}z + {1:.3f}z2 + {2:.3f}z3 + {3:.3f}z4'.format(b1,b2,b3,b4))
+            ax.set_xlabel('Elevation (m)')
+            ax.set_ylabel('Phase (rad)')
+            plt.legend(loc='best')
+            plotfile = path.splitext(infile)[0] + '_phase-topo.png'
+            fig.savefig(plotfile, format='PNG')
+            plt.show()
+
         else:
             logger.debug('Flatten topo on IFG: {0} already done'.format(infile))
 
-    def flat_model(kk, prefix, suffix):
+    def flat_model(kk):
         return
 
+    def colin(kk):
+        return 
+
     def unwrapping(kk):
-        date1, date2 = self.date_1[kk], self.date_2[kk]
         return 
 
     def addback(kk):
-        date1, date2 = self.date_1[kk], self.date_2[kk]
         return 
 
 
@@ -472,6 +586,7 @@ nproc=1
 nfit_topo=-1
 thresh_amp_topo=0.2
 ivar=1
+z_ref=8000.
 
 ####################
 # Test Process List
@@ -496,7 +611,7 @@ postprocess = FiltFlatUnw(
         nfit_range, thresh_amp_range,
         nfit_az, thresh_amp_az,
         filterstyle,SWwindowsize, SWamplim,
-        nfit_topo,thresh_amp_topo,ivar,
+        nfit_topo,thresh_amp_topo,ivar,z_ref,
         seedx,seedy]
         ) 
 
