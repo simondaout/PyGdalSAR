@@ -349,7 +349,6 @@ class FiltFlatUnw:
         outfile = self.stack.getname(kk)
         outrsc = outfile + '.rsc'
         filtout = self.stack.getfilt(kk)
-        print(inrsc,outrsc)
         shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
@@ -368,18 +367,21 @@ class FiltFlatUnw:
             logger.debug('Flatten range on IFG: {0} already done'.format(infile))
 
     def flat_az(self,kk):
+        # need to be in the corect dir for stupid perl scripts
+        chdir(self.stack.getpath(kk))
+
         ''' Faltten Azimuth function '''
-        infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        infile = self.stack.getname(kk)
         inrsc = infile + '.rsc'
-        corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
-        filtfile = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+        corfile = self.stack.getcor(kk)
+        filtfile = self.stack.getfilt(kk)
 
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flataz'
         self.stack.updatefix(kk,prefix,newsuffix)
-        outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
-        filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+        outfile = self.stack.getname(kk)
+        filtout = self.stack.getfilt(kk)
         outrsc = outfile + '.rsc'
         shutil.copy(inrsc,outrsc)
 
@@ -406,18 +408,18 @@ class FiltFlatUnw:
         filtfile = self.stack.getfilt(kk)
         stratfile = self.stack.getstratfile(kk)
 
+        # filt must be done before changing name
+        if path.exists(filtfile) == False:
+            logger.debug('{0} does not exist'.format(filtfile))
+            # call filter function
+            self.filter(kk)
+
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flatz'
         self.stack.updatefix(kk,prefix,newsuffix)
         outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
-
-        # filt must be done before changing name
-        if path.exists(filtfile) == False:
-            logger.debug('{0} does not exist'.format(filtfile))
-            # call filter function
-            eval(self.filter(kk))
 
         # look dem
         rscin = self.dem + '.rsc'
@@ -435,6 +437,7 @@ class FiltFlatUnw:
         
         inrsc = infile + '.rsc'
         outrsc = outfile + '.rsc'
+        print(inrsc,outrsc)
         filtrsc = filtout + '.rsc'
         shutil.copy(inrsc,outrsc)
         shutil.copy(inrsc,filtrsc)
