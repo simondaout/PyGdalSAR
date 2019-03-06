@@ -416,7 +416,7 @@ class FiltFlatUnw:
 
         # look dem
         rscin = self.dem + '.rsc'
-        eval(self.look_file(self.dem))
+        self.look_file(self.dem)
         self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
         rscout = self.dem + '.rsc'
         shutil.copy(rscin,rscout)
