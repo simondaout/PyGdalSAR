@@ -349,6 +349,7 @@ class FiltFlatUnw:
         outfile = self.stack.getname(kk)
         outrsc = outfile + '.rsc'
         filtout = self.stack.getfilt(kk)
+        shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
             logger.debug('{0} does not exist'.format(filtfile))
@@ -361,9 +362,7 @@ class FiltFlatUnw:
                 " "+str(self.nfit_range)+" "+str(self.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.warning("Flatten range failed for IFG: {0}".format(infile))
-                logger.warning(r)
-            else:
-                shutil.copy(inrsc,outrsc) 
+                logger.warning(r) 
         else:
             logger.debug('Flatten range on IFG: {0} already done'.format(infile))
 
@@ -381,6 +380,7 @@ class FiltFlatUnw:
         outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
         outrsc = outfile + '.rsc'
+        shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
             logger.debug('{0} does not exist'.format(filtfile))
@@ -393,8 +393,6 @@ class FiltFlatUnw:
                 " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
             if r != 0:
                 logger.warning("Flatten azimuth failed for int. {0}-{1}".format(date1,date2))
-            else:
-                shutil.copy(inrsc,outrsc)
         else:
             logger.debug('Flatten azimuth on IFG: {0} already done'.format(infile))
 
@@ -433,12 +431,12 @@ class FiltFlatUnw:
             +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile)+" >> log_flattopo.txt", shell=True)
         if r != 0:
             logger.warning("Flatten topo failed for int. {0}".format(infile))
-        else:
-            inrsc = infile + '.rsc'
-            outrsc = outfile + '.rsc'
-            filtrsc = filtout + '.rsc'
-            shutil.copy(inrsc,outrsc)
-            shutil.copy(inrsc,filtrsc)
+        
+        inrsc = infile + '.rsc'
+        outrsc = outfile + '.rsc'
+        filtrsc = filtout + '.rsc'
+        shutil.copy(inrsc,outrsc)
+        shutil.copy(inrsc,filtrsc)
 
         # select points
         i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
