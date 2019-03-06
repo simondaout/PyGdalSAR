@@ -196,6 +196,7 @@ class FiltFlatUnw:
         self.nfit_range, self.thresh_amp_range,
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
+        self.nfit_topo,self.thresh_amp_topo, self.ivar,
         self.seedx, self.seedy,
         ) = map(str, params)
 
@@ -204,7 +205,7 @@ class FiltFlatUnw:
         self.rlook = int(int(self.Rlooks_unw) - int(self.Rlooks_int))
 
         # initilise radar file
-        self.dem = self.SARMasterDir + '_' + self.Rlooks_int + '.hgt'
+        self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_int + 'rlks.hgt'
 
         # define list of interferograms
         dates1,dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
@@ -217,16 +218,16 @@ class FiltFlatUnw:
         self.images.info()
         self.Nimages = len(self.images)
 
-    def look(self):
+    def look_file(self,file):
         ''' Look Radar function '''
-        chdir(self.SARMasterDir) 
+        
+        dirname, filename = path.split(path.abspath(file))
+        chdir(dirname) 
 
-        r= subprocess.call("look.pl "+str(self.dem)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
+        r= subprocess.call("look.pl "+str(filename)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
         if r != 0:
             logger.warning(r)
-            logger.warning(' Can''t look file {0} in {1} look'.format(self.dem,self.rlook))
-
-        self.dem = self.SARMasterDir + '_' + self.Rlooks_unw + '.hgt'
+            logger.warning(' Can''t look file {0} in {1} look'.format(filename,self.rlook))
 
     def look_int(self,kk):
         ''' Look function '''
@@ -353,7 +354,8 @@ class FiltFlatUnw:
 
         if path.exists(outfile) == False:
             logger.debug('Flatten range on IFG: {0}'.format(infile))
-            r = subprocess.call("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+" "+str(self.nfit_range)+" "+str(self.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
+            r = subprocess.call("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
+                " "+str(self.nfit_range)+" "+str(self.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.warning("Flatten range failed for IFG: {0}".format(infile))
                 logger.warning(r)
@@ -371,7 +373,7 @@ class FiltFlatUnw:
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flataz'
-        self.stack.updatefix(kk,newprefix,suffix)
+        self.stack.updatefix(kk,prefix,newsuffix)
         outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
 
@@ -382,7 +384,8 @@ class FiltFlatUnw:
 
         if path.exists(outfile) == False:
             logger.debug('Flatten azimuth on IFG: {0}'.format(infile))
-            r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+" "+str(fit)+" "+str(threshold), shell=True)
+            r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
+                " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
             if r != 0:
                 logger.warning("Flatten azimuth failed for int. {0}-{1}".format(date1,date2))
             else:
@@ -390,8 +393,7 @@ class FiltFlatUnw:
         else:
             logger.debug('Flatten azimuth on IFG: {0} already done'.format(infile))
 
-
-    def flat_topo(kk, prefix, suffix):
+    def flat_topo(self, kk):
         ''' Faltten topo function '''
         infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
@@ -400,13 +402,19 @@ class FiltFlatUnw:
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flatz'
-        self.stack.updatefix(kk,newprefix,suffix)
+        self.stack.updatefix(kk,prefix,newsuffix)
         outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
 
-        dem = 
-
-        if path.exists(filtfile) == False:
+        # look dem
+        rscin = self.dem + '.rsc'
+        print(rscin)
+        self.look_file(self.dem)
+        self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
+        rscout = self.dem + '.rsc'
+        print(rscout)
+        shutil.copy(rscin,rscout)
+        del rscin,rscout
 
         if path.exists(filtfile) == False:
             logger.debug('{0} does not exist'.format(filtfile))
@@ -415,9 +423,11 @@ class FiltFlatUnw:
 
         if path.exists(outfile) == False:
             logger.debug('Flatten topo on IFG: {0}'.format(infile))
-            r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+" "+str(fit)+" "+str(threshold), shell=True)
+            r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
+                +" "+str(nfit_topo)+" "+str(ivar)+" "+str(8000)+" "+str(thresh_amp_topo), shell=True)
+
             if r != 0:
-                logger.warning("Flatten topo failed for int. {0}-{1}".format(date1,date2))
+                logger.warning("Flatten topo failed for int. {0}".format(infile))
             else:
                 shutil.copy(rscfile,outrsc)
         else:
@@ -459,13 +469,16 @@ seedy=1766
 prefix = '' 
 suffix = '_sd'
 nproc=1
+nfit_topo=-1
+thresh_amp_topo=0.2
+ivar=1
 
 ####################
 # Test Process List
 ####################
 
 # Job list: look_int replace_amp   filter     flat_range    flat_az    flat_topo  flat_model      unw         add_back
-do_list =   [True,     True,       True,       True,       False,       False,      False,      False,      False] 
+do_list =   [True,     True,       True,       True,       False,       True,      False,      False,      False] 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
@@ -483,6 +496,7 @@ postprocess = FiltFlatUnw(
         nfit_range, thresh_amp_range,
         nfit_az, thresh_amp_az,
         filterstyle,SWwindowsize, SWamplim,
+        nfit_topo,thresh_amp_topo,ivar,
         seedx,seedy]
         ) 
 
