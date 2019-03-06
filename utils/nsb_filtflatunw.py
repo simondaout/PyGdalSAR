@@ -6,13 +6,15 @@
 # Author        : Simon DAOUT (Oxford)
 ############################################
 
+from __future__ import print_function
 
 # gdal
 import gdal, shutil
 gdal.UseExceptions()
 # system
-from os import path, environ, system
+from os import path, environ, system, chdir, remove
 # plot
+import subprocess
 import matplotlib
 if environ["TERM"].startswith("screen"):
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
@@ -28,7 +30,6 @@ from numpy.lib.stride_tricks import as_strided
 # scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
-from __future__ import print_function
 import logging
 
 
@@ -36,134 +37,402 @@ import logging
 ###  INITIALISE
 ##################################################################################
 
+# init logger 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('filtcorunw')
 
-# figures
-nfigure=0
+# init figures
+nfigure = 0
 
-# int and dates
-date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
-kmax=len(date_1)
-print("number of interferogram: ",kmax)
-im = []; bt = []
-for date1,date2 in zip(date_1,date_2):
-    if date1 not in im: im.append(date1)
-    if date2 not in im: im.append(date2)
-nmax=len(im)
-print("number of image: ",nmax)
-imd = date2dec(im)
-cst = np.copy(imd[0])
-for i in xrange((nmax)):
-    bt.append(imd[i]-cst)
-
+# init collections 
+import collections
+Process = collections.namedtuple('Process', 'name  do', rename=True)
+Param = collections.namedtuple('Param', 'name', rename=True)
+IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix', rename=True)
+Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline', rename=True)
 
 ##################################################################################
-###  DEF FUNCTIONS
+###  Class and Functions
 ##################################################################################
 
-def look(kk, look, prefix, suffix):
-	date1, date2 = date_1[kk], date_2[kk]
-	corfile = str(date1) + '-' + str(date2) + '_' + rlook + 'rlks.cor'
-	intfile = str(prefix) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int'
-	
-	# lets assume that int are always created at 2looks...
-	rlook = int(look - 2)
+def date2dec(dates):
+    ''' Transform dates %Y%m%d to decimal dates'''
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetime.strptime('{}'.format(date),'%Y%m%d')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        times.append(year + dec)
+    return times
 
-	logger.debug('Look file {0} in {1} look'.format(intfile,rlook))
-	try:
-		os.system("look.pl "+str(intfile)+" "+str(rlook))
-		os.system("look.pl "+str(corfile)+" "+str(rlook))
-	except:
-		logger.warning('Cant look file {0} in {1} look'.format(intfile,rlook))
+class Job:
+    """ Create a class of Jobs: 
+    Job list is: look_int replace_amp filter flat_range flat_topo flat_model unw add_back"""
+    names = 'look_int replace_amp filter flat_range flat_az flat_topo flat_model unw add_back'.split()
 
-def filter(file, ftype, outfile, corfile, window):
-	logger.debug('Filter filter {0} with {1} filter type'.format(file,ftype))
-	try:
-		os.system("nsb_SWfilter.pl "+str(file)+" "+str(outfile)+" "+str(corfile)+" "+str(window)+" "+str(0.05)+" "+str(ftype))
-	except:
-		logger.warning('Cant filter {0} with {1} filter type'.format(file,ftype))
+    def __init__(self, do_list):
+        self.do_list = do_list
+        try:
+            self._processes = [Process(name,do) for (name,do) in zip(self.names,self.do_list)]
+        except ValueError as error:
+            logger.warning(error)
 
-def replaceAmp(kk, rlook, prefix, suffix):
-	date1, date2 = date_1[kk], date_2[kk]
-	logger.debug('Replace Amplitude by coherence on int. {0}-{1}'.format(date1,date2))
+    # create spetial methods len() and getititem for Job class
+    def __len__(self):
+        return len(self._processes)
+    
+    def __getitem__(self ,pos):
+        return self._processes[pos]
 
-	corfile = str(date1) + '-' + str(date2) + '_' + rlook + 'rlks.cor'
-	ds_cor = gdal.Open(corfile, gdal.GA_ReadOnly)
-	intfile = str(prefix) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int'
-	rscfile = str(prefix) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int.rsc'
-	ds_int = gdal.Open(infile, gdal.GA_ReadOnly)
-	driver = ds.GetDriver()
+    def __call__(self, pos):
+        return self._processes[post].name()
 
-	if os.path.exists(corfile):
-		outfile = 'coh_' + str(prefix) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int'
-		
-		cor_band = ds_cor.GetRasterBand(2)
-		cor = cor_band.ReadAsArray(0, 0,
-                   ds_cor.RasterXSize, ds_cor.RasterYSize,
-                   ds_cor.RasterXSize, ds_cor.RasterYSize)
+    def add_job(self,job):
+        self._processes._make(job)
 
-		phase_band = ds_int.GetRasterBand(1)
-		phi = np.angle(phase_band.ReadAsArray(0, 0,
-               ds.RasterXSize, ds.RasterYSize,
-               ds.RasterXSize, ds.RasterYSize))
-
-		newphi = np.complex(cor,phi)
-		dst_ds = driver.Create(outfile, ds_int.RasterXSize, ds_int.RasterYSize, ds_int.RasterCount, phi_band.DataType)
-		dst_band1 = dst_ds.GetRasterBand(1)
-		dst_band1.WriteArray(newphi)
-		shutil.copy(rscfile,outrsc)
-		
-		dst_band1.FlushCache()
-		phase_band.FlushCache()
-		cor_band.FlushCache()
-		del dst_ds, phi, newphi, cor
-
-	else:
-		logger.warning('Coherence file does not exit...')
-
-	del ds_int, ds_cor 
-
-def flattenrange(kk, rlook, prefix, suffix, ftype, fit, threshold):
-	date1, date2 = date_1[kk], date_2[kk]
-	logger.debug('Flatten range on int. {0}-{1}'.format(date1,date2))
-
-	prefixfilt = 'filt' + str(ftype) + '_' + str(prefix)
-	suffixrange = suffix + '_flatr'
-
-	corfile = str(date1) + '-' + str(date2) + '_' + rlook + 'rlks.cor'
-	intfile = str(prefix) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int'
-	rscfile = str(prefix) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int.rsc'
-	filtint = str(prefixfilt) + str(date1) + '-' + str(date2) + str(suffix) + '_' +  rlook + 'rlks.int'
-
-	if os.path.exists(filtint) == False:
-		logger.debug('{0} doesnot exist'.format(filtint))
-		filter(intfile, ftype, filtint, corfile, window)
-
-	outfile = str(prefix) + str(date1) + '-' + str(date2) + str(suffixrange) + '_' +  rlook + 'rlks.int'
-	outrsc = str(prefix) + str(date1) + '-' + str(date2) + str(suffixrange) + '_' +  rlook + 'rlks.int.rsc'
-	filtout = str(prefixfilt) + str(date1) + '-' + str(date2) + str(suffixrange) + '_' +  rlook + 'rlks.int'
-
-	r = subprocess.call("flatten_range "+str(infile)+" "+str(filtint)+" "+str(outfile)+" "+str(filtout)+" "+str(fit)+" "+str(threshold), shell=True)
-	if r != 0:
-		logger.warning("Flatten range failed for int. {0}-{1}".format(date1,date2))
-	else:
-		shutil.copy(rscfile,outrsc)	
-
-def flattentopo(kk, prefix, suffix):
-	date1, date2 = date_1[kk], date_2[kk]
-	logger.debug('Flatten topo on int. {0}-{1}'.format(date1,date2))
-
-	prefixfilt = 'filt' + str(ftype) + '_' + str(prefix)
+    def replace_job(self,pos,value):
+        self._processes[pos]._replace(value)
 
 
-def unwrapping(kk):
-	date1, date2 = date_1[kk], date_2[kk]
-	return 
+class PileInt:
+    def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
+        self.dates1, self.dates2 = dates1, dates2
+        self.dir = dir
+        self.filterstyle = filterstyle
 
-def addback(kk):
-	date1, date2 = date_1[kk], date_2[kk]
-	return 
+        self.Nifg=len(self.dates1)
+        print("number of interferogram: ",self.Nifg)
+
+        try:
+            self._ifgs = [IFG(date1,date2,look,prefix,suffix) for (date1,date2) in zip(self.dates1,self.dates2)]
+        except ValueError as error:
+            logger.warning(error)
+
+    # create spetial methods len() and getititem for PileInt class
+    def __len__(self):
+        return len(self._ifgs)
+
+    def __getitem__(self,kk):
+        return self._ifgs[kk]
+
+    def getlook(self,kk):
+        return self._ifgs[kk].look
+
+    def getfix(self,kk):
+        return self._ifgs[kk].prefix, self._ifgs[kk].suffix
+
+    def getname(self,kk):
+        ''' Return interfergram file name '''
+        return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks.int'
+
+    def getfilt(self,kk):
+        ''' Return interfergram file name '''
+        return 'filt' + str(self.filterstyle) + '_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks.int'
+
+    def getcor(self,kk):
+        ''' Return cohrence file name '''
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self._ifgs[kk].look + 'rlks.cor'
+
+    def getpath(self,kk):
+        ''' Return path ifg dir '''
+        return  self.dir + 'int_' + str(self.dates1[kk]) + '_' + str(self.dates2[kk]) 
+
+    def updatelook(self,kk,newlook):
+        self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
+
+    def updatefix(self,kk,newprefix, newsuffix):
+        self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix))
+        self._ifgs[kk] = self._ifgs[kk]._replace(suffix=str(newsuffix))
+
+    def info(self):
+        print('List of interferograms:')
+        print ([self.getname(kk) for kk in range(self.Nifg)])
+        print()
+
+class PileImages:
+    def __init__(self,dates1,dates2):
+        self.dates1, self.dates2 = dates1, dates2
+
+        # define list of images 
+        im = []; bt = []
+        for date1,date2 in zip(self.dates1,self.dates2):
+            if date1 not in im: im.append(date1)
+            if date2 not in im: im.append(date2)
+        self.Nimages=len(im)
+        print("number of image: ",self.Nimages)
+        imd = date2dec(im)
+        cst = np.copy(imd[0])
+        for i in xrange((self.Nimages)):
+            bt.append(imd[i]-cst)
+        del cst
+
+        try:
+            self._images = [Image(date,dec,baseline) for (date,dec,baseline) in zip(im,imd,bt)]
+        except ValueError as error:
+            logger.warning(error)
+    
+    # create spetial methods len() and getititem for PileImages class
+    def __len__(self):
+        return len(self._images)
+
+    def __getitem__(self,kk):
+        return self._images[kk]
+
+    def info(self):
+        print('List of Images:')
+        print ([self._images[kk] for kk in xrange(self.Nimages)])
+        print()
+
+class FiltFlatUnw:
+    """ Create a class FiltFlatUnw defining all the post-procesing functions 
+    list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
+    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim,
+    seedx, seedy """
+
+    def __init__(self, params):
+        (self.ListInterfero, self.SARMasterDir, self.IntDir,
+        self.Rlooks_int, self.Rlooks_unw, self.prefix, self.suffix, 
+        self.nfit_range, self.thresh_amp_range,
+        self.nfit_az, self.thresh_amp_az,
+        self.filterstyle,self.SWwindowsize, self.SWamplim,
+        self.seedx, self.seedy,
+        ) = map(str, params)
+
+        # initiliase number of looks
+        self.look = self.Rlooks_int
+        self.rlook = int(int(self.Rlooks_unw) - int(self.Rlooks_int))
+
+        # initilise radar file
+        self.dem = self.SARMasterDir + '_' + self.Rlooks_int + '.hgt'
+
+        # define list of interferograms
+        dates1,dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
+        self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.look,self.filterstyle, self.IntDir)
+        self.stack.info()
+        self.Nifg = len(self.stack)
+
+        # define list images
+        self.images = PileImages(dates1,dates2)
+        self.images.info()
+        self.Nimages = len(self.images)
+
+    def look(self):
+        ''' Look Radar function '''
+        chdir(self.SARMasterDir) 
+
+        r= subprocess.call("look.pl "+str(self.dem)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
+        if r != 0:
+            logger.warning(r)
+            logger.warning(' Can''t look file {0} in {1} look'.format(self.dem,self.rlook))
+
+        self.dem = self.SARMasterDir + '_' + self.Rlooks_unw + '.hgt'
+
+    def look_int(self,kk):
+        ''' Look function '''
+
+        # need to be in the corect dir for stupid perl scripts
+        chdir(self.stack.getpath(kk))
+
+        infile =  self.stack.getname(kk)
+        corfile =  self.stack.getcor(kk)
+        print(corfile) 
+        logger.debug('Look file {0} in {1} look'.format(infile,self.rlook))
+
+        r= subprocess.call("look.pl "+str(infile)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
+        if r != 0:
+            logger.warning(r)
+            logger.warning(' Can''t look file {0} in {1} look'.format(infile,self.rlook))
+        
+        r = subprocess.call("look.pl "+str(corfile)+" "+str(self.rlook)+" >> log_look.txt", shell=True)
+        if r != 0:
+            logger.warning(r)
+            logger.warning(' Can''t look file {0} in {1} look'.format(corfile,self.rlook))
+
+        # update looks
+        self.stack.updatelook(kk,self.Rlooks_unw)
+
+    def replace_amp(self, kk):
+
+        # update looks
+        self.stack.updatelook(kk,self.Rlooks_unw)
+
+        infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        rscfile = infile + '.rsc'
+        corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
+        logger.debug('Replace Amplitude by Coherence on IFG: {0}'.format(infile))
+
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newprefix = 'coh_' + prefix
+        self.stack.updatefix(kk,newprefix,suffix)
+        outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        outrsc = outfile + '.rsc'
+
+        tmp = self.stack.getpath(kk) + '/tmp'
+        phs = self.stack.getpath(kk) + '/phs'
+        cor = self.stack.getpath(kk) + '/cor'
+
+        # Open
+        ds_int = gdal.Open(infile, gdal.GA_ReadOnly)
+        driver = ds_int.GetDriver()
+        width = ds_int.RasterXSize
+        print("> Width:     ", ds_int.RasterXSize)
+
+        # check if nor done
+        if path.exists(outfile) is False:
+            if path.exists(corfile):
+
+                logger.debug('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
+                r1 = subprocess.call("rmg2mag_phs "+str(corfile)+" "+str(tmp)+" "+str(cor)+" "+str(width), shell=True)
+                r2 = subprocess.call("cpx2mag_phs "+str(infile)+" "+str(tmp)+" "+str(phs)+" "+str(width), shell=True)
+                r3 = subprocess.call("mag_phs2cpx cor phs "+str(outfile)+" "+str(width), shell=True)
+                if (r1 or r2 or r3) != 0:
+                    logger.warning(r1, r2, r3)
+                    logger.warning('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
+                
+                remove(tmp); remove(phs); remove(cor)
+                del tmp, phs, cor
+                shutil.copy(rscfile,outrsc)
+
+            else:
+                logger.warning('Coherence file does not exit...')
+
+        else:
+            logger.debug('Replace Amplitude by Cohrence for IFG: {} already done'.format(infile))
+        
+        del ds_int 
+
+    def filter(self, kk):
+        ''' Filter function '''
+
+        # need to be in the corect dir for stupid perl scripts
+        chdir(self.stack.getpath(kk))
+
+        infile = self.stack.getname(kk)
+        inrsc = infile + '.rsc'
+        inbase = path.splitext(infile)[0]
+        corfile = self.stack.getcor(kk)
+        corbase = path.splitext(corfile)[0]
+        filtfile = self.stack.getfilt(kk)
+        filtrsc = filtfile + '.rsc'
+        filtbase = path.splitext(filtfile)[0]
+
+        logger.debug('Filter filter {0} with {1} filter type'.format(infile,self.filterstyle))
+        try:
+            system("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)+" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle))
+        except:
+            logger.warning('Cant filter {0} with {1} filter type'.format(infile,self.filterstyle))
+
+        if path.exists(filtrsc) == False:
+            shutil.copy(inrsc,filtrsc)
+
+    def flat_range(self,kk):
+        ''' Faltten Range function '''
+
+        # need to be in the corect dir for stupid perl scripts
+        chdir(self.stack.getpath(kk))
+
+        infile = self.stack.getname(kk)
+        inrsc = infile + '.rsc'
+        corfile = self.stack.getcor(kk)
+        filtfile = self.stack.getfilt(kk)
+
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newsuffix = suffix + '_flatr'
+        self.stack.updatefix(kk,prefix,newsuffix)
+        outfile = self.stack.getname(kk)
+        outrsc = outfile + '.rsc'
+        filtout = self.stack.getfilt(kk)
+
+        if path.exists(filtfile) == False:
+            logger.debug('{0} does not exist'.format(filtfile))
+            # call filter function
+            eval(self.filter(kk))
+
+        if path.exists(outfile) == False:
+            logger.debug('Flatten range on IFG: {0}'.format(infile))
+            r = subprocess.call("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+" "+str(self.nfit_range)+" "+str(self.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
+            if r != 0:
+                logger.warning("Flatten range failed for IFG: {0}".format(infile))
+                logger.warning(r)
+            else:
+                shutil.copy(inrsc,outrsc) 
+        else:
+            logger.debug('Flatten range on IFG: {0} already done'.format(infile))
+
+    def flat_az(self,kk):
+        ''' Faltten Azimuth function '''
+        infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
+        filtfile = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newsuffix = suffix + '_flataz'
+        self.stack.updatefix(kk,newprefix,suffix)
+        outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+
+        if path.exists(filtfile) == False:
+            logger.debug('{0} does not exist'.format(filtfile))
+            # call filter function
+            eval(self.filter(kk))
+
+        if path.exists(outfile) == False:
+            logger.debug('Flatten azimuth on IFG: {0}'.format(infile))
+            r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+" "+str(fit)+" "+str(threshold), shell=True)
+            if r != 0:
+                logger.warning("Flatten azimuth failed for int. {0}-{1}".format(date1,date2))
+            else:
+                shutil.copy(rscfile,outrsc)
+        else:
+            logger.debug('Flatten azimuth on IFG: {0} already done'.format(infile))
+
+
+    def flat_topo(kk, prefix, suffix):
+        ''' Faltten topo function '''
+        infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
+        filtfile = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newsuffix = suffix + '_flatz'
+        self.stack.updatefix(kk,newprefix,suffix)
+        outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
+
+        dem = 
+
+        if path.exists(filtfile) == False:
+
+        if path.exists(filtfile) == False:
+            logger.debug('{0} does not exist'.format(filtfile))
+            # call filter function
+            eval(self.filter(kk))
+
+        if path.exists(outfile) == False:
+            logger.debug('Flatten topo on IFG: {0}'.format(infile))
+            r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+" "+str(fit)+" "+str(threshold), shell=True)
+            if r != 0:
+                logger.warning("Flatten topo failed for int. {0}-{1}".format(date1,date2))
+            else:
+                shutil.copy(rscfile,outrsc)
+        else:
+            logger.debug('Flatten topo on IFG: {0} already done'.format(infile))
+
+    def flat_model(kk, prefix, suffix):
+        return
+
+    def unwrapping(kk):
+        date1, date2 = self.date_1[kk], self.date_2[kk]
+        return 
+
+    def addback(kk):
+        date1, date2 = self.date_1[kk], self.date_2[kk]
+        return 
 
 
 ##################################################################################
@@ -171,60 +440,66 @@ def addback(kk):
 ##################################################################################
 
 # # input parameters 
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1'
-int_list='interf_pair.rsc'
-master='20160608'
-look_int=int(2)
-look_unw=int(4)
-look=int(look_int - look_unw)
-fit_range = -1
-threshold_coh = 0.3
-ftype='SWc'
-SWamplim=0.1
+home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+IntDir=path.abspath(home)+'/'+'test/'
+ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+SARMasterDir=path.abspath(home)+'/'+'20160608'
+
+Rlooks_int=int(2)
+Rlooks_unw=int(4)
+nfit_range = -1
+thresh_amp_range = 0.3
+nfit_az = 0
+thresh_amp_az = 0.3
+filterstyle='SWc'
+SWamplim=0.05
 SWwindowsize=8
-thresholdfiltSW=0.25
-thresholdcol=0.04
 seedx=268
 seedy=1766
 prefix = '' 
 suffix = '_sd'
+nproc=1
 
+####################
+# Test Process List
+####################
 
-##################################################################################
-###  WORK
-##################################################################################
+# Job list: look_int replace_amp   filter     flat_range    flat_az    flat_topo  flat_model      unw         add_back
+do_list =   [True,     True,       True,       True,       False,       False,      False,      False,      False] 
+jobs = Job(do_list)
 
-if look_int > 2:
+print('List of Post-Processing Jobs:')
+for job in jobs:
+    print(job)
+print()
 
-	work = [(kk, look_int, prefix, suffix) for kk in xrange(kmax)]
-	# pool = multiprocessing.Pool(nproc)
-	# pool.map(look, work)
-	# pool.close()
-	for w in work:
-		look(w)
+###########
+#   MAIN 
+###########
 
-if replace_amp == 'yes':
+postprocess = FiltFlatUnw(
+        [ListInterfero,SARMasterDir,IntDir,
+        Rlooks_int, Rlooks_unw, prefix, suffix, 
+        nfit_range, thresh_amp_range,
+        nfit_az, thresh_amp_az,
+        filterstyle,SWwindowsize, SWamplim,
+        seedx,seedy]
+        ) 
 
-	work = [(kk, look_int, prefix, suffix) for kk in xrange(kmax)]
-	for w in work:
-		replaceAmp(w)
+# loop over the processes
+for p in jobs:
+    # check if the process has to be done
+    # print(getattr(p,'name'))
+    job = getattr(p,'name')
+    if p.do is True:
+        print('Run {} ....'.format(p))
+        [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
+        print()
 
-if flat_range == 'yes': 
-	prefixflat = 'coh_' + preffix
+# [postprocess.call(job,kk) for kk in range(postprocess.Nifg)]
+# work = [kk for kk in range(postprocess.Nifg)]
+# pool = multiprocessing.Pool(nproc)
+# pool.map(look, work)
+# pool.close()      
 
-	work = [(kk, look_int, prefixflat, suffix, ftype, fit_range, threshold_coh) for kk in xrange(kmax)]
-	# pool = multiprocessing.Pool(nproc)
-	# pool.map(flattenrange, work)
-	# pool.close()
-	for w in work:
-		flattenrange(w)
-
-if flat_topo == 'yes':
-	pass
-
-if do_unw == 'yes':
-	pass
-
-if add_back == 'yes':
-	pass
 
