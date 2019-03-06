@@ -414,6 +414,12 @@ class FiltFlatUnw:
         outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
         filtout = self.stack.getpath(kk) + '/'+ self.stack.getfilt(kk)
 
+        # filt must be done before changing name
+        if path.exists(filtfile) == False:
+            logger.debug('{0} does not exist'.format(filtfile))
+            # call filter function
+            eval(self.filter(kk))
+
         # look dem
         rscin = self.dem + '.rsc'
         self.look_file(self.dem)
@@ -421,131 +427,122 @@ class FiltFlatUnw:
         rscout = self.dem + '.rsc'
         shutil.copy(rscin,rscout)
         del rscin,rscout
-
-        if path.exists(filtfile) == False:
-            logger.debug('{0} does not exist'.format(filtfile))
-            # call filter function
-            eval(self.filter(kk))
-
-        if path.exists(outfile) == False:
-            logger.debug('Flatten topo on IFG: {0}'.format(infile))
-            r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
-                +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile)+" >> log_flattopo.txt", shell=True)
-            if r != 0:
-                logger.warning("Flatten topo failed for int. {0}".format(infile))
-            else:
-                inrsc = infile + '.rsc'
-                outrsc = outfile + '.rsc'
-                filtrsc = filtout + '.rsc'
-                shutil.copy(inrsc,outrsc)
-                shutil.copy(inrsc,filtrsc)
-
-            # select points
-            i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
-            z = z - self.z_ref
-            phi = phi*0.00020944
-
-            topfile = path.splitext(infile)[0] + '.top'
-            b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
-
-            if ((self.jend_mask > self.jbeg_mask) or (self.iend_mask > self.ibeg_mask)) and self.ivar<2 :
-                b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
-
-                index = np.nonzero(
-                np.logical_and(coh>self.thresh_amp_atmo,
-                np.logical_and(deltaz>75.,
-                np.logical_and(np.logical_or(i<self.ibeg_mask,pix_az>self.iend_mask),
-                np.logical_or(j<self.jbeg_mask,j>self.jend_mask),
-                ))))
-
-                phi_select = phi[index]
-                z_select = z[index]
-
-                if self.nfit_atmo == -1:
-                    b1 = np.nanmedian(phi_select)
-                    fit = z_select*b1
-                elif self.nfit_atmo == 0:
-                    b1 = np.nanmean(phi_select)
-                    fit = z_select*b1
-                elif self.nfit_atmo == 1:
-                    from sklearn.linear_model import LinearRegression
-                    model = LinearRegression()
-                    model.fit(z_select, phi_select)
-                    fit = model.predict(z_select)
-                else:
-                    from sklearn.preprocessing import PolynomialFeatures
-                    polynomial_features= PolynomialFeatures(degree=self.nfit_atmo)
-                    x_poly = polynomial_features.fit_transform(z_select)
-                    model = LinearRegression()
-                    model.fit(x_poly, phi_select)
-                    fit = model.predict(x_poly)
-                
-                # save median phase/topo
-                strattxt = path.splitext(infile)[0] + '_strat.top'
-                np.savetxt(strattxt, median, fmt=('%.8f'))
-
-                ax.plot(z_select,phi_selct*z_select,'.r',label='selected points')
-                av = np.median(phi_select*z_select)
-                
-                # clean and prepare for write strat
-                infileunw = path.splitext(infile)[0] + '.unw'
-                remove(infileunw)
-
-                logger.debub("Convert {0} to .unw".format(infile))
-                r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
-                if r != 0:
-                    logger.warning("Failed to convert {0} to .unw".format(infile))
-                inrsc = infile + '.rsc'
-                outrsc = infileunw + '.rsc'
-                shutil.copy(inrsc,outrsc)
-
-                # remove strat file created by flatten_topo and write
-                remove(stratfile)
-                logger.debub("Create stratified file {0}: ".format(strat))
-                r = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(self.dem)+" "+str(stratfile)\
-                        +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(self.z_ref)+" >> log_flattopo.txt", shell=True)
-                if r != 0:
-                    logger.warning("Failed creating stratified file: {0}".format(stratfile))
-                outrsc = stratfile + '.rsc'
-                shutil.copy(inrsc,outrsc)
-
-                # remove model created by flatten_topo and run
-                remove(outfile)
-                remove(filtout)
-                logger.debub("Remove stratified file {0} from IFG {1}: ".format(stratfile,infile))
-                r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
-                if r != 0:
-                    logger.warning("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
-
-                corfile = self.stack.getcor(kk)
-                corbase = path.splitext(corfile)[0]
-                logger.debub("Filter IFG {0}: ".format(outfile))
-                r = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
-                    +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle))
-                if r != 0:
-                    logger.warning("Failed filtering IFG {0}: ".format(outfile))
-            else:
-                z_select = z; phi_select = phi
-                # I dont understand ivar=0
-                if self.ivar == 1:
-                    fit = b1*z_select + (b2/2.)*z_select**2 + (b3/3.)*z_select**2 + (b4/4.)*z_select**2
-
-            # plot phase/topo
-            fig = plt.figure(nfigure)
-            nfigure =+ 1
-            ax = fig.add_subplot(1,1,1)
-            # lets not plot dphi but phi
-            ax.plot(z,phi*z,'.',alpha=.6)
-            ax.plot(z_select,fit,'-r',lw=4,label='Fit: {0:.3f}z + {1:.3f}z2 + {2:.3f}z3 + {3:.3f}z4'.format(b1,b2,b3,b4))
-            ax.set_xlabel('Elevation (m)')
-            ax.set_ylabel('Phase (rad)')
-            plt.legend(loc='best')
-            plotfile = path.splitext(infile)[0] + '_phase-topo.png'
-            fig.savefig(plotfile, format='PNG')
-            plt.show()
-
+ 
+        logger.debug('Flatten topo on IFG: {0}'.format(infile))
+        r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
+            +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile)+" >> log_flattopo.txt", shell=True)
+        if r != 0:
+            logger.warning("Flatten topo failed for int. {0}".format(infile))
         else:
-            logger.debug('Flatten topo on IFG: {0} already done'.format(infile))
+            inrsc = infile + '.rsc'
+            outrsc = outfile + '.rsc'
+            filtrsc = filtout + '.rsc'
+            shutil.copy(inrsc,outrsc)
+            shutil.copy(inrsc,filtrsc)
+
+        # select points
+        i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
+        z = z - self.z_ref
+        phi = phi*0.00020944
+
+        topfile = path.splitext(infile)[0] + '.top'
+        b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
+
+        if ((self.jend_mask > self.jbeg_mask) or (self.iend_mask > self.ibeg_mask)) and self.ivar<2 :
+            b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
+
+            index = np.nonzero(
+            np.logical_and(coh>self.thresh_amp_atmo,
+            np.logical_and(deltaz>75.,
+            np.logical_and(np.logical_or(i<self.ibeg_mask,pix_az>self.iend_mask),
+            np.logical_or(j<self.jbeg_mask,j>self.jend_mask),
+            ))))
+
+            phi_select = phi[index]
+            z_select = z[index]
+
+            if self.nfit_atmo == -1:
+                b1 = np.nanmedian(phi_select)
+                fit = z_select*b1
+            elif self.nfit_atmo == 0:
+                b1 = np.nanmean(phi_select)
+                fit = z_select*b1
+            elif self.nfit_atmo == 1:
+                from sklearn.linear_model import LinearRegression
+                model = LinearRegression()
+                model.fit(z_select, phi_select)
+                fit = model.predict(z_select)
+            else:
+                from sklearn.preprocessing import PolynomialFeatures
+                polynomial_features= PolynomialFeatures(degree=self.nfit_atmo)
+                x_poly = polynomial_features.fit_transform(z_select)
+                model = LinearRegression()
+                model.fit(x_poly, phi_select)
+                fit = model.predict(x_poly)
+            
+            # save median phase/topo
+            strattxt = path.splitext(infile)[0] + '_strat.top'
+            np.savetxt(strattxt, median, fmt=('%.8f'))
+
+            ax.plot(z_select,phi_selct*z_select,'.r',label='selected points')
+            av = np.median(phi_select*z_select)
+            
+            # clean and prepare for write strat
+            infileunw = path.splitext(infile)[0] + '.unw'
+            remove(infileunw)
+
+            logger.debub("Convert {0} to .unw".format(infile))
+            r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
+            if r != 0:
+                logger.warning("Failed to convert {0} to .unw".format(infile))
+            inrsc = infile + '.rsc'
+            outrsc = infileunw + '.rsc'
+            shutil.copy(inrsc,outrsc)
+
+            # remove strat file created by flatten_topo and write
+            remove(stratfile)
+            logger.debub("Create stratified file {0}: ".format(strat))
+            r = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(self.dem)+" "+str(stratfile)\
+                    +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(self.z_ref)+" >> log_flattopo.txt", shell=True)
+            if r != 0:
+                logger.warning("Failed creating stratified file: {0}".format(stratfile))
+            outrsc = stratfile + '.rsc'
+            shutil.copy(inrsc,outrsc)
+
+            # remove model created by flatten_topo and run
+            remove(outfile)
+            remove(filtout)
+            logger.debub("Remove stratified file {0} from IFG {1}: ".format(stratfile,infile))
+            r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
+            if r != 0:
+                logger.warning("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
+
+            corfile = self.stack.getcor(kk)
+            corbase = path.splitext(corfile)[0]
+            logger.debub("Filter IFG {0}: ".format(outfile))
+            r = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
+                +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle))
+            if r != 0:
+                logger.warning("Failed filtering IFG {0}: ".format(outfile))
+        else:
+            z_select = z; phi_select = phi
+            # I dont understand ivar=0
+            if self.ivar == 1:
+                fit = b1*z_select + (b2/2.)*z_select**2 + (b3/3.)*z_select**2 + (b4/4.)*z_select**2
+
+        # plot phase/topo
+        fig = plt.figure(nfigure)
+        nfigure =+ 1
+        ax = fig.add_subplot(1,1,1)
+        # lets not plot dphi but phi
+        ax.plot(z,phi*z,'.',alpha=.6)
+        ax.plot(z_select,fit,'-r',lw=4,label='Fit: {0:.3f}z + {1:.3f}z2 + {2:.3f}z3 + {3:.3f}z4'.format(b1,b2,b3,b4))
+        ax.set_xlabel('Elevation (m)')
+        ax.set_ylabel('Phase (rad)')
+        plt.legend(loc='best')
+        plotfile = path.splitext(infile)[0] + '_phase-topo.png'
+        fig.savefig(plotfile, format='PNG')
+        plt.show()
 
     def flat_model(kk):
         return
