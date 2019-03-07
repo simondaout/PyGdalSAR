@@ -20,15 +20,13 @@ if environ["TERM"].startswith("screen"):
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
 from pylab import *
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-import matplotlib.dates as mdates
 from datetime import datetime
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import logging
 import multiprocessing
+import pathos.pools as pp
 
 ##################################################################################
 ###  INITIALISE
@@ -236,7 +234,7 @@ class FiltFlatUnw:
 
         # initialise model to be removed from wrapped int
         self.model = model
-        self.strat = None
+        self.strat = False
 
         # initilise radar file
         self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_int + 'rlks.hgt'
@@ -254,6 +252,29 @@ class FiltFlatUnw:
         self.images = PileImages(dates1,dates2)
         self.images.info()
         self.Nimages = len(self.images)
+
+    def go(self,jobs, nproc):
+        ''' RUN function '''
+
+        # import itertools
+        for p in jobs:
+            
+            job = getattr(p,'name')
+            print('----------------------------------')
+            print('Run {} ....'.format(job))
+            
+            #[eval('self.{0}({1})'.format(job,kk)) for kk in range(self.Nifg)]
+            
+            # work = [ (job,kk) for kk in range(self.Nifg)]
+            # sys.exit()
+            #pool = multiprocessing.Pool(nproc)
+            pool = pp.ProcessPool(nproc)
+            pool.map(eval('self.{0}'.format(job)), range(self.Nifg))
+            #pool.close()
+            #pool.join() 
+            print('----------------------------------')
+            print()
+
 
     def look_file(self,file):
         ''' Look function 
@@ -912,19 +933,20 @@ class FiltFlatUnw:
 ##################################################################################
 
 # # input parameters (not in the proc file)
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+#home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
 prefix = '' 
 suffix = '_sd'
 iend_mask=0 # mask for empirical estimations
 jend_mask=0
 jbeg_mask=0
-jend_mask=200
+jend_mask=0
 model=None # model to be removed from wrapped int
-nproc=2
+nproc=6
 
 # proc file parameters
-IntDir=path.abspath(home)+'/'+'test/'
-ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+IntDir=path.abspath(home)+'/'+'int/'
+ListInterfero=path.abspath(home)+'/'+'interf_pair.rsc'
 SARMasterDir=path.abspath(home)+'/'+'20160608'
 Rlooks_int=int(2)
 Rlooks_unw=int(4)
@@ -936,10 +958,12 @@ filterstyle='SWc'
 SWamplim=0.05
 SWwindowsize=8
 filterStrength=2.
-seedx=268
-seedy=1766
+#seedx=336
+#seedy=1840
+seedx=300
+seedy=2384
 threshold_unw=0.35
-unw_method='roi'
+unw_method='mpd'
 
 nfit_topo=-1
 thresh_amp_topo=0.2
@@ -979,21 +1003,7 @@ postprocess = FiltFlatUnw(
         seedx,seedy,threshold_unw,unw_method]
         ) 
 
-# loop over the processes
-for p in jobs:
-    # check if the process has to be done
-    # print(getattr(p,'name'))
-    job = getattr(p,'name')
-    print('----------------------------------')
-    print('Run {} ....'.format(p))
-    # [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
-    work = [kk for kk in range(postprocess.Nifg)]
-    pool = multiprocessing.Pool(nproc)
-    pool.map(eval('postprocess.{0}({1})'.format(job,kk)), work)
-    pool.close() 
-    print('----------------------------------')
-    print()
+# RUN
+postprocess.go(jobs,nproc)
 print("That's all folks")
  
-
-
