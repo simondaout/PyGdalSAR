@@ -39,14 +39,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('filtcorunw')
 
-# init figures
-nfigure = 0
-
 # init collections 
 import collections
-Process = collections.namedtuple('Process', 'name  do', rename=True)
-IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix', rename=True)
-Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline', rename=True)
+Process = collections.namedtuple('Process', 'name')
+IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
+Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
 ##################################################################################
 ###  Class and Functions
@@ -63,17 +60,18 @@ def date2dec(dates):
         times.append(year + dec)
     return times
 
-class Job:
+class Job():
     """ Create a class of Jobs: 
-    Job list is: look_int replace_amp filter flat_range flat_topo flat_model unw add_back"""
-    names = 'look_int replace_amp filter flat_range flat_az flat_topo flat_model unw add_back'.split()
+    Job list: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unw add_model_back add_atmo_back add_ramp_back """
 
-    def __init__(self, do_list):
-        self.do_list = do_list
+    def __init__(self, names):
+        self.names = names.split()
         try:
-            self._processes = [Process(name,do) for (name,do) in zip(self.names,self.do_list)]
+            self._processes = [Process(name) for name in self.names]
         except ValueError as error:
             logger.warning(error)
+            self.info()
+            sys.exit()
 
     # create spetial methods len() and getititem for Job class
     def __len__(self):
@@ -91,6 +89,12 @@ class Job:
     def replace_job(self,pos,value):
         self._processes = self._processes[pos]._replace(value)
 
+    def info(self):
+        print('List of possible Jobs:') 
+        print('erai look_int replace_amp filter flat_range flat_topo flat_model colin \
+            unwrapping add_model_back add_atmo_back add_ramp_back')
+        print('Choose them in the order that you want')
+
 class PileInt:
     def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
         self.dates1, self.dates2 = dates1, dates2
@@ -100,10 +104,14 @@ class PileInt:
         self.Nifg=len(self.dates1)
         print("number of interferogram: ",self.Nifg)
 
+        # init width and length to zero as long as we don't need it
+        width, length = 0, 0
+
         try:
-            self._ifgs = [IFG(date1,date2,look,prefix,suffix) for (date1,date2) in zip(self.dates1,self.dates2)]
+            self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
         except ValueError as error:
             logger.warning(error)
+            self.exit()
 
     # create spetial methods len() and getititem for PileInt class
     def __len__(self):
@@ -120,15 +128,26 @@ class PileInt:
 
     def getname(self,kk):
         ''' Return interfergram file name '''
-        return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks.int'
+        return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  \
+        self._ifgs[kk].look + 'rlks'
 
-    def getfilt(self,kk):
+    def getfiltSW(self,kk):
         ''' Return interfergram file name '''
-        return 'filt' + str(self.filterstyle) + '_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks.int'
+        return 'filt' + str(self.filterstyle) + '_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + \
+        str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks'
+
+    def getfiltROI(self,kk):
+        ''' Return interfergram file name '''
+        return 'filt_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) \
+        + '_' +  self._ifgs[kk].look + 'rlks'
 
     def getcor(self,kk):
         ''' Return cohrence file name '''
         return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self._ifgs[kk].look + 'rlks.cor'
+
+    def getsize(self,kk):
+        ''' Return width and length IFG '''
+        return  str(self._ifgs[kk].width),  str(self._ifgs[kk].length)
 
     def getpath(self,kk):
         ''' Return path ifg dir '''
@@ -136,10 +155,13 @@ class PileInt:
 
     def getstratfile(self,kk):
         ''' Return stratified file name '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks.unw'
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks'
 
     def updatelook(self,kk,newlook):
         self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
+
+    def updatesize(self,kk,newwidth,newlength):
+        self._ifgs[kk] = self._ifgs[kk]._replace(width=newwidth,length=newlength)
 
     def updatefix(self,kk,newprefix, newsuffix):
         self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix))
@@ -187,22 +209,35 @@ class PileImages:
 class FiltFlatUnw:
     """ Create a class FiltFlatUnw defining all the post-procesing functions 
     list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
-    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim,
-    seedx, seedy """
+    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, filterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref,
+    seedx, seedy.threshold_unw, unw_method
+    Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask, 
+    defining the boundary of the mask zone for emprical estimations
+    suffix, preffix: define name of the interferogram at the start of the processes
+    model: model to be removed from wrapped interferograms
+    """
 
-    def __init__(self, params, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0):
+    def __init__(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
-        self.Rlooks_int, self.Rlooks_unw, self.prefix, self.suffix, 
+        self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
+        self.filterStrength,
         self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref,
-        self.seedx, self.seedy,
+        self.seedx, self.seedy,self.threshold_unw,self.unw_method,
         ) = map(str, params)
+
+        # initialise prefix, suffix
+        self.prefix, self.suffix = prefix, suffix
 
         # initiliase number of looks
         self.look = self.Rlooks_int
         self.rlook = int(int(self.Rlooks_unw) - int(self.Rlooks_int))
+
+        # initialise model to be removed from wrapped int
+        self.model = model
+        self.strat = None
 
         # initilise radar file
         self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_int + 'rlks.hgt'
@@ -222,139 +257,170 @@ class FiltFlatUnw:
         self.Nimages = len(self.images)
 
     def look_file(self,file):
-        ''' Look Radar function '''
+        ''' Look function 
+            Requiered parameters:  Rlooks_int, Rlooks_unw
+        '''
         
         dirname, filename = path.split(path.abspath(file))
         chdir(dirname) 
 
         r= subprocess.call("look.pl "+str(filename)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
         if r != 0:
-            logger.warning(r)
             logger.warning(' Can''t look file {0} in {1} look'.format(filename,self.rlook))
+            print(self.look_file.__doc__)
 
-    def look_int(self,kk):
-        ''' Look function '''
+    def erai(self,kk):
+        return
 
-        # need to be in the corect dir for stupid perl scripts
-        chdir(self.stack.getpath(kk))
-
-        infile =  self.stack.getname(kk)
-        corfile =  self.stack.getcor(kk)
-        print(corfile) 
-        logger.debug('Look file {0} in {1} look'.format(infile,self.rlook))
-
-        r= subprocess.call("look.pl "+str(infile)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
-        if r != 0:
-            logger.warning(r)
-            logger.warning(' Can''t look file {0} in {1} look'.format(infile,self.rlook))
+    def computesize(self,file):
+        ''' Open file with gdal and retrieve width anf length 
+        '''
         
-        r = subprocess.call("look.pl "+str(corfile)+" "+str(self.rlook)+" >> log_look.txt", shell=True)
-        if r != 0:
-            logger.warning(r)
-            logger.warning(' Can''t look file {0} in {1} look'.format(corfile,self.rlook))
+        try:
+            dirname, filename = path.split(path.abspath(file))
+            chdir(dirname) 
 
-        # update looks
-        self.stack.updatelook(kk,self.Rlooks_unw)
+            ds_int = gdal.Open(filename, gdal.GA_ReadOnly)
+            driver = ds_int.GetDriver()
+            return ds_int.RasterXSize, ds_int.RasterYSize
+        except ValueError as error:
+            logger.warning(error)
+            print(self.computesize.__doc__)
 
     def replace_amp(self, kk):
+        ''' Replace amplitude by coherence'''
 
-        # update looks
-        self.stack.updatelook(kk,self.Rlooks_unw)
+        chdir(self.stack.getpath(kk))
 
-        infile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
+        infile = self.stack.getname(kk)+ '.int'
         rscfile = infile + '.rsc'
-        corfile = self.stack.getpath(kk) + '/' + self.stack.getcor(kk)
+        corfile = self.stack.getcor(kk) 
         logger.debug('Replace Amplitude by Coherence on IFG: {0}'.format(infile))
+
+        # compute width and length
+        width,length = self.computesize(infile)
+        self.stack.updatesize(kk,width,length)
 
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newprefix = 'coh_' + prefix
         self.stack.updatefix(kk,newprefix,suffix)
-        outfile = self.stack.getpath(kk) + '/'+ self.stack.getname(kk)
-        outrsc = outfile + '.rsc'
+        outfile = self.stack.getname(kk) + '.int'
+        outrsc = outfile + '.rsc' 
+        shutil.copy(rscfile,outrsc)
 
-        tmp = self.stack.getpath(kk) + '/tmp'
-        phs = self.stack.getpath(kk) + '/phs'
-        cor = self.stack.getpath(kk) + '/cor'
-
-        # Open
-        ds_int = gdal.Open(infile, gdal.GA_ReadOnly)
-        driver = ds_int.GetDriver()
-        width = ds_int.RasterXSize
-        print("> Width:     ", ds_int.RasterXSize)
-
-        # check if nor done
+        # check if not done
         if path.exists(outfile) is False:
             if path.exists(corfile):
 
                 logger.debug('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
-                r1 = subprocess.call("rmg2mag_phs "+str(corfile)+" "+str(tmp)+" "+str(cor)+" "+str(width), shell=True)
-                r2 = subprocess.call("cpx2mag_phs "+str(infile)+" "+str(tmp)+" "+str(phs)+" "+str(width), shell=True)
-                r3 = subprocess.call("mag_phs2cpx cor phs "+str(outfile)+" "+str(width), shell=True)
-                if (r1 or r2 or r3) != 0:
-                    logger.warning(r1, r2, r3)
+                r1 = subprocess.call("rmg2mag_phs "+str(corfile)+" tmp cor "+str(width), shell=True)
+                if r1 != 0:
+                    logger.warning(r1)
                     logger.warning('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
-                
-                remove(tmp); remove(phs); remove(cor)
-                del tmp, phs, cor
-                shutil.copy(rscfile,outrsc)
+                    sys.exit()
+                r2 = subprocess.call("cpx2mag_phs "+str(infile)+" tmp2 phs "+str(width), shell=True)
+                if (r2) != 0:
+                    logger.warning(r2)
+                    logger.warning('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
+                    sys.exit()
+                r3 = subprocess.call("mag_phs2cpx cor phs "+str(outfile)+" "+str(width), shell=True)
+                if (r3) != 0:
+                    logger.warning(r3)
+                    logger.warning('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
+                    sys.exit()
+
+                remove('tmp'); remove('tmp2'); remove('phs'); remove('cor')
 
             else:
                 logger.warning('Coherence file does not exit...')
+                print(self.replace_amp.__doc__)
+                sys.exit()
 
         else:
             logger.debug('Replace Amplitude by Cohrence for IFG: {} already done'.format(infile))
-        
-        del ds_int 
 
-    def filter(self, kk):
-        ''' Filter function '''
+    def filterSW(self, kk):
+        ''' Filter SW function form Doin et. al. 2011
+        Requiered proc parameters: SWwindowsize, SWamplim, filterstyle
+        '''
 
-        # need to be in the corect dir for stupid perl scripts
         chdir(self.stack.getpath(kk))
 
-        infile = self.stack.getname(kk)
-        inrsc = infile + '.rsc'
-        inbase = path.splitext(infile)[0]
-        corfile = self.stack.getcor(kk)
+        inbase = self.stack.getname(kk) 
+        inrsc = inbase + '.int.rsc'
+        infile = inbase + '.int'
+        corfile = self.stack.getcor(kk) 
         corbase = path.splitext(corfile)[0]
-        filtfile = self.stack.getfilt(kk)
-        filtrsc = filtfile + '.rsc'
-        filtbase = path.splitext(filtfile)[0]
+        filtbase = self.stack.getfiltSW(kk)
+        filtrsc = filtbase + '.int.rsc'
 
         logger.debug('Filter {0} with {1} filter type'.format(infile,self.filterstyle))
         r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
                 +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle), shell=True)
         if r != 0:
             logger.warning('Failed filtering {0} with {1} filter type'.format(infile,self.filterstyle))
+            print(self.filterSW.__doc__)
+            sys.exit()
 
         if path.exists(filtrsc) == False:
             shutil.copy(inrsc,filtrsc)
 
-    def flat_range(self,kk):
-        ''' Faltten Range function '''
+    def filterROI(self, kk):
+        ''' ROI-PAC Filter function
+            Requiered proc file parameter: filterStrength
+        '''
 
-        # need to be in the corect dir for stupid perl scripts
         chdir(self.stack.getpath(kk))
 
-        infile = self.stack.getname(kk)
+        infile = self.stack.getname(kk) + '.int'
+        inrsc = infile + '.rsc'
+        
+        # get width and compute if not already done
+        width,length =  self.stack.getsize(kk)
+        if (int(width) == 0) or (int(length) == 0):
+            width,length = self.computesize(infile)
+            self.stack.updatesize(kk,width,length)
+
+        filtfile = self.stack.getfiltROI(kk) + '.int'
+        filtrsc = filtfile + '.rsc'
+        if path.exists(filtrsc) == False:
+            shutil.copy(inrsc,filtrsc)
+
+        logger.debug('Filter {0} with ROI-PAC adaptative filter'.format(infile))
+        r = subprocess.call("adapt_filt "+str(infile)+" "+str(filtfile)+" "\
+                +str(width)+" 0.25"+" "+str(self.filterStrength)+"  >> log_filtROI.txt", shell=True)
+        if r != 0:
+            logger.warning('Failed filtering {0} with ROI-PAC adaptative filter'.format(infile))
+            print(self.filterROI.__doc__)
+            sys.exit()
+        
+    def flat_range(self,kk):
+        ''' Faltten range function on wrapped phase  (See Doin et al., 2015)
+            Requiered proc file parameters: nfit_range, thresh_amp_range
+            Estimation done on filterSW file
+        '''
+
+        chdir(self.stack.getpath(kk))
+
+        infile = self.stack.getname(kk) + '.int'
         inrsc = infile + '.rsc'
         corfile = self.stack.getcor(kk)
-        filtfile = self.stack.getfilt(kk)
+        filtfile = self.stack.getfiltSW(kk) + '.int'
 
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flatr'
         self.stack.updatefix(kk,prefix,newsuffix)
-        outfile = self.stack.getname(kk)
+        outfile = self.stack.getname(kk) + '.int' 
         outrsc = outfile + '.rsc'
-        filtout = self.stack.getfilt(kk)
+        filtout = self.stack.getfiltSW(kk)
         shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
-            logger.debug('{0} does not exist'.format(filtfile))
+            logger.warning('{0} does not exist'.format(filtfile))
             # call filter function
-            eval(self.filter(kk))
+            self.filterSW(kk)
 
         if path.exists(outfile) == False:
             logger.debug('Flatten range on IFG: {0}'.format(infile))
@@ -362,33 +428,39 @@ class FiltFlatUnw:
                 " "+str(self.nfit_range)+" "+str(self.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.warning("Flatten range failed for IFG: {0}".format(infile))
-                logger.warning(r) 
+                print(self.flat_range.__doc__) 
+                sys.exit()
         else:
             logger.debug('Flatten range on IFG: {0} already done'.format(infile))
 
     def flat_az(self,kk):
+        ''' Faltten azimuth function on wrapped phase  (See Doin et al., 2015)
+            Requiered proc file parameters: nfit_az, thresh_amp_az
+            Estimation done on filterSW file
+        '''
+
         # need to be in the corect dir for stupid perl scripts
         chdir(self.stack.getpath(kk))
 
         ''' Faltten Azimuth function '''
-        infile = self.stack.getname(kk)
+        infile = self.stack.getname(kk) + '.int'
         inrsc = infile + '.rsc'
-        corfile = self.stack.getcor(kk)
-        filtfile = self.stack.getfilt(kk)
+        corfile = self.stack.getcor(kk) 
+        filtfile = self.stack.getfiltSW(kk) + '.int'
 
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flataz'
         self.stack.updatefix(kk,prefix,newsuffix)
-        outfile = self.stack.getname(kk)
-        filtout = self.stack.getfilt(kk)
+        outfile = self.stack.getname(kk) + '.int' 
+        filtout = self.stack.getfiltSW(kk) + '.int'
         outrsc = outfile + '.rsc'
         shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
             logger.debug('{0} does not exist'.format(filtfile))
             # call filter function
-            eval(self.filter(kk))
+            eval(self.filterSW(kk))
 
         if path.exists(outfile) == False:
             logger.debug('Flatten azimuth on IFG: {0}'.format(infile))
@@ -396,45 +468,62 @@ class FiltFlatUnw:
                 " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
             if r != 0:
                 logger.warning("Flatten azimuth failed for int. {0}-{1}".format(date1,date2))
+                print(self.flat_az.__doc__)
+                sys.exit()
         else:
             logger.debug('Flatten azimuth on IFG: {0} already done'.format(infile))
 
     def flat_topo(self, kk):
-        ''' Faltten topo function '''
-        chdir(self.stack.getpath(kk))
-        print(getcwd())
+        ''' Faltten atmosphere function on wrapped phase  (See Doin et al., 2015)
+            Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo
+            Estimation done on filterSW file
+            Plot phase/topo in *_phase-topo.png file
+        '''
 
-        infile = self.stack.getname(kk)
+        chdir(self.stack.getpath(kk))
+        # print(getcwd())
+
+        infile = self.stack.getname(kk) + '.int'
         corfile = self.stack.getcor(kk)
-        filtfile = self.stack.getfilt(kk)
-        stratfile = self.stack.getstratfile(kk)
+        filtfile = self.stack.getfiltSW(kk) + '.int'
+        stratfile = self.stack.getstratfile(kk) + '.unw'
 
         # filt must be done before changing name
         if path.exists(filtfile) == False:
             logger.debug('{0} does not exist'.format(filtfile))
             # call filter function
-            self.filter(kk)
+            self.filterSW(kk)
 
         # update names
         prefix, suffix = self.stack.getfix(kk)
         newsuffix = suffix + '_flatz'
         self.stack.updatefix(kk,prefix,newsuffix)
-        outfile = self.stack.getname(kk)
-        filtout = self.stack.getfilt(kk)
+        outfile = self.stack.getname(kk) + '.int'
+        filtout = self.stack.getfiltSW(kk) + '.int'
 
-        # look dem
-        rscin = self.dem + '.rsc'
-        self.look_file(self.dem)
-        self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
-        rscout = self.dem + '.rsc'
-        shutil.copy(rscin,rscout)
-        del rscin,rscout
- 
-        logger.debug('Flatten topo on IFG: {0}'.format(infile))
-        r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
-            +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+str(stratfile)+" >> log_flattopo.txt", shell=True)
-        if r != 0:
-            logger.warning("Flatten topo failed for int. {0}".format(infile))
+        # check width IFG
+        width,length = self.getsize(infile)
+        if (int(width) == 0) or (int(length) == 0):
+            width,length = self.computesize(infile)
+            self.stack.updatesize(kk,width,length)
+
+        # look dem if necessary
+        w,l = self.computesize(self.dem)
+        if w != width:
+            logger.warning('IFG:{0} and DEM file are not the same size: {0}'.format(infile))
+            self.look_file(self.dem)
+            # update DEM
+            self.dem = self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
+
+        if path.exists(outfile) == False:
+            logger.debug('Flatten topo on IFG: {0}'.format(infile))
+            r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
+                +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+\
+                str(stratfile)+" >> log_flattopo.txt", shell=True)
+            if r != 0:
+                logger.warning("Flatten topo failed for int. {0}".format(infile))
+                print(self.flatten_topo.__doc__)
+                sys.exit()
         
         inrsc = infile + '.rsc'
         outrsc = outfile + '.rsc'
@@ -445,13 +534,14 @@ class FiltFlatUnw:
 
         # select points
         i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
-        z = z - self.z_ref
+        z = z - float(self.z_ref)
         phi = phi*0.00020944
 
         topfile = path.splitext(infile)[0] + '.top'
         b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
 
         if ((self.jend_mask > self.jbeg_mask) or (self.iend_mask > self.ibeg_mask)) and self.ivar<2 :
+            sys.exit(0)
             b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
 
             index = np.nonzero(
@@ -498,6 +588,8 @@ class FiltFlatUnw:
             r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
             if r != 0:
                 logger.warning("Failed to convert {0} to .unw".format(infile))
+                sys.exit()
+
             inrsc = infile + '.rsc'
             outrsc = infileunw + '.rsc'
             shutil.copy(inrsc,outrsc)
@@ -509,6 +601,8 @@ class FiltFlatUnw:
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(self.z_ref)+" >> log_flattopo.txt", shell=True)
             if r != 0:
                 logger.warning("Failed creating stratified file: {0}".format(stratfile))
+                sys.exit()
+
             outrsc = stratfile + '.rsc'
             shutil.copy(inrsc,outrsc)
 
@@ -519,57 +613,258 @@ class FiltFlatUnw:
             r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
             if r != 0:
                 logger.warning("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
+                sys.exit()
 
             corfile = self.stack.getcor(kk)
             corbase = path.splitext(corfile)[0]
             logger.debub("Filter IFG {0}: ".format(outfile))
             r = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
-                +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle))
+                +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle), shell=True)
             if r != 0:
                 logger.warning("Failed filtering IFG {0}: ".format(outfile))
+                sys.exit()
+
         else:
             z_select = z; phi_select = phi
             # I dont understand ivar=0
-            if self.ivar == 1:
-                fit = b1*z_select + (b2/2.)*z_select**2 + (b3/3.)*z_select**2 + (b4/4.)*z_select**2
+            # ivar=2 needs to be implemented
+            fit = b1*z_select + (b2/2.)*z_select**2 + (b3/3.)*z_select**2 + (b4/4.)*z_select**2
+
+        # What about the cst??
+        cst = np.nanmean(fit-phi_select*z_select)
 
         # plot phase/topo
-        fig = plt.figure(nfigure)
-        nfigure =+ 1
+        fig = plt.figure(0)
         ax = fig.add_subplot(1,1,1)
         # lets not plot dphi but phi
         ax.plot(z,phi*z,'.',alpha=.6)
-        ax.plot(z_select,fit,'-r',lw=4,label='Fit: {0:.3f}z + {1:.3f}z2 + {2:.3f}z3 + {3:.3f}z4'.format(b1,b2,b3,b4))
+        ax.plot(z_select,fit-cst,'-r',lw=3,label='Fit: {0:.3f}z + {1:.3f}z**2 + {2:.3f}z**3 + {3:.3f}z**4'.format(b1,b2,b3,b4))
         ax.set_xlabel('Elevation (m)')
         ax.set_ylabel('Phase (rad)')
         plt.legend(loc='best')
         plotfile = path.splitext(infile)[0] + '_phase-topo.png'
         fig.savefig(plotfile, format='PNG')
-        plt.show()
+        # plt.show()
+        plt.close()
+        del fig, ax
 
-    def flat_model(kk):
+        # update strat
+        self.strat = True
+
+    def look_int(self,kk):
+        ''' Look function for IFG, coherence, strat, and radar files
+            Requiered parameters:  Rlooks_int, Rlooks_unw
+        '''
+
+        # need to be in the corect dir for stupid perl scripts
+        chdir(self.stack.getpath(kk))
+
+        infile =  self.stack.getname(kk) + '.int'
+        corfile =  self.stack.getcor(kk) + '.int'
+
+        # look strat file
+        stratfile = self.stack.getstratfile(kk) + '.unw'
+        if (path.exists(stratfile) == False) and (self.strat == True):
+            # self.strat check if flatten_topo has been done
+            self.look_file(stratfile)
+            self.strat = stratfile
+ 
+        # look radar file if not done
+        dem = self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
+        if path.exists(self.dem) is False:
+            self.look_file(self.dem)
+            self.dem = dem
+
+        logger.debug('Look file {0} in {1} look'.format(infile,self.rlook))
+
+        # update looks
+        self.stack.updatelook(kk,self.Rlooks_unw)
+        outfile =  self.stack.getname(kk) + '.int'
+        outcor = self.stack.getcor(kk) + '.int'
+
+        if path.exists(outfile) is False:
+            r= subprocess.call("look.pl "+str(infile)+" "+str(self.rlook)+" >> log_look.txt" , shell=True)
+            if r != 0:
+                logger.warning(' Can''t look file {0} in {1} look'.format(infile,self.rlook))
+                print(self.look_int.__doc__)
+        
+        if path.exists(outcor) is False:
+            r = subprocess.call("look.pl "+str(corfile)+" "+str(self.rlook)+" >> log_look.txt", shell=True)
+            if r != 0:
+                logger.warning(' Can''t look file {0} in {1} look'.format(corfile,self.rlook))
+                print(self.look_int.__doc__)
+                
+            r = subprocess.call("look.pl "+str(self.dem)+" "+str(self.rlook)+" >> log_look.txt", shell=True)
+            if r != 0:
+                logger.warning(' Can''t look file {0} in {1} look'.format(corfile,self.rlook))
+                print(self.look_int.__doc__)
+                
+        # update size
+        width,length = self.computesize(outfile)
+        self.stack.updatesize(kk,width,length)
+
+    def flat_model(self,kk):
         return
 
-    def colin(kk):
-        return 
+    def colin(self,kk):
+        ''' Compute and replace amplitude by colinearity (See Pinel-Puyssegur et al., 2012)'''
 
-    def unwrapping(kk):
-        return 
+        chdir(self.stack.getpath(kk))
 
-    def addback(kk):
-        return 
+        infile = self.stack.getname(kk) + '.int'
+        inrsc = infile + '.rsc'
+        filtfile = self.stack.getfiltSW(kk) + '.int'
 
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newprefix = 'col_'
+        self.stack.updatefix(kk,newprefix,suffix)
+        outfile = self.stack.getname(kk) + '.int'
+        filtout = self.stack.getfiltSW(kk) + '.int'
+        filtoutroi = self.stack.getfiltROI(kk)+ '.int'
+
+        # Retrieve length and width
+        width,length =  self.stack.getsize(kk)
+        if (int(width) == 0) or (int(length) == 0):
+            width,length = self.computesize(infile)
+            self.stack.updatesize(kk,width,length)
+
+        if path.exists(outfile) == False:
+            logger.debug('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
+            shutil.copy(infile,'temp')
+            r = subprocess.call("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
+                " 3 0.0001 2  >> log_flatenrange.txt", shell=True)
+            if r != 0:
+                logger.warning('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
+                print(self.colin.__doc__)
+                sys.exit()
+            # clean
+            remove(temp)
+
+        else:
+            logger.debug('Colinearity on IFG {0} already computed'.format(infile))
+
+        # Filter with colinearity for unwrapping
+        if path.exists(filtout) == False:
+            self.filterSW(kk)
+        if path.exists(filtoutroi) == False:
+            self.filterROI(kk)
+
+    def unwrapping(self,kk):
+        ''' Unwrap function from strating seedx, seedy
+        if unw_method: mpd, MP.DOIN algorthim (Grandin et al., 2012). Requiered: threshold_unw, filterSW, filterROI
+        if unw_method: roi, ROIPAC algorthim. Requiered threshold_unw, filterROI
+        '''
+
+        chdir(self.stack.getpath(kk))
+
+        infile = self.stack.getname(kk)+ '.int'
+        inrsc = infile + '.rsc'
+        filtSWfile = self.stack.getfiltSW(kk)+ '.int'
+        filtROIfile = self.stack.getfiltROI(kk)+ '.int'
+
+        unwfile = self.stack.getname(kk)+ '.unw'
+        unwrsc = unwfile + '.rsc'
+        unwfiltSW = self.stack.getfiltSW(kk)+ '.unw'
+        unwSWrsc = unwfiltSW + '.rsc'
+        unwfiltROI = self.stack.getfiltROI(kk)+ '.unw'
+        unwROIrsc = unwfiltROI + '.rsc'
+        shutil.copy(inrsc,unwrsc)
+        shutil.copy(inrsc,unwSWrsc)
+        shutil.copy(inrsc,unwROIrsc)
+
+        # Filter with colinearity
+        if path.exists(unwfiltROI) == False:
+            self.filterROI(kk)
+
+        print('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
+            format(unwfile,self.seedx,self.seedy,self.threshold_unw))
+        if self.unw_method == 'mpd':
+            logger.debug("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
+
+            if path.exists(unwfiltSW) == False:
+                self.filterSW(kk)
+
+            # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
+            # unwrapped firt filtSWfile and then add high frequency of filtROIfile
+            r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
+                +" "+str(self.seedx)+" "+str(self.seedy)+" "+str(0.04)+" "+str(self.threshold_unw)+" 0  >> log_unw.txt", shell=True)
+            if r != 0:
+                print(self._unwrapping.__doc__)
+                logger.warning("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
+                sys.exit()
+            # remove('cut')
+
+        if self.unw_method == 'roi':
+
+            logger.debug("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
+            mask = path.splitext(filtSWfile)[0] + '_msk'
+
+            r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
+            if r != 0:
+                print(self._unwrapping.__doc__)
+                logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                sys.exit()
+            r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
+            if r != 0:
+                print(self._unwrapping.__doc__)
+                logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                sys.exit()
+            r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
+                +" "+str(self.threshold_unw)+" "+str(self.seedx)+" "+str(self.seedy)+"  >> log_unw.txt",shell=True)
+            if r != 0:
+                print(self._unwrapping.__doc__)
+                logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                sys.exit()
+
+    def add_atmo_back(self,kk):
+        ''' Add back stratified model computed by flatten_topo'''
+
+        chdir(self.stack.getpath(kk))
+
+        # the final product is always filtROI
+        unwfile = self.stack.getfiltROI(kk) + '.unw'
+        stratfile = self.stack.getstratfile(kk) + '.unw'
+
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newsuffix = suffix.replace("_flatz", "")
+        self.stack.updatefix(kk,prefix,newsuffix)
+        outfile = self.stack.getname(kk) + '.unw'
+
+        logger.debug('Adding back {0} on IFG: {1}'.format(stratfile,unwfile))
+        r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(outfile)+" "+str(stratfile)+\
+             " >> log_flatenrange.txt", shell=True)
+        if r != 0:
+            logger.warning('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
+            logger.warning(r) 
+            sys.exit()
+
+    def add_ramp_back(self,kk):
+        return
+
+    def add_model_back(self,kk):
+        return
 
 ##################################################################################
 ###  READ IMPUT PARAMETERS
 ##################################################################################
 
-# # input parameters 
+# # input parameters (not in the proc file)
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+prefix = '' 
+suffix = '_sd'
+iend_mask=0 # mask for empirical estimations
+jend_mask=0
+jbeg_mask=0
+jend_mask=0
+model=None # model to be removed from wrapped int
+nproc=1
+
+# proc file parameters
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
 SARMasterDir=path.abspath(home)+'/'+'20160608'
-
 Rlooks_int=int(2)
 Rlooks_unw=int(4)
 nfit_range = -1
@@ -579,22 +874,26 @@ thresh_amp_az = 0.3
 filterstyle='SWc'
 SWamplim=0.05
 SWwindowsize=8
+filterStrength=2.
 seedx=268
 seedy=1766
-prefix = '' 
-suffix = '_sd'
-nproc=1
+threshold_unw=0.35
+unw_method='mpd'
+
 nfit_topo=-1
 thresh_amp_topo=0.2
 ivar=1
 z_ref=8000.
 
+
+names = 'erai look_int replace_amp filterSW flat_range flat_az flat_atmo look_int flat_model colin unwrapping add_atmo_back add_ramp_back'
+
 ####################
 # Test Process List
 ####################
 
-# Job list: look_int replace_amp   filter     flat_range    flat_az    flat_topo  flat_model      unw         add_back
-do_list =   [True,     True,       True,       True,       False,       True,      False,      False,      False] 
+""" Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unw add_model_back add_atmo_back add_ramp_back """
+do_list =  'replace_amp filterSW flat_range  flat_topo colin unw add_atmo_back'  
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
@@ -608,12 +907,13 @@ print()
 
 postprocess = FiltFlatUnw(
         [ListInterfero,SARMasterDir,IntDir,
-        Rlooks_int, Rlooks_unw, prefix, suffix, 
+        Rlooks_int, Rlooks_unw, 
         nfit_range, thresh_amp_range,
         nfit_az, thresh_amp_az,
         filterstyle,SWwindowsize, SWamplim,
+        filterStrength,
         nfit_topo,thresh_amp_topo,ivar,z_ref,
-        seedx,seedy]
+        seedx,seedy,threshold_unw,unw_method]
         ) 
 
 # loop over the processes
@@ -621,10 +921,10 @@ for p in jobs:
     # check if the process has to be done
     # print(getattr(p,'name'))
     job = getattr(p,'name')
-    if p.do is True:
-        print('Run {} ....'.format(p))
-        [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
-        print()
+
+    print('Run {} ....'.format(p))
+    [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
+    print()
 
 # [postprocess.call(job,kk) for kk in range(postprocess.Nifg)]
 # work = [kk for kk in range(postprocess.Nifg)]
