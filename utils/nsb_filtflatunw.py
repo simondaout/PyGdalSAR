@@ -689,15 +689,6 @@ class FiltFlatUnw:
         infile =  self.stack.getname(kk) + '.int'
         corfile =  self.stack.getcor(kk) 
 
-        # look strat file
-        stratfile = self.stack.getstratfile(kk) + '.unw'
-        if (path.exists(stratfile) == False) and (self.strat == True):
-            # self.strat check if flatten_topo has been done
-            self.look_file(stratfile)
-            self.strat = stratfile
- 
-        chdir(self.stack.getpath(kk))
-
         # look radar file if not done
         dem = self.SARMasterDir + '/'+  'radar_' + self.Rlooks_unw + 'rlks.hgt'
         if path.exists(self.dem) is False:
@@ -711,6 +702,15 @@ class FiltFlatUnw:
         self.stack.updatelook(kk,self.Rlooks_unw)
         outfile =  self.stack.getname(kk) + '.int'
         outcor = self.stack.getcor(kk) 
+
+        # look strat file
+        stratfile = self.stack.getstratfile(kk) + '.unw'
+        if (path.exists(stratfile) == False) and (self.strat == True):
+            # self.strat check if flatten_topo has been done
+            self.look_file(stratfile)
+            self.strat = stratfile
+
+        chdir(self.stack.getpath(kk))
 
         if path.exists(outfile) is False:
             print("look.pl "+str(infile)+" "+str(self.rlook))
