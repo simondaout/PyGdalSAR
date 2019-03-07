@@ -687,7 +687,7 @@ class FiltFlatUnw:
         chdir(self.stack.getpath(kk))
 
         infile =  self.stack.getname(kk) + '.int'
-        corfile =  self.stack.getcor(kk) + '.int'
+        corfile =  self.stack.getcor(kk) 
 
         # look strat file
         stratfile = self.stack.getstratfile(kk) + '.unw'
@@ -710,7 +710,7 @@ class FiltFlatUnw:
         # update looks
         self.stack.updatelook(kk,self.Rlooks_unw)
         outfile =  self.stack.getname(kk) + '.int'
-        outcor = self.stack.getcor(kk) + '.int'
+        outcor = self.stack.getcor(kk) 
 
         if path.exists(outfile) is False:
             print("look.pl "+str(infile)+" "+str(self.rlook))
@@ -790,11 +790,11 @@ class FiltFlatUnw:
             logger.debug('Colinearity on IFG {0} already computed'.format(infile))
             print('{0} exists, assuming OK'.format(outfile))
 
-        # Filter with colinearity for unwrapping
-        if path.exists(filtout) == False:
-            self.filterSW(kk)
-        if path.exists(filtoutroi) == False:
-            self.filterROI(kk)
+        # # Filter with colinearity for unwrapping
+        # if path.exists(filtout) == False:
+        #     self.filterSW(kk)
+        # if path.exists(filtoutroi) == False:
+        #     self.filterROI(kk)
 
     def unwrapping(self,kk):
         ''' Unwrap function from strating seedx, seedy
