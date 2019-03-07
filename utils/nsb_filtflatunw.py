@@ -575,6 +575,8 @@ class FiltFlatUnw:
             phi_select = phi[index]
             z_select = z[index]
 
+
+
             if self.nfit_atmo == -1:
                 b1 = np.nanmedian(phi_select)
                 fit = z_select*b1
@@ -596,7 +598,7 @@ class FiltFlatUnw:
             
             # save median phase/topo
             strattxt = path.splitext(infile)[0] + '_strat.top'
-            np.savetxt(strattxt, median, fmt=('%.8f'))
+            np.savetxt(strattxt, np.array([b1, b2, b3, b4]), header='# z   |   z**2   |   z**3   |   z**4  ' ,  fmt=('%.8f','%.8f','%.8f','%.8f')
 
             ax.plot(z_select,phi_selct*z_select,'.r',label='selected points')
             av = np.median(phi_select*z_select)
