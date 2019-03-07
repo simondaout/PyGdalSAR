@@ -36,7 +36,7 @@ import logging
 ##################################################################################
 
 # init logger 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('filtcorunw')
 
 # init collections 
@@ -61,8 +61,8 @@ def date2dec(dates):
     return times
 
 class Job():
-    """ Create a class of Jobs: 
-    Job list: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unw add_model_back add_atmo_back add_ramp_back """
+    """ Create a class of Jobs to be run: 
+    Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -211,10 +211,10 @@ class FiltFlatUnw:
     list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
     nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, filterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref,
     seedx, seedy.threshold_unw, unw_method
-    Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask, 
+    Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask (default: 0.)
     defining the boundary of the mask zone for emprical estimations
     suffix, preffix: define name of the interferogram at the start of the processes
-    model: model to be removed from wrapped interferograms
+    model: model to be removed from wrapped interferograms (default: None)
     """
 
     def __init__(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
@@ -296,7 +296,7 @@ class FiltFlatUnw:
         infile = self.stack.getname(kk)+ '.int'
         rscfile = infile + '.rsc'
         corfile = self.stack.getcor(kk) 
-        logger.debug('Replace Amplitude by Coherence on IFG: {0}'.format(infile))
+        logger.info('Replace Amplitude by Coherence on IFG: {0}'.format(infile))
 
         # compute width and length
         width,length = self.computesize(infile)
@@ -314,7 +314,7 @@ class FiltFlatUnw:
         if path.exists(outfile) is False:
             if path.exists(corfile):
 
-                logger.debug('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
+                logger.info('Replace Amplitude by Cohrence for IFG: {}'.format(infile))
                 print("rmg2mag_phs "+str(corfile)+" tmp cor "+str(width))
                 r1 = subprocess.call("rmg2mag_phs "+str(corfile)+" tmp cor "+str(width)+"  >> log_replaceAMP.txt", shell=True)
                 if r1 != 0:
@@ -362,7 +362,7 @@ class FiltFlatUnw:
         filtbase = self.stack.getfiltSW(kk)
         filtrsc = filtbase + '.int.rsc'
 
-        logger.debug('Filter {0} with {1} filter type'.format(infile,self.filterstyle))
+        logger.info('Filter {0} with {1} filter type'.format(infile,self.filterstyle))
         r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
                 +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle), shell=True)
         if r != 0:
@@ -394,9 +394,9 @@ class FiltFlatUnw:
         if path.exists(filtrsc) == False:
             shutil.copy(inrsc,filtrsc)
 
-        logger.debug('Filter {0} with ROI-PAC adaptative filter'.format(infile))
-        print("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(self.filterStrength))
-        r = subprocess.call("adapt_filt "+str(infile)+" "+str(filtfile)+" "\
+        logger.info('Filter {0} with ROI-PAC adaptative filter'.format(infile))
+        print("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(self.filterStrength))
+        r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
                 +str(width)+" 0.25"+" "+str(self.filterStrength)+"  >> log_filtROI.txt", shell=True)
         if r != 0:
             logger.warning('Failed filtering {0} with ROI-PAC adaptative filter'.format(infile))
@@ -431,7 +431,7 @@ class FiltFlatUnw:
             self.filterSW(kk)
 
         if path.exists(outfile) == False:
-            logger.debug('Flatten range on IFG: {0}'.format(infile))
+            logger.info('Flatten range on IFG: {0}'.format(infile))
             print("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
                 " "+str(self.nfit_range)+" "+str(self.thresh_amp_range))
             r = subprocess.call("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
@@ -469,12 +469,12 @@ class FiltFlatUnw:
         shutil.copy(inrsc,outrsc)
 
         if path.exists(filtfile) == False:
-            logger.debug('{0} does not exist'.format(filtfile))
+            logger.info('{0} does not exist'.format(filtfile))
             # call filter function
             eval(self.filterSW(kk))
 
         if path.exists(outfile) == False:
-            logger.debug('Flatten azimuth on IFG: {0}'.format(infile))
+            logger.info('Flatten azimuth on IFG: {0}'.format(infile))
             print("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
                 " "+str(nfit_az)+" "+str(thresh_amp_az))
 
@@ -503,7 +503,7 @@ class FiltFlatUnw:
 
         # filt must be done before changing name
         if path.exists(filtfile) == False:
-            logger.debug('{0} does not exist'.format(filtfile))
+            logger.info('{0} does not exist'.format(filtfile))
             # call filter function
             self.filterSW(kk)
 
@@ -533,7 +533,7 @@ class FiltFlatUnw:
         chdir(self.stack.getpath(kk))
 
         if path.exists(outfile) == False:
-            logger.debug('Flatten topo on IFG: {0}'.format(infile))
+            logger.info('Flatten topo on IFG: {0}'.format(infile))
             print("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(self.dem)+" "+str(outfile)+" "+str(filtout)\
                 +" "+str(self.nfit_atmo)+" "+str(self.ivar)+" "+str(self.z_ref)+" "+str(self.thresh_amp_atmo)+" "+\
                 str(stratfile))
@@ -705,9 +705,9 @@ class FiltFlatUnw:
             self.look_file(self.dem)
             self.dem = dem
 
-        logger.debug('Look file {0} in {1} look'.format(infile,self.rlook))
+        logger.info('Look file {0} in {1} look'.format(infile,self.rlook))
         chdir(self.stack.getpath(kk))
-        
+
         # update looks
         self.stack.updatelook(kk,self.Rlooks_unw)
         outfile =  self.stack.getname(kk) + '.int'
@@ -757,8 +757,15 @@ class FiltFlatUnw:
         newprefix = 'col_'
         self.stack.updatefix(kk,newprefix,suffix)
         outfile = self.stack.getname(kk) + '.int'
+        outrsc = outfile + '.rsc'
         filtout = self.stack.getfiltSW(kk) + '.int'
+        filtrsc = filtout + '.rsc'
         filtoutroi = self.stack.getfiltROI(kk)+ '.int'
+        filtroirsc = filtoutroi + '.rsc'
+
+        shutil.copy(inrsc,outrsc)
+        shutil.copy(inrsc,filtrsc)
+        shutil.copy(inrsc,filtroirsc)
 
         # Retrieve length and width
         width,length =  self.stack.getsize(kk)
@@ -767,7 +774,7 @@ class FiltFlatUnw:
             self.stack.updatesize(kk,width,length)
 
         if path.exists(outfile) == False:
-            logger.debug('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
+            logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
             shutil.copy(infile,'temp')
             print("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
                 " 3 0.0001 2")
@@ -778,7 +785,7 @@ class FiltFlatUnw:
                 print(self.colin.__doc__)
                 sys.exit()
             # clean
-            remove(temp)
+            remove('temp')
 
         else:
             logger.debug('Colinearity on IFG {0} already computed'.format(infile))
@@ -814,55 +821,60 @@ class FiltFlatUnw:
         shutil.copy(inrsc,unwROIrsc)
 
         # Filter with colinearity
-        if path.exists(unwfiltROI) == False:
+        if path.exists(filtROIfile) == False:
             self.filterROI(kk)
 
-        print('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
-            format(unwfile,self.seedx,self.seedy,self.threshold_unw))
-        if self.unw_method == 'mpd':
-            logger.debug("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
-            if path.exists(unwfiltSW) == False:
-                self.filterSW(kk)
+        if path.exists(unwfiltROI) == False:
 
-            # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
-            # unwrapped firt filtSWfile and then add high frequency of filtROIfile
-            print("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
-                +" "+str(self.seedx)+" "+str(self.seedy)+" "+str(0.04)+" "+str(self.threshold_unw)+" 0")
-            r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
-                +" "+str(self.seedx)+" "+str(self.seedy)+" "+str(0.04)+" "+str(self.threshold_unw)+" 0  >> log_unw.txt", shell=True)
-            if r != 0:
-                print(self._unwrapping.__doc__)
-                logger.warning("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
-                sys.exit()
-            # remove('cut')
+            print('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
+                format(unwfile,self.seedx,self.seedy,self.threshold_unw))
+            if self.unw_method == 'mpd':
+                logger.info("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
+                if path.exists(unwfiltSW) == False:
+                    self.filterSW(kk)
 
-        if self.unw_method == 'roi':
+                # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
+                # unwrapped firt filtSWfile and then add high frequency of filtROIfile
+                print("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
+                    +" "+str(self.seedx)+" "+str(self.seedy)+" "+str(0.04)+" "+str(self.threshold_unw)+" 0")
+                r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
+                    +" "+str(self.seedx)+" "+str(self.seedy)+" "+str(0.04)+" "+str(self.threshold_unw)+" 0  >> log_unw.txt", shell=True)
+                if r != 0:
+                    print(self._unwrapping.__doc__)
+                    logger.warning("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
+                    sys.exit()
+                # remove('cut')
 
-            logger.debug("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
-            mask = path.splitext(filtSWfile)[0] + '_msk'
+            if self.unw_method == 'roi':
 
-            print("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
-            r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
-            if r != 0:
-                print(self._unwrapping.__doc__)
-                logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-                sys.exit()
+                logger.info("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
+                mask = path.splitext(filtSWfile)[0] + '_msk'
 
-            print("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
-            r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
-            if r != 0:
-                print(self._unwrapping.__doc__)
-                logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-                sys.exit()
+                print("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
+                r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
+                if r != 0:
+                    print(self._unwrapping.__doc__)
+                    logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                    sys.exit()
 
-            print("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
-                +" "+str(self.threshold_unw)+" "+str(self.seedx)+" "+str(self.seedy))
-            r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
-                +" "+str(self.threshold_unw)+" "+str(self.seedx)+" "+str(self.seedy)+"  >> log_unw.txt",shell=True)
-            if r != 0:
-                print(self._unwrapping.__doc__)
-                logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-                sys.exit()
+                print("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
+                r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
+                if r != 0:
+                    print(self._unwrapping.__doc__)
+                    logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                    sys.exit()
+
+                print("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
+                    +" "+str(self.threshold_unw)+" "+str(self.seedx)+" "+str(self.seedy))
+                r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
+                    +" "+str(self.threshold_unw)+" "+str(self.seedx)+" "+str(self.seedy)+"  >> log_unw.txt",shell=True)
+                if r != 0:
+                    print(self._unwrapping.__doc__)
+                    logger.warning("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                    sys.exit()
+        else:
+            logger.debug("Unwraped IFG:{0} already done  ".format(unwfiltROI))
+            print('{0} exists, assuming OK'.format(unwfiltROI))
 
     def add_atmo_back(self,kk):
         ''' Add back stratified model computed by flatten_topo'''
@@ -879,14 +891,18 @@ class FiltFlatUnw:
         self.stack.updatefix(kk,prefix,newsuffix)
         outfile = self.stack.getname(kk) + '.unw'
 
-        logger.debug('Adding back {0} on IFG: {1}'.format(stratfile,unwfile))
-        print("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(outfile)+" "+str(stratfile))
-        r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(outfile)+" "+str(stratfile)+\
-             " >> log_flatenrange.txt", shell=True)
-        if r != 0:
-            logger.warning('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
-            logger.warning(r) 
-            sys.exit()
+        if path.exists(outfile) == False:
+            logger.info('Adding back {0} on IFG: {1}'.format(stratfile,unwfile))
+            print("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
+            r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
+                 " >> log_flatenrange.txt", shell=True)
+            if r != 0:
+                logger.warning('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
+                logger.warning(r) 
+                sys.exit()
+        else:
+            logger.debug("Adding back {0} on IFG already done: {1}".format(stratfile,unwfile))
+            print('{0} exists, assuming OK'.format(outfile))
 
     def add_ramp_back(self,kk):
         return
@@ -926,7 +942,7 @@ filterStrength=2.
 seedx=268
 seedy=1766
 threshold_unw=0.35
-unw_method='mpd'
+unw_method='roi'
 
 nfit_topo=-1
 thresh_amp_topo=0.2
@@ -938,8 +954,9 @@ z_ref=8000.
 # Test Process List
 ####################
 
-""" Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unw add_model_back add_atmo_back add_ramp_back """
-do_list =  'replace_amp filterSW flat_topo colin unw add_atmo_back'  
+""" Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
+print(Job.__doc__)
+do_list =  'replace_amp filterSW flat_topo colin look_int filterSW unwrapping add_atmo_back'  
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
@@ -972,6 +989,7 @@ for p in jobs:
     [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
     print('----------------------------------')
     print()
+print("That's all folks")
 
 # [postprocess.call(job,kk) for kk in range(postprocess.Nifg)]
 # work = [kk for kk in range(postprocess.Nifg)]
