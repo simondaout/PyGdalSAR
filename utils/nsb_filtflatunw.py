@@ -575,8 +575,6 @@ class FiltFlatUnw:
             phi_select = phi[index]
             z_select = z[index]
 
-
-
             if self.nfit_atmo == -1:
                 b1 = np.nanmedian(phi_select)
                 fit = z_select*b1
@@ -598,10 +596,7 @@ class FiltFlatUnw:
             
             # save median phase/topo
             strattxt = path.splitext(infile)[0] + '_strat.top'
-            np.savetxt(strattxt, np.array([b1, b2, b3, b4]), header='# z   |   z**2   |   z**3   |   z**4  ' ,  fmt=('%.8f','%.8f','%.8f','%.8f')
-
-            ax.plot(z_select,phi_selct*z_select,'.r',label='selected points')
-            av = np.median(phi_select*z_select)
+            np.savetxt(strattxt, np.array([b1, b2, b3, b4]), header='# z   |   z**2   |   z**3   |   z**4  ' ,  fmt=('%.8f','%.8f','%.8f','%.8f'))
             
             # clean and prepare for write strat
             infileunw = path.splitext(infile)[0] + '.unw'
@@ -667,6 +662,7 @@ class FiltFlatUnw:
         ax = fig.add_subplot(1,1,1)
         # lets not plot dphi but phi
         ax.plot(z,phi*z,'.',alpha=.6)
+        ax.plot(z_select,phi_select*z_select,'.',label='selected points',alpha=.6)
         ax.plot(z_select,fit-cst,'-r',lw=3,label='Fit: {0:.3f}z + {1:.3f}z**2 + {2:.3f}z**3 + {3:.3f}z**4'.format(b1,b2,b3,b4))
         ax.set_xlabel('Elevation (m)')
         ax.set_ylabel('Phase (rad)')
@@ -922,7 +918,7 @@ suffix = '_sd'
 iend_mask=0 # mask for empirical estimations
 jend_mask=0
 jbeg_mask=0
-jend_mask=0
+jend_mask=200
 model=None # model to be removed from wrapped int
 nproc=2
 
