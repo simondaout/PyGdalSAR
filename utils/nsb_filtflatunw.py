@@ -27,9 +27,8 @@ from datetime import datetime
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-# scipy
 import logging
-
+import multiprocessing
 
 ##################################################################################
 ###  INITIALISE
@@ -923,7 +922,7 @@ jend_mask=0
 jbeg_mask=0
 jend_mask=0
 model=None # model to be removed from wrapped int
-nproc=1
+nproc=2
 
 # proc file parameters
 IntDir=path.abspath(home)+'/'+'test/'
@@ -968,6 +967,9 @@ print()
 #   MAIN 
 ###########
 
+print(FiltFlatUnw.__doc__)
+print()
+
 postprocess = FiltFlatUnw(
         [ListInterfero,SARMasterDir,IntDir,
         Rlooks_int, Rlooks_unw, 
@@ -986,15 +988,14 @@ for p in jobs:
     job = getattr(p,'name')
     print('----------------------------------')
     print('Run {} ....'.format(p))
-    [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
+    # [eval('postprocess.{0}({1})'.format(job,kk)) for kk in range(postprocess.Nifg)]
+    work = [kk for kk in range(postprocess.Nifg)]
+    pool = multiprocessing.Pool(nproc)
+    pool.map(eval('postprocess.{0}({1})'.format(job,kk)), work)
+    pool.close() 
     print('----------------------------------')
     print()
 print("That's all folks")
-
-# [postprocess.call(job,kk) for kk in range(postprocess.Nifg)]
-# work = [kk for kk in range(postprocess.Nifg)]
-# pool = multiprocessing.Pool(nproc)
-# pool.map(look, work)
-# pool.close()      
+ 
 
 
