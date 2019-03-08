@@ -256,22 +256,21 @@ class FiltFlatUnw:
     def go(self,jobs, nproc):
         ''' RUN function '''
 
-        # import itertools
         for p in jobs:
             
             job = getattr(p,'name')
             print('----------------------------------')
             print('Run {} ....'.format(job))
             
-            #[eval('self.{0}({1})'.format(job,kk)) for kk in range(self.Nifg)]
-            
-            # work = [ (job,kk) for kk in range(self.Nifg)]
-            # sys.exit()
-            #pool = multiprocessing.Pool(nproc)
-            pool = pp.ProcessPool(nproc)
-            pool.map(eval('self.{0}'.format(job)), range(self.Nifg))
-            #pool.close()
-            #pool.join() 
+            [eval('self.{0}({1})'.format(job,kk)) for kk in range(self.Nifg)]
+
+            # pool = pp.ProcessPool(nproc)
+            # results = pool.map(eval('self.{0}'.format(job)), range(self.Nifg))
+            # while not results.ready():
+            #     time.sleep(3); print (".",end=' ')
+            # results = results.get()
+
+
             print('----------------------------------')
             print()
 
@@ -381,17 +380,23 @@ class FiltFlatUnw:
         corbase = path.splitext(corfile)[0]
         filtbase = self.stack.getfiltSW(kk)
         filtrsc = filtbase + '.int.rsc'
+        outfile = filtbase + '.int'
 
-        logger.info('Filter {0} with {1} filter type'.format(infile,self.filterstyle))
-        r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
-                +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle), shell=True)
-        if r != 0:
-            logger.warning('Failed filtering {0} with {1} filter type'.format(infile,self.filterstyle))
-            print(self.filterSW.__doc__)
-            sys.exit()
+        if path.exists(outfile) == False:
+            logger.info('Filter {0} with {1} filter type'.format(infile,self.filterstyle))
+            r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
+                    +" "+str(self.SWwindowsize)+" "+str(self.SWamplim)+" "+str(self.filterstyle), shell=True)
+            if r != 0:
+                logger.warning('Failed filtering {0} with {1} filter type'.format(infile,self.filterstyle))
+                print(self.filterSW.__doc__)
+                sys.exit()
 
-        if path.exists(filtrsc) == False:
-            shutil.copy(inrsc,filtrsc)
+            if path.exists(filtrsc) == False:
+                shutil.copy(inrsc,filtrsc)
+
+        else:
+            logger.debug('Filter IFG: {0} already done'.format(infile))
+            print('{0} exists, assuming OK'.format(outfile))
 
     def filterROI(self, kk):
         ''' ROI-PAC Filter function
@@ -402,7 +407,7 @@ class FiltFlatUnw:
 
         infile = self.stack.getname(kk) + '.int'
         inrsc = infile + '.rsc'
-        
+
         # get width and compute if not already done
         width,length =  self.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
@@ -414,15 +419,21 @@ class FiltFlatUnw:
         if path.exists(filtrsc) == False:
             shutil.copy(inrsc,filtrsc)
 
-        logger.info('Filter {0} with ROI-PAC adaptative filter'.format(infile))
-        print("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(self.filterStrength))
-        r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
-                +str(width)+" 0.25"+" "+str(self.filterStrength)+"  >> log_filtROI.txt", shell=True)
-        if r != 0:
-            logger.warning('Failed filtering {0} with ROI-PAC adaptative filter'.format(infile))
-            print(self.filterROI.__doc__)
-            sys.exit()
-        
+        if path.exists(filtfile) == False:
+
+            logger.info('Filter {0} with ROI-PAC adaptative filter'.format(infile))
+            print("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(self.filterStrength))
+            r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
+                    +str(width)+" 0.25"+" "+str(self.filterStrength)+"  >> log_filtROI.txt", shell=True)
+            if r != 0:
+                logger.warning('Failed filtering {0} with ROI-PAC adaptative filter'.format(infile))
+                print(self.filterROI.__doc__)
+                sys.exit()
+
+        else:
+            logger.debug('Filter IFG: {0} already done'.format(infile))
+            print('{0} exists, assuming OK'.format(filtfile))
+            
     def flat_range(self,kk):
         ''' Function flatten range  on wrapped phase  (See Doin et al., 2015)
         Requiered proc file parameters: nfit_range, thresh_amp_range
@@ -569,7 +580,7 @@ class FiltFlatUnw:
         
         inrsc = infile + '.rsc'
         outrsc = outfile + '.rsc'
-        print(inrsc,outrsc)
+        # print(inrsc,outrsc)
         filtrsc = filtout + '.rsc'
         shutil.copy(inrsc,outrsc)
         shutil.copy(inrsc,filtrsc)
@@ -697,6 +708,65 @@ class FiltFlatUnw:
         # update strat
         self.strat = True
 
+    def flat_model(self,kk):
+        return
+
+    def colin(self,kk):
+        ''' Compute and replace amplitude by colinearity (See Pinel-Puyssegur et al., 2012)'''
+
+        chdir(self.stack.getpath(kk))
+
+        infile = self.stack.getname(kk) + '.int'
+        inrsc = infile + '.rsc'
+        filtfile = self.stack.getfiltSW(kk) + '.int'
+        # print(infile)
+        # sys.exit(0)
+
+        # update names
+        prefix, suffix = self.stack.getfix(kk)
+        newprefix = 'col_'
+        self.stack.updatefix(kk,newprefix,suffix)
+        outfile = self.stack.getname(kk) + '.int'
+        outrsc = outfile + '.rsc'
+        filtout = self.stack.getfiltSW(kk) + '.int'
+        filtrsc = filtout + '.rsc'
+        filtoutroi = self.stack.getfiltROI(kk)+ '.int'
+        filtroirsc = filtoutroi + '.rsc'
+
+        shutil.copy(inrsc,outrsc)
+        shutil.copy(inrsc,filtrsc)
+        shutil.copy(inrsc,filtroirsc)
+
+        # Retrieve length and width
+        width,length =  self.stack.getsize(kk)
+        if (int(width) == 0) or (int(length) == 0):
+            width,length = self.computesize(infile)
+            self.stack.updatesize(kk,width,length)
+
+        if path.exists(outfile) == False:
+            logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
+            shutil.copy(infile,'temp')
+            print("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
+                " 3 0.0001 2")
+            r = subprocess.call("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
+                " 3 0.0001 2  >> log_flatenrange.txt", shell=True)
+            if r != 0:
+                logger.warning('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
+                print(self.colin.__doc__)
+                sys.exit()
+            # clean
+            remove('temp')
+
+        else:
+            logger.debug('Colinearity on IFG {0} already computed'.format(infile))
+            print('{0} exists, assuming OK'.format(outfile))
+
+        # # Filter with colinearity for unwrapping
+        # if path.exists(filtout) == False:
+        #     self.filterSW(kk)
+        # if path.exists(filtoutroi) == False:
+        #     self.filterROI(kk)
+
     def look_int(self,kk):
         ''' Look function for IFG, coherence, strat, and radar files
         Requiered parameters:  Rlooks_int, Rlooks_unw
@@ -746,74 +816,16 @@ class FiltFlatUnw:
             if r != 0:
                 logger.warning(' Can''t look file {0} in {1} look'.format(corfile,self.rlook))
                 print(self.look_int.__doc__)
-                
-            r = subprocess.call("look.pl "+str(self.dem)+" "+str(self.rlook)+" >> log_look.txt", shell=True)
-            if r != 0:
-                logger.warning(' Can''t look file {0} in {1} look'.format(corfile,self.rlook))
-                print(self.look_int.__doc__)
         else:
-            print('{0} exists, assuming OK'.format(outfile))
+            print('{0} exists, assuming OK'.format(outfile))        
                 
         # update size
-        width,length = self.computesize(outcor)
+        width,length = self.computesize(outfile)
         self.stack.updatesize(kk,width,length)
 
-    def flat_model(self,kk):
-        return
+        # print(outfile)
+        # print(self.stack.getlook(kk))
 
-    def colin(self,kk):
-        ''' Compute and replace amplitude by colinearity (See Pinel-Puyssegur et al., 2012)'''
-
-        chdir(self.stack.getpath(kk))
-
-        infile = self.stack.getname(kk) + '.int'
-        inrsc = infile + '.rsc'
-        filtfile = self.stack.getfiltSW(kk) + '.int'
-
-        # update names
-        prefix, suffix = self.stack.getfix(kk)
-        newprefix = 'col_'
-        self.stack.updatefix(kk,newprefix,suffix)
-        outfile = self.stack.getname(kk) + '.int'
-        outrsc = outfile + '.rsc'
-        filtout = self.stack.getfiltSW(kk) + '.int'
-        filtrsc = filtout + '.rsc'
-        filtoutroi = self.stack.getfiltROI(kk)+ '.int'
-        filtroirsc = filtoutroi + '.rsc'
-
-        shutil.copy(inrsc,outrsc)
-        shutil.copy(inrsc,filtrsc)
-        shutil.copy(inrsc,filtroirsc)
-
-        # Retrieve length and width
-        width,length =  self.stack.getsize(kk)
-        if (int(width) == 0) or (int(length) == 0):
-            width,length = self.computesize(infile)
-            self.stack.updatesize(kk,width,length)
-
-        if path.exists(outfile) == False:
-            logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
-            shutil.copy(infile,'temp')
-            print("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
-                " 3 0.0001 2")
-            r = subprocess.call("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
-                " 3 0.0001 2  >> log_flatenrange.txt", shell=True)
-            if r != 0:
-                logger.warning('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
-                print(self.colin.__doc__)
-                sys.exit()
-            # clean
-            remove('temp')
-
-        else:
-            logger.debug('Colinearity on IFG {0} already computed'.format(infile))
-            print('{0} exists, assuming OK'.format(outfile))
-
-        # # Filter with colinearity for unwrapping
-        # if path.exists(filtout) == False:
-        #     self.filterSW(kk)
-        # if path.exists(filtoutroi) == False:
-        #     self.filterROI(kk)
 
     def unwrapping(self,kk):
         ''' Unwrap function from strating seedx, seedy
@@ -933,8 +945,14 @@ class FiltFlatUnw:
 ##################################################################################
 
 # # input parameters (not in the proc file)
-#home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+# seedx=336 ## iw1
+# seedy=1840
+
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
+# seedx=300 ## iw2
+# seedy=2384
+
 prefix = '' 
 suffix = '_sd'
 iend_mask=0 # mask for empirical estimations
@@ -958,10 +976,10 @@ filterstyle='SWc'
 SWamplim=0.05
 SWwindowsize=8
 filterStrength=2.
-#seedx=336
-#seedy=1840
-seedx=300
-seedy=2384
+
+
+
+
 threshold_unw=0.35
 unw_method='mpd'
 
@@ -971,13 +989,19 @@ ivar=1
 z_ref=8000.
 
 
+#### TEST DIR
+home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+IntDir=path.abspath(home)+'/'+'test/'
+ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+
 ####################
 # Test Process List
 ####################
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-do_list =  'replace_amp filterSW flat_topo colin look_int filterSW unwrapping add_atmo_back'  
+do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_atmo_back'  
+# do_list =  'replace_amp filterSW flat_topo colin look_int ' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
