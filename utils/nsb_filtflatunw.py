@@ -383,7 +383,7 @@ def filterROI(config, kk):
 
     with Cd(config.stack.getpath(kk)):
 
-        infile = config.stack.getname(kk) + '.int'; ; checkinfile(infile)
+        infile = config.stack.getname(kk) + '.int'; checkinfile(infile)
         inrsc = infile + '.rsc'
         # get width and compute if not already done
         width,length =  config.stack.getsize(kk)
@@ -391,7 +391,7 @@ def filterROI(config, kk):
             width,length = config.computesize(infile)
             config.stack.updatesize(kk,width,length)
 
-        filtfile = config.stack.getfiltROI(kk) + '.int'; ; checkinfile(filtfile)
+        filtfile = config.stack.getfiltROI(kk) + '.int'; checkinfile(filtfile)
         filtrsc = filtfile + '.rsc'
         if path.exists(filtrsc) == False:
             shutil.copy(inrsc,filtrsc)
@@ -921,7 +921,6 @@ def poolcontext(*arg, **kargs):
     yield pool
     pool.terminate()
     pool.join()
-
 
 #raise Exception('Look file {0} failed !'.format(file))
 
