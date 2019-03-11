@@ -282,7 +282,7 @@ class TimeIt(ContextDecorator):
         print((datetime.datetime.now() - self.start).total_seconds())
 
 # create context manager for change dirt
-class Cd(objet):
+class Cd(object):
     def __init__(dirname):
         self.dirname = dirname
     def __enter__(self):
