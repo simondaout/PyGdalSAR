@@ -27,10 +27,9 @@ from numpy.lib.stride_tricks import as_strided
 import logging
 from multiprocessing import Pool
 # import pathos.pools as pp
-
 from contextlib import contextmanager
 from functools import wraps, partial
-
+from itertools import repeat
 
 
 
@@ -975,10 +974,14 @@ def poolcontext(*arg, **kargs):
 
 #raise Exception('Look file {0} failed !'.format(file))
 
+
+
 def go(config,job,nproc):
     ''' RUN processing function '''
     
-    map(partial(eval(job), config=config), range(config.Nifg))
+    work = range(config.Nifg)
+    map(eval(job), repeat(config, len(work)) , work)
+
     # with poolcontext(processes=nproc) as pool:
     #     results = pool.map(eval('config.{0}.format(job))',  range(config.Nifg)))
     
