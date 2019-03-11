@@ -73,8 +73,11 @@ class ContextDecorator(object):
             with self:
                 try:
                     return f(*args, **kwds)
+                except (KeyboardInterrupt, SystemExit):
+                    raise
                 except:
                     Exception('{0} Failed !'.format(f))
+                    raise
         return decorated
 
 class TimeIt(ContextDecorator):
@@ -109,26 +112,31 @@ def checkinfile(file):
 ##################################################################################
 
 # create generator for pool
-@contextmanager
-def poolcontext(*arg, **kargs):
-    pool = Pool(*arg, **kargs)
-    yield pool
-    pool.terminate()
-    pool.join()
+# @contextmanager
+# def poolcontext(*arg, **kargs):
+#     pool = Pool(*arg, **kargs)
+#     yield pool
+#     pool.terminate()
+#     pool.join()
 
-def go(config,job,nproc):
+def go(config,job,nproc=1):
     ''' RUN processing function '''
     
     with TimeIt():
         work = range(config.Nifg)
         
-        map(eval(job), repeat(config, len(work)) , work)
-        # with poolcontext(processes=2) as pool:
-        #     pool.map(partial(eval(job), config), work)
-    
-    # pool.close()
-    # pool.join()
+        if nproc > 1:
+            pool = Pool(*arg, **kargs)
+            results = pool.map(partial(eval(job), config), work)
+            while not results.ready():
+                  time.sleep(1)
+        else:
+            map(eval(job), repeat(config, len(work)) , work)
 
+
+        # with poolcontext(processes=2) as pool:
+
+    
     # # pool = pp.ProcessPool(nproc)
     # results = pool.map(eval('config.{0}'.format(job)), range(config.Nifg))
     # while not results.ready():
@@ -990,7 +998,6 @@ jend_mask=0
 jbeg_mask=0
 jend_mask=0
 model=None # model to be removed from wrapped int
-nproc=2
 
 # proc file parameters
 IntDir=path.abspath(home)+'/'+'int/'
@@ -1019,7 +1026,7 @@ z_ref=8000.
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-
+nproc=1
 
 ####################
 # Test Process List
