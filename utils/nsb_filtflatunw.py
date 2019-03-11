@@ -38,7 +38,7 @@ from itertools import repeat
 ##################################################################################
 
 # init logger 
-logging.basicConfig(level=logging.DEBUG,\
+logging.basicConfig(level=logging.INFO,\
       format='%(asctime)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('filtflatunw_log.log')
 
@@ -93,7 +93,7 @@ class Cd(object):
         logger.debug('Enter {0}'.format(self.dirname))
         chdir(self.dirname)
     def __exit__(self, type, value, traceback):
-        logger.debug('Exit{0}, Enter {1}'.format(self.dirname,self.curdir))
+        logger.debug('Enter {0}'.format(self.curdir))
         chdir(self.curdir)
 
 def checkinfile(file):
@@ -121,12 +121,11 @@ def go(config,job,nproc):
     
     with TimeIt():
         work = range(config.Nifg)
-        map(eval(job), repeat(config, len(work)) , work)
-
-    # with poolcontext(processes=nproc) as pool:
-    #     results = pool.map(eval('config.{0}.format(job))',  range(config.Nifg)))
+        
+        #map(eval(job), repeat(config, len(work)) , work)
+        with poolcontext(processes=2) as pool:
+            pool.map(eval(eval(job), repeat(config, len(work)) , work))
     
-    # print(results)
     # pool.close()
     # pool.join()
 
