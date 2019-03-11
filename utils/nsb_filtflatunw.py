@@ -267,7 +267,6 @@ def look_file(config,file):
         if r != 0:
             logger.critical(' Can''t look file {0} in {1} look'.format(filename,config.rlook))
             print(config.look_file.__doc__)
-        raise Exception('Look file {0} failed !'.{file})
 
 @TimeIt()
 def erai(config,kk):
@@ -921,7 +920,11 @@ def poolcontext(*arg, **kargs):
     pool = Pool(*arg, **kargs)
     yield pool
     pool.terminate()
-    pool.join()   
+    pool.join()
+
+
+#raise Exception('Look file {0} failed !'.format(file))
+
 
 def go(config,job,nproc):
     ''' RUN processing function '''
