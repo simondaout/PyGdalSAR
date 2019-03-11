@@ -350,7 +350,7 @@ def replace_amp(config, kk):
         logger.info('Replace Amplitude by Coherence on IFG: {0}'.format(infile))
 
         # compute width and length
-        width,length = computesize(infile)
+        width,length = computesize(config,infile)
         config.stack.updatesize(kk,width,length)
 
         # update names
@@ -439,7 +439,7 @@ def filterROI(config, kk):
         # get width and compute if not already done
         width,length =  config.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
-            width,length = computesize(infile)
+            width,length = computesize(config,infile)
             config.stack.updatesize(kk,width,length)
 
         filtfile = config.stack.getfiltROI(kk) + '.int'; checkinfile(filtfile)
@@ -571,15 +571,15 @@ def flat_topo(config, kk):
         # check width IFG
         width,length = config.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
-            width,length = computesize(infile)
+            width,length = computesize(config,infile)
             config.stack.updatesize(kk,width,length)
 
     # look dem if necessary
-    w,l = computesize(config.dem)
+    w,l = computesize(config,config.dem)
 
     if int(w) != int(width):
         logger.warning('IFG:{0} and DEM file are not the same size: {0}'.format(infile))
-        look_file(config.dem)
+        look_file(config,config.dem)
         # update DEM
         config.dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
         
@@ -764,7 +764,7 @@ def colin(config,kk):
         # Retrieve length and width
         width,length =  config.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
-            width,length = computesize(infile)
+            width,length = computesize(config,infile)
             config.stack.updatesize(kk,width,length)
 
         if path.exists(outfile) == False:
@@ -799,7 +799,7 @@ def look_int(config,kk):
         # look radar file if not done
         dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
         if path.exists(config.dem) is False:
-            look_file(config.dem)
+            look_file(config,config.dem)
             config.dem = dem
 
         logger.info('Look file {0} in {1} look'.format(infile,config.rlook))
@@ -814,7 +814,7 @@ def look_int(config,kk):
         stratfile = config.stack.getstratfile(kk) + '.unw'
         if (path.exists(stratfile) == False) and (config.strat == True):
             # config.strat check if flatten_topo has been done
-            look_file(stratfile)
+            look_file(config,stratfile)
             config.strat = stratfile
 
         chdir(config.stack.getpath(kk))
@@ -838,7 +838,7 @@ def look_int(config,kk):
             logger.warning('{0} exists, assuming OK'.format(outfile))        
                 
         # update size
-        width,length = computesize(outfile)
+        width,length = computesize(config,outfile)
         config.stack.updatesize(kk,width,length)
         # print(outfile)
         # print(config.stack.getlook(kk))
