@@ -343,7 +343,7 @@ def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
 
     dirn = config.stack.getpath(kk)
-    print dirn
+    print(dirn)
     with Cd(dirn):
         infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
         rscfile = infile + '.rsc'
