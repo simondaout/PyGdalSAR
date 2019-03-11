@@ -93,8 +93,9 @@ class Cd(object):
 
 def checkinfile(file):
     if path.exists(file) is False:
-        print("File: {0} not found".format(file))
-        print(listdir('./'))
+        logger.critical("File: {0} not found, Exit !".format(file))
+        print("File: {0} not found, Exit !".format(file))
+        # print(listdir('./'))
         sys.exit()
 
 ##################################################################################
@@ -742,9 +743,6 @@ def colin(config,kk):
 
         infile = config.stack.getname(kk) + '.int';  checkinfile(infile)
         inrsc = infile + '.rsc'
-        filtfile = config.stack.getfiltSW(kk) + '.int';  checkinfile(filtfile)
-        # print(infile)
-        # sys.exit(0)
 
         # update names
         prefix, suffix = config.stack.getfix(kk)
@@ -752,14 +750,6 @@ def colin(config,kk):
         config.stack.updatefix(kk,newprefix,suffix)
         outfile = config.stack.getname(kk) + '.int'
         outrsc = outfile + '.rsc'
-        filtout = config.stack.getfiltSW(kk) + '.int'
-        filtrsc = filtout + '.rsc'
-        filtoutroi = config.stack.getfiltROI(kk)+ '.int'
-        filtroirsc = filtoutroi + '.rsc'
-
-        shutil.copy(inrsc,outrsc)
-        shutil.copy(inrsc,filtrsc)
-        shutil.copy(inrsc,filtroirsc)
 
         # Retrieve length and width
         width,length =  config.stack.getsize(kk)
