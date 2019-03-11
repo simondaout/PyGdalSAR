@@ -128,8 +128,7 @@ def go(config,job,nproc=1):
         if nproc > 1:
             pool = Pool(processes=nproc)
             results = pool.map(partial(eval(job), config), work)
-            while not results.ready():
-                  time.sleep(1)
+
         else:
             map(eval(job), repeat(config, len(work)) , work)
 
