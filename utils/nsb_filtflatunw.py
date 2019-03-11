@@ -92,9 +92,7 @@ class Cd(object):
         chdir(self.curdir)
 
 def checkinfile(file):
-    try:
-        file = file.resolve(strict=True)
-    except:
+    if path.exists(file) is False:
         print("File: {0} not found".format(file))
         print(listdir('./'))
         sys.exit()
