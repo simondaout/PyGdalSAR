@@ -26,12 +26,9 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import logging
 from multiprocessing import Pool
-# import pathos.pools as pp
 from contextlib import contextmanager
 from functools import wraps, partial
 from itertools import repeat
-
-
 
 ##################################################################################
 ###  INITIALISE
@@ -129,17 +126,9 @@ def go(config,job,nproc=1):
             # pool = Pool(processes=nproc)
             with poolcontext(processes=2) as pool:
                 results = pool.map(partial(eval(job), config), work)
-
         else:
             map(eval(job), repeat(config, len(work)) , work)
 
-    
-    # # pool = pp.ProcessPool(nproc)
-    # results = pool.map(eval('config.{0}'.format(job)), range(config.Nifg))
-    # while not results.ready():
-    #      time.sleep(3); print (".",end=' ')
-    # results = results.get()
-    # time.sleep(3)
 
 ##################################################################################
 ###  Define Job, IFG, Images and FiltFlatUnw classes  
@@ -305,7 +294,6 @@ class FiltFlatUnw:
     suffix, preffix: define name of the interferogram at the start of the processes
     model: model to be removed from wrapped interferograms (default: None)
     """
-
 
     def __init__(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
@@ -1031,7 +1019,7 @@ z_ref=8000.
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-nproc=2
+nproc=1
 
 ####################
 # Test Process List
