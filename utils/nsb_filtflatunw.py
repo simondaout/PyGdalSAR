@@ -69,17 +69,18 @@ class ContextDecorator(object):
         @wraps(f)
         def decorated(*args, **kwds):
             with self:
-                return f(*args, **kwds)
+                try:
+                    return f(*args, **kwds)
+                except:
+                    Exception('{0} Failed !'.format(f))
         return decorated
 
 class TimeIt(ContextDecorator):
     def __enter__(self):
         self.start = datetime.now()
         print('Starting time process: {0}'.format(self.start))
-        raise Exception('Fail !')
     def __exit__(self, type, value, traceback):
         print('Time process: {0}s'.format((datetime.now() - self.start).total_seconds()))
-
 
 # create context manager for change dirt
 class Cd(object):
