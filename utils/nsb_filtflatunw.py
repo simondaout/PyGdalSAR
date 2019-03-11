@@ -126,7 +126,7 @@ def go(config,job,nproc=1):
         work = range(config.Nifg)
         
         if nproc > 1:
-            pool = Pool(*arg, **kargs)
+            pool = Pool(processes=nproc)
             results = pool.map(partial(eval(job), config), work)
             while not results.ready():
                   time.sleep(1)
