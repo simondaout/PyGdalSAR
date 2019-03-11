@@ -112,12 +112,12 @@ def checkinfile(file):
 ##################################################################################
 
 # create generator for pool
-# @contextmanager
-# def poolcontext(*arg, **kargs):
-#     pool = Pool(*arg, **kargs)
-#     yield pool
-#     pool.terminate()
-#     pool.join()
+@contextmanager
+def poolcontext(*arg, **kargs):
+    pool = Pool(*arg, **kargs)
+    yield pool
+    pool.terminate()
+    pool.join()
 
 def go(config,job,nproc=1):
     ''' RUN processing function '''
@@ -126,14 +126,12 @@ def go(config,job,nproc=1):
         work = range(config.Nifg)
         
         if nproc > 1:
-            pool = Pool(processes=nproc)
-            results = pool.map(partial(eval(job), config), work)
+            # pool = Pool(processes=nproc)
+            with poolcontext(processes=2) as pool:
+                results = pool.map(partial(eval(job), config), work)
 
         else:
             map(eval(job), repeat(config, len(work)) , work)
-
-
-        # with poolcontext(processes=2) as pool:
 
     
     # # pool = pp.ProcessPool(nproc)
