@@ -49,6 +49,55 @@ IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length
 Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
 ##################################################################################
+###  Extras functions and context maganers
+##################################################################################
+
+def date2dec(dates):
+    ''' Transform dates %Y%m%d to decimal dates'''
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetime.strptime('{}'.format(date),'%Y%m%d')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        times.append(year + dec)
+    return times
+
+# Timer for all the functions
+class ContextDecorator(object):
+    def __call__(self, f):
+        @wraps(f)
+        def decorated(*args, **kwds):
+            with self:
+                return f(*args, **kwds)
+        return decorated
+
+class TimeIt(ContextDecorator):
+    def __enter__(self):
+        self.start = datetime.now()
+        print('Starting time process: {0}'.format(self.start))
+    def __exit__(self, type, value, traceback):
+        print('Time process: {0}s'.format((datetime.now() - self.start).total_seconds()))
+
+# create context manager for change dirt
+class Cd(object):
+    def __init__(self,dirname):
+        self.dirname = dirname
+    def __enter__(self):
+        self.curdir = os.getcwd()
+        os.chdir(self.dirname)
+    def __exit__(self, type, value, traceback):
+        os.chdir(self.curdir)
+
+def checkinfile(file):
+    try:
+        file = file.resolve(strict=True)
+    except FileNotFoundError:
+        print("File: {0} not found".format(err))
+        sys.exit()
+
+
+##################################################################################
 ###  Define Job, IFG, Images and FiltFlatUnw classes  
 ##################################################################################
 
@@ -251,54 +300,6 @@ class FiltFlatUnw:
         self.images.info()
         self.Nimages = len(self.images)
 
-##################################################################################
-###  Extras functions and context maganers
-##################################################################################
-
-def date2dec(dates):
-    ''' Transform dates %Y%m%d to decimal dates'''
-    dates  = np.atleast_1d(dates)
-    times = []
-    for date in dates:
-        x = datetime.strptime('{}'.format(date),'%Y%m%d')
-        dec = float(x.strftime('%j'))/365.1
-        year = float(x.strftime('%Y'))
-        times.append(year + dec)
-    return times
-
-# Timer for all the functions
-class ContextDecorator(object):
-    def __call__(self, f):
-        @wraps(f)
-        def decorated(*args, **kwds):
-            with self:
-                return f(*args, **kwds)
-        return decorated
-
-class TimeIt(ContextDecorator):
-    def __enter__(self):
-        self.start = datetime.now()
-        print('Starting time process: {0}'.format(self.start))
-    def __exit__(self, type, value, traceback):
-        print('Time process: {0}s'.format((datetime.now() - self.start).total_seconds()))
-
-# create context manager for change dirt
-class Cd(object):
-    def __init__(dirname):
-        self.dirname = dirname
-    def __enter__(self):
-        self.curdir = os.getcwd()
-        os.chdir(self.dirname)
-    def __exit__(self, type, value, traceback):
-        os.chdir(self.curdir)
-
-def checkinfile(file):
-    try:
-        file = file.resolve(strict=True)
-    except FileNotFoundError:
-        print("File: {0} not found".format(err))
-        sys.exit()
-
 
 ##################################################################################
 ###  Define Job functions 
@@ -344,7 +345,7 @@ def replace_amp(config, kk):
 
     dirn = str(config.stack.getpath(kk))
     print(dirn[0],dirn[1])
-    with Cd('./'):
+    with Cd(config.stack.getpath(kk)):
         infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
         rscfile = infile + '.rsc'
         corfile = config.stack.getcor(kk); checkinfile(corfile)
