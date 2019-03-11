@@ -278,9 +278,9 @@ class ContextDecorator(object):
 class TimeIt(ContextDecorator):
     def __enter__(self):
         self.start = datetime.now()
-        print(self.start)
+        print('Starting time: {0}'.format(self.start))
     def __exit__(self, type, value, traceback):
-        print((datetime.now() - self.start).total_seconds())
+        print('Time process: {0}'.format((datetime.now() - self.start).total_seconds()))
 
 # create context manager for change dirt
 class Cd(object):
@@ -342,7 +342,7 @@ def computesize(config,file):
 def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
 
-    dirn = config.stack.getpath(kk)
+    dirn = str(config.stack.getpath(kk))
     print(dirn)
     with Cd(dirn):
         infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
@@ -975,8 +975,6 @@ def poolcontext(*arg, **kargs):
     pool.join()
 
 #raise Exception('Look file {0} failed !'.format(file))
-
-
 
 def go(config,job,nproc):
     ''' RUN processing function '''
