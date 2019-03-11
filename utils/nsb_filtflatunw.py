@@ -94,7 +94,7 @@ class Cd(object):
 def checkinfile(file):
     try:
         file = file.resolve(strict=True)
-    except FileNotFoundError:
+    except:
         print("File: {0} not found".format(err))
         sys.exit()
 
