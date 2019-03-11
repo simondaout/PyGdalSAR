@@ -1055,7 +1055,9 @@ print(FiltFlatUnw.__doc__)
 print()
 
 # weird beahavior between pool and __init__
-postprocess = FiltFlatUnw().load(
+postprocess = FiltFlatUnw()
+
+postprocess.load(
         [ListInterfero,SARMasterDir,IntDir,
         Rlooks_int, Rlooks_unw, 
         nfit_range, thresh_amp_range,
