@@ -306,11 +306,8 @@ class FiltFlatUnw:
     model: model to be removed from wrapped interferograms (default: None)
     """
 
-    # pool seems to run __init__
-    # def __init__(self):
-    #     pass
 
-    def load(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
+    def init(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -348,6 +345,12 @@ class FiltFlatUnw:
         self.images = PileImages(dates1,dates2)
         self.images.info()
         self.Nimages = len(self.images)
+
+    def update(self, prefix, siffix, look):
+
+        self.stack = self.stack._replace(prefix=str(prefix), suffix=str(suffix), look=str(look))
+
+
 
 
 ##################################################################################
@@ -1053,9 +1056,7 @@ print(FiltFlatUnw.__doc__)
 print()
 
 # weird beahavior between pool and __init__
-postprocess = FiltFlatUnw()
-
-postprocess.load(
+postprocess = FiltFlatUnw(
         [ListInterfero,SARMasterDir,IntDir,
         Rlooks_int, Rlooks_unw, 
         nfit_range, thresh_amp_range,
@@ -1070,9 +1071,9 @@ postprocess.load(
 for p in jobs:
     
     print()
+    job = getattr(p,'name')
     # print ifg names at the begining of each process
     postprocess.stack.info()
-    job = getattr(p,'name')
 
     print('----------------------------------')
     print('Run {} ....'.format(job))
@@ -1084,4 +1085,4 @@ for p in jobs:
     print()
 
 print("That's all folks")
- 
+
