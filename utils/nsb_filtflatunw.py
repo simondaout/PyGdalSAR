@@ -38,7 +38,7 @@ from itertools import repeat
 ##################################################################################
 
 # init logger 
-logging.basicConfig(filename='filtflatunw_log.log',level=logging.WARNING,\
+logging.basicConfig(filename='filtflatunw_log.log',level=logging.DEBUG,\
       format='%(asctime)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('filtflatunw_log.log')
 
@@ -95,7 +95,7 @@ def checkinfile(file):
     try:
         file = file.resolve(strict=True)
     except:
-        print("File: {0} not found".format(err))
+        print("File: {0} not found".format(file))
         sys.exit()
 
 
