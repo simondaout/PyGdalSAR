@@ -308,7 +308,8 @@ class FiltFlatUnw:
     model: model to be removed from wrapped interferograms (default: None)
     """
 
-    def__init__(self):
+    # pool seems to run __init__
+    def __init__(self):
         pass
 
     def load(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
