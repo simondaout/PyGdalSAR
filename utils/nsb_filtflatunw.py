@@ -145,7 +145,7 @@ class PileInt:
 
     def getpath(self,kk):
         ''' Return path ifg dir '''
-        return  self.dir + 'int_' + str(self.dates1[kk]) + '_' + str(self.dates2[kk]) 
+        return  str(self.dir + 'int_' + str(self.dates1[kk]) + '_' + str(self.dates2[kk])) 
 
     def getstratfile(self,kk):
         ''' Return stratified file name '''
@@ -278,9 +278,9 @@ class ContextDecorator(object):
 class TimeIt(ContextDecorator):
     def __enter__(self):
         self.start = datetime.now()
-        print('Starting time: {0}'.format(self.start))
+        print('Starting time process: {0}'.format(self.start))
     def __exit__(self, type, value, traceback):
-        print('Time process: {0}'.format((datetime.now() - self.start).total_seconds()))
+        print('Time process: {0}s'.format((datetime.now() - self.start).total_seconds()))
 
 # create context manager for change dirt
 class Cd(object):
