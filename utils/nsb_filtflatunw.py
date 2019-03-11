@@ -84,10 +84,12 @@ class Cd(object):
     def __init__(self,dirname):
         self.dirname = dirname
     def __enter__(self):
-        self.curdir = os.getcwd()
-        os.chdir(self.dirname)
+        self.curdir = getcwd()
+        chdir(self.dirname)
+        logger.debug('Enter {0}'.format(self.dirname))
     def __exit__(self, type, value, traceback):
-        os.chdir(self.curdir)
+        chdir(self.curdir)
+        logger.debug('Exit{0}, Enter {1}'.format(self.dirname,self.curdir))
 
 def checkinfile(file):
     try:
@@ -343,8 +345,6 @@ def computesize(config,file):
 def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
 
-    dirn = str(config.stack.getpath(kk))
-    print(dirn[0],dirn[1])
     with Cd(config.stack.getpath(kk)):
         infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
         rscfile = infile + '.rsc'
