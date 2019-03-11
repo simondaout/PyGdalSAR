@@ -969,9 +969,9 @@ class ContextDecorator(object):
 class TimeIt(ContextDecorator):
     def __enter__(self):
         self.start = datetime.datetime.now()
-        print self.start
+        print(self.start)
     def __exit__(self, type, value, traceback):
-        print (datetime.datetime.now() -self.start).total_seconds()
+        print((datetime.datetime.now() - self.start).total_seconds())
 
 # create context manager for change dirt
 class Cd(objet):
