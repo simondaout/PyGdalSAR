@@ -258,7 +258,8 @@ class PileInt:
 
     def info(self):
         print('List of interferograms:')
-        print ([self.getname(kk) for kk in range(self.Nifg)])
+        print ([self._ifgs[kk] for kk in xrange(self.Nifg)])
+        # print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
 
 class PileImages:
