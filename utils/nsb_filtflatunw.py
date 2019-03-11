@@ -12,7 +12,7 @@ from __future__ import print_function
 import gdal, shutil
 gdal.UseExceptions()
 # system
-from os import path, environ, system, chdir, remove, getcwd, lsdir
+from os import path, environ, system, chdir, remove, getcwd, listdir
 # plot
 import subprocess
 import matplotlib
@@ -85,11 +85,11 @@ class Cd(object):
         self.dirname = dirname
     def __enter__(self):
         self.curdir = getcwd()
-        chdir(self.dirname)
         logger.debug('Enter {0}'.format(self.dirname))
+        chdir(self.dirname)
     def __exit__(self, type, value, traceback):
-        chdir(self.curdir)
         logger.debug('Exit{0}, Enter {1}'.format(self.dirname,self.curdir))
+        chdir(self.curdir)
 
 def checkinfile(file):
     try:
