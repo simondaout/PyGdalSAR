@@ -124,7 +124,7 @@ def go(config,job,nproc):
         
         #map(eval(job), repeat(config, len(work)) , work)
         with poolcontext(processes=2) as pool:
-            pool.map(eval(eval(job), repeat(config, len(work)) , work))
+            pool.map(eval(job), repeat(config, len(work)) , work)
     
     # pool.close()
     # pool.join()
