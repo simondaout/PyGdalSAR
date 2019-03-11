@@ -76,8 +76,10 @@ class TimeIt(ContextDecorator):
     def __enter__(self):
         self.start = datetime.now()
         print('Starting time process: {0}'.format(self.start))
+        raise Exception('Fail !')
     def __exit__(self, type, value, traceback):
         print('Time process: {0}s'.format((datetime.now() - self.start).total_seconds()))
+
 
 # create context manager for change dirt
 class Cd(object):
@@ -97,6 +99,40 @@ def checkinfile(file):
         print("File: {0} not found, Exit !".format(file))
         # print(listdir('./'))
         sys.exit()
+
+
+##################################################################################
+###  RUN FONCTION
+##################################################################################
+
+# create generator for pool
+@contextmanager
+def poolcontext(*arg, **kargs):
+    pool = Pool(*arg, **kargs)
+    yield pool
+    pool.terminate()
+    pool.join()
+
+def go(config,job,nproc):
+    ''' RUN processing function '''
+    
+    with TimeIt():
+        work = range(config.Nifg)
+        map(eval(job), repeat(config, len(work)) , work)
+
+    # with poolcontext(processes=nproc) as pool:
+    #     results = pool.map(eval('config.{0}.format(job))',  range(config.Nifg)))
+    
+    # print(results)
+    # pool.close()
+    # pool.join()
+
+    # # pool = pp.ProcessPool(nproc)
+    # results = pool.map(eval('config.{0}'.format(job)), range(config.Nifg))
+    # while not results.ready():
+    #      time.sleep(3); print (".",end=' ')
+    # results = results.get()
+    # time.sleep(3)
 
 ##################################################################################
 ###  Define Job, IFG, Images and FiltFlatUnw classes  
@@ -306,7 +342,6 @@ class FiltFlatUnw:
 ###  Define Job functions 
 ##################################################################################
 
-@TimeIt() # Tmer tous les appels
 def look_file(config,file):
     ''' Look function 
     Requiered parameters:  Rlooks_int, Rlooks_unw
@@ -320,11 +355,9 @@ def look_file(config,file):
             logger.critical(' Can''t look file {0} in {1} look'.format(filename,config.rlook))
             print(look_file.__doc__)
 
-@TimeIt()
 def erai(config,kk):
     return
 
-@TimeIt()
 def computesize(config,file):
     ''' Extract width anf length with gdal
     '''
@@ -340,7 +373,6 @@ def computesize(config,file):
         logger.critical(error)
         print(computesize.__doc__)
 
-@TimeIt()
 def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
 
@@ -396,7 +428,6 @@ def replace_amp(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-@TimeIt()
 def filterSW(config, kk):
     ''' Filter SW function form Doin et. al. 2011
     Requiered proc parameters: SWwindowsize, SWamplim, filterstyle
@@ -427,7 +458,6 @@ def filterSW(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-@TimeIt()
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
     Requiered proc file parameter: filterStrength
@@ -459,8 +489,7 @@ def filterROI(config, kk):
                 sys.exit()
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
-
-@TimeIt()        
+        
 def flat_range(config,kk):
     ''' Function flatten range  on wrapped phase  (See Doin et al., 2015)
     Requiered proc file parameters: nfit_range, thresh_amp_range
@@ -500,7 +529,6 @@ def flat_range(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-@TimeIt()
 def flat_az(config,kk):
     ''' Function flatten azimuth  on wrapped phase  (See Doin et al., 2015)
         Requiered proc file parameters: nfit_az, thresh_amp_az
@@ -542,7 +570,6 @@ def flat_az(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-@TimeIt()
 def flat_topo(config, kk):
     ''' Function flatten atmosphere on wrapped phase  (See Doin et al., 2015)
     Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo
@@ -731,11 +758,9 @@ def flat_topo(config, kk):
         # update strat
         config.strat = True
 
-@TimeIt()
 def flat_model(config,kk):
     return
 
-@TimeIt()
 def colin(config,kk):
     ''' Compute and replace amplitude by colinearity (See Pinel-Puyssegur et al., 2012)'''
 
@@ -774,7 +799,6 @@ def colin(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-@TimeIt()
 def look_int(config,kk):
     ''' Look function for IFG, coherence, strat, and radar files
     Requiered parameters:  Rlooks_int, Rlooks_unw
@@ -833,7 +857,6 @@ def look_int(config,kk):
         # print(outfile)
         # print(config.stack.getlook(kk))
 
-@TimeIt()
 def unwrapping(config,kk):
     ''' Unwrap function from strating seedx, seedy
     if unw_method: mpd, MP.DOIN algorthim (Grandin et al., 2012). Requiered: threshold_unw, filterSW, filterROI
@@ -915,7 +938,6 @@ def unwrapping(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
 
-@TimeIt()
 def add_atmo_back(config,kk):
     ''' Add back stratified model computed by flatten_topo'''
 
@@ -943,47 +965,11 @@ def add_atmo_back(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-@TimeIt()
 def add_ramp_back(config,kk):
     return
 
-@TimeIt()
 def add_model_back(config,kk):
     return
-
-##################################################################################
-###  RUN FONCTION
-##################################################################################
-
-# create generator for pool
-@contextmanager
-def poolcontext(*arg, **kargs):
-    pool = Pool(*arg, **kargs)
-    yield pool
-    pool.terminate()
-    pool.join()
-
-#raise Exception('Look file {0} failed !'.format(file))
-
-def go(config,job,nproc):
-    ''' RUN processing function '''
-    
-    work = range(config.Nifg)
-    map(eval(job), repeat(config, len(work)) , work)
-
-    # with poolcontext(processes=nproc) as pool:
-    #     results = pool.map(eval('config.{0}.format(job))',  range(config.Nifg)))
-    
-    # print(results)
-    # pool.close()
-    # pool.join()
-
-    # # pool = pp.ProcessPool(nproc)
-    # results = pool.map(eval('config.{0}'.format(job)), range(config.Nifg))
-    # while not results.ready():
-    #      time.sleep(3); print (".",end=' ')
-    # results = results.get()
-    # time.sleep(3)
 
 ##################################################################################
 ###  READ IMPUT PARAMETERS
