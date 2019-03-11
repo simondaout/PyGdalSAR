@@ -29,7 +29,6 @@ from multiprocessing import Pool
 # import pathos.pools as pp
 
 from contextlib import contextmanager
-import datetime
 from functools import wraps
 
 
@@ -277,10 +276,10 @@ class ContextDecorator(object):
 
 class TimeIt(ContextDecorator):
     def __enter__(self):
-        self.start = datetime.datetime.now()
+        self.start = datetime.now()
         print(self.start)
     def __exit__(self, type, value, traceback):
-        print((datetime.datetime.now() - self.start).total_seconds())
+        print((datetime.now() - self.start).total_seconds())
 
 # create context manager for change dirt
 class Cd(object):
