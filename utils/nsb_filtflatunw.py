@@ -317,7 +317,7 @@ def look_file(config,file):
         r= subprocess.call("look.pl "+str(filename)+" "+str(config.rlook)+" >> log_look.txt" , shell=True)
         if r != 0:
             logger.critical(' Can''t look file {0} in {1} look'.format(filename,config.rlook))
-            print(config.look_file.__doc__)
+            print(look_file.__doc__)
 
 @TimeIt()
 def erai(config,kk):
@@ -337,7 +337,7 @@ def computesize(config,file):
         print("OS error: {0}".format(err))
     except ValueError as error:
         logger.critical(error)
-        print(config.computesize.__doc__)
+        print(computesize.__doc__)
 
 @TimeIt()
 def replace_amp(config, kk):
@@ -350,7 +350,7 @@ def replace_amp(config, kk):
         logger.info('Replace Amplitude by Coherence on IFG: {0}'.format(infile))
 
         # compute width and length
-        width,length = config.computesize(infile)
+        width,length = computesize(infile)
         config.stack.updatesize(kk,width,length)
 
         # update names
@@ -389,7 +389,7 @@ def replace_amp(config, kk):
                 remove('tmp'); remove('tmp2'); remove('phs'); remove('cor')
 
             except:
-                print(config.replace_amp.__doc__)
+                print(replace_amp.__doc__)
                 sys.exit()
 
         else:
@@ -417,7 +417,7 @@ def filterSW(config, kk):
                     +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
             if r != 0:
                 logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
-                print(config.filterSW.__doc__)
+                print(filterSW.__doc__)
                 sys.exit()
 
             if path.exists(filtrsc) == False:
@@ -439,7 +439,7 @@ def filterROI(config, kk):
         # get width and compute if not already done
         width,length =  config.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
-            width,length = config.computesize(infile)
+            width,length = computesize(infile)
             config.stack.updatesize(kk,width,length)
 
         filtfile = config.stack.getfiltROI(kk) + '.int'; checkinfile(filtfile)
@@ -454,7 +454,7 @@ def filterROI(config, kk):
                     +str(width)+" 0.25"+" "+str(config.filterStrength)+"  >> log_filtROI.txt", shell=True)
             if r != 0:
                 logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
-                print(config.filterROI.__doc__)
+                print(filterROI.__doc__)
                 sys.exit()
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
@@ -494,7 +494,7 @@ def flat_range(config,kk):
                 " "+str(config.nfit_range)+" "+str(config.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
-                print(config.flat_range.__doc__) 
+                print(flat_range.__doc__) 
                 sys.exit()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
@@ -536,7 +536,7 @@ def flat_az(config,kk):
                 " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
-                print(config.flat_az.__doc__)
+                print(flat_az.__doc__)
                 sys.exit()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
@@ -571,15 +571,15 @@ def flat_topo(config, kk):
         # check width IFG
         width,length = config.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
-            width,length = config.computesize(infile)
+            width,length = computesize(infile)
             config.stack.updatesize(kk,width,length)
 
     # look dem if necessary
-    w,l = config.computesize(config.dem)
+    w,l = computesize(config.dem)
 
     if int(w) != int(width):
         logger.warning('IFG:{0} and DEM file are not the same size: {0}'.format(infile))
-        config.look_file(config.dem)
+        look_file(config.dem)
         # update DEM
         config.dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
         
@@ -595,7 +595,7 @@ def flat_topo(config, kk):
                 str(stratfile)+" >> log_flattopo.txt", shell=True)
             if r != 0:
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
-                print(config.flat_topo.__doc__)
+                print(flat_topo.__doc__)
                 sys.exit()
         else:
             print('{0} exists, assuming OK'.format(outfile))
@@ -764,7 +764,7 @@ def colin(config,kk):
         # Retrieve length and width
         width,length =  config.stack.getsize(kk)
         if (int(width) == 0) or (int(length) == 0):
-            width,length = config.computesize(infile)
+            width,length = computesize(infile)
             config.stack.updatesize(kk,width,length)
 
         if path.exists(outfile) == False:
@@ -776,7 +776,7 @@ def colin(config,kk):
                 " 3 0.0001 2  >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.critical('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
-                print(config.colin.__doc__)
+                print(colin.__doc__)
                 sys.exit()
             # clean
             remove('temp')
@@ -799,7 +799,7 @@ def look_int(config,kk):
         # look radar file if not done
         dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
         if path.exists(config.dem) is False:
-            config.look_file(config.dem)
+            look_file(config.dem)
             config.dem = dem
 
         logger.info('Look file {0} in {1} look'.format(infile,config.rlook))
@@ -814,7 +814,7 @@ def look_int(config,kk):
         stratfile = config.stack.getstratfile(kk) + '.unw'
         if (path.exists(stratfile) == False) and (config.strat == True):
             # config.strat check if flatten_topo has been done
-            config.look_file(stratfile)
+            look_file(stratfile)
             config.strat = stratfile
 
         chdir(config.stack.getpath(kk))
@@ -824,7 +824,7 @@ def look_int(config,kk):
             r= subprocess.call("look.pl "+str(infile)+" "+str(config.rlook)+" >> log_look.txt" , shell=True)
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
-                print(config.look_int.__doc__)
+                print(look_int.__doc__)
         else:
             print('{0} exists, assuming OK'.format(outfile))
         
@@ -833,12 +833,12 @@ def look_int(config,kk):
             r = subprocess.call("look.pl "+str(corfile)+" "+str(config.rlook)+" >> log_look.txt", shell=True)
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
-                print(config.look_int.__doc__)
+                print(look_int.__doc__)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))        
                 
         # update size
-        width,length = config.computesize(outfile)
+        width,length = computesize(outfile)
         config.stack.updatesize(kk,width,length)
         # print(outfile)
         # print(config.stack.getlook(kk))
@@ -890,7 +890,7 @@ def unwrapping(config,kk):
                 r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.04)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
                 if r != 0:
-                    print(config._unwrapping.__doc__)
+                    print(_unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
                     sys.exit()
                 # remove('cut')
@@ -903,14 +903,14 @@ def unwrapping(config,kk):
                 print("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
                 r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
                 if r != 0:
-                    print(config._unwrapping.__doc__)
+                    print(_unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
 
                 print("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
                 r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
                 if r != 0:
-                    print(config._unwrapping.__doc__)
+                    print(_unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
 
@@ -919,7 +919,7 @@ def unwrapping(config,kk):
                 r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+"  >> log_unw.txt",shell=True)
                 if r != 0:
-                    print(config._unwrapping.__doc__)
+                    print(_unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
         else:
