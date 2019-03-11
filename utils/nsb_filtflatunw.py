@@ -309,8 +309,8 @@ class FiltFlatUnw:
     """
 
     # pool seems to run __init__
-    def __init__(self):
-        pass
+    # def __init__(self):
+    #     pass
 
     def load(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
