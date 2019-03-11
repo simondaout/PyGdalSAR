@@ -12,7 +12,7 @@ from __future__ import print_function
 import gdal, shutil
 gdal.UseExceptions()
 # system
-from os import path, environ, system, chdir, remove, getcwd
+from os import path, environ, system, chdir, remove, getcwd, lsdir
 # plot
 import subprocess
 import matplotlib
@@ -96,8 +96,8 @@ def checkinfile(file):
         file = file.resolve(strict=True)
     except:
         print("File: {0} not found".format(file))
+        print(listdir('./'))
         sys.exit()
-
 
 ##################################################################################
 ###  Define Job, IFG, Images and FiltFlatUnw classes  
