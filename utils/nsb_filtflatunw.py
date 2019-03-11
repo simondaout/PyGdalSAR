@@ -342,7 +342,8 @@ def computesize(config,file):
 def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
 
-    with Cd(config.stack.getpath(kk)):
+    dirn = config.stack.getpath(kk)
+    with Cd(dirn):
         infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
         rscfile = infile + '.rsc'
         corfile = config.stack.getcor(kk); checkinfile(corfile)
