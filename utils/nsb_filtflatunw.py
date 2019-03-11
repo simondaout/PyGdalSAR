@@ -308,7 +308,10 @@ class FiltFlatUnw:
     model: model to be removed from wrapped interferograms (default: None)
     """
 
-    def __init__(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
+    def__init__(self):
+        pass
+
+    def load(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -1050,7 +1053,8 @@ print()
 print(FiltFlatUnw.__doc__)
 print()
 
-postprocess = FiltFlatUnw(
+# weird beahavior between pool and __init__
+postprocess = FiltFlatUnw().load(
         [ListInterfero,SARMasterDir,IntDir,
         Rlooks_int, Rlooks_unw, 
         nfit_range, thresh_amp_range,
