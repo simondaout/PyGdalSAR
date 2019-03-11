@@ -251,6 +251,55 @@ class FiltFlatUnw:
         self.Nimages = len(self.images)
 
 ##################################################################################
+###  Extras functions and context maganers
+##################################################################################
+
+def date2dec(dates):
+    ''' Transform dates %Y%m%d to decimal dates'''
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetime.strptime('{}'.format(date),'%Y%m%d')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        times.append(year + dec)
+    return times
+
+# Timer for all the functions
+class ContextDecorator(object):
+    def __call__(self, f):
+        @wraps(f)
+        def decorated(*args, **kwds):
+            with self:
+                return f(*args, **kwds)
+        return decorated
+
+class TimeIt(ContextDecorator):
+    def __enter__(self):
+        self.start = datetime.datetime.now()
+        print(self.start)
+    def __exit__(self, type, value, traceback):
+        print((datetime.datetime.now() - self.start).total_seconds())
+
+# create context manager for change dirt
+class Cd(objet):
+    def __init__(dirname):
+        self.dirname = dirname
+    def __enter__(self):
+        self.curdir = os.getcwd()
+        os.chdir(self.dirname)
+    def __exit__(self, type, value, traceback):
+        os.chdir(self.curdir)
+
+def checkinfile(file):
+    try:
+        file = file.resolve(strict=True)
+    except FileNotFoundError:
+        print("File: {0} not found".format(err))
+        sys.exit()
+
+
+##################################################################################
 ###  Define Job functions 
 ##################################################################################
 
@@ -942,53 +991,6 @@ def go(config,job,nproc):
     #      time.sleep(3); print (".",end=' ')
     # results = results.get()
     # time.sleep(3)
-
-##################################################################################
-###  Extras functions and context maganers
-##################################################################################
-
-def date2dec(dates):
-    ''' Transform dates %Y%m%d to decimal dates'''
-    dates  = np.atleast_1d(dates)
-    times = []
-    for date in dates:
-        x = datetime.strptime('{}'.format(date),'%Y%m%d')
-        dec = float(x.strftime('%j'))/365.1
-        year = float(x.strftime('%Y'))
-        times.append(year + dec)
-    return times
-
-# Timer for all the functions
-class ContextDecorator(object):
-    def __call__(self, f):
-        @wraps(f)
-        def decorated(*args, **kwds):
-            with self:
-                return f(*args, **kwds)
-        return decorated
-class TimeIt(ContextDecorator):
-    def __enter__(self):
-        self.start = datetime.datetime.now()
-        print(self.start)
-    def __exit__(self, type, value, traceback):
-        print((datetime.datetime.now() - self.start).total_seconds())
-
-# create context manager for change dirt
-class Cd(objet):
-    def __init__(dirname):
-        self.dirname = dirname
-    def __enter__(self):
-        self.curdir = os.getcwd()
-        os.chdir(self.dirname)
-    def __exit__(self, type, value, traceback):
-        os.chdir(self.curdir)
-
-def checkinfile(file):
-    try:
-        file = file.resolve(strict=True)
-    except FileNotFoundError:
-        print("File: {0} not found".format(err))
-        sys.exit()
 
 ##################################################################################
 ###  READ IMPUT PARAMETERS
