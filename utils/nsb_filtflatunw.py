@@ -1030,7 +1030,7 @@ z_ref=8000.
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-nproc=1
+nproc=2
 
 ####################
 # Test Process List
