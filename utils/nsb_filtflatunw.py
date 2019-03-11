@@ -307,7 +307,7 @@ class FiltFlatUnw:
     """
 
 
-    def init(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
+    def __init__(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -1055,7 +1055,6 @@ print()
 print(FiltFlatUnw.__doc__)
 print()
 
-# weird beahavior between pool and __init__
 postprocess = FiltFlatUnw(
         [ListInterfero,SARMasterDir,IntDir,
         Rlooks_int, Rlooks_unw, 
