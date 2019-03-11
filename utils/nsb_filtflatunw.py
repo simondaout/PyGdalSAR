@@ -38,9 +38,11 @@ from itertools import repeat
 ##################################################################################
 
 # init logger 
-logging.basicConfig(filename='filtflatunw_log.log',level=logging.DEBUG,\
+logging.basicConfig(level=logging.DEBUG,\
       format='%(asctime)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('filtflatunw_log.log')
+
+#filename='filtflatunw_log.log'
 
 # init collections 
 import collections
@@ -870,9 +872,6 @@ def unwrapping(config,kk):
         inrsc = infile + '.rsc'
         filtSWfile = config.stack.getfiltSW(kk)+ '.int'
         filtROIfile = config.stack.getfiltROI(kk)+ '.int'
-
-        print(infile)
-        sys.exit(0)
 
         unwfile = config.stack.getname(kk)+ '.unw'
         unwrsc = unwfile + '.rsc'
