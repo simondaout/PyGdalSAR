@@ -344,7 +344,7 @@ def replace_amp(config, kk):
 
     dirn = str(config.stack.getpath(kk))
     print(dirn[0],dirn[1])
-    with Cd(dirn[0]):
+    with Cd('./'):
         infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
         rscfile = infile + '.rsc'
         corfile = config.stack.getcor(kk); checkinfile(corfile)
