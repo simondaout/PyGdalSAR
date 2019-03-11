@@ -978,7 +978,7 @@ def poolcontext(*arg, **kargs):
 def go(config,job,nproc):
     ''' RUN processing function '''
     
-    map(partial(job, config=config), range(config.Nifg))
+    map(partial(eval(job), config=config), range(config.Nifg))
     # with poolcontext(processes=nproc) as pool:
     #     results = pool.map(eval('config.{0}.format(job))',  range(config.Nifg)))
     
