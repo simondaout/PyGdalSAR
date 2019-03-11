@@ -29,7 +29,9 @@ from multiprocessing import Pool
 # import pathos.pools as pp
 
 from contextlib import contextmanager
-from functools import wraps
+from functools import wraps, partial
+
+
 
 
 ##################################################################################
@@ -973,11 +975,10 @@ def poolcontext(*arg, **kargs):
 
 #raise Exception('Look file {0} failed !'.format(file))
 
-
 def go(config,job,nproc):
     ''' RUN processing function '''
     
-    [eval('config.{0}({1})'.format(job,kk)) for kk in range(config.Nifg)]
+    map(partial(job, config=config), range(config.Nifg))
     # with poolcontext(processes=nproc) as pool:
     #     results = pool.map(eval('config.{0}.format(job))',  range(config.Nifg)))
     
