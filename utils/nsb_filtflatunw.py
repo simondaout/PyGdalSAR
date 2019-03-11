@@ -40,6 +40,7 @@ from functools import wraps
 # init logger 
 logging.basicConfig(filename='filtflatunw_log.log',level=logging.WARNING,\
       format='%(asctime)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('filtflatunw_log.log')
 
 # init collections 
 import collections
