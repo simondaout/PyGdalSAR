@@ -295,7 +295,7 @@ class FiltFlatUnw:
     model: model to be removed from wrapped interferograms (default: None)
     """
 
-    def __init__(self, params, prefix='', siffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
+    def __init__(self, params, prefix='', suffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -1019,8 +1019,8 @@ z_ref=8000.
 # prefix = '' 
 # suffix = '_sd'
 # home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-IntDir=path.abspath(home)+'/'+'test/'
-# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+# IntDir=path.abspath(home)+'/'+'test/'
+ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
 nproc=1
 
 ####################
