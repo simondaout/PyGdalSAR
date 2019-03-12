@@ -885,7 +885,7 @@ def unwrapping(config,kk):
 
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
-            config.filterROI(kk); checkinfile(filtROIfile)
+            filterROI(kk); checkinfile(filtROIfile)
 
         if path.exists(unwfiltROI) == False:
 
@@ -894,7 +894,7 @@ def unwrapping(config,kk):
             if config.unw_method == 'mpd':
                 logger.info("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
                 if path.exists(unwfiltSW) == False:
-                    config.filterSW(kk); checkinfile(unwfiltROI)
+                    filterSW(kk); checkinfile(unwfiltROI)
 
                 # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
                 # unwrapped firt filtSWfile and then add high frequency of filtROIfile
@@ -1019,9 +1019,9 @@ z_ref=8000.
 # prefix = '' 
 # suffix = '_sd'
 # home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-# IntDir=path.abspath(home)+'/'+'test/'
+IntDir=path.abspath(home)+'/'+'test/'
 # ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-# nproc=2
+nproc=1
 
 ####################
 # Test Process List
