@@ -984,8 +984,8 @@ seedy=1840
 # seedx=300 ## iw2
 # seedy=2384
 
-prefix = '' 
-suffix = '_sd'
+prefix = 'col_' 
+suffix = '_sd_flatz'
 iend_mask=0 # mask for empirical estimations
 jend_mask=0
 jbeg_mask=0
@@ -1016,10 +1016,12 @@ z_ref=8000.
 
 
 #### TEST DIR
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-IntDir=path.abspath(home)+'/'+'test/'
-ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-nproc=1
+# prefix = '' 
+# suffix = '_sd'
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+# IntDir=path.abspath(home)+'/'+'test/'
+# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+# nproc=2
 
 ####################
 # Test Process List
@@ -1027,7 +1029,7 @@ nproc=1
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-do_list =  'replace_amp flat_topo colin look_int filterSW'  
+do_list =  'unwrapping add_model_back'  
 # do_list =  'replace_amp filterSW flat_topo colin look_int ' 
 jobs = Job(do_list)
 
