@@ -886,7 +886,7 @@ def unwrapping(config,kk):
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
             filterROI(config, kk)
-            checkinfile(filtROIfile)
+            # checkinfile(filtROIfile)
 
         if path.exists(unwfiltROI) == False:
 
@@ -896,7 +896,7 @@ def unwrapping(config,kk):
                 logger.info("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
                 if path.exists(unwfiltSW) == False:
                     filterSW(config, kk)
-                    checkinfile(unwfiltROI)
+                    # checkinfile(unwfiltROI)
 
                 # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
                 # unwrapped firt filtSWfile and then add high frequency of filtROIfile
