@@ -1053,7 +1053,8 @@ postprocess = FiltFlatUnw(
         filterstyle,SWwindowsize, SWamplim,
         filterStrength,
         nfit_topo,thresh_amp_topo,ivar,z_ref,
-        seedx,seedy,threshold_unw,unw_method]
+        seedx,seedy,threshold_unw,unw_method], 
+        prefix=prefix, suffix=suffix,
         ) 
 
 # RUN
