@@ -44,7 +44,7 @@ logger = logging.getLogger('filtflatunw_log.log')
 # init collections 
 import collections
 Process = collections.namedtuple('Process', 'name')
-IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
+# IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
 Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
 ##################################################################################
@@ -103,7 +103,6 @@ def checkinfile(file):
         # print(listdir('./'))
         sys.exit()
 
-
 ##################################################################################
 ###  RUN FONCTION
 ##################################################################################
@@ -123,9 +122,9 @@ def go(config,job,nproc=1):
         work = range(config.Nifg)
         
         if nproc > 1:
-            # pool = Pool(processes=nproc)
-            with poolcontext(processes=2) as pool:
-                results = pool.map(partial(eval(job), config), work)
+            pool = Pool(processes=nproc)
+            # with poolcontext(processes=nproc) as pool:
+            results = pool.map(partial(eval(job), config), work)
         else:
             map(eval(job), repeat(config, len(work)) , work)
 
@@ -170,6 +169,22 @@ class Job():
             unwrapping add_model_back add_atmo_back add_ramp_back')
         print('Choose them in the order that you want')
 
+class IFG:
+    def __init__(self, date1, date2, look, prefix, suffix, width, length):
+        self.date1 = date1
+        self.date2 = date2
+        self.look = look
+        self.prefix = prefix 
+        self.suffix = suffix
+        self.width = width
+        self.length = length
+
+    def info(self):
+        print ' date: {0}-{1}, look: {2}, prefix: {3}, suffix: {4}, width: {5}, length: {6}'.format(*(self.tolist()))
+
+    def tolist(self):
+        return [self.date1,self.date2,self.look,self.prefix,self.suffix,self.width,self.length]
+
 class PileInt:
     def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
         self.dates1, self.dates2 = dates1, dates2
@@ -182,9 +197,14 @@ class PileInt:
         # init width and length to zero as long as we don't need it
         width, length = 0, 0
 
+        self._ifgs = []
         try:
             logger.info('Define IFG list')
-            self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
+            # self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
+            for i in xrange((self.Nifg)):
+                src = IFG(date1[i],date2[i],look[i],prefix[i],suffix[i],width[i],length[i])
+                self._ifgs.append(src)
+
         except ValueError as error:
             logger.critical(error)
             self.exit()
@@ -234,18 +254,19 @@ class PileInt:
         return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks'
 
     def updatelook(self,kk,newlook):
-        self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
+        self._ifgs[kk].look = newlook
 
     def updatesize(self,kk,newwidth,newlength):
-        self._ifgs[kk] = self._ifgs[kk]._replace(width=newwidth,length=newlength)
+        self._ifgs[kk].width = newwidth
+        self._ifgs[kk].length = newlength
 
     def updatefix(self,kk,newprefix, newsuffix):
-        self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix))
-        self._ifgs[kk] = self._ifgs[kk]._replace(suffix=str(newsuffix))
+        self._ifgs[kk].prefix = newprefix
+        self._ifgs[kk].suffix = newsuffix
 
     def info(self):
         print('List of interferograms:')
-        print ([self._ifgs[kk] for kk in xrange(self.Nifg)])
+        print ([self._ifgs[kk].info() for kk in xrange(self.Nifg)])
         # print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
 
@@ -329,13 +350,11 @@ class FiltFlatUnw:
         self.stack.info()
         self.Nifg = len(self.stack)
 
-        # define list images
-        self.images = PileImages(dates1,dates2)
-        self.images.info()
-        self.Nimages = len(self.images)
+        # # define list images
+        # self.images = PileImages(dates1,dates2)
+        # self.images.info()
+        # self.Nimages = len(self.images)
 
-    # def update(self, prefix, siffix, look):
-    #     self.stack = self.stack._replace(prefix=str(prefix), suffix=str(suffix), look=str(look))
 
 ##################################################################################
 ###  Define Job functions 
@@ -1019,7 +1038,7 @@ suffix = '_sd'
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-nproc=2
+nproc=1
 
 ####################
 # Test Process List
