@@ -126,7 +126,7 @@ def go(config,job,nproc):
         if nproc > 1:
             pool = Pool(processes=nproc)
             results = pool.map(partial(eval(job), config), work)
-            results.join()
+            pool.join()
 
             # with poolcontext(processes=nproc) as pool:
                 # results = pool.map(partial(eval(job), config), work)
