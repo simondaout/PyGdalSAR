@@ -29,6 +29,7 @@ from multiprocessing import Pool
 from contextlib import contextmanager
 from functools import wraps, partial
 from itertools import repeat
+# import subprocess
 
 ##################################################################################
 ###  INITIALISE
@@ -44,7 +45,7 @@ logger = logging.getLogger('filtflatunw_log.log')
 # init collections 
 import collections
 Process = collections.namedtuple('Process', 'name')
-# IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
+IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
 Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
 ##################################################################################
@@ -103,28 +104,32 @@ def checkinfile(file):
         # print(listdir('./'))
         sys.exit()
 
+
 ##################################################################################
 ###  RUN FONCTION
 ##################################################################################
 
 # create generator for pool
-@contextmanager
-def poolcontext(*arg, **kargs):
-    pool = Pool(*arg, **kargs)
-    yield pool
-    pool.terminate()
-    pool.join()
+# @contextmanager
+# def poolcontext(*arg, **kargs):
+#     pool = Pool(*arg, **kargs)
+#     yield pool
+#     pool.terminate()
+#     pool.join()
 
-def go(config,job,nproc=1):
+def go(config,job,nproc):
     ''' RUN processing function '''
     
     with TimeIt():
         work = range(config.Nifg)
         
         if nproc > 1:
-            pool = Pool(processes=nproc)
-            # with poolcontext(processes=nproc) as pool:
+            # pool = Pool(processes=nproc)
             results = pool.map(partial(eval(job), config), work)
+            results.join()
+
+            # with poolcontext(processes=nproc) as pool:
+                # results = pool.map(partial(eval(job), config), work)
         else:
             map(eval(job), repeat(config, len(work)) , work)
 
@@ -169,24 +174,9 @@ class Job():
             unwrapping add_model_back add_atmo_back add_ramp_back')
         print('Choose them in the order that you want')
 
-class IFG:
-    def __init__(self, date1, date2, look, prefix, suffix, width, length):
-        self.date1 = date1
-        self.date2 = date2
-        self.look = look
-        self.prefix = prefix 
-        self.suffix = suffix
-        self.width = width
-        self.length = length
-
-    def info(self):
-        print(' dates: {0}-{1}, look: {2}, prefix: {3}, suffix: {4}, width: {5}, length: {6}'.format(
-            self.date1,self.date2,self.look,self.prefix,self.suffix,self.width,self.length))
-
 class PileInt:
     def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
         self.dates1, self.dates2 = dates1, dates2
-        self.prefix, self.suffix = prefix, suffix
         self.dir = dir
         self.filterstyle = filterstyle
 
@@ -196,14 +186,9 @@ class PileInt:
         # init width and length to zero as long as we don't need it
         width, length = 0, 0
 
-        self._ifgs = []
         try:
             logger.info('Define IFG list')
-            # self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
-            for i in xrange((self.Nifg)):
-                src = IFG(self.dates1[i],self.dates2[i],look,self.prefix,self.suffix,width,length)
-                self._ifgs.append(src)
-
+            self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
         except ValueError as error:
             logger.critical(error)
             self.exit()
@@ -253,20 +238,19 @@ class PileInt:
         return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks'
 
     def updatelook(self,kk,newlook):
-        self._ifgs[kk].look = newlook
+        self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
 
     def updatesize(self,kk,newwidth,newlength):
-        self._ifgs[kk].width = newwidth
-        self._ifgs[kk].length = newlength
+        self._ifgs[kk] = self._ifgs[kk]._replace(width=newwidth,length=newlength)
 
     def updatefix(self,kk,newprefix, newsuffix):
-        self._ifgs[kk].prefix = newprefix
-        self._ifgs[kk].suffix = newsuffix
+        self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix))
+        self._ifgs[kk] = self._ifgs[kk]._replace(suffix=str(newsuffix))
 
     def info(self):
         print('List of interferograms:')
-        # print ([self._ifgs[kk].info() for kk in xrange(self.Nifg)])
-        print ([self.getname(kk) for kk in range(self.Nifg)])
+        print ([self._ifgs[kk] for kk in xrange(self.Nifg)])
+        # print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
 
 class PileImages:
@@ -349,11 +333,13 @@ class FiltFlatUnw:
         self.stack.info()
         self.Nifg = len(self.stack)
 
-        # # define list images
-        # self.images = PileImages(dates1,dates2)
-        # self.images.info()
-        # self.Nimages = len(self.images)
+        # define list images
+        self.images = PileImages(dates1,dates2)
+        self.images.info()
+        self.Nimages = len(self.images)
 
+    # def update(self, prefix, siffix, look):
+    #     self.stack = self.stack._replace(prefix=str(prefix), suffix=str(suffix), look=str(look))
 
 ##################################################################################
 ###  Define Job functions 
@@ -366,7 +352,7 @@ def look_file(config,file):
     
     dirname, filename = path.split(path.abspath(file)) 
     with Cd(dirname):
-        print("look.pl "+str(filename)+" "+str(config.rlook))
+        logger.info("look.pl "+str(filename)+" "+str(config.rlook))
         r= subprocess.call("look.pl "+str(filename)+" "+str(config.rlook)+" >> log_look.txt" , shell=True)
         if r != 0:
             logger.critical(' Can''t look file {0} in {1} look'.format(filename,config.rlook))
@@ -496,8 +482,7 @@ def filterROI(config, kk):
             shutil.copy(inrsc,filtrsc)
 
         if path.exists(filtfile) == False:
-            logger.info('Filter {0} with ROI-PAC adaptative filter'.format(infile))
-            print("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
+            logger.info("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
             r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
                     +str(width)+" 0.25"+" "+str(config.filterStrength)+"  >> log_filtROI.txt", shell=True)
             if r != 0:
@@ -534,8 +519,7 @@ def flat_range(config,kk):
             config.filterSW(kk)
 
         if path.exists(outfile) == False:
-            logger.info('Flatten range on IFG: {0}'.format(infile))
-            print("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
+            logger.info("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
                 " "+str(config.nfit_range)+" "+str(config.thresh_amp_range))
             r = subprocess.call("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
                 " "+str(config.nfit_range)+" "+str(config.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
@@ -574,10 +558,8 @@ def flat_az(config,kk):
             eval(config.filterSW(kk))
 
         if path.exists(outfile) == False:
-            logger.info('Flatten azimuth on IFG: {0}'.format(infile))
-            print("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
+            logger.info("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
                 " "+str(nfit_az)+" "+str(thresh_amp_az))
-
             r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
                 " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
             if r != 0:
@@ -631,8 +613,7 @@ def flat_topo(config, kk):
     with Cd(config.stack.getpath(kk)):
 
         if path.exists(outfile) == False:
-            logger.info('Flatten topo on IFG: {0}'.format(infile))
-            print("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
+            logger.info("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
                 +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" "+str(config.thresh_amp_atmo)+" "+\
                 str(stratfile))
             r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
@@ -701,8 +682,7 @@ def flat_topo(config, kk):
             infileunw = path.splitext(infile)[0] + '.unw'
             remove(infileunw)
 
-            logger.info("Convert {0} to .unw".format(infile))
-            print("cpx2rmg.pl "+str(infile)+" "+str(infileunw))
+            logger.info("cpx2rmg.pl "+str(infile)+" "+str(infileunw))
             r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
             if r != 0:
                 logger.critical("Failed to convert {0} to .unw".format(infile))
@@ -714,8 +694,7 @@ def flat_topo(config, kk):
 
             # remove strat file created by flatten_topo and write
             remove(stratfile)
-            logger.info("Create stratified file {0}: ".format(strat))
-            print("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
+            logger.info("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref))
             r = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref)+" >> log_flattopo.txt", shell=True)
@@ -729,8 +708,7 @@ def flat_topo(config, kk):
             # remove model created by flatten_topo and run
             remove(outfile)
             remove(filtout)
-            logger.debub("Remove stratified file {0} from IFG {1}: ".format(stratfile,infile))
-            print("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile))
+            logger.info("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile))
             r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
             if r != 0:
                 logger.critical("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
@@ -738,8 +716,7 @@ def flat_topo(config, kk):
 
             corfile = config.stack.getcor(kk)
             corbase = path.splitext(corfile)[0]
-            logger.info("Filter IFG {0}: ".format(outfile))
-            print("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
+            logger.info("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
                 +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle))
             r = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
                 +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
@@ -802,7 +779,7 @@ def colin(config,kk):
         if path.exists(outfile) == False:
             logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
             shutil.copy(infile,'temp')
-            print("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
+            logger.info("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
                 " 3 0.0001 2")
             r = subprocess.call("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
                 " 3 0.0001 2  >> log_flatenrange.txt", shell=True)
@@ -851,16 +828,16 @@ def look_int(config,kk):
         chdir(config.stack.getpath(kk))
 
         if path.exists(outfile) is False:
-            print("look.pl "+str(infile)+" "+str(config.rlook))
+            logger.info("look.pl "+str(infile)+" "+str(config.rlook))
             r= subprocess.call("look.pl "+str(infile)+" "+str(config.rlook)+" >> log_look.txt" , shell=True)
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
                 print(look_int.__doc__)
         else:
-            print('{0} exists, assuming OK'.format(outfile))
+            logger.warning('{0} exists, assuming OK'.format(outfile))
         
         if path.exists(outcor) is False:
-            print("look.pl "+str(corfile)+" "+str(config.rlook))
+            logger.info("look.pl "+str(corfile)+" "+str(config.rlook))
             r = subprocess.call("look.pl "+str(corfile)+" "+str(config.rlook)+" >> log_look.txt", shell=True)
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
@@ -879,6 +856,8 @@ def unwrapping(config,kk):
     if unw_method: mpd, MP.DOIN algorthim (Grandin et al., 2012). Requiered: threshold_unw, filterSW, filterROI
     if unw_method: roi, ROIPAC algorthim. Requiered threshold_unw, filterROI
     '''
+
+    config.stack.updatelook(kk,config.Rlooks_unw)
 
     with Cd(config.stack.getpath(kk)):
 
@@ -904,7 +883,7 @@ def unwrapping(config,kk):
 
         if path.exists(unwfiltROI) == False:
 
-            print('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
+            logger.info('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
                 format(unwfile,config.seedx,config.seedy,config.threshold_unw))
             if config.unw_method == 'mpd':
                 logger.info("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
@@ -914,7 +893,7 @@ def unwrapping(config,kk):
 
                 # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
                 # unwrapped firt filtSWfile and then add high frequency of filtROIfile
-                print("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
+                logger.info("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.04)+" "+str(config.threshold_unw)+" 0")
                 r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.04)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
@@ -929,21 +908,21 @@ def unwrapping(config,kk):
                 logger.info("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
                 mask = path.splitext(filtSWfile)[0] + '_msk'
 
-                print("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
+                logger.info("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
                 r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
                 if r != 0:
                     print(_unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
 
-                print("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
+                logger.info("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
                 r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
                 if r != 0:
                     print(_unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
 
-                print("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
+                logger.info("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy))
                 r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+"  >> log_unw.txt",shell=True)
@@ -970,8 +949,7 @@ def add_atmo_back(config,kk):
         outfile = config.stack.getname(kk) + '.unw'
 
         if path.exists(outfile) == False:
-            logger.info('Adding back {0} on IFG: {1}'.format(stratfile,unwfile))
-            print("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
+            logger.info("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
             r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
                  " >> log_flatenrange.txt", shell=True)
             if r != 0:
@@ -991,6 +969,8 @@ def add_model_back(config,kk):
 ###  READ IMPUT PARAMETERS
 ##################################################################################
 
+nproc=1
+
 # # input parameters (not in the proc file)
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 seedx=336 ## iw1
@@ -1000,8 +980,8 @@ seedy=1840
 # seedx=300 ## iw2
 # seedy=2384
 
-prefix = '' 
-suffix = '_sd_'
+prefix = 'col_' 
+suffix = '_sd_flatz'
 iend_mask=0 # mask for empirical estimations
 jend_mask=0
 jbeg_mask=0
@@ -1046,7 +1026,7 @@ nproc=2
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
 # do_list =  'unwrapping add_model_back'  
-do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
+do_list =  'replace_amp filterSW flat_topo colin look_int' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
