@@ -180,10 +180,8 @@ class IFG:
         self.length = length
 
     def info(self):
-        print(' dates: {0}-{1}, look: {2}, prefix: {3}, suffix: {4}, width: {5}, length: {6}'.format(*(self.tolist())))
-
-    def tolist(self):
-        return [self.date1,self.date2,self.look,self.prefix,self.suffix,self.width,self.length]
+        print(' dates: {0}-{1}, look: {2}, prefix: {3}, suffix: {4}, width: {5}, length: {6}'.format(
+            self.date1,self.date2,self.look,self.prefix,self.suffix,self.width,self.length))
 
 class PileInt:
     def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
@@ -267,8 +265,8 @@ class PileInt:
 
     def info(self):
         print('List of interferograms:')
-        print ([self._ifgs[kk].info() for kk in xrange(self.Nifg)])
-        # print ([self.getname(kk) for kk in range(self.Nifg)])
+        # print ([self._ifgs[kk].info() for kk in xrange(self.Nifg)])
+        print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
 
 class PileImages:
@@ -1039,7 +1037,7 @@ suffix = '_sd'
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-nproc=1
+nproc=2
 
 ####################
 # Test Process List
