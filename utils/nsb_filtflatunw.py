@@ -180,7 +180,7 @@ class IFG:
         self.length = length
 
     def info(self):
-        print ' date: {0}-{1}, look: {2}, prefix: {3}, suffix: {4}, width: {5}, length: {6}'.format(*(self.tolist()))
+        print(' dates: {0}-{1}, look: {2}, prefix: {3}, suffix: {4}, width: {5}, length: {6}'.format(*(self.tolist())))
 
     def tolist(self):
         return [self.date1,self.date2,self.look,self.prefix,self.suffix,self.width,self.length]
@@ -188,6 +188,7 @@ class IFG:
 class PileInt:
     def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
         self.dates1, self.dates2 = dates1, dates2
+        self.prefix, self.suffix = prefix, suffix
         self.dir = dir
         self.filterstyle = filterstyle
 
@@ -202,7 +203,7 @@ class PileInt:
             logger.info('Define IFG list')
             # self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
             for i in xrange((self.Nifg)):
-                src = IFG(date1[i],date2[i],look[i],prefix[i],suffix[i],width[i],length[i])
+                src = IFG(self.dates1[i],self.dates2[i],look,self.prefix,self.suffix,width,length)
                 self._ifgs.append(src)
 
         except ValueError as error:
