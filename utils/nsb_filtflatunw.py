@@ -1006,8 +1006,8 @@ seedy=1840
 # seedx=300 ## iw2
 # seedy=2384
 
-prefix = 'col_' 
-suffix = '_sd_flatz'
+prefix = '' 
+suffix = '_sd'
 iend_mask=0 # mask for empirical estimations
 jend_mask=0
 jbeg_mask=0
@@ -1038,8 +1038,8 @@ z_ref=8000.
 
 
 #### TEST DIR
-prefix = '' 
-suffix = '_sd'
+prefix = 'col_' 
+suffix = '_sd_flatz'
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
@@ -1052,8 +1052,8 @@ nproc=2
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-# do_list =  'replace_amp filterSW'  
-do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
+do_list =  'add_model_back'  
+# do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
