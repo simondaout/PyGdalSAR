@@ -969,6 +969,7 @@ def add_atmo_back(config,kk):
         prefix, suffix = config.stack.getfix(kk)
         newsuffix = suffix.replace("_flatz", "")
         config.stack.updatefix(kk,prefix,newsuffix)
+        print(newsuffix)
         outfile = config.stack.getname(kk) + '.unw'
 
         if path.exists(outfile) == False:
