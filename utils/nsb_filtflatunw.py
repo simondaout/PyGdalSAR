@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 
@@ -6,7 +6,7 @@
 # Author        : Simon DAOUT (Oxford)
 ############################################
 
-from __future__ import print_function
+# from __future__ import print_function
 
 # gdal
 import gdal, shutil
@@ -100,7 +100,7 @@ class Cd(object):
 def checkinfile(file):
     if path.exists(file) is False:
         logger.critical("File: {0} not found, Exit !".format(file))
-        print("File: {0} not found, Exit !".format(file))
+        print("File: {0} not found in {1}, Exit !".format(file,getcwd()))
         # print(listdir('./'))
         sys.exit()
 
@@ -110,28 +110,31 @@ def checkinfile(file):
 ##################################################################################
 
 # create generator for pool
-# @contextmanager
-# def poolcontext(*arg, **kargs):
-#     pool = Pool(*arg, **kargs)
-#     yield pool
-#     pool.terminate()
-#     pool.join()
+@contextmanager
+def poolcontext(*arg, **kargs):
+    pool = Pool(*arg, **kargs)
+    yield pool
+    pool.terminate()
+    pool.join()
 
 def go(config,job,nproc):
     ''' RUN processing function '''
     
+    # from multiprocessing.dummy import Pool as ThreadPool
+    import itertools
+
     with TimeIt():
         work = range(config.Nifg)
         
         if nproc > 1:
             pool = Pool(processes=nproc)
-            results = pool.map(partial(eval(job), config), work)
-            pool.join()
+            results = pool.starmap(eval(job), zip(repeat(config), work))
 
             # with poolcontext(processes=nproc) as pool:
-                # results = pool.map(partial(eval(job), config), work)
+            #     results = pool.map(partial(eval(job), config), work)
         else:
             map(eval(job), repeat(config, len(work)) , work)
+
 
 
 ##################################################################################
@@ -179,6 +182,9 @@ class PileInt:
         self.dates1, self.dates2 = dates1, dates2
         self.dir = dir
         self.filterstyle = filterstyle
+        self.prefix = prefix
+        self.suffix = suffix
+        self.look = look
 
         self.Nifg=len(self.dates1)
         print("number of interferogram: ",self.Nifg)
@@ -239,17 +245,18 @@ class PileInt:
 
     def updatelook(self,kk,newlook):
         self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
+        self.look = newlook
 
     def updatesize(self,kk,newwidth,newlength):
         self._ifgs[kk] = self._ifgs[kk]._replace(width=newwidth,length=newlength)
 
     def updatefix(self,kk,newprefix, newsuffix):
-        self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix))
-        self._ifgs[kk] = self._ifgs[kk]._replace(suffix=str(newsuffix))
+        self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix), suffix=str(newsuffix))
+        self.prefix, self.suffix = newprefix, newsuffix
 
     def info(self):
         print('List of interferograms:')
-        print ([self._ifgs[kk] for kk in xrange(self.Nifg)])
+        print ([self._ifgs[kk] for kk in range(self.Nifg)])
         # print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
 
@@ -266,7 +273,7 @@ class PileImages:
         print("number of image: ",self.Nimages)
         imd = date2dec(im)
         cst = np.copy(imd[0])
-        for i in xrange((self.Nimages)):
+        for i in range((self.Nimages)):
             bt.append(imd[i]-cst)
         del cst
 
@@ -285,7 +292,7 @@ class PileImages:
 
     def info(self):
         print('List of Images:')
-        print ([self._images[kk] for kk in xrange(self.Nimages)])
+        print ([self._images[kk] for kk in range(self.Nimages)])
         print()
 
 class FiltFlatUnw:
@@ -338,8 +345,8 @@ class FiltFlatUnw:
         self.images.info()
         self.Nimages = len(self.images)
 
-    # def update(self, prefix, siffix, look):
-    #     self.stack = self.stack._replace(prefix=str(prefix), suffix=str(suffix), look=str(look))
+    def getconfig(self):
+         return self.stack.prefix, self.stack.suffix, self.stack.look
 
 ##################################################################################
 ###  Define Job functions 
@@ -898,7 +905,7 @@ def unwrapping(config,kk):
                 r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(unwfiltROI)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.04)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
                 if r != 0:
-                    print(_unwrapping.__doc__)
+                    print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
                     sys.exit()
                 # remove('cut')
@@ -911,14 +918,14 @@ def unwrapping(config,kk):
                 logger.info("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
                 r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
                 if r != 0:
-                    print(_unwrapping.__doc__)
+                    print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
 
                 logger.info("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
                 r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
                 if r != 0:
-                    print(_unwrapping.__doc__)
+                    print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
 
@@ -927,7 +934,7 @@ def unwrapping(config,kk):
                 r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+"  >> log_unw.txt",shell=True)
                 if r != 0:
-                    print(_unwrapping.__doc__)
+                    print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
                     sys.exit()
         else:
@@ -1026,7 +1033,7 @@ nproc=2
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
 # do_list =  'unwrapping add_model_back'  
-do_list =  'replace_amp filterSW flat_topo colin look_int' 
+do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
@@ -1042,20 +1049,24 @@ print(FiltFlatUnw.__doc__)
 print()
 
 postprocess = FiltFlatUnw(
-        [ListInterfero,SARMasterDir,IntDir,
-        Rlooks_int, Rlooks_unw, 
-        nfit_range, thresh_amp_range,
-        nfit_az, thresh_amp_az,
-        filterstyle,SWwindowsize, SWamplim,
-        filterStrength,
-        nfit_topo,thresh_amp_topo,ivar,z_ref,
-        seedx,seedy,threshold_unw,unw_method], 
-        prefix=prefix, suffix=suffix,
-        ) 
+    [ListInterfero,SARMasterDir,IntDir,
+    Rlooks_int, Rlooks_unw, 
+    nfit_range, thresh_amp_range,
+    nfit_az, thresh_amp_az,
+    filterstyle,SWwindowsize, SWamplim,
+    filterStrength,
+    nfit_topo,thresh_amp_topo,ivar,z_ref,
+    seedx,seedy,threshold_unw,unw_method], 
+    prefix=prefix, suffix=suffix,
+    ) 
 
 # RUN
 for p in jobs:
-    
+
+    print('...........')
+    print(prefix, suffix, Rlooks_int)
+    print('...........')
+
     print()
     job = getattr(p,'name')
     # print ifg names at the begining of each process
