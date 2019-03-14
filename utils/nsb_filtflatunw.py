@@ -1045,7 +1045,7 @@ home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
 unw_method='roi'
-nproc=2
+nproc=1
 
 ####################
 # Test Process List
