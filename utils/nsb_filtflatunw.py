@@ -25,7 +25,7 @@ from datetime import datetime
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import logging
-from multiprocessing
+import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
 from itertools import repeat
