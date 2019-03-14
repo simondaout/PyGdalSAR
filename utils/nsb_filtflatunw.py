@@ -127,7 +127,7 @@ def go(config,job,nproc):
 
         queue = multiprocessing.Queue()
         queue.put(config)
-        for i in xrange(config.Nifg):
+        for i in range(config.Nifg):
             p = multiprocessing.Process(target=eval(job), args=(queue,i))
             p.start()
             p.join()
