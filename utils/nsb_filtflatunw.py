@@ -128,9 +128,9 @@ def go(config,job,nproc):
         work = range(config.Nifg)
         if nproc > 1:
             pool = multiprocessing.Pool(processes=nproc)
-            results = pool.starmap(eval(job), zip(repeat(config), work))
-            # with poolcontext(processes=nproc) as pool:
-            #     results = pool.map(partial(eval(job), config), work)
+            # results = pool.starmap(eval(job), zip(repeat(config), work))
+            with poolcontext(processes=nproc) as pool:
+                results = pool.map(partial(eval(job), config), work)
         else:
             map(eval(job), repeat(config, len(work)) , work)
 
@@ -366,9 +366,6 @@ def look_file(config,file):
             logger.critical(' Can''t look file {0} in {1} look'.format(filename,config.rlook))
             print(look_file.__doc__)
 
-def erai(config,kk):
-    return
-
 def computesize(config,file):
     ''' Extract width anf length with gdal
     '''
@@ -383,6 +380,9 @@ def computesize(config,file):
     except ValueError as error:
         logger.critical(error)
         print(computesize.__doc__)
+
+def erai(config,kk):
+    return
 
 def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
@@ -542,6 +542,8 @@ def flat_range(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
+    return config.getconfig()
+
 def flat_az(config,kk):
     ''' Function flatten azimuth  on wrapped phase  (See Doin et al., 2015)
         Requiered proc file parameters: nfit_az, thresh_amp_az
@@ -580,6 +582,8 @@ def flat_az(config,kk):
                 sys.exit()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
+
+    return config.getconfig()
 
 def flat_topo(config, kk):
     ''' Function flatten atmosphere on wrapped phase  (See Doin et al., 2015)
@@ -764,8 +768,10 @@ def flat_topo(config, kk):
         # update strat
         config.strat = True
 
+        return config.getconfig()
+
 def flat_model(config,kk):
-    return
+    return config.getconfig()
 
 def colin(config,kk):
     ''' Compute and replace amplitude by colinearity (See Pinel-Puyssegur et al., 2012)'''
@@ -804,6 +810,8 @@ def colin(config,kk):
 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
+
+    return config.getconfig()
 
 def look_int(config,kk):
     ''' Look function for IFG, coherence, strat, and radar files
@@ -860,8 +868,8 @@ def look_int(config,kk):
         # update size
         width,length = computesize(config,outfile)
         config.stack.updatesize(kk,width,length)
-        # print(outfile)
-        # print(config.stack.getlook(kk))
+
+        return config.getconfig()
 
 def unwrapping(config,kk):
     ''' Unwrap function from strating seedx, seedy
@@ -945,6 +953,8 @@ def unwrapping(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
 
+        return config.getconfig()
+
 def add_atmo_back(config,kk):
     ''' Add back stratified model computed by flatten_topo'''
 
@@ -970,6 +980,8 @@ def add_atmo_back(config,kk):
                 sys.exit()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
+
+    return config.getconfig()
 
 def add_ramp_back(config,kk):
     return
@@ -1029,6 +1041,7 @@ suffix = '_sd'
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 IntDir=path.abspath(home)+'/'+'test/'
 ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+unw_method='roi'
 nproc=2
 
 ####################
@@ -1037,7 +1050,7 @@ nproc=2
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-do_list =  'replace_amp filterSW'  
+# do_list =  'replace_amp filterSW'  
 # do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
 jobs = Job(do_list)
 
@@ -1086,8 +1099,6 @@ if __name__ == '__main__':
         # run process
         output = []
         output.append(go(postprocess, job, nproc))
-
-        print(output[0][0])
         prefix, suffix, Rlooks_int = output[0][0]
 
         print('----------------------------------')
