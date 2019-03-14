@@ -954,7 +954,7 @@ def unwrapping(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
 
-        return config.getconfig()
+    return config.getconfig()
 
 def add_atmo_back(config,kk):
     ''' Add back stratified model computed by flatten_topo'''
@@ -985,10 +985,10 @@ def add_atmo_back(config,kk):
     return config.getconfig()
 
 def add_ramp_back(config,kk):
-    return
+    return config.getconfig()
 
 def add_model_back(config,kk):
-    return
+    return config.getconfig()
 
 ##################################################################################
 ###  READ IMPUT PARAMETERS
@@ -1085,9 +1085,9 @@ if __name__ == '__main__':
             prefix=prefix, suffix=suffix,
             ) 
 
-        print('...........')
-        print(prefix, suffix, Rlooks_int)
-        print('...........')
+        # print('...........')
+        # print(prefix, suffix, Rlooks_int)
+        # print('...........')
 
         print()
         job = getattr(p,'name')
@@ -1100,6 +1100,7 @@ if __name__ == '__main__':
         # run process
         output = []
         output.append(go(postprocess, job, nproc))
+        print(output[0][0])
         prefix, suffix, Rlooks_int = output[0][0]
 
         print('----------------------------------')
