@@ -787,6 +787,7 @@ def colin(config,kk):
         config.stack.updatefix(kk,newprefix,suffix)
         outfile = config.stack.getname(kk) + '.int'
         outrsc = outfile + '.rsc'
+        shutil.copy(inrsc,outrsc)
 
         # Retrieve length and width
         width,length =  config.stack.getsize(kk)
