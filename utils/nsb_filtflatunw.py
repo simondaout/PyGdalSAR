@@ -25,7 +25,7 @@ from datetime import datetime
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import logging
-from multiprocessing import Pool
+from multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
 from itertools import repeat
@@ -112,7 +112,7 @@ def checkinfile(file):
 # create generator for pool
 @contextmanager
 def poolcontext(*arg, **kargs):
-    pool = Pool(*arg, **kargs)
+    pool = multiprocessing.Pool(*arg, **kargs)
     yield pool
     pool.terminate()
     pool.join()
@@ -124,16 +124,22 @@ def go(config,job,nproc):
     import itertools
 
     with TimeIt():
-        work = range(config.Nifg)
-        
-        if nproc > 1:
-            pool = Pool(processes=nproc)
-            results = pool.starmap(eval(job), zip(repeat(config), work))
 
-            # with poolcontext(processes=nproc) as pool:
-            #     results = pool.map(partial(eval(job), config), work)
-        else:
-            map(eval(job), repeat(config, len(work)) , work)
+        queue = multiprocessing.Queue()
+        queue.put(config)
+        for i in xrange(config.Nifg):
+            p = multiprocessing.Process(target=eval(job), args=(queue,i))
+            p.start()
+            p.join()
+
+        # work = range(config.Nifg)
+        # if nproc > 1:
+        #     # pool = multiprocessing.Pool(processes=nproc)
+        #     # results = pool.starmap(eval(job), zip(repeat(config), work))
+        #     # with poolcontext(processes=nproc) as pool:
+        #     #     results = pool.map(partial(eval(job), config), work)
+        # else:
+        #     map(eval(job), repeat(config, len(work)) , work)
 
 
 
@@ -438,6 +444,8 @@ def replace_amp(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
+        queue.put(config)
+
 def filterSW(config, kk):
     ''' Filter SW function form Doin et. al. 2011
     Requiered proc parameters: SWwindowsize, SWamplim, filterstyle
@@ -467,6 +475,8 @@ def filterSW(config, kk):
 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
+
+        queue.put(config)
 
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
@@ -1032,8 +1042,8 @@ nproc=2
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-# do_list =  'unwrapping add_model_back'  
-do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
+do_list =  'replace_amp filterSW'  
+# do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
