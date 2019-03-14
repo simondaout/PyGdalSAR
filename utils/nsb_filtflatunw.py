@@ -125,12 +125,15 @@ def go(config,job,nproc):
 
     with TimeIt():
 
-        queue = multiprocessing.Queue()
-        queue.put(config)
-        for i in range(config.Nifg):
-            p = multiprocessing.Process(target=eval(job), args=(queue,i))
+        proc = []
+        manager = multiprocessing.Manager()
+        m_list = manager.dict()
+        for k in range(config.Nifg):
+            p = Process(target=eval(job), args=(config, k))
             p.start()
-            p.join()
+            proc.append(p)
+        for p in proc:
+             p.join()
 
         # work = range(config.Nifg)
         # if nproc > 1:
@@ -444,8 +447,6 @@ def replace_amp(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-        queue.put(config)
-
 def filterSW(config, kk):
     ''' Filter SW function form Doin et. al. 2011
     Requiered proc parameters: SWwindowsize, SWamplim, filterstyle
@@ -475,8 +476,6 @@ def filterSW(config, kk):
 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
-
-        queue.put(config)
 
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
@@ -1055,41 +1054,43 @@ print()
 #   MAIN 
 ###########
 
-print(FiltFlatUnw.__doc__)
-print()
+if __name__ == '__main__':
 
-postprocess = FiltFlatUnw(
-    [ListInterfero,SARMasterDir,IntDir,
-    Rlooks_int, Rlooks_unw, 
-    nfit_range, thresh_amp_range,
-    nfit_az, thresh_amp_az,
-    filterstyle,SWwindowsize, SWamplim,
-    filterStrength,
-    nfit_topo,thresh_amp_topo,ivar,z_ref,
-    seedx,seedy,threshold_unw,unw_method], 
-    prefix=prefix, suffix=suffix,
-    ) 
-
-# RUN
-for p in jobs:
-
-    print('...........')
-    print(prefix, suffix, Rlooks_int)
-    print('...........')
-
-    print()
-    job = getattr(p,'name')
-    # print ifg names at the begining of each process
-    postprocess.stack.info()
-
-    print('----------------------------------')
-    print('Run {} ....'.format(job))
-    
-    # run process
-    go(postprocess, job, nproc)
-
-    print('----------------------------------')
+    print(FiltFlatUnw.__doc__)
     print()
 
-print("That's all folks")
+    postprocess = FiltFlatUnw(
+        [ListInterfero,SARMasterDir,IntDir,
+        Rlooks_int, Rlooks_unw, 
+        nfit_range, thresh_amp_range,
+        nfit_az, thresh_amp_az,
+        filterstyle,SWwindowsize, SWamplim,
+        filterStrength,
+        nfit_topo,thresh_amp_topo,ivar,z_ref,
+        seedx,seedy,threshold_unw,unw_method], 
+        prefix=prefix, suffix=suffix,
+        ) 
+
+    # RUN
+    for p in jobs:
+
+        print('...........')
+        print(prefix, suffix, Rlooks_int)
+        print('...........')
+
+        print()
+        job = getattr(p,'name')
+        # print ifg names at the begining of each process
+        postprocess.stack.info()
+
+        print('----------------------------------')
+        print('Run {} ....'.format(job))
+        
+        # run process
+        go(postprocess, job, nproc)
+
+        print('----------------------------------')
+        print()
+
+    print("That's all folks")
 
