@@ -1087,6 +1087,7 @@ if __name__ == '__main__':
         output = []
         output.append(go(postprocess, job, nproc))
 
+        print(output[0])
         prefix, suffix, Rlooks_int = output[0]
 
         print('----------------------------------')
