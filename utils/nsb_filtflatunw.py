@@ -126,13 +126,12 @@ def go(config,job,nproc):
     with TimeIt():
 
         work = range(config.Nifg)
-        if nproc > 1:
-            pool = multiprocessing.Pool(processes=nproc)
-            # results = pool.starmap(eval(job), zip(repeat(config), work))
-            with poolcontext(processes=nproc) as pool:
-                results = pool.map(partial(eval(job), config), work)
-        else:
-            results = map(eval(job), repeat(config, len(work)) , work)
+        pool = multiprocessing.Pool(processes=nproc)
+        # results = pool.starmap(eval(job), zip(repeat(config), work))
+        with poolcontext(processes=nproc) as pool:
+            results = pool.map(partial(eval(job), config), work)
+        
+        # results = eval(job), repeat(config, len(work)) , work)
 
     return results
 
