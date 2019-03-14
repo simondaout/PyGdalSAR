@@ -136,7 +136,6 @@ def go(config,job,nproc):
     return results
 
 
-
 ##################################################################################
 ###  Define Job, IFG, Images and FiltFlatUnw classes  
 ##################################################################################
@@ -968,8 +967,6 @@ def add_atmo_back(config,kk):
         prefix, suffix = config.stack.getfix(kk)
         newsuffix = suffix.replace("_flatz", "")
         config.stack.updatefix(kk,prefix,newsuffix)
-        print(suffix,newsuffix)
-        time.sleep(2)
         outfile = config.stack.getname(kk) + '.unw'
 
         if path.exists(outfile) == False:
@@ -995,16 +992,16 @@ def add_model_back(config,kk):
 ###  READ IMPUT PARAMETERS
 ##################################################################################
 
-nproc=1
+nproc=8
 
 # # input parameters (not in the proc file)
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-seedx=336 ## iw1
-seedy=1840
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+# seedx=336 ## iw1
+# seedy=1840
 
-# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
-# seedx=300 ## iw2
-# seedy=2384
+home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
+seedx=300 ## iw2
+seedy=2384
 
 prefix = '' 
 suffix = '_sd'
@@ -1038,13 +1035,13 @@ z_ref=8000.
 
 
 #### TEST DIR
-prefix = 'col_' 
-suffix = '_sd_flatz'
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-IntDir=path.abspath(home)+'/'+'test/'
-ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-unw_method='roi'
-nproc=1
+# prefix = 'col_' 
+# suffix = '_sd_flatz'
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+# IntDir=path.abspath(home)+'/'+'test/'
+# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+# unw_method='roi'
+# nproc=1
 
 ####################
 # Test Process List
@@ -1052,8 +1049,8 @@ nproc=1
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-do_list =  'add_model_back'  
-# do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
+# do_list =  'add_model_back'  
+do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_atmo_back' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
@@ -1101,7 +1098,7 @@ if __name__ == '__main__':
         # run process
         output = []
         output.append(go(postprocess, job, nproc))
-        print(output[0][0])
+        # print(output[0][0])
         prefix, suffix, Rlooks_int = output[0][0]
 
         print('----------------------------------')
