@@ -439,7 +439,7 @@ def replace_amp(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-    return self.getconfig()
+    return config.getconfig()
 
 def filterSW(config, kk):
     ''' Filter SW function form Doin et. al. 2011
@@ -471,7 +471,7 @@ def filterSW(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-    return self.getconfig()
+    return config.getconfig()
 
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
