@@ -125,24 +125,16 @@ def go(config,job,nproc):
 
     with TimeIt():
 
-        proc = []
-        manager = multiprocessing.Manager()
-        m_list = manager.dict()
-        for k in range(config.Nifg):
-            p = Process(target=eval(job), args=(config, k))
-            p.start()
-            proc.append(p)
-        for p in proc:
-             p.join()
+        work = range(config.Nifg)
+        if nproc > 1:
+            pool = multiprocessing.Pool(processes=nproc)
+            results = pool.starmap(eval(job), zip(repeat(config), work))
+            # with poolcontext(processes=nproc) as pool:
+            #     results = pool.map(partial(eval(job), config), work)
+        else:
+            map(eval(job), repeat(config, len(work)) , work)
 
-        # work = range(config.Nifg)
-        # if nproc > 1:
-        #     # pool = multiprocessing.Pool(processes=nproc)
-        #     # results = pool.starmap(eval(job), zip(repeat(config), work))
-        #     # with poolcontext(processes=nproc) as pool:
-        #     #     results = pool.map(partial(eval(job), config), work)
-        # else:
-        #     map(eval(job), repeat(config, len(work)) , work)
+    return results
 
 
 
@@ -447,6 +439,8 @@ def replace_amp(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
+    return self.getconfig()
+
 def filterSW(config, kk):
     ''' Filter SW function form Doin et. al. 2011
     Requiered proc parameters: SWwindowsize, SWamplim, filterstyle
@@ -476,6 +470,8 @@ def filterSW(config, kk):
 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
+
+    return self.getconfig()
 
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
@@ -1054,25 +1050,26 @@ print()
 #   MAIN 
 ###########
 
+
 if __name__ == '__main__':
 
     print(FiltFlatUnw.__doc__)
     print()
 
-    postprocess = FiltFlatUnw(
-        [ListInterfero,SARMasterDir,IntDir,
-        Rlooks_int, Rlooks_unw, 
-        nfit_range, thresh_amp_range,
-        nfit_az, thresh_amp_az,
-        filterstyle,SWwindowsize, SWamplim,
-        filterStrength,
-        nfit_topo,thresh_amp_topo,ivar,z_ref,
-        seedx,seedy,threshold_unw,unw_method], 
-        prefix=prefix, suffix=suffix,
-        ) 
-
     # RUN
     for p in jobs:
+
+        postprocess = FiltFlatUnw(
+            [ListInterfero,SARMasterDir,IntDir,
+            Rlooks_int, Rlooks_unw, 
+            nfit_range, thresh_amp_range,
+            nfit_az, thresh_amp_az,
+            filterstyle,SWwindowsize, SWamplim,
+            filterStrength,
+            nfit_topo,thresh_amp_topo,ivar,z_ref,
+            seedx,seedy,threshold_unw,unw_method], 
+            prefix=prefix, suffix=suffix,
+            ) 
 
         print('...........')
         print(prefix, suffix, Rlooks_int)
@@ -1087,7 +1084,10 @@ if __name__ == '__main__':
         print('Run {} ....'.format(job))
         
         # run process
-        go(postprocess, job, nproc)
+        output = []
+        output.append(go(postprocess, job, nproc))
+
+        prefix, suffix, Rlooks_int = output[0]
 
         print('----------------------------------')
         print()
