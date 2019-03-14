@@ -1051,7 +1051,7 @@ nproc=2
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
 # do_list =  'replace_amp filterSW'  
-# do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
+do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_model_back' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
