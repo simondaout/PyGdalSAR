@@ -132,7 +132,7 @@ def go(config,job,nproc):
             with poolcontext(processes=nproc) as pool:
                 results = pool.map(partial(eval(job), config), work)
         else:
-            map(eval(job), repeat(config, len(work)) , work)
+            results = map(eval(job), repeat(config, len(work)) , work)
 
     return results
 
