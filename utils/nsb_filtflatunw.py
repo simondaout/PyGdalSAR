@@ -895,6 +895,8 @@ def unwrapping(config,kk):
         shutil.copy(inrsc,unwSWrsc)
         shutil.copy(inrsc,unwROIrsc)
 
+        bridgefile = 'bridge.in'
+
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
             filterROI(config, kk)
@@ -904,11 +906,17 @@ def unwrapping(config,kk):
 
             logger.info('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
                 format(unwfile,config.seedx,config.seedy,config.threshold_unw))
+            
             if config.unw_method == 'mpd':
                 logger.info("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
-                if path.exists(unwfiltSW) == False:
+                if path.exists(filtSWfile) == False:
                     filterSW(config, kk)
-                    checkinfile(unwfiltROI)
+                    checkinfile(filtSWfile)
+
+                if path.exists(bridgefile) == False:
+                    wf = open(bridgefile,"w")
+                    wf.write("1  1  1  1  0  0")
+                    wf.close()
 
                 # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
                 # unwrapped firt filtSWfile and then add high frequency of filtROIfile
@@ -992,16 +1000,16 @@ def add_model_back(config,kk):
 ###  READ IMPUT PARAMETERS
 ##################################################################################
 
-nproc=8
+nproc=4
 
 # # input parameters (not in the proc file)
-# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-# seedx=336 ## iw1
-# seedy=1840
+home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+seedx=336 ## iw1
+seedy=1840
 
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
-seedx=300 ## iw2
-seedy=2384
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
+# seedx=300 ## iw2
+# seedy=2384
 
 prefix = '' 
 suffix = '_sd'
