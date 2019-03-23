@@ -114,7 +114,6 @@ def checkinfile(file):
         logger.critical("File: {0} not found, Exit !".format(file))
         print("File: {0} not found in {1}, Exit !".format(file,getcwd()))
         # print(listdir('./'))
-        pool.terminate()
 
 
 ##################################################################################
@@ -163,8 +162,8 @@ class Job():
             self._processes = [Process(name) for name in self.names]
         except ValueError as error:
             logger.critical(error)
-            self.info()
-            pool.terminate()
+            self.info() 
+            sys.exit()
 
     # create spetial methods len() and getititem for Job class
     def __len__(self):
@@ -424,27 +423,23 @@ def replace_amp(config, kk):
                 if r1 != 0:
                     logger.critical(r1)
                     logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
-                    pool.terminate()
 
                 logger.info("cpx2mag_phs "+str(infile)+" tmp2 phs "+str(width))
                 r2 = subprocess.call("cpx2mag_phs "+str(infile)+" tmp2 phs "+str(width)+"  >> log_replaceAMP.txt", shell=True)
                 if (r2) != 0:
                     logger.critical(r2)
                     logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
-                    pool.terminate()
 
                 logger.info("mag_phs2cpx cor phs "+str(outfile)+" "+str(width))
                 r3 = subprocess.call("mag_phs2cpx cor phs "+str(outfile)+" "+str(width)+"  >> log_replaceAMP.txt", shell=True)
                 if (r3) != 0:
                     logger.critical(r3)
                     logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
-                    pool.terminate()
 
                 remove('tmp'); remove('tmp2'); remove('phs'); remove('cor')
 
             except:
                 print(replace_amp.__doc__)
-                pool.terminate()
 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
@@ -468,17 +463,19 @@ def filterSW(config, kk):
 
         do = checkoutile(config,outfile)
         if do:
+         try:
             logger.info('Filter {0} with {1} filter type'.format(infile,config.filterstyle))
             r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
                     +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
             if r != 0:
                 logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
                 print(filterSW.__doc__)
-                pool.terminate()
 
             if path.exists(filtrsc) == False:
                 shutil.copy(inrsc,filtrsc)
-
+         except:
+            logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
+            print(filterSW.__doc__)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -506,13 +503,17 @@ def filterROI(config, kk):
 
         do = checkoutile(config,filtfile)
         if do:
+          try:
             logger.info("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
             r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
                     +str(width)+" 0.25"+" "+str(config.filterStrength)+"  >> log_filtROI.txt", shell=True)
             if r != 0:
                 logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
                 print(filterROI.__doc__)
-                pool.terminate()
+          except:
+            logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
+            print(filterROI.__doc__)
+           
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
         
@@ -551,7 +552,6 @@ def flat_range(config,kk):
             if r != 0:
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
                 print(flat_range.__doc__) 
-                pool.terminate()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -594,7 +594,6 @@ def flat_az(config,kk):
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
                 print(flat_az.__doc__)
-                pool.terminate()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -654,7 +653,6 @@ def flat_topo(config, kk):
             if r != 0:
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
                 print(flat_topo.__doc__)
-                pool.terminate()
         else:
             print('{0} exists, assuming OK'.format(outfile))
         
@@ -718,7 +716,6 @@ def flat_topo(config, kk):
             r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
             if r != 0:
                 logger.critical("Failed to convert {0} to .unw".format(infile))
-                pool.terminate()
 
             inrsc = infile + '.rsc'
             outrsc = infileunw + '.rsc'
@@ -732,7 +729,6 @@ def flat_topo(config, kk):
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref)+" >> log_flattopo.txt", shell=True)
             if r != 0:
                 logger.critical("Failed creating stratified file: {0}".format(stratfile))
-                pool.terminate()
 
             outrsc = stratfile + '.rsc'
             shutil.copy(inrsc,outrsc)
@@ -744,7 +740,6 @@ def flat_topo(config, kk):
             r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
             if r != 0:
                 logger.critical("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
-                pool.terminate()
 
             corfile = config.stack.getcor(kk)
             corbase = path.splitext(corfile)[0]
@@ -754,7 +749,6 @@ def flat_topo(config, kk):
                 +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
             if r != 0:
                 logger.critical("Failed filtering IFG {0}: ".format(outfile))
-                pool.terminate()
 
         else:
             z_select = z; phi_select = phi
@@ -822,7 +816,6 @@ def colin(config,kk):
             if r != 0:
                 logger.critical('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
                 print(colin.__doc__)
-                pool.terminate()
             # clean
             remove('temp')
 
@@ -925,6 +918,7 @@ def unwrapping(config,kk):
 
         do = checkoutile(config,unwfiltROI)
         if do:
+          try:
             logger.info('Unwraped IFG:{0} with strating point col:{1} line:{2} and filterd coherence threshold {3}'.\
                 format(unwfile,config.seedx,config.seedy,config.threshold_unw))
             
@@ -948,7 +942,6 @@ def unwrapping(config,kk):
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
-                    pool.terminate()
                 # remove('cut')
 
             if config.unw_method == 'roi':
@@ -961,14 +954,12 @@ def unwrapping(config,kk):
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-                    pool.terminate()
 
                 logger.info("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
                 r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-                    pool.terminate()
 
                 logger.info("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy))
@@ -977,7 +968,10 @@ def unwrapping(config,kk):
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-                    pool.terminate()
+          except:
+            print(unwrapping.__doc__)
+            logger.critical("Failed unwrapping IFG {0} ".format(unwfile))
+
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
 
@@ -1005,7 +999,6 @@ def add_atmo_back(config,kk):
             if r != 0:
                 logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
                 logger.critical(r) 
-                pool.terminate()
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -1021,12 +1014,12 @@ def add_model_back(config,kk):
 ###  READ IMPUT PARAMETERS
 ##################################################################################
 
-nproc=6
+nproc=10
 
-# input parameters (not in the proc file)
-# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-# seedx=336 ## iw1
-# seedy=1840
+## input parameters (not in the proc file)
+#home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+#seedx=336 ## iw1
+#seedy=1840
 
 home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
 seedx=300 ## iw2
