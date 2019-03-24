@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 ############################################
 
@@ -6,22 +6,37 @@
 # Author        : Simon DAOUT (Oxford)
 ############################################
 
-# from __future__ import print_function
+"""\
+nsb_filtflatunw.py
+----------------------
 
-# gdal
-import gdal, shutil
-gdal.UseExceptions()
-# system
+usage:
+  nsb_filtflatunw.py [-v] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] \
+  [--model=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>] <proc_file> 
+  nsb_filtflatunw.py -h | --help
+
+options:
+  --nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
+  --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
+  --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
+  --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_topo/colin/look_int/unwrapping/add_atmo_back) 
+Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back
+  --model=<path>        Model to be removed from wrapped IFG [default: None]
+  --ibeg_mask,iend_mask Starting and Ending columbs defining mask for empirical estimations [default: 0,0]
+  --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
+  -v                    Verbose mode. Show more information about the processing
+  -h --help             Show this screen.
+"""
+
+from __future__ import print_function
+import shutil
 from os import path, environ, system, chdir, remove, getcwd, listdir
-# plot
-import subprocess
 import matplotlib
 if environ["TERM"].startswith("screen"):
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
 from pylab import *
 import matplotlib.pyplot as plt
 from datetime import datetime
-# numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import logging
@@ -29,24 +44,10 @@ import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
 from itertools import repeat
+from nsbas import docopt, gdal, procparser, subprocess
+gdal.UseExceptions()
 # import subprocess
-
-##################################################################################
-###  INITIALISE
-##################################################################################
-
-# init logger 
-logging.basicConfig(level=logging.INFO,\
-      format='%(asctime)s -- %(levelname)s -- %(message)s')
-logger = logging.getLogger('filtflatunw_log.log')
-
-#filename='filtflatunw_log.log'
-
-# init collections 
 import collections
-Process = collections.namedtuple('Process', 'name')
-IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
-Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
 ##################################################################################
 ###  Extras functions and context maganers
@@ -1016,51 +1017,111 @@ def add_ramp_back(config,kk):
 def add_model_back(config,kk):
     return config.getconfig()
 
+
 ##################################################################################
 ###  READ IMPUT PARAMETERS
 ##################################################################################
 
-nproc=10
+# Parse arguments
+arguments = docopt.docopt(__doc__)
+home = getcwd()
+
+if arguments["--nproc"] == None:
+    nproc = 4
+else:
+    nproc = int(arguments["--nproc"])
+
+if arguments["--prefix"] == None:
+    prefix = ''
+else:
+    prefix=arguments["--prefix"]
+if arguments["--suffix"] == None:
+    suffix = '_sd'
+else:
+    suffix=arguments["--suffix"]
+if arguments["--jobs"] ==  None:
+    print('--jobs list is empty. Nothing to be done. Exit!')
+    print(Job.__doc__)
+    sys.exit()
+else:
+    do_list = map(float,arguments["--jobs"].replace('/',' ').split())
+
+if arguments["--model"] == None:
+    model = None
+else:
+    model = path.abspath(home)+'/'+arguments["--model"]
+
+if arguments["--ibeg_mask"] == None:
+    ibeg_mask = 0
+else:
+    ibeg_mask = int(arguments["--ibeg_mask"])
+
+if arguments["--iend_mask"] == None:
+    iend_mask = 0
+else:
+    iend_mask = int(arguments["--iend_mask"])
+
+if arguments["--jbeg_mask"] == None:
+    jbeg_mask = 0
+else:
+    jbeg_mask = int(arguments["--jbeg_mask"])
+
+if arguments["--jend_mask"] == None:
+    jend_mask = 0
+else:
+    jend_mask = int(arguments["--jend_mask"])
+
+##################################################################################
+###  READ PROC FILE
+##################################################################################
+
+# Read proc file
+# default procfile: I dont know if that is a good idea as we maybe want error messages
+# and process to stop when procfile parameters not well defined for run process
+# but like this it run fine all the time
+proc_defaults = {
+    "IntDir": "int",
+    "ListInterfero": "interf_pair.rsc"
+    "Rlooks_int": "2"
+    "Rlooks_unw": "4"
+    "nfit_range": "-1"
+    "thresh_amp_range": "0.3"
+    "nfit_az": "0"
+    "thresh_amp_az": "0.3"
+    "filterstyle": "SWc"
+    "SWamplim": "0.05"
+    "SWwindowsize": "8"
+    "filterStrength": "2"
+    "threshold_unw": "0.35"
+    "unw_method": "mpd"
+    "nfit_topo": "-1"
+    "thresh_amp_topo": "0.2"
+    "ivar": "1"
+    "z_ref": "8000."
+    }
+
+proc = procparser.ProcParser(proc_defaults)
+if arguments["-v"]:
+    print("reading proc file "+arguments["<proc_file>"])
+proc.read(arguments["<proc_file>"])
+
+# is that usefull? not sure...
+IntDir = path.abspath(home)+'/'+proc.get("IntDir")
+ListInterfero = path.abspath(home)+'/'+proc["ListInterfero"]
+SARMasterDir = path.abspath(home)+'/'+proc["ListInterfero"]
+
+
+##################################################################################
+###  TESTS
+##################################################################################
 
 ## input parameters (not in the proc file)
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-seedx=336 ## iw1
-seedy=1840
-
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+# seedx=336 ## iw1
+# seedy=1840
 #home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
 #seedx=300 ## iw2
 #seedy=2384
-
-prefix = '' 
-suffix = '_sd'
-iend_mask=0 # mask for empirical estimations
-jend_mask=0
-jbeg_mask=0
-jend_mask=0
-model=None # model to be removed from wrapped int
-
-# proc file parameters
-IntDir=path.abspath(home)+'/'+'int/'
-ListInterfero=path.abspath(home)+'/'+'interf_pair.rsc'
-SARMasterDir=path.abspath(home)+'/'+'20160608'
-Rlooks_int=int(2)
-Rlooks_unw=int(4)
-nfit_range = -1
-thresh_amp_range = 0.3
-nfit_az = 0
-thresh_amp_az = 0.3
-filterstyle='SWc'
-SWamplim=0.05
-SWwindowsize=8
-filterStrength=2.
-threshold_unw=0.35
-unw_method='mpd'
-
-nfit_topo=-1
-thresh_amp_topo=0.2
-ivar=1
-z_ref=8000.
-
 
 #### TEST DIR
 # prefix = 'col_' 
@@ -1071,68 +1132,79 @@ z_ref=8000.
 # unw_method='roi'
 # nproc=1
 
-####################
-# Test Process List
-####################
-
-""" Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
-print(Job.__doc__)
-do_list =  'add_atmo_back'  
-prefix = 'col_' 
-suffix = '_sd_flatz'
+# prefix = 'col_' 
+# suffix = '_sd_flatz'
+# do_list =  'add_atmo_back'  
+# prefix = '' 
+# suffix = '_sd'
 #do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_atmo_back' 
-jobs = Job(do_list)
-
-print('List of Post-Processing Jobs:')
-for p in jobs:
-    print(p)
-print()
 
 ###########
 #   MAIN 
 ###########
 
+# init collections 
+Process = collections.namedtuple('Process', 'name')
+IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
+Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
-if __name__ == '__main__':
+# init logger 
+if arguments["-v"]:
+    logging.basicConfig(level=logging.INFO,\
+        format='%(asctime)s -- %(levelname)s -- %(message)s')
+else:
+    logging.basicConfig(level=logging.WARNING,\
+        format='%(asctime)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('filtflatunw_log.log')
 
+# initialise job list
+jobs = Job(do_list)
+print('List of Post-Processing Jobs:')
+for p in jobs:
+    print(p)
+    # test if job in available list
+    job = getattr(p,'name')
+    if callable(job):
+        pass
+    else:
+        print(Job.__doc__)
+        sys.exit()
+print()
+
+if arguments["-v"]:
     print(FiltFlatUnw.__doc__)
     print()
 
-    # RUN
-    for p in jobs:
+# RUN
+for p in jobs:
+    postprocess = FiltFlatUnw(
+        [ListInterfero,SARMasterDir,IntDir,
+        proc["Rlooks_int"], proc["Rlooks_unw"], 
+        proc["nfit_range"], proc["thresh_amp_range"],
+        proc["nfit_az"], proc["thresh_amp_az"],
+        proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
+        proc["filterStrength"],
+        proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
+        proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["unw_method"]], 
+        prefix=prefix, suffix=suffix,
+        ) 
 
-        postprocess = FiltFlatUnw(
-            [ListInterfero,SARMasterDir,IntDir,
-            Rlooks_int, Rlooks_unw, 
-            nfit_range, thresh_amp_range,
-            nfit_az, thresh_amp_az,
-            filterstyle,SWwindowsize, SWamplim,
-            filterStrength,
-            nfit_topo,thresh_amp_topo,ivar,z_ref,
-            seedx,seedy,threshold_unw,unw_method], 
-            prefix=prefix, suffix=suffix,
-            ) 
+    print()
+    job = getattr(p,'name')
+    # print ifg names at the begining of each process
+    postprocess.stack.info()
 
-        # print('...........')
-        # print(prefix, suffix, Rlooks_int)
-        # print('...........')
+    print('----------------------------------')
+    print('Run {} ....'.format(job))
+    
+    # run process
+    output = []
+    output.append(go(postprocess, job, nproc))
+    # print(output[0][0])
+    prefix, suffix, Rlooks_int = output[0][0]
 
-        print()
-        job = getattr(p,'name')
-        # print ifg names at the begining of each process
-        postprocess.stack.info()
+    print('----------------------------------')
+    print()
 
-        print('----------------------------------')
-        print('Run {} ....'.format(job))
-        
-        # run process
-        output = []
-        output.append(go(postprocess, job, nproc))
-        # print(output[0][0])
-        prefix, suffix, Rlooks_int = output[0][0]
-
-        print('----------------------------------')
-        print()
-
-    print("That's all folks")
+print("That's all folks")
 
