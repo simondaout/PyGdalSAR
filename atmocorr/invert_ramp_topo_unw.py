@@ -349,7 +349,7 @@ if radar is not None:
             # par_file = ref 
             mlines,mcols = gm.readpar()
             elev_map = gm.readgamma(radar)
-
+        
         maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
     
 else:
@@ -1962,7 +1962,7 @@ for kk in xrange((kmax)):
     else:
         flatlos = flatlos - cst
         corr_inv = corr_inv + cst
-    print(cst,np.nanmean(zone))
+    print('Remove ref. frame:', cst)
     
     # print(suffout, rlook)
     # print(outfile)
