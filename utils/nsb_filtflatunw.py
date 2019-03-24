@@ -844,17 +844,15 @@ def look_int(config,kk):
         logger.info('Look file {0} in {1} look'.format(infile,config.rlook))
         chdir(config.stack.getpath(kk))
 
+        # look strat file
+        stratfile = config.stack.getstratfile(kk) + '.unw'
+        if config.strat == True: # config.strat check if flatten_topo has been done
+            look_file(config,stratfile)
+
         # update looks
         config.stack.updatelook(kk,config.Rlooks_unw)
         outfile =  config.stack.getname(kk) + '.int'
         outcor = config.stack.getcor(kk) 
-
-        # look strat file
-        stratfile = config.stack.getstratfile(kk) + '.unw'
-        if (path.exists(stratfile) == False) and (config.strat == True):
-            # config.strat check if flatten_topo has been done
-            look_file(config,stratfile)
-            config.strat = stratfile
 
         chdir(config.stack.getpath(kk))
 
@@ -982,6 +980,13 @@ def add_atmo_back(config,kk):
 
     with Cd(config.stack.getpath(kk)):
 
+        # in case look strat failed
+        stratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
+        look_file(config,stratfile)
+        
+        # update look unw in case not done already
+        config.stack.updatelook(kk,config.Rlooks_unw)
+
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
         stratfile = config.stack.getstratfile(kk) + '.unw'; checkinfile(stratfile)
@@ -990,7 +995,7 @@ def add_atmo_back(config,kk):
         prefix, suffix = config.stack.getfix(kk)
         newsuffix = suffix.replace("_flatz", "")
         config.stack.updatefix(kk,prefix,newsuffix)
-        outfile = config.stack.getname(kk) + '.unw'
+        outfile = config.stack.getfiltROI(kk) + '.unw'
 
         if path.exists(outfile) == False:
             logger.info("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
@@ -998,7 +1003,8 @@ def add_atmo_back(config,kk):
                  " >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
-                logger.critical(r) 
+                logger.critical(r)
+                #sys.exit() 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -1017,13 +1023,13 @@ def add_model_back(config,kk):
 nproc=10
 
 ## input parameters (not in the proc file)
-#home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-#seedx=336 ## iw1
-#seedy=1840
+home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
+seedx=336 ## iw1
+seedy=1840
 
-home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
-seedx=300 ## iw2
-seedy=2384
+#home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
+#seedx=300 ## iw2
+#seedy=2384
 
 prefix = '' 
 suffix = '_sd'
@@ -1061,7 +1067,7 @@ z_ref=8000.
 # suffix = '_sd_flatz'
 # home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 # IntDir=path.abspath(home)+'/'+'test/'
-# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+#ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
 # unw_method='roi'
 # nproc=1
 
@@ -1071,8 +1077,10 @@ z_ref=8000.
 
 """ Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
 print(Job.__doc__)
-# do_list =  'add_model_back'  
-do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_atmo_back' 
+do_list =  'add_atmo_back'  
+prefix = 'col_' 
+suffix = '_sd_flatz'
+#do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_atmo_back' 
 jobs = Job(do_list)
 
 print('List of Post-Processing Jobs:')
