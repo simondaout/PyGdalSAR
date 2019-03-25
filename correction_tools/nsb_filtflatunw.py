@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 
@@ -20,7 +20,7 @@ options:
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
   --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_topo/colin/look_int/unwrapping/add_atmo_back) 
-Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back
+Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
   --model=<path>        Model to be removed from wrapped IFG [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
@@ -44,9 +44,11 @@ import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
 from itertools import repeat
-from nsbas import docopt, gdal, procparser, subprocess
+from operator import methodcaller
+# from nsbas import docopt, gdal, procparser, subprocess
+import subprocess, docopt, gdal, procparser
 gdal.UseExceptions()
-# import subprocess
+
 import collections
 
 ##################################################################################
@@ -108,6 +110,14 @@ def checkoutfile(config,file):
         pass
     return do
 
+def force_link(src,dest):
+    try:
+        symlink(src,dest)
+    except OSError:
+        remove(dest)
+        symlink(src,dest)
+
+
 def checkinfile(file):
     if path.exists(file) is False:
         logger.critical("File: {0} not found, Exit !".format(file))
@@ -151,7 +161,7 @@ def go(config,job,nproc):
 
 class Job():
     """ Create a class of Jobs to be run: 
-    Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_ramp_back """
+    Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -186,13 +196,15 @@ class Job():
         print('Choose them in the order that you want')
 
 class PileInt:
-    def __init__(self,dates1, dates2, prefix, suffix, look, filterstyle ,dir):
+    def __init__(self,dates1, dates2, prefix, suffix, Rlooks_int, Rlooks_unw, look, filterstyle ,dir):
         self.dates1, self.dates2 = dates1, dates2
         self.dir = dir
         self.filterstyle = filterstyle
         self.prefix = prefix
         self.suffix = suffix
         self.look = look
+        self.Rlooks_int = Rlooks_int
+        self.Rlooks_unw = Rlooks_unw
 
         self.Nifg=len(self.dates1)
         print("number of interferogram: ",self.Nifg)
@@ -252,16 +264,22 @@ class PileInt:
         return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks'
 
     def getmodelfile(self,kk):
-        ''' Return stratified file name '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  self._ifgs[kk].look + 'rlks' + '.strat'
+        ''' Return model file name 
+        Supposed model computed on the Rlooks_unw IFG...
+        '''
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.strat'
 
     def getflatrfile(self,kk):
-        ''' Return stratified file name '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  self._ifgs[kk].look + 'rlks' + '.flatr'
+        ''' Return stratified file name 
+        Supposed estimation computed on the Rlooks_int IFG...
+        '''
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flatr'
 
     def getflatafile(self,kk):
-        ''' Return stratified file name '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  self._ifgs[kk].look + 'rlks' + '.flata'
+        ''' Return stratified file name 
+        Supposed estimation computed on the Rlooks_int IFG...
+        '''
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flata'
 
     def updatelook(self,kk,newlook):
         self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
@@ -326,7 +344,7 @@ class FiltFlatUnw:
     model: model to be removed from wrapped interferograms (default: None)
     """
 
-    def __init__(self, params, prefix='', suffix='_sd', ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
+    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -341,7 +359,7 @@ class FiltFlatUnw:
         self.prefix, self.suffix = prefix, suffix
 
         # initiliase number of looks
-        self.look = self.Rlooks_int
+        self.look = look
         self.rlook = int(int(self.Rlooks_unw) - int(self.Rlooks_int))
 
         # initialise model to be removed from wrapped int
@@ -356,7 +374,7 @@ class FiltFlatUnw:
 
         # define list of interferograms
         dates1,dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
-        self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.look,self.filterstyle, self.IntDir)
+        self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.Rlooks_int, self.Rlooks_unw, self.look,self.filterstyle, self.IntDir)
         self.stack.info()
         self.Nifg = len(self.stack)
 
@@ -542,7 +560,7 @@ def flat_range(config,kk):
         if path.exists(filtfile) == False:
             logger.warning('{0} does not exist'.format(filtfile))
             # call filter function
-            config.filterSW(kk)
+            filterSW(config,kk)
 
         # parameter file
         param = config.stack.getname(kk) + '.flatr'
@@ -569,7 +587,7 @@ def flat_range(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-        symlink(param,newparam)
+        force_link(param,newparam)
 
     return config.getconfig()
 
@@ -593,7 +611,7 @@ def flat_az(config,kk):
         if path.exists(filtfile) == False:
             logger.warning('{0} does not exist'.format(filtfile))
             # call filter function
-            eval(config.filterSW(kk))
+            filterSW(config,kk)
 
         # update names
         prefix, suffix = config.stack.getfix(kk)
@@ -616,7 +634,7 @@ def flat_az(config,kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-        symlink(param,newparam)
+        force_link(param,newparam)
 
     return config.getconfig()
 
@@ -631,13 +649,13 @@ def flat_topo(config, kk):
         infile = config.stack.getname(kk) + '.int';  checkinfile(infile)
         corfile = config.stack.getcor(kk)
         filtfile = config.stack.getfiltSW(kk) + '.int';  checkinfile(filtfile)
-        stratfile = config.stack.getstratfile(kk) + '.unw'
+        stratfile = config.stack.getstratfile(kk) + '.unw' 
 
         # filt must be done before changing name
         if path.exists(filtfile) == False:
             logger.info('{0} does not exist'.format(filtfile))
             # call filter function
-            config.filterSW(kk)
+            filterSW(config,kk)
 
         # update names
         prefix, suffix = config.stack.getfix(kk)
@@ -654,13 +672,12 @@ def flat_topo(config, kk):
 
     # look dem if necessary
     w,l = computesize(config,config.dem)
-
     if int(w) != int(width):
         logger.warning('IFG:{0} and DEM file are not the same size: {0}'.format(infile))
         look_file(config,config.dem)
         # update DEM
         config.dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
-        
+
     with Cd(config.stack.getpath(kk)):
 
         do = checkoutfile(config,outfile)
@@ -679,10 +696,11 @@ def flat_topo(config, kk):
         
         inrsc = infile + '.rsc'
         outrsc = outfile + '.rsc'
-        # print(inrsc,outrsc)
         filtrsc = filtout + '.rsc'
         shutil.copy(inrsc,outrsc)
         shutil.copy(inrsc,filtrsc)
+        stratrsc =  stratfile + '.rsc'
+        shutil.copy(inrsc,stratrsc)
 
         # select points
         i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
@@ -809,6 +827,7 @@ def flat_model(config,kk):
 
         infile = config.stack.getname(kk) + '.int'; checkinfile(infile)
         inrsc = infile + '.rsc'
+
         filtfile = config.stack.getfiltSW(kk) + '.int'
         # param file
         param = config.stack.getname(kk) + '.stack'
@@ -817,7 +836,7 @@ def flat_model(config,kk):
         if path.exists(filtfile) == False:
             logger.warning('{0} does not exist'.format(filtfile))
             # call filter function
-            eval(config.filterSW(kk))
+            filterSW(config, kk)
 
         # update names
         prefix, suffix = config.stack.getfix(kk)
@@ -847,7 +866,7 @@ def flat_model(config,kk):
             sys.exit()
 
         # move param file into a file name independent of prefix and suffix
-        symlink(param,newparam)
+        force_link(param,newparam)
 
     return config.getconfig()
 
@@ -1066,14 +1085,19 @@ def add_atmo_back(config,kk):
         outrsc = outfile + '.rsc'
         shutil.copy(unwrsc,outrsc)
 
-        if path.exists(outfile) == False:
+        do = checkoutfile(config,outfile)
+        if do:
+
+            logger.info("length.pl "+str(unwfile))
+            r = subprocess.call("length.pl "+str(unwfile), shell=True)
+
             logger.info("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
             r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
                  " >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
                 logger.critical(r)
-                #sys.exit() 
+                # sys.exit() 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -1092,7 +1116,7 @@ def add_flatr_back(config,kk):
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
-        param = getflatrfile(kk)
+        param = config.stack.getflatrfile(kk)
         unwrsc = unwfile + '.rsc'
 
         # assume flatr done on Rlooks_int...but it is always the case?
@@ -1107,7 +1131,12 @@ def add_flatr_back(config,kk):
         shutil.copy(unwrsc,outrsc)
 
         if path.exists(param):
-            if path.exists(outfile) == False:
+            do = checkoutfile(config,outfile)
+            if do:
+
+                logger.info("length.pl "+str(unwfile))
+                r = subprocess.call("length.pl "+str(unwfile), shell=True)
+
                 logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
                 r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
                      " >> log_flatenrange.txt", shell=True)
@@ -1136,7 +1165,7 @@ def add_flata_back(config,kk):
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
-        param = getflatafile(kk)
+        param = config.stack.getflatafile(kk)
         unwrsc = unwfile + '.rsc'
 
         # assume flatr done on Rlooks_int...but it is always the case?
@@ -1150,8 +1179,13 @@ def add_flata_back(config,kk):
         outrsc = outfile + '.rsc'
         shutil.copy(unwrsc,outrsc)
 
-        if path.exists(param):
+        do = checkoutfile(config,outfile)
+        if do:
             if path.exists(outfile) == False:
+
+                logger.info("length.pl "+str(unwfile))
+                r = subprocess.call("length.pl "+str(unwfile), shell=True)
+
                 logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
                 r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
                      " >> log_flatenrange.txt", shell=True)
@@ -1195,19 +1229,23 @@ def add_model_back(config,kk):
             if path.exists(param) is True:
                 do = checkoutfile(config,outfile)
                 if do:
+
+                    logger.info("length.pl "+str(unwfile))
+                    r = subprocess.call("length.pl "+str(unwfile), shell=True)
+
                     logger.info("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param))
                     r = subprocess.call("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt", shell=True)
                     if r != 0:
-                        logger.critical("Unflatten model failed for int. {0} Failed!".format(infile))
+                        logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
                         print(add_model_back.__doc__)
                 else:
                     logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
-                    logger.critical("Unflatten model for int. {0} Failed!".format(infile))
+                    logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
                     logger.critical("Param file {0}, does not exist!".format(param))
                     print(add_model_back.__doc__)        
         else:
-            logger.critical("Model file not found. Exit!".format(infile))
+            logger.critical("Model file not found. Exit!".format(unwfile))
             print(add_model_back.__doc__)  
             sys.exit()
 
@@ -1239,7 +1277,8 @@ if arguments["--jobs"] ==  None:
     print(Job.__doc__)
     sys.exit()
 else:
-    do_list = map(float,arguments["--jobs"].replace('/',' ').split())
+    split = methodcaller('replace','/',' ')
+    do_list = split(arguments["--jobs"])
 
 if arguments["--model"] == None:
     model = None
@@ -1276,36 +1315,63 @@ else:
 # but like this it run fine all the time
 proc_defaults = {
     "IntDir": "int",
-    "ListInterfero": "interf_pair.rsc"
-    "Rlooks_int": "2"
-    "Rlooks_unw": "4"
-    "nfit_range": "-1" # median
-    "thresh_amp_range": "0.3" # threshold on coherence
-    "nfit_az": "-1" # median
-    "thresh_amp_az": "0.3" # threshold on coherence
-    "nfit_topo": "-1". # median 
-    "thresh_amp_topo": "0.2"
-    "ivar": "1" # fct of topography only
-    "z_ref": "8000." # reference
-    "filterstyle": "SWc"
-    "SWamplim": "0.05"
-    "SWwindowsize": "8"
-    "filterStrength": "2" # strenght filter roi
-    "unw_method": "mpd"
-    "threshold_unw": "0.35" # filtered colinearity 
-    "seedx": "1" # starting col for unw
-    "seedy": "1" # starting line for unw
+    "ListInterfero": "interf_pair.rsc",
+    "Rlooks_int": "2",
+    "Rlooks_unw": "4",
+    "nfit_range": "-1", # median
+    "thresh_amp_range": "0.3", # threshold on coherence
+    "nfit_az": "-1", # median
+    "thresh_amp_az": "0.3", # threshold on coherence
+    "nfit_topo": "-1", # median 
+    "thresh_amp_topo": "0.2",
+    "ivar": "1", # fct of topography only
+    "z_ref": "8000.", # reference
+    "filterstyle": "SWc",
+    "SWamplim": "0.05",
+    "SWwindowsize": "8",
+    "filterStrength": "2", # strenght filter roi
+    "unw_method": "roi",
+    "threshold_unw": "0.35", # filtered colinearity 
+    "seedx": "50", # starting col for unw
+    "seedy": "50", # starting line for unw
     }
 
 proc = procparser.ProcParser(proc_defaults)
 if arguments["-v"]:
     print("reading proc file "+arguments["<proc_file>"])
-proc.read(arguments["<proc_file>"])
+if path.exists(arguments["<proc_file>"]):
+    proc.read(arguments["<proc_file>"])
+else:
+    print('{0} does not exist. Exit!'.format(arguments["<proc_file>"]))
+    sys.exit()
 
 # is that usefull? not sure...
 IntDir = path.abspath(home)+'/'+proc.get("IntDir")
 ListInterfero = path.abspath(home)+'/'+proc["ListInterfero"]
-SARMasterDir = path.abspath(home)+'/'+proc["ListInterfero"]
+SARMasterDir = path.abspath(home)+'/'+proc["SarMasterDir"]
+
+print('Proc File parameters:')
+print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n\
+    Rlooks_int: {3}, Rlooks_unw: {4}\n\
+    nfit_range: {5}, thresh_amp_range: {6}\n\
+    nfit_az: {7}, thresh_amp_az: {8}\n\
+    filterstyle : {9}, SWwindowsize: {10}, SWamplim: {11}\n\
+    filterStrength : {12}\n\
+    nfit_topo: {13}, thresh_amp_topo: {14}, ivar: {15}, z_ref: {16}\n\
+    seedx: {17}, seedy: {18}, threshold_unw: {19}, unw_method: {20}'.\
+    format(ListInterfero,SARMasterDir,IntDir,\
+    proc["Rlooks_int"], proc["Rlooks_unw"],\
+    proc["nfit_range"], proc["thresh_amp_range"],\
+    proc["nfit_az"], proc["thresh_amp_az"],\
+    proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
+    proc["filterStrength"],\
+    proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],\
+    proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["unw_method"]\
+    ))
+print()
+if arguments["-v"]:
+    # give me the time to read terminal
+    time.sleep(3)
 
 ##################################################################################
 ###  TESTS
@@ -1319,18 +1385,12 @@ SARMasterDir = path.abspath(home)+'/'+proc["ListInterfero"]
 #seedx=300 ## iw2
 #seedy=2384
 
-#### TEST DIR
 # home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
 # IntDir=path.abspath(home)+'/'+'test/'
-#ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-# unw_method='roi'
-
-# prefix = 'col_' 
-# suffix = '_sd_flatz'
-# do_list =  'add_atmo_back'  
-# prefix = '' 
-# suffix = '_sd'
-#do_list =  'replace_amp filterSW flat_topo colin look_int unwrapping add_atmo_back' 
+# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
+# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/T047/'
+# IntDir=path.abspath(home)+'/'+'test/'
+# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
 
 ###########
 #   MAIN 
@@ -1357,9 +1417,10 @@ for p in jobs:
     print(p)
     # test if job in available list
     job = getattr(p,'name')
-    if callable(job):
+    if callable(eval(job)):
         pass
     else:
+        print('Job: {0} does not exist'.format(job))
         print(Job.__doc__)
         sys.exit()
 print()
@@ -1367,6 +1428,13 @@ print()
 if arguments["-v"]:
     print(FiltFlatUnw.__doc__)
     print()
+
+if arguments["-v"]:
+    # give me the time to read terminal
+    time.sleep(3)
+
+# init look to Rlooks_int
+look = str(np.copy(proc["Rlooks_int"]))
 
 # RUN
 for p in jobs:
@@ -1379,7 +1447,7 @@ for p in jobs:
         proc["filterStrength"],
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["unw_method"]], 
-        prefix=prefix, suffix=suffix,
+        prefix=prefix, suffix=suffix, look=look, model=model
         ) 
 
     print()
@@ -1394,8 +1462,8 @@ for p in jobs:
     output = []
     output.append(go(postprocess, job, nproc))
     # print(output[0][0])
-    prefix, suffix, Rlooks_int = output[0][0]
-
+    prefix, suffix, look = output[0][0]
+    
     print('----------------------------------')
     print()
 
