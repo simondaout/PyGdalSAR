@@ -1080,7 +1080,54 @@ def add_atmo_back(config,kk):
     return config.getconfig()
 
 def add_flatr_back(config,kk):
-    ''' Add ramp estimated on wrapped IFG back on unwrapped IFG'''
+    ''' Add range ramp estimated on wrapped IFG back on unwrapped IFG
+    Requiered .flatr parameter file containing polynomial fit
+    !!! Supposed flattening estimated on Rlooks_int file. 
+    '''
+
+    with Cd(config.stack.getpath(kk)):
+   
+        # update look unw in case not done already
+        config.stack.updatelook(kk,config.Rlooks_unw)
+
+        # the final product is always filtROI
+        unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
+        param = getflatrfile(kk)
+        unwrsc = unwfile + '.rsc'
+
+        # assume flatr done on Rlooks_int...but it is always the case?
+        look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
+
+        # update names
+        prefix, suffix = config.stack.getfix(kk)
+        newsuffix = suffix.replace("_flatr", "")
+        config.stack.updatefix(kk,prefix,newsuffix)
+        outfile = config.stack.getfiltROI(kk) + '.unw'
+        outrsc = outfile + '.rsc'
+        shutil.copy(unwrsc,outrsc)
+
+        if path.exists(param):
+            if path.exists(outfile) == False:
+                logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
+                r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
+                     " >> log_flatenrange.txt", shell=True)
+                if r != 0:
+                    logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
+                    logger.critical(r)
+                    #sys.exit() 
+            else:
+                logger.warning('{0} exists, assuming OK'.format(outfile))
+        else:
+            logger.critical('Param file {0} does not exist. Exit!'.format(param))
+            sys.exit()
+
+    return config.getconfig()
+
+def add_flata_back(config,kk):
+    ''' Add azimutal ramp estimated on wrapped IFG back on unwrapped IFG
+    Requiered .flata parameter file containing polynomial fit
+    !!! Supposed flattening estimated on Rlooks_int file. 
+    '''
 
     with Cd(config.stack.getpath(kk)):
    
@@ -1092,6 +1139,9 @@ def add_flatr_back(config,kk):
         param = getflatafile(kk)
         unwrsc = unwfile + '.rsc'
 
+        # assume flatr done on Rlooks_int...but it is always the case?
+        look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
+
         # update names
         prefix, suffix = config.stack.getfix(kk)
         newsuffix = suffix.replace("_flatr", "")
@@ -1100,16 +1150,21 @@ def add_flatr_back(config,kk):
         outrsc = outfile + '.rsc'
         shutil.copy(unwrsc,outrsc)
 
-        if path.exists(outfile) == False:
-            logger.info("correct_ramp_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
-            r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
-                 " >> log_flatenrange.txt", shell=True)
-            if r != 0:
-                logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
-                logger.critical(r)
-                #sys.exit() 
+        if path.exists(param):
+            if path.exists(outfile) == False:
+                logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
+                r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
+                     " >> log_flatenrange.txt", shell=True)
+                if r != 0:
+                    logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
+                    logger.critical(r)
+                    #sys.exit() 
+            else:
+                logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
+            logger.critical('Param file {0} does not exist. Exit!'.format(param))
+            print(add_flata_back.__doc__)  
+            sys.exit()
 
     return config.getconfig()
 
@@ -1152,11 +1207,11 @@ def add_model_back(config,kk):
                     logger.critical("Param file {0}, does not exist!".format(param))
                     print(add_model_back.__doc__)        
         else:
-            logger.critical('Model file is not defined. Exit!')
+            logger.critical("Model file not found. Exit!".format(infile))
+            print(add_model_back.__doc__)  
             sys.exit()
 
     return config.getconfig()
-
 
 ##################################################################################
 ###  READ IMPUT PARAMETERS
