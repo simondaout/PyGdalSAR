@@ -11,8 +11,8 @@ nsb_filtflatunw.py
 ----------------------
 
 usage:
-  nsb_filtflatunw.py [-v] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] \
-  [--model=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>] <proc_file> 
+  nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] \
+  [--model=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>]  <proc_file> 
   nsb_filtflatunw.py -h | --help
 
 options:
@@ -20,11 +20,13 @@ options:
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
   --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_topo/colin/look_int/unwrapping/add_atmo_back) 
-Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
+Job list is: erai look_int replace_amp filterSW filterROI flatr flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
+  --list_int=<path>     Overwrite liste ifg in proc file            
   --model=<path>        Model to be removed from wrapped IFG [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
   -v                    Verbose mode. Show more information about the processing
+  -f                    Force mode. Overwrite output files
   -h --help             Show this screen.
 """
 
@@ -48,7 +50,7 @@ from operator import methodcaller
 # from nsbas import docopt, gdal, procparser, subprocess
 import subprocess, docopt, gdal, procparser
 gdal.UseExceptions()
-
+import filecmp
 import collections
 
 ##################################################################################
@@ -117,6 +119,12 @@ def force_link(src,dest):
         remove(dest)
         symlink(src,dest)
 
+# check if rsc file exist and good size
+def copyrsc(src,dest):
+    if filecmp.cmp(src,dest):
+        pass
+    else:
+        shutil.copy(src,dest)
 
 def checkinfile(file):
     if path.exists(file) is False:
@@ -161,7 +169,7 @@ def go(config,job,nproc):
 
 class Job():
     """ Create a class of Jobs to be run: 
-    Job list is: erai look_int replace_amp filterSW filterROI flat_range flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
+    Job list is: erai look_int replace_amp filterSW filterROI flatr flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -191,7 +199,7 @@ class Job():
 
     def info(self):
         print('List of possible Jobs:') 
-        print('erai look_int replace_amp filter flat_range flat_topo flat_model colin \
+        print('erai look_int replace_amp filter flatr flat_topo flat_model colin \
             unwrapping add_model_back add_atmo_back add_ramp_back')
         print('Choose them in the order that you want')
 
@@ -257,7 +265,7 @@ class PileInt:
 
     def getpath(self,kk):
         ''' Return path ifg dir '''
-        return  str(self.dir + 'int_' + str(self.dates1[kk]) + '_' + str(self.dates2[kk])) 
+        return  str(self.dir + '/'  + 'int_' + str(self.dates1[kk]) + '_' + str(self.dates2[kk])) 
 
     def getstratfile(self,kk):
         ''' Return stratified file name '''
@@ -294,44 +302,45 @@ class PileInt:
 
     def info(self):
         print('List of interferograms:')
-        print ([self._ifgs[kk] for kk in range(self.Nifg)])
-        # print ([self.getname(kk) for kk in range(self.Nifg)])
+        # print ([self._ifgs[kk] for kk in range(self.Nifg)])
+        print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
 
-class PileImages:
-    def __init__(self,dates1,dates2):
-        self.dates1, self.dates2 = dates1, dates2
+# class PileImages:
+#     def __init__(self,dates1,dates2):
+#         self.dates1, self.dates2 = dates1, dates2
 
-        # define list of images 
-        im = []; bt = []
-        for date1,date2 in zip(self.dates1,self.dates2):
-            if date1 not in im: im.append(date1)
-            if date2 not in im: im.append(date2)
-        self.Nimages=len(im)
-        print("number of image: ",self.Nimages)
-        imd = date2dec(im)
-        cst = np.copy(imd[0])
-        for i in range((self.Nimages)):
-            bt.append(imd[i]-cst)
-        del cst
+#         # define list of images 
+#         im = []; bt = []
+#         for date1,date2 in zip(self.dates1,self.dates2):
+#             if date1 not in im: im.append(date1)
+#             if date2 not in im: im.append(date2)
+#         self.Nimages=len(im)
+#         print("number of image: ",self.Nimages)
+#         print(im)
+#         imd = date2dec(im)
+#         cst = np.copy(imd[0])
+#         for i in range((self.Nimages)):
+#             bt.append(imd[i]-cst)
+#         del cst
 
-        try:
-            logger.info('Define list of Images')
-            self._images = [Image(date,dec,baseline) for (date,dec,baseline) in zip(im,imd,bt)]
-        except ValueError as error:
-            logger.critical(error)
+#         try:
+#             logger.info('Define list of Images')
+#             self._images = [Image(date,dec,baseline) for (date,dec,baseline) in zip(im,imd,bt)]
+#         except ValueError as error:
+#             logger.critical(error)
     
-    # create spetial methods len() and getititem for PileImages class
-    def __len__(self):
-        return len(self._images)
+#     # create spetial methods len() and getititem for PileImages class
+#     def __len__(self):
+#         return len(self._images)
 
-    def __getitem__(self,kk):
-        return self._images[kk]
+#     def __getitem__(self,kk):
+#         return self._images[kk]
 
-    def info(self):
-        print('List of Images:')
-        print ([self._images[kk] for kk in range(self.Nimages)])
-        print()
+#     def info(self):
+#         print('List of Images:')
+#         print ([self._images[kk] for kk in range(self.Nimages)])
+#         print()
 
 class FiltFlatUnw:
     """ Create a class FiltFlatUnw defining all the post-procesing functions 
@@ -344,7 +353,7 @@ class FiltFlatUnw:
     model: model to be removed from wrapped interferograms (default: None)
     """
 
-    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None):
+    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False):
         (self.ListInterfero, self.SARMasterDir, self.IntDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -378,10 +387,10 @@ class FiltFlatUnw:
         self.stack.info()
         self.Nifg = len(self.stack)
 
-        # define list images
-        self.images = PileImages(dates1,dates2)
-        self.images.info()
-        self.Nimages = len(self.images)
+        # # define list images
+        # self.images = PileImages(dates1,dates2)
+        # self.images.info()
+        # self.Nimages = len(self.images)
 
     def getconfig(self):
          return self.stack.prefix, self.stack.suffix, self.stack.look
@@ -440,8 +449,10 @@ def replace_amp(config, kk):
         config.stack.updatefix(kk,newprefix,suffix)
         outfile = config.stack.getname(kk) + '.int'
         outrsc = outfile + '.rsc' 
-        shutil.copy(rscfile,outrsc)
+        copyrsc(rscfile,outrsc)
 
+        if force:
+            remove(outfile)
         # check if not done
         do = checkoutfile(config,outfile)
         if do:
@@ -489,6 +500,8 @@ def filterSW(config, kk):
         filtrsc = filtbase + '.int.rsc'
         outfile = filtbase + '.int'
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
          try:
@@ -500,7 +513,7 @@ def filterSW(config, kk):
                 print(filterSW.__doc__)
 
             if path.exists(filtrsc) == False:
-                shutil.copy(inrsc,filtrsc)
+                copyrsc(inrsc,filtrsc)
          except:
             logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
             print(filterSW.__doc__)
@@ -527,8 +540,10 @@ def filterROI(config, kk):
         filtfile = config.stack.getfiltROI(kk) + '.int'
         filtrsc = filtfile + '.rsc'
         if path.exists(filtrsc) == False:
-            shutil.copy(inrsc,filtrsc)
+            copyrsc(inrsc,filtrsc)
 
+        if force:
+            remove(filtfile)
         do = checkoutfile(config,filtfile)
         if do:
           try:
@@ -544,8 +559,10 @@ def filterROI(config, kk):
            
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
+
+    return config.getconfig()
         
-def flat_range(config,kk):
+def flatr(config,kk):
     ''' Function flatten range  on wrapped phase  (See Doin et al., 2015)
     Requiered proc file parameters: nfit_range, thresh_amp_range
     Estimation done on filterSW file
@@ -573,8 +590,10 @@ def flat_range(config,kk):
         outfile = config.stack.getname(kk) + '.int' 
         outrsc = outfile + '.rsc'
         filtout = config.stack.getfiltSW(kk)
-        shutil.copy(inrsc,outrsc)
+        copyrsc(inrsc,outrsc)
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
@@ -583,7 +602,7 @@ def flat_range(config,kk):
                 " "+str(config.nfit_range)+" "+str(config.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
             if r != 0:
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
-                print(flat_range.__doc__) 
+                print(flatr.__doc__) 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -591,7 +610,7 @@ def flat_range(config,kk):
 
     return config.getconfig()
 
-def flat_az(config,kk):
+def flata(config,kk):
     ''' Function flatten azimuth  on wrapped phase  (See Doin et al., 2015)
         Requiered proc file parameters: nfit_az, thresh_amp_az
         Estimation done on filterSW file
@@ -620,8 +639,10 @@ def flat_az(config,kk):
         outfile = config.stack.getname(kk) + '.int' 
         filtout = config.stack.getfiltSW(kk) + '.int'
         outrsc = outfile + '.rsc'
-        shutil.copy(inrsc,outrsc)
+        copyrsc(inrsc,outrsc)
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
@@ -630,7 +651,7 @@ def flat_az(config,kk):
                 " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
-                print(flat_az.__doc__)
+                print(flata.__doc__)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -680,6 +701,8 @@ def flat_topo(config, kk):
 
     with Cd(config.stack.getpath(kk)):
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
@@ -697,10 +720,10 @@ def flat_topo(config, kk):
         inrsc = infile + '.rsc'
         outrsc = outfile + '.rsc'
         filtrsc = filtout + '.rsc'
-        shutil.copy(inrsc,outrsc)
-        shutil.copy(inrsc,filtrsc)
+        copyrsc(inrsc,outrsc)
+        copyrsc(inrsc,filtrsc)
         stratrsc =  stratfile + '.rsc'
-        shutil.copy(inrsc,stratrsc)
+        copyrsc(inrsc,stratrsc)
 
         # select points
         i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
@@ -758,7 +781,7 @@ def flat_topo(config, kk):
 
             inrsc = infile + '.rsc'
             outrsc = infileunw + '.rsc'
-            shutil.copy(inrsc,outrsc)
+            copyrsc(inrsc,outrsc)
 
             # remove strat file created by flatten_topo and write
             remove(stratfile)
@@ -770,7 +793,7 @@ def flat_topo(config, kk):
                 logger.critical("Failed creating stratified file: {0}".format(stratfile))
 
             outrsc = stratfile + '.rsc'
-            shutil.copy(inrsc,outrsc)
+            copyrsc(inrsc,outrsc)
 
             # remove model created by flatten_topo and run
             remove(outfile)
@@ -846,9 +869,11 @@ def flat_model(config,kk):
         filtout = config.stack.getfiltSW(kk) + '.int'
         outrsc = outfile + '.rsc'
         filtoutrsc = filtout + '.rsc'
-        shutil.copy(inrsc,outrsc)
-        shutil.copy(inrsc,filtoutrsc)
+        copyrsc(inrsc,outrsc)
+        copyrsc(inrsc,filtoutrsc)
 
+        if force:
+            remove(outfile)
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
@@ -884,7 +909,7 @@ def colin(config,kk):
         config.stack.updatefix(kk,newprefix,suffix)
         outfile = config.stack.getname(kk) + '.int'
         outrsc = outfile + '.rsc'
-        shutil.copy(inrsc,outrsc)
+        copyrsc(inrsc,outrsc)
 
         # Retrieve length and width
         width,length =  config.stack.getsize(kk)
@@ -892,10 +917,12 @@ def colin(config,kk):
             width,length = computesize(config,infile)
             config.stack.updatesize(kk,width,length)
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
-            shutil.copy(infile,'temp')
+            copyrsc(infile,'temp')
             logger.info("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
                 " 3 0.0001 2")
             r = subprocess.call("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
@@ -941,6 +968,8 @@ def look_int(config,kk):
 
         chdir(config.stack.getpath(kk))
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("look.pl "+str(infile)+" "+str(config.rlook))
@@ -988,9 +1017,9 @@ def unwrapping(config,kk):
         unwSWrsc = unwfiltSW + '.rsc'
         unwfiltROI = config.stack.getfiltROI(kk)+ '.unw'
         unwROIrsc = unwfiltROI + '.rsc'
-        shutil.copy(inrsc,unwrsc)
-        shutil.copy(inrsc,unwSWrsc)
-        shutil.copy(inrsc,unwROIrsc)
+        copyrsc(inrsc,unwrsc)
+        copyrsc(inrsc,unwSWrsc)
+        copyrsc(inrsc,unwROIrsc)
 
         bridgefile = 'bridge.in'
 
@@ -999,6 +1028,8 @@ def unwrapping(config,kk):
             filterROI(config, kk)
             checkinfile(filtROIfile)
 
+        if force:
+            remove(unwfiltROI); remove(unwfiltSW)
         do = checkoutfile(config,unwfiltROI)
         if do:
           try:
@@ -1083,8 +1114,10 @@ def add_atmo_back(config,kk):
         config.stack.updatefix(kk,prefix,newsuffix)
         outfile = config.stack.getfiltROI(kk) + '.unw'
         outrsc = outfile + '.rsc'
-        shutil.copy(unwrsc,outrsc)
+        copyrsc(unwrsc,outrsc)
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
 
@@ -1128,9 +1161,11 @@ def add_flatr_back(config,kk):
         config.stack.updatefix(kk,prefix,newsuffix)
         outfile = config.stack.getfiltROI(kk) + '.unw'
         outrsc = outfile + '.rsc'
-        shutil.copy(unwrsc,outrsc)
+        copyrsc(unwrsc,outrsc)
 
         if path.exists(param):
+            if force:
+                remove(outfile)
             do = checkoutfile(config,outfile)
             if do:
 
@@ -1177,8 +1212,10 @@ def add_flata_back(config,kk):
         config.stack.updatefix(kk,prefix,newsuffix)
         outfile = config.stack.getfiltROI(kk) + '.unw'
         outrsc = outfile + '.rsc'
-        shutil.copy(unwrsc,outrsc)
+        copyrsc(unwrsc,outrsc)
 
+        if force:
+            remove(outfile)
         do = checkoutfile(config,outfile)
         if do:
             if path.exists(outfile) == False:
@@ -1223,8 +1260,10 @@ def add_model_back(config,kk):
         config.stack.updatefix(kk,prefix,newsuffix)
         outfile = config.stack.getfiltROI(kk) + '.unw'
         outrsc = outfile + '.rsc'
-        shutil.copy(unwrsc,outrsc)
+        copyrsc(unwrsc,outrsc)
 
+        if force:
+            remove(outfile)
         if config.model != None:
             if path.exists(param) is True:
                 do = checkoutfile(config,outfile)
@@ -1305,6 +1344,11 @@ if arguments["--jend_mask"] == None:
 else:
     jend_mask = int(arguments["--jend_mask"])
 
+if arguments["-f"]:
+    force = True
+else:
+    force = False
+
 ##################################################################################
 ###  READ PROC FILE
 ##################################################################################
@@ -1347,7 +1391,10 @@ else:
 
 # is that usefull? not sure...
 IntDir = path.abspath(home)+'/'+proc.get("IntDir")
-ListInterfero = path.abspath(home)+'/'+proc["ListInterfero"]
+if arguments["--list_int"] == None:
+    ListInterfero = path.abspath(home)+'/'+proc["ListInterfero"]
+else:
+    ListInterfero = path.abspath(home)+'/'+arguments["--list_int"]
 SARMasterDir = path.abspath(home)+'/'+proc["SarMasterDir"]
 
 print('Proc File parameters:')
@@ -1447,7 +1494,7 @@ for p in jobs:
         proc["filterStrength"],
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["unw_method"]], 
-        prefix=prefix, suffix=suffix, look=look, model=model
+        prefix=prefix, suffix=suffix, look=look, model=model, force=force
         ) 
 
     print()
