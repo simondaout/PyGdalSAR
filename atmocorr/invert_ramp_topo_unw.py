@@ -2052,8 +2052,7 @@ print('#################################')
 print()
 
 # go 
-import itertools
-
+#import itertools
 with TimeIt():
     work = range(Nifg)
     with poolcontext(processes=8) as pool:
