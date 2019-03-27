@@ -474,7 +474,7 @@ def replace_amp(config, kk):
                     logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
 
                 if r1 != 0 or r2 != 0 or r3 != 0 :
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
 
                 remove('tmp'); remove('tmp2'); remove('phs'); remove('cor')
 
@@ -512,14 +512,14 @@ def filterSW(config, kk):
             if r != 0:
                 logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
                 print(filterSW.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
 
             if path.exists(filtrsc) == False:
                 copyrsc(inrsc,filtrsc)
          except:
             logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
             print(filterSW.__doc__)
-            config.dates = np.deletes(config.dates, kk, 0)
+            config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -556,12 +556,12 @@ def filterROI(config, kk):
             if r != 0:
                 logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
                 print(filterROI.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
 
           except:
             logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
             print(filterROI.__doc__)
-            config.dates = np.deletes(config.dates, kk, 0)
+            config.dates = np.delete(config.dates, kk, 0)
            
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
@@ -609,7 +609,7 @@ def flatr(config,kk):
             if r != 0:
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
                 print(flatr.__doc__) 
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -664,7 +664,7 @@ def flata(config,kk):
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
                 print(flata.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -727,7 +727,7 @@ def flat_topo(config, kk):
             if r != 0:
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
                 print(flat_topo.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
         
@@ -827,7 +827,7 @@ def flat_topo(config, kk):
                 logger.critical("Failed filtering IFG {0}: ".format(outfile))
 
             if r1 != 0 or r2 != 0 or r3 != 0 or r4 != 0::
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
 
         else:
             z_select = z; phi_select = phi
@@ -901,7 +901,7 @@ def flat_model(config,kk):
                 if r != 0:
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
                     print(flat_model.__doc__)
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
@@ -949,7 +949,7 @@ def colin(config,kk):
             if r != 0:
                 logger.critical('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
                 print(colin.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
             # clean
             remove('temp')
 
@@ -997,7 +997,7 @@ def look_int(config,kk):
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
                 print(look_int.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
         
@@ -1008,7 +1008,7 @@ def look_int(config,kk):
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
                 print(look_int.__doc__)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))        
                 
@@ -1078,7 +1078,7 @@ def unwrapping(config,kk):
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
 
             if config.unw_method == 'roi':
 
@@ -1106,12 +1106,12 @@ def unwrapping(config,kk):
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
 
                 if r1 != 0 or r2 != 0 or r3 != 0: 
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
 
           except:
             print(unwrapping.__doc__)
             logger.critical("Failed unwrapping IFG {0} ".format(unwfile))
-            config.dates = np.deletes(config.dates, kk, 0)
+            config.dates = np.delete(config.dates, kk, 0)
 
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
@@ -1157,7 +1157,7 @@ def add_atmo_back(config,kk):
             if r != 0:
                 logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
                 logger.critical(r)
-                config.dates = np.deletes(config.dates, kk, 0)
+                config.dates = np.delete(config.dates, kk, 0)
                 # sys.exit() 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
@@ -1206,13 +1206,13 @@ def add_flatr_back(config,kk):
                 if r != 0:
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                     logger.critical(r)
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
                     #sys.exit() 
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
             logger.critical('Param file {0} does not exist. Exit!'.format(param))
-            config.dates = np.deletes(config.dates, kk, 0)
+            config.dates = np.delete(config.dates, kk, 0)
             sys.exit()
 
     return config.getconfig()
@@ -1259,13 +1259,13 @@ def add_flata_back(config,kk):
                 if r != 0:
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                     logger.critical(r)
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
                     #sys.exit() 
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
             logger.critical('Param file {0} does not exist. Exit!'.format(param))
-            config.dates = np.deletes(config.dates, kk, 0)
+            config.dates = np.delete(config.dates, kk, 0)
             print(add_flata_back.__doc__)  
             sys.exit()
 
@@ -1309,18 +1309,18 @@ def add_model_back(config,kk):
                     if r != 0:
                         logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
                         print(add_model_back.__doc__)
-                        config.dates = np.deletes(config.dates, kk, 0)
+                        config.dates = np.delete(config.dates, kk, 0)
                 else:
                     logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
                     logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
                     logger.critical("Param file {0}, does not exist!".format(param))
                     print(add_model_back.__doc__)        
-                    config.dates = np.deletes(config.dates, kk, 0)
+                    config.dates = np.delete(config.dates, kk, 0)
         else:
             logger.critical("Model file not found. Exit!".format(unwfile))
             print(add_model_back.__doc__)  
-            config.dates = np.deletes(config.dates, kk, 0)
+            config.dates = np.delete(config.dates, kk, 0)
             sys.exit()
 
     return config.getconfig()
