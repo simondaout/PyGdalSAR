@@ -45,8 +45,6 @@ import logging
 import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
-from itertools import repeat
-from operator import methodcaller
 # from nsbas import docopt, gdal, procparser, subprocess
 import subprocess, docopt, gdal, procparser
 gdal.UseExceptions()
@@ -158,8 +156,6 @@ def go(config,job,nproc):
         with poolcontext(processes=nproc) as pool:
             results = pool.map(partial(eval(job), config), work)
         
-        # results = eval(job), repeat(config, len(work)) , work)
-
     return results
 
 
@@ -301,7 +297,7 @@ class PileInt:
         self.prefix, self.suffix = newprefix, newsuffix
 
     def info(self):
-        print('List of interferograms:')
+        print('List of interferograms to be process:')
         # print ([self._ifgs[kk] for kk in range(self.Nifg)])
         print ([self.getname(kk) for kk in range(self.Nifg)])
         print()
@@ -382,7 +378,9 @@ class FiltFlatUnw:
         self.ibeg_mask, self.iend_mask, self.jbeg_mask, self.jend_mask = ibeg_mask, iend_mask, jbeg_mask, jend_mask
 
         # define list of interferograms
-        dates1,dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
+        dates1, dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
+        # save list of dates 
+        self.dates = np.array([dates1, dates2])
         self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.Rlooks_int, self.Rlooks_unw, self.look,self.filterstyle, self.IntDir)
         self.stack.info()
         self.Nifg = len(self.stack)
@@ -393,7 +391,7 @@ class FiltFlatUnw:
         # self.Nimages = len(self.images)
 
     def getconfig(self):
-         return self.stack.prefix, self.stack.suffix, self.stack.look
+         return self.stack.prefix, self.stack.suffix, self.stack.look, self.dates
 
 ##################################################################################
 ###  Define Job functions 
@@ -475,6 +473,9 @@ def replace_amp(config, kk):
                     logger.critical(r3)
                     logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
 
+                if r1 != 0 or r2 != 0 or r3 != 0 :
+                    config.dates = np.deletes(config.dates, kk, 0)
+
                 remove('tmp'); remove('tmp2'); remove('phs'); remove('cor')
 
             except:
@@ -511,12 +512,14 @@ def filterSW(config, kk):
             if r != 0:
                 logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
                 print(filterSW.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
 
             if path.exists(filtrsc) == False:
                 copyrsc(inrsc,filtrsc)
          except:
             logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
             print(filterSW.__doc__)
+            config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -547,15 +550,18 @@ def filterROI(config, kk):
         do = checkoutfile(config,filtfile)
         if do:
           try:
-            logger.info("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
-            r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
+            logger.info("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
+            r = subprocess.call("adapt_filt "+str(infile)+" "+str(filtfile)+" "\
                     +str(width)+" 0.25"+" "+str(config.filterStrength)+"  >> log_filtROI.txt", shell=True)
             if r != 0:
                 logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
                 print(filterROI.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
+
           except:
             logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
             print(filterROI.__doc__)
+            config.dates = np.deletes(config.dates, kk, 0)
            
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
@@ -603,6 +609,7 @@ def flatr(config,kk):
             if r != 0:
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
                 print(flatr.__doc__) 
+                config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -657,6 +664,7 @@ def flata(config,kk):
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
                 print(flata.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
@@ -719,6 +727,7 @@ def flat_topo(config, kk):
             if r != 0:
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
                 print(flat_topo.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
         
@@ -780,8 +789,8 @@ def flat_topo(config, kk):
             remove(infileunw)
 
             logger.info("cpx2rmg.pl "+str(infile)+" "+str(infileunw))
-            r = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
-            if r != 0:
+            r1 = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
+            if r1 != 0:
                 logger.critical("Failed to convert {0} to .unw".format(infile))
 
             inrsc = infile + '.rsc'
@@ -792,9 +801,9 @@ def flat_topo(config, kk):
             remove(stratfile)
             logger.info("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref))
-            r = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
+            r2 = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref)+" >> log_flattopo.txt", shell=True)
-            if r != 0:
+            if r2 != 0:
                 logger.critical("Failed creating stratified file: {0}".format(stratfile))
 
             outrsc = stratfile + '.rsc'
@@ -804,18 +813,21 @@ def flat_topo(config, kk):
             remove(outfile)
             remove(filtout)
             logger.info("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile))
-            r = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
-            if r != 0:
+            r3 = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
+            if r3 != 0:
                 logger.critical("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
 
             corfile = config.stack.getcor(kk)
             corbase = path.splitext(corfile)[0]
             logger.info("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
                 +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle))
-            r = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
+            r4 = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
                 +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
-            if r != 0:
+            if r4 != 0:
                 logger.critical("Failed filtering IFG {0}: ".format(outfile))
+
+            if r1 != 0 or r2 != 0 or r3 != 0 or r4 != 0::
+                config.dates = np.deletes(config.dates, kk, 0)
 
         else:
             z_select = z; phi_select = phi
@@ -889,6 +901,7 @@ def flat_model(config,kk):
                 if r != 0:
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
                     print(flat_model.__doc__)
+                    config.dates = np.deletes(config.dates, kk, 0)
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
@@ -922,6 +935,7 @@ def colin(config,kk):
             width,length = computesize(config,infile)
             config.stack.updatesize(kk,width,length)
 
+
         if force:
             remove(outfile)
         do = checkoutfile(config,outfile)
@@ -935,6 +949,7 @@ def colin(config,kk):
             if r != 0:
                 logger.critical('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
                 print(colin.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
             # clean
             remove('temp')
 
@@ -982,6 +997,7 @@ def look_int(config,kk):
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
                 print(look_int.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
         
@@ -992,6 +1008,7 @@ def look_int(config,kk):
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
                 print(look_int.__doc__)
+                config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))        
                 
@@ -1061,7 +1078,7 @@ def unwrapping(config,kk):
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
-                # remove('cut')
+                    config.dates = np.deletes(config.dates, kk, 0)
 
             if config.unw_method == 'roi':
 
@@ -1069,27 +1086,32 @@ def unwrapping(config,kk):
                 mask = path.splitext(filtSWfile)[0] + '_msk'
 
                 logger.info("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
-                r = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
-                if r != 0:
+                r1 = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
+                if r1 != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
 
                 logger.info("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
-                r = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
-                if r != 0:
+                r2 = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
+                if r2 != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
 
                 logger.info("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy))
-                r = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
+                r3 = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+"  >> log_unw.txt",shell=True)
-                if r != 0:
+                if r3 != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+
+                if r1 != 0 or r2 != 0 or r3 != 0: 
+                    config.dates = np.deletes(config.dates, kk, 0)
+
           except:
             print(unwrapping.__doc__)
             logger.critical("Failed unwrapping IFG {0} ".format(unwfile))
+            config.dates = np.deletes(config.dates, kk, 0)
 
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
@@ -1135,6 +1157,7 @@ def add_atmo_back(config,kk):
             if r != 0:
                 logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
                 logger.critical(r)
+                config.dates = np.deletes(config.dates, kk, 0)
                 # sys.exit() 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
@@ -1183,11 +1206,13 @@ def add_flatr_back(config,kk):
                 if r != 0:
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                     logger.critical(r)
+                    config.dates = np.deletes(config.dates, kk, 0)
                     #sys.exit() 
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
             logger.critical('Param file {0} does not exist. Exit!'.format(param))
+            config.dates = np.deletes(config.dates, kk, 0)
             sys.exit()
 
     return config.getconfig()
@@ -1234,11 +1259,13 @@ def add_flata_back(config,kk):
                 if r != 0:
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                     logger.critical(r)
+                    config.dates = np.deletes(config.dates, kk, 0)
                     #sys.exit() 
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
             logger.critical('Param file {0} does not exist. Exit!'.format(param))
+            config.dates = np.deletes(config.dates, kk, 0)
             print(add_flata_back.__doc__)  
             sys.exit()
 
@@ -1282,15 +1309,18 @@ def add_model_back(config,kk):
                     if r != 0:
                         logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
                         print(add_model_back.__doc__)
+                        config.dates = np.deletes(config.dates, kk, 0)
                 else:
                     logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
                     logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
                     logger.critical("Param file {0}, does not exist!".format(param))
                     print(add_model_back.__doc__)        
+                    config.dates = np.deletes(config.dates, kk, 0)
         else:
             logger.critical("Model file not found. Exit!".format(unwfile))
             print(add_model_back.__doc__)  
+            config.dates = np.deletes(config.dates, kk, 0)
             sys.exit()
 
     return config.getconfig()
@@ -1504,7 +1534,7 @@ for p in jobs:
 
     print()
     job = getattr(p,'name')
-    # print ifg names at the begining of each process
+    # print ifgs list at the begining of each process
     postprocess.stack.info()
 
     print('----------------------------------')
@@ -1514,8 +1544,12 @@ for p in jobs:
     output = []
     output.append(go(postprocess, job, nproc))
     # print(output[0][0])
-    prefix, suffix, look = output[0][0]
-    
+    prefix, suffix, look, dates = output[0][0]
+
+    # update list ifg
+    ListInterfero = open(os.path.join(path.abspath(home), "interf_pair_success.txt"), "w")
+    np.savetxt(ListInterfero, dates.astype(int), fmt='%i')
+
     print('----------------------------------')
     print()
 
