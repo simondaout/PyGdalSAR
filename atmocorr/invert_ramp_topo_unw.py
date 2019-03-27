@@ -20,7 +20,7 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
 [--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
-[<ibeg>] [<iend>] [<jbeg>] [<jend>] 
+[<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] 
 
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
@@ -37,6 +37,8 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 --topofile  PATH      Path to the radar_look.hgt file. If not None add phase/elevation relationship in the relation [default:None]
 --nfit VALUE          fit degree in azimuth or in elevation
 --ivar VALUE          define phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation
+--nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
+
 
 if ivar=0 and nfit=0, add linear elev. term (z) to ramps estimation defined by the flat argument such as:
 0: ref frame+ez [default], 1: range ramp ax+b+ez , 2: azimutal ramp ay+b+ez, 
@@ -1755,6 +1757,10 @@ if arguments["--suffix_output"] ==  None:
 else:
     suffout = arguments["--suffix_output"]
 
+if arguments["--nproc"] == None:
+    nproc = 4
+else:
+    nproc = int(arguments["--nproc"])
 
 #####################################################################################
 # INITIALISE 
@@ -1933,7 +1939,7 @@ if estim=='yes':
     with TimeIt():
         # for kk in range(Nifg):
         work = range(Nifg)
-        with poolcontext(processes=8) as pool:
+        with poolcontext(processes=nproc) as pool:
             results = pool.map(empirical_cor, work)
         output.append(results)
 
@@ -2056,6 +2062,6 @@ import itertools
 
 with TimeIt():
     work = range(Nifg)
-    with poolcontext(processes=8) as pool:
+    with poolcontext(processes=nproc) as pool:
         pool.map(partial(apply_cor, sp=spint, sp_inv=spint_inv), work)
         # results = pool.map(apply_cor, itertools.zip(itertools.repeat(spint), itertools.repeat(spint_inv), work))
