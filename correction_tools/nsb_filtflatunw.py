@@ -49,6 +49,7 @@ from functools import wraps, partial
 import subprocess, docopt, gdal, procparser
 gdal.UseExceptions()
 import filecmp
+from operator import methodcaller
 import collections
 
 ##################################################################################
@@ -114,7 +115,7 @@ def force_link(src,dest):
     try:
         symlink(src,dest)
     except OSError:
-        remove(dest)
+        rm(dest)
         symlink(src,dest)
 
 # check if rsc file exist and good size
@@ -127,10 +128,14 @@ def copyrsc(src,dest):
     else:
             shutil.copy(src,dest)
 
+def rm(file):
+    if path.exists(file):
+        remove(file)
+
 def checkinfile(file):
     if path.exists(file) is False:
-        logger.critical("File: {0} not found, Exit !".format(file))
-        print("File: {0} not found in {1}, Exit !".format(file,getcwd()))
+        logger.critical("File: {0} not found, Exit!".format(file))
+        print("File: {0} not found in {1}, Exit!".format(file,getcwd()))
         # print(listdir('./'))
 
 ##################################################################################
@@ -218,7 +223,7 @@ class PileInt:
 
         try:
             logger.info('Define IFG list')
-            self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length) for (date1,date2) in zip(self.dates1,self.dates2)]
+            self._ifgs = [IFG(date1,date2,look,prefix,suffix,width,length,1) for (date1,date2) in zip(self.dates1,self.dates2)]
         except ValueError as error:
             logger.critical(error)
             self.exit()
@@ -291,6 +296,9 @@ class PileInt:
 
     def updatesize(self,kk,newwidth,newlength):
         self._ifgs[kk] = self._ifgs[kk]._replace(width=newwidth,length=newlength)
+
+    def updatesuccess(self,kk):
+        self._ifgs[kk] = self._ifgs[kk]._replace(success=0)
 
     def updatefix(self,kk,newprefix, newsuffix):
         self._ifgs[kk] = self._ifgs[kk]._replace(prefix=str(newprefix), suffix=str(newsuffix))
@@ -378,9 +386,7 @@ class FiltFlatUnw:
         self.ibeg_mask, self.iend_mask, self.jbeg_mask, self.jend_mask = ibeg_mask, iend_mask, jbeg_mask, jend_mask
 
         # define list of interferograms
-        dates1, dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
-        # save list of dates 
-        self.dates = np.array([dates1, dates2])
+        dates1, dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i') 
         self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.Rlooks_int, self.Rlooks_unw, self.look,self.filterstyle, self.IntDir)
         self.stack.info()
         self.Nifg = len(self.stack)
@@ -390,8 +396,8 @@ class FiltFlatUnw:
         # self.images.info()
         # self.Nimages = len(self.images)
 
-    def getconfig(self):
-         return self.stack.prefix, self.stack.suffix, self.stack.look, self.dates
+    def getconfig(self,kk):
+         return self.stack[kk].prefix, self.stack[kk].suffix, self.stack[kk].look, self.stack[kk].success
 
 ##################################################################################
 ###  Define Job functions 
@@ -450,7 +456,7 @@ def replace_amp(config, kk):
         copyrsc(rscfile,outrsc)
 
         if force:
-            remove(outfile)
+            rm(outfile)
         # check if not done
         do = checkoutfile(config,outfile)
         if do:
@@ -474,9 +480,9 @@ def replace_amp(config, kk):
                     logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
 
                 if r1 != 0 or r2 != 0 or r3 != 0 :
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
 
-                remove('tmp'); remove('tmp2'); remove('phs'); remove('cor')
+                rm('tmp'); rm('tmp2'); rm('phs'); rm('cor')
 
             except:
                 print(replace_amp.__doc__)
@@ -484,7 +490,7 @@ def replace_amp(config, kk):
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def filterSW(config, kk):
     ''' Filter SW function form Doin et. al. 2011
@@ -502,7 +508,7 @@ def filterSW(config, kk):
         outfile = filtbase + '.int'
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
          try:
@@ -512,18 +518,18 @@ def filterSW(config, kk):
             if r != 0:
                 logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
                 print(filterSW.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
 
             if path.exists(filtrsc) == False:
                 copyrsc(inrsc,filtrsc)
          except:
             logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
             print(filterSW.__doc__)
-            config.dates = np.delete(config.dates, kk, 0)
+            config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
@@ -546,7 +552,7 @@ def filterROI(config, kk):
             copyrsc(inrsc,filtrsc)
 
         if force:
-            remove(filtfile)
+            rm(filtfile)
         do = checkoutfile(config,filtfile)
         if do:
           try:
@@ -556,17 +562,17 @@ def filterROI(config, kk):
             if r != 0:
                 logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
                 print(filterROI.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
 
           except:
             logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
             print(filterROI.__doc__)
-            config.dates = np.delete(config.dates, kk, 0)
+            config.stack.updatesuccess(kk)
            
         else:
             logger.warning('{0} exists, assuming OK'.format(filtfile))
 
-    return config.getconfig()
+    return config.getconfig(kk)
         
 def flatr(config,kk):
     ''' Function flatten range  on wrapped phase  (See Doin et al., 2015)
@@ -599,7 +605,7 @@ def flatr(config,kk):
         copyrsc(inrsc,outrsc)
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
@@ -609,13 +615,13 @@ def flatr(config,kk):
             if r != 0:
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
                 print(flatr.__doc__) 
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
         force_link(param,newparam)
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def flata(config,kk):
     ''' Function flatten azimuth  on wrapped phase  (See Doin et al., 2015)
@@ -651,7 +657,7 @@ def flata(config,kk):
 
         if force:
             try:
-                remove(outfile)
+                rm(outfile)
             except:
                 pass
         print(outfile)
@@ -664,13 +670,13 @@ def flata(config,kk):
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
                 print(flata.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
         force_link(param,newparam)
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def flat_topo(config, kk):
     ''' Function flatten atmosphere on wrapped phase  (See Doin et al., 2015)
@@ -715,7 +721,7 @@ def flat_topo(config, kk):
     with Cd(config.stack.getpath(kk)):
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
@@ -727,7 +733,7 @@ def flat_topo(config, kk):
             if r != 0:
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
                 print(flat_topo.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
         
@@ -786,7 +792,7 @@ def flat_topo(config, kk):
             
             # clean and prepare for write strat
             infileunw = path.splitext(infile)[0] + '.unw'
-            remove(infileunw)
+            rm(infileunw)
 
             logger.info("cpx2rmg.pl "+str(infile)+" "+str(infileunw))
             r1 = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
@@ -798,7 +804,7 @@ def flat_topo(config, kk):
             copyrsc(inrsc,outrsc)
 
             # remove strat file created by flatten_topo and write
-            remove(stratfile)
+            rm(stratfile)
             logger.info("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
                     +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref))
             r2 = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
@@ -810,8 +816,8 @@ def flat_topo(config, kk):
             copyrsc(inrsc,outrsc)
 
             # remove model created by flatten_topo and run
-            remove(outfile)
-            remove(filtout)
+            rm(outfile)
+            rm(filtout)
             logger.info("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile))
             r3 = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
             if r3 != 0:
@@ -826,8 +832,8 @@ def flat_topo(config, kk):
             if r4 != 0:
                 logger.critical("Failed filtering IFG {0}: ".format(outfile))
 
-            if r1 != 0 or r2 != 0 or r3 != 0 or r4 != 0::
-                config.dates = np.delete(config.dates, kk, 0)
+            if r1 != 0 or r2 != 0 or r3 != 0 or r4 != 0:
+                config.stack.updatesuccess(kk)
 
         else:
             z_select = z; phi_select = phi
@@ -854,7 +860,7 @@ def flat_topo(config, kk):
         plt.close()
         del fig, ax
 
-        return config.getconfig()
+        return config.getconfig(kk)
 
 def flat_model(config,kk):
     ''' Function flatten model on wrapped phase  (See Daout et al., 2017)
@@ -890,7 +896,7 @@ def flat_model(config,kk):
         copyrsc(inrsc,filtoutrsc)
 
         if force:
-            remove(outfile)
+            rm(outfile)
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
@@ -901,7 +907,7 @@ def flat_model(config,kk):
                 if r != 0:
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
                     print(flat_model.__doc__)
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
@@ -911,7 +917,7 @@ def flat_model(config,kk):
         # move param file into a file name independent of prefix and suffix
         force_link(param,newparam)
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def colin(config,kk):
     ''' Compute and replace amplitude by colinearity (See Pinel-Puyssegur et al., 2012)'''
@@ -937,7 +943,7 @@ def colin(config,kk):
 
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
@@ -949,14 +955,14 @@ def colin(config,kk):
             if r != 0:
                 logger.critical('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
                 print(colin.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
             # clean
-            remove('temp')
+            rm('temp')
 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def look_int(config,kk):
     ''' Look function for IFG, coherence, strat, and radar files
@@ -989,7 +995,7 @@ def look_int(config,kk):
         chdir(config.stack.getpath(kk))
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("look.pl "+str(infile)+" "+str(config.rlook))
@@ -997,7 +1003,7 @@ def look_int(config,kk):
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
                 print(look_int.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
         
@@ -1008,7 +1014,7 @@ def look_int(config,kk):
             if r != 0:
                 logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
                 print(look_int.__doc__)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))        
                 
@@ -1016,7 +1022,7 @@ def look_int(config,kk):
         width,length = computesize(config,outfile)
         config.stack.updatesize(kk,width,length)
 
-        return config.getconfig()
+        return config.getconfig(kk)
 
 def unwrapping(config,kk):
     ''' Unwrap function from strating seedx, seedy
@@ -1051,7 +1057,7 @@ def unwrapping(config,kk):
             checkinfile(filtROIfile)
 
         if force:
-            remove(unwfiltROI); remove(unwfiltSW)
+            rm(unwfiltROI); rm(unwfiltSW)
         do = checkoutfile(config,unwfiltROI)
         if do:
           try:
@@ -1078,7 +1084,7 @@ def unwrapping(config,kk):
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
 
             if config.unw_method == 'roi':
 
@@ -1106,17 +1112,17 @@ def unwrapping(config,kk):
                     logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
 
                 if r1 != 0 or r2 != 0 or r3 != 0: 
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
 
           except:
             print(unwrapping.__doc__)
             logger.critical("Failed unwrapping IFG {0} ".format(unwfile))
-            config.dates = np.delete(config.dates, kk, 0)
+            config.stack.updatesuccess(kk)
 
         else:
             logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def add_atmo_back(config,kk):
     ''' Add back stratified model computed by flatten_topo'''
@@ -1144,10 +1150,9 @@ def add_atmo_back(config,kk):
         copyrsc(unwrsc,outrsc)
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
-
             logger.info("length.pl "+str(unwfile))
             r = subprocess.call("length.pl "+str(unwfile), shell=True)
 
@@ -1157,12 +1162,12 @@ def add_atmo_back(config,kk):
             if r != 0:
                 logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
                 logger.critical(r)
-                config.dates = np.delete(config.dates, kk, 0)
+                config.stack.updatesuccess(kk)
                 # sys.exit() 
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def add_flatr_back(config,kk):
     ''' Add range ramp estimated on wrapped IFG back on unwrapped IFG
@@ -1193,7 +1198,7 @@ def add_flatr_back(config,kk):
 
         if path.exists(param):
             if force:
-                remove(outfile)
+                rm(outfile)
             do = checkoutfile(config,outfile)
             if do:
 
@@ -1206,16 +1211,16 @@ def add_flatr_back(config,kk):
                 if r != 0:
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                     logger.critical(r)
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
                     #sys.exit() 
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
             logger.critical('Param file {0} does not exist. Exit!'.format(param))
-            config.dates = np.delete(config.dates, kk, 0)
+            config.stack.updatesuccess(kk)
             sys.exit()
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def add_flata_back(config,kk):
     ''' Add azimutal ramp estimated on wrapped IFG back on unwrapped IFG
@@ -1245,7 +1250,7 @@ def add_flata_back(config,kk):
         copyrsc(unwrsc,outrsc)
 
         if force:
-            remove(outfile)
+            rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
             if path.exists(outfile) == False:
@@ -1259,17 +1264,17 @@ def add_flata_back(config,kk):
                 if r != 0:
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                     logger.critical(r)
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
                     #sys.exit() 
             else:
                 logger.warning('{0} exists, assuming OK'.format(outfile))
         else:
             logger.critical('Param file {0} does not exist. Exit!'.format(param))
-            config.dates = np.delete(config.dates, kk, 0)
+            config.stack.updatesuccess(kk)
             print(add_flata_back.__doc__)  
             sys.exit()
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 def add_model_back(config,kk):
     ''' Function adding model on unwrapped IFG previously removed on wrapped IFG  (See Daout et al., 2017)
@@ -1295,7 +1300,7 @@ def add_model_back(config,kk):
         copyrsc(unwrsc,outrsc)
 
         if force:
-            remove(outfile)
+            rm(outfile)
         if config.model != None:
             if path.exists(param) is True:
                 do = checkoutfile(config,outfile)
@@ -1309,21 +1314,21 @@ def add_model_back(config,kk):
                     if r != 0:
                         logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
                         print(add_model_back.__doc__)
-                        config.dates = np.delete(config.dates, kk, 0)
+                        config.stack.updatesuccess(kk)
                 else:
                     logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
                     logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
                     logger.critical("Param file {0}, does not exist!".format(param))
                     print(add_model_back.__doc__)        
-                    config.dates = np.delete(config.dates, kk, 0)
+                    config.stack.updatesuccess(kk)
         else:
             logger.critical("Model file not found. Exit!".format(unwfile))
             print(add_model_back.__doc__)  
-            config.dates = np.delete(config.dates, kk, 0)
+            config.stack.updatesuccess(kk)
             sys.exit()
 
-    return config.getconfig()
+    return config.getconfig(kk)
 
 ##################################################################################
 ###  READ IMPUT PARAMETERS
@@ -1480,7 +1485,7 @@ if arguments["-v"]:
 
 # init collections 
 Process = collections.namedtuple('Process', 'name')
-IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length')
+IFG = collections.namedtuple('IFG', 'date1 date2 look prefix suffix width length success')
 Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 
 # init logger 
@@ -1518,6 +1523,8 @@ if arguments["-v"]:
 # init look to Rlooks_int
 look = str(np.copy(proc["Rlooks_int"]))
 
+
+
 # RUN
 for p in jobs:
     postprocess = FiltFlatUnw(
@@ -1543,12 +1550,28 @@ for p in jobs:
     # run process
     output = []
     output.append(go(postprocess, job, nproc))
-    # print(output[0][0])
-    prefix, suffix, look, dates = output[0][0]
+
+    # update name
+    prefix, suffix, look = output[0][0][:3]
+
+    # load list of dates
+    dates1, dates2 = np.loadtxt(ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i') 
+    dates = np.vstack([dates1,dates2]).T
+    Nifg = len(dates1)
 
     # update list ifg
-    ListInterfero = open(os.path.join(path.abspath(home), "interf_pair_success.txt"), "w")
-    np.savetxt(ListInterfero, dates.astype(int), fmt='%i')
+    sucess = [] 
+    [sucess.append(output[0][i][3]) for i in range(Nifg)]
+    sucess = np.array(sucess)
+    index = np.flatnonzero(sucess==1)
+    newdates =  dates[index,:] 
+
+    # save new list
+    ListInterfero = path.join(path.abspath(home) + "interf_pair_success.txt")
+    wf = open(ListInterfero, 'w')
+    for i in range(len(sucess)):
+        wf.write("%i  %i\n" % (newdates[i][0], newdates[i][1]))
+    wf.close()
 
     print('----------------------------------')
     print()
