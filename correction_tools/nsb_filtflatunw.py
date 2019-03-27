@@ -121,10 +121,13 @@ def force_link(src,dest):
 
 # check if rsc file exist and good size
 def copyrsc(src,dest):
-    if filecmp.cmp(src,dest):
-        pass
+    if path.exists(dest):
+        if filecmp.cmp(src,dest):
+            pass
+        else:
+            shutil.copy(src,dest)
     else:
-        shutil.copy(src,dest)
+            shutil.copy(src,dest)
 
 def checkinfile(file):
     if path.exists(file) is False:
@@ -146,15 +149,12 @@ def poolcontext(*arg, **kargs):
 
 def go(config,job,nproc):
     ''' RUN processing function '''
-    
-    # from multiprocessing.dummy import Pool as ThreadPool
-    import itertools
 
     with TimeIt():
 
         work = range(config.Nifg)
         pool = multiprocessing.Pool(processes=nproc)
-        # results = pool.starmap(eval(job), zip(repeat(config), work))
+
         with poolcontext(processes=nproc) as pool:
             results = pool.map(partial(eval(job), config), work)
         
@@ -639,16 +639,21 @@ def flata(config,kk):
         outfile = config.stack.getname(kk) + '.int' 
         filtout = config.stack.getfiltSW(kk) + '.int'
         outrsc = outfile + '.rsc'
+        print(inrsc,outrsc)
         copyrsc(inrsc,outrsc)
 
         if force:
-            remove(outfile)
+            try:
+                remove(outfile)
+            except:
+                pass
+        print(outfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(nfit_az)+" "+str(thresh_amp_az))
+                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az))
             r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(nfit_az)+" "+str(thresh_amp_az), shell=True)
+                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az), shell=True)
             if r != 0:
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
                 print(flata.__doc__)
