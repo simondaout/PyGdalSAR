@@ -18,7 +18,7 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
 [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
-[--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] \
+[--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] [--perc_topo=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] 
 
@@ -59,13 +59,14 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --tsinv yes/no        If yes, invert corrected phase into time series [default:no]
 --estim yes/no        If yes, do the estimation, otherwise read input files corection_matrix and liste_coeff_ramps.txt [default:yes]
 --mask PATH           Mask in .r4 format. Keep only values > threshold_mask. [default:None]
---threshold_mask      Threshold on mask: take only values > threshold_mask [default: -1]
+--threshold_mask      Thresclean_r4.pyhold on mask: take only values > threshold_mask [default: -1]
 --cohpixel  yes/no    If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
 --format VALUE        Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --threshold_coh VALUE Threshold on cohpixel file [default:0]
 --ibeg_mask VALUE     Start line number for the mask [default: None]
 --iend_mask VALUE     Stop line number for the mask [default: None]  
 --perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
+--perc_topo VALUE     Percentile of hidden elevation pixel for the estimation and clean outliers [default:98.]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
 --ibeg VALUE          Line number bounding the estimation zone [default: 0]
@@ -1227,8 +1228,8 @@ def empirical_cor(kk):
         # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
         # par_file = ref 
         lines,cols = gm.readpar(int_path)
-        checkinfile(infile)
         infile= int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.unw'
+        checkinfile(infile)
         los_map = gm.readgamma(infile,int_path)
 
     logger.info('lines:{0}, cols:{1}, IFG:{2}:'.format(lines, cols, idate))
@@ -1399,25 +1400,27 @@ def empirical_cor(kk):
               fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
 
         #corected map
-        vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
+        #vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
+        vmax = np.nanpercentile(los_clean,95)
+        vmin = np.nanpercentile(los_clean,5)
 
         fig = plt.figure(3,figsize=(11,4))
 
         ax = fig.add_subplot(1,4,1)
         hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,interpolation=None,alpha=1.)
+        cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None,alpha=1.)
         ax.set_title('LOS')
         setp( ax.get_xticklabels(), visible=None)
         fig.colorbar(cax, orientation='vertical',aspect=10)
 
         ax = fig.add_subplot(1,4,2)
-        cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+        cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
         ax.set_title('LOS ESTIMATION')
         setp( ax.get_xticklabels(), visible=None)
         fig.colorbar(cax, orientation='vertical',aspect=10)
 
         ax = fig.add_subplot(1,4,3)
-        cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax)
+        cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
         ax.set_title('RAMP+TOPO')
         setp( ax.get_xticklabels(), visible=None)
         fig.colorbar(cax, orientation='vertical',aspect=10)
@@ -1744,6 +1747,10 @@ if arguments["--iend_mask"] ==  None:
     iend_mask = -np.inf
 else:
     iend_mask = int(arguments["--iend_mask"])
+if arguments["--perc_topo"] ==  None:
+    perc_topo = 98.
+else:
+    perc_topo = float(arguments["--perc_topo"])
 if arguments["--perc"] ==  None:
     perc = 98.
 else:
@@ -1758,7 +1765,7 @@ else:
     suffout = arguments["--suffix_output"]
 
 if arguments["--nproc"] == None:
-    nproc = 4
+    nproc = 8
 else:
     nproc = int(arguments["--nproc"])
 
@@ -1854,8 +1861,8 @@ if radar is not None:
             mlines,mcols = gm.readpar()
             elev_map = gm.readgamma(radar)
         
-        maxelev,minelev = np.nanpercentile(elev_map,99),np.nanpercentile(elev_map,1)
-    
+        maxelev,minelev = np.nanpercentile(elev_map,perc_topo),np.nanpercentile(elev_map,100-perc_topo)
+ 
 else:
     maxelev,minelev = 1.,-1
     elev_map = np.zeros((mlines,mcols))
