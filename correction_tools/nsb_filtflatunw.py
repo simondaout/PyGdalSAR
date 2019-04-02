@@ -11,7 +11,7 @@ nsb_filtflatunw.py
 ----------------------
 
 usage:
-  nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] \
+  nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] [--look=<value>] \
   [--model=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>]  <proc_file> 
   nsb_filtflatunw.py -h | --help
 
@@ -22,6 +22,7 @@ options:
   --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_topo/colin/look_int/unwrapping/add_atmo_back) 
 Job list is: erai look_int replace_amp filterSW filterROI flatr flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
+  --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
@@ -98,6 +99,7 @@ class Cd(object):
         logger.debug('Enter {0}'.format(self.dirname))
         chdir(self.dirname)
     def __exit__(self, type, value, traceback):
+        logger.debug('Exit {0}'.format(self.dirname))
         logger.debug('Enter {0}'.format(self.curdir))
         chdir(self.curdir)
 
@@ -215,7 +217,7 @@ class PileInt:
         self.Rlooks_int = Rlooks_int
         self.Rlooks_unw = Rlooks_unw
 
-        self.Nifg=len(self.dates1)
+        self.Nifg=len(np.atleast_1d(self.dates1))
         print("number of interferogram: ",self.Nifg)
 
         # init width and length to zero as long as we don't need it
@@ -556,8 +558,8 @@ def filterROI(config, kk):
         do = checkoutfile(config,filtfile)
         if do:
           try:
-            logger.info("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
-            r = subprocess.call("adapt_filt "+str(infile)+" "+str(filtfile)+" "\
+            logger.info("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
+            r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
                     +str(width)+" 0.25"+" "+str(config.filterStrength)+"  >> log_filtROI.txt", shell=True)
             if r != 0:
                 logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
@@ -1051,12 +1053,17 @@ def unwrapping(config,kk):
 
         bridgefile = 'bridge.in'
 
+        if force: 
+            rm(filtSWfile); rm(filtROIfile)
+
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
             filterROI(config, kk)
             checkinfile(filtROIfile)
+            logger.info("length.pl "+str(filtROIfile))
+            r = subprocess.call("length.pl "+str(filtROIfile), shell=True)
 
-        if force:
+        if force: 
             rm(unwfiltROI); rm(unwfiltSW)
         do = checkoutfile(config,unwfiltROI)
         if do:
@@ -1069,6 +1076,8 @@ def unwrapping(config,kk):
                 if path.exists(filtSWfile) == False:
                     filterSW(config, kk)
                     checkinfile(filtSWfile)
+                    logger.info("length.pl "+str(filtSWfile))
+                    r = subprocess.call("length.pl "+str(filtSWfile), shell=True)
 
                 if path.exists(bridgefile) == False:
                     wf = open(bridgefile,"w")
@@ -1336,10 +1345,15 @@ def add_model_back(config,kk):
 
 # Parse arguments
 arguments = docopt.docopt(__doc__)
-home = getcwd()
+home = getcwd() + '/'
+
 
 if arguments["--nproc"] == None:
     nproc = 4
+elif arguments["--nproc"] == 'all':
+    nproc = multiprocessing.cpu_count() - 4
+    print('Using all {} cpu available with all option'.format(multiprocessing.cpu_count()))
+    time.sleep(1)
 else:
     nproc = int(arguments["--nproc"])
 
@@ -1520,10 +1534,11 @@ if arguments["-v"]:
     # give me the time to read terminal
     time.sleep(3)
 
-# init look to Rlooks_int
-look = str(np.copy(proc["Rlooks_int"]))
-
-
+if arguments["--look"] == None:
+    # init look to Rlooks_int
+    look = str(np.copy(proc["Rlooks_int"]))
+else:
+    look = str(int(arguments["--look"]))
 
 # RUN
 for p in jobs:
@@ -1556,20 +1571,17 @@ for p in jobs:
 
     # load list of dates
     dates1, dates2 = np.loadtxt(ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i') 
-    dates = np.vstack([dates1,dates2]).T
-    Nifg = len(dates1)
+    dates = np.vstack([dates1,dates2]).T; Nifg = len(dates1)
 
     # update list ifg
-    sucess = [] 
-    [sucess.append(output[0][i][3]) for i in range(Nifg)]
-    sucess = np.array(sucess)
-    index = np.flatnonzero(sucess==1)
-    newdates =  dates[index,:] 
+    success = []; [success.append(output[0][i][3]) for i in range(Nifg)]; success = np.array(success)
+    index = np.flatnonzero(success==1); newdates =  dates[index,:] 
 
     # save new list
-    ListInterfero = path.join(path.abspath(home) + "interf_pair_success.txt")
+    ListInterfero = path.join(path.abspath(home) + '/' + "interf_pair_success.txt")
+    logger.info("Save successfull list of interferograms in {}".format(ListInterfero))
     wf = open(ListInterfero, 'w')
-    for i in range(len(sucess)):
+    for i in range(len(index)):
         wf.write("%i  %i\n" % (newdates[i][0], newdates[i][1]))
     wf.close()
 
