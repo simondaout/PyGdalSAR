@@ -69,8 +69,10 @@ else:
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
 fid = open(infile, 'r')
-m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
+m = np.fromfile(fid,dtype=np.float32)
 # m[m==0.0] = np.float('NaN')
+nlign = int(len(m)/ncol)
+m = m.reshape((nlign,ncol)) 
 
 # clean
 maxlos,minlos=np.nanpercentile(m,perc),np.nanpercentile(m,(100-perc))
@@ -97,7 +99,7 @@ else:
     crop = map(float,arguments["--clean"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
-if iend-ibeg<ncol and jend-jbeg<nlign:
+if (iend-ibeg<ncol) or (jend-jbeg<nlign):
     if arguments["--buff"] ==  None:
         buf = 50
     else:
