@@ -19,8 +19,8 @@ options:
   --nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
-  --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_topo/colin/look_int/unwrapping/add_atmo_back) 
-Job list is: erai look_int replace_amp filterSW filterROI flatr flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
+  --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
+Job list is: erai look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
@@ -172,7 +172,7 @@ def go(config,job,nproc):
 
 class Job():
     """ Create a class of Jobs to be run: 
-    Job list is: erai look_int replace_amp filterSW filterROI flatr flat_topo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
+    Job list is: erai look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -202,7 +202,7 @@ class Job():
 
     def info(self):
         print('List of possible Jobs:') 
-        print('erai look_int replace_amp filter flatr flat_topo flat_model colin \
+        print('erai look_int replace_amp filter flatr flat_atmo flat_model colin \
             unwrapping add_model_back add_atmo_back add_ramp_back')
         print('Choose them in the order that you want')
 
@@ -680,7 +680,7 @@ def flata(config,kk):
 
     return config.getconfig(kk)
 
-def flat_topo(config, kk):
+def flat_atmo(config, kk):
     ''' Function flatten atmosphere on wrapped phase  (See Doin et al., 2015)
     Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo
     Estimation done on filterSW file
@@ -734,7 +734,7 @@ def flat_topo(config, kk):
                 str(stratfile)+" >> log_flattopo.txt", shell=True)
             if r != 0:
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
-                print(flat_topo.__doc__)
+                print(flat_atmo.__doc__)
                 config.stack.updatesuccess(kk)
         else:
             logger.warning('{0} exists, assuming OK'.format(outfile))
@@ -1147,34 +1147,43 @@ def add_atmo_back(config,kk):
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
-        stratfile = config.stack.getstratfile(kk) + '.unw'; checkinfile(stratfile)
-        unwrsc = unwfile + '.rsc'
+        if "_flatz" in unwfile:
+            stratfile = config.stack.getstratfile(kk) + '.unw'; checkinfile(stratfile)
+            unwrsc = unwfile + '.rsc'
 
-        # update names
-        prefix, suffix = config.stack.getfix(kk)
-        newsuffix = suffix.replace("_flatz", "")
-        config.stack.updatefix(kk,prefix,newsuffix)
-        outfile = config.stack.getfiltROI(kk) + '.unw'
-        outrsc = outfile + '.rsc'
-        copyrsc(unwrsc,outrsc)
+            # update names
+            prefix, suffix = config.stack.getfix(kk)
+            newsuffix = suffix.replace("_flatz", "")
+            config.stack.updatefix(kk,prefix,newsuffix)
+            outfile = config.stack.getfiltROI(kk) + '.unw'
+            outrsc = outfile + '.rsc'
+            copyrsc(unwrsc,outrsc)
 
-        if force:
-            rm(outfile)
-        do = checkoutfile(config,outfile)
-        if do:
-            logger.info("length.pl "+str(unwfile))
-            r = subprocess.call("length.pl "+str(unwfile), shell=True)
+            if force:
+                rm(outfile)
+            do = checkoutfile(config,outfile)
+            if do:
+                logger.info("length.pl "+str(unwfile))
+                r = subprocess.call("length.pl "+str(unwfile), shell=True)
 
-            logger.info("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
-            r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
-                 " >> log_flatenrange.txt", shell=True)
-            if r != 0:
-                logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
-                logger.critical(r)
+                logger.info("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
+                r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
+                     " >> log_flatenrange.txt", shell=True)
+                if r != 0:
+                    logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
+                    config.stack.updatesuccess(kk)
+                    print(add_atmo_back.__doc__)
+
+            else:
+                logger.warning('{0} exists, assuming OK'.format(outfile))
                 config.stack.updatesuccess(kk)
-                # sys.exit() 
+                print(add_atmo_back.__doc__)
+
         else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
+            logger.critical('flat_atmo() does not seem to have been done... Exit!')
+            config.stack.updatesuccess(kk)
+            print(add_atmo_back.__doc__)
+ 
 
     return config.getconfig(kk)
 
@@ -1191,43 +1200,49 @@ def add_flatr_back(config,kk):
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
-        param = config.stack.getflatrfile(kk)
-        unwrsc = unwfile + '.rsc'
+        if "_flatr" in unwfile:
+            param = config.stack.getflatrfile(kk)
+            unwrsc = unwfile + '.rsc'
 
-        # assume flatr done on Rlooks_int...but it is always the case?
-        look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
+            # assume flatr done on Rlooks_int...but it is always the case?
+            look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
 
-        # update names
-        prefix, suffix = config.stack.getfix(kk)
-        newsuffix = suffix.replace("_flatr", "")
-        config.stack.updatefix(kk,prefix,newsuffix)
-        outfile = config.stack.getfiltROI(kk) + '.unw'
-        outrsc = outfile + '.rsc'
-        copyrsc(unwrsc,outrsc)
+            # update names
+            prefix, suffix = config.stack.getfix(kk)
+            newsuffix = suffix.replace("_flatr", "")
+            config.stack.updatefix(kk,prefix,newsuffix)
+            outfile = config.stack.getfiltROI(kk) + '.unw'
+            outrsc = outfile + '.rsc'
+            copyrsc(unwrsc,outrsc)
 
-        if path.exists(param):
-            if force:
-                rm(outfile)
-            do = checkoutfile(config,outfile)
-            if do:
+            if path.exists(param):
+                if force:
+                    rm(outfile)
+                do = checkoutfile(config,outfile)
+                if do:
 
-                logger.info("length.pl "+str(unwfile))
-                r = subprocess.call("length.pl "+str(unwfile), shell=True)
+                    logger.info("length.pl "+str(unwfile))
+                    r = subprocess.call("length.pl "+str(unwfile), shell=True)
 
-                logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
-                r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
-                     " >> log_flatenrange.txt", shell=True)
-                if r != 0:
-                    logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
-                    logger.critical(r)
-                    config.stack.updatesuccess(kk)
-                    #sys.exit() 
+                    logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
+                    r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
+                         " >> log_flatenrange.txt", shell=True)
+                    if r != 0:
+                        logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
+                        config.stack.updatesuccess(kk)
+                        print(add_flatr_back.__doc__)
+
+                else:
+                    logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
-                logger.warning('{0} exists, assuming OK'.format(outfile))
+                logger.critical('Param file {0} does not exist. Exit!'.format(param))
+                config.stack.updatesuccess(kk)
+                print(add_flatr_back.__doc__)
+
         else:
-            logger.critical('Param file {0} does not exist. Exit!'.format(param))
+            logger.critical('flatr() does not seem to have been done... Exit!')
             config.stack.updatesuccess(kk)
-            sys.exit()
+            print(add_flatr_back.__doc__)
 
     return config.getconfig(kk)
 
@@ -1244,44 +1259,49 @@ def add_flata_back(config,kk):
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
-        param = config.stack.getflatafile(kk)
-        unwrsc = unwfile + '.rsc'
+        if "_flata" in unwfile:
 
-        # assume flatr done on Rlooks_int...but it is always the case?
-        look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
+            param = config.stack.getflatafile(kk)
+            unwrsc = unwfile + '.rsc'
 
-        # update names
-        prefix, suffix = config.stack.getfix(kk)
-        newsuffix = suffix.replace("_flatr", "")
-        config.stack.updatefix(kk,prefix,newsuffix)
-        outfile = config.stack.getfiltROI(kk) + '.unw'
-        outrsc = outfile + '.rsc'
-        copyrsc(unwrsc,outrsc)
+            # assume flatr done on Rlooks_int...but it is always the case?
+            look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
 
-        if force:
-            rm(outfile)
-        do = checkoutfile(config,outfile)
-        if do:
-            if path.exists(outfile) == False:
+            # update names
+            prefix, suffix = config.stack.getfix(kk)
+            newsuffix = suffix.replace("_flata", "")
+            config.stack.updatefix(kk,prefix,newsuffix)
+            outfile = config.stack.getfiltROI(kk) + '.unw'
+            outrsc = outfile + '.rsc'
+            copyrsc(unwrsc,outrsc)
 
-                logger.info("length.pl "+str(unwfile))
-                r = subprocess.call("length.pl "+str(unwfile), shell=True)
+            if force:
+                rm(outfile)
+            do = checkoutfile(config,outfile)
+            if do:
+                if path.exists(outfile) == False:
 
-                logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
-                r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
-                     " >> log_flatenrange.txt", shell=True)
-                if r != 0:
-                    logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
-                    logger.critical(r)
-                    config.stack.updatesuccess(kk)
-                    #sys.exit() 
+                    logger.info("length.pl "+str(unwfile))
+                    r = subprocess.call("length.pl "+str(unwfile), shell=True)
+
+                    logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
+                    r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
+                         " >> log_flatenrange.txt", shell=True)
+                    if r != 0:
+                        logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
+                        config.stack.updatesuccess(kk)
+                        print(add_flata_back.__doc__)
+                else:
+                    logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
-                logger.warning('{0} exists, assuming OK'.format(outfile))
+                logger.critical('Param file {0} does not exist. Exit!'.format(param))
+                config.stack.updatesuccess(kk)
+                print(add_flata_back.__doc__)  
         else:
-            logger.critical('Param file {0} does not exist. Exit!'.format(param))
+            logger.critical('flata() does not seem to have been done... Exit!')
             config.stack.updatesuccess(kk)
-            print(add_flata_back.__doc__)  
-            sys.exit()
+            print(add_flata_back.__doc__) 
+                    
 
     return config.getconfig(kk)
 
@@ -1297,45 +1317,51 @@ def add_model_back(config,kk):
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
-        unwrsc = unwfile + '.rsc'
-        param = config.stack.getmodelfile(kk)
+        if "_nomodel" in unwfile:
+            unwrsc = unwfile + '.rsc'
+            param = config.stack.getmodelfile(kk)
 
-        # update names
-        prefix, suffix = config.stack.getfix(kk)
-        newsuffix = suffix.replace("_nomodel", "")
-        config.stack.updatefix(kk,prefix,newsuffix)
-        outfile = config.stack.getfiltROI(kk) + '.unw'
-        outrsc = outfile + '.rsc'
-        copyrsc(unwrsc,outrsc)
+            # update names
+            prefix, suffix = config.stack.getfix(kk)
+            newsuffix = suffix.replace("_nomodel", "")
+            config.stack.updatefix(kk,prefix,newsuffix)
+            outfile = config.stack.getfiltROI(kk) + '.unw'
+            outrsc = outfile + '.rsc'
+            copyrsc(unwrsc,outrsc)
 
-        if force:
-            rm(outfile)
-        if config.model != None:
-            if path.exists(param) is True:
-                do = checkoutfile(config,outfile)
-                if do:
+            if force:
+                rm(outfile)
+            if config.model != None:
+                if path.exists(param) is True:
+                    do = checkoutfile(config,outfile)
+                    if do:
 
-                    logger.info("length.pl "+str(unwfile))
-                    r = subprocess.call("length.pl "+str(unwfile), shell=True)
+                        logger.info("length.pl "+str(unwfile))
+                        r = subprocess.call("length.pl "+str(unwfile), shell=True)
 
-                    logger.info("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param))
-                    r = subprocess.call("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt", shell=True)
-                    if r != 0:
-                        logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
-                        print(add_model_back.__doc__)
-                        config.stack.updatesuccess(kk)
+                        logger.info("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param))
+                        r = subprocess.call("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt", shell=True)
+                        if r != 0:
+                            logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
+                            print(add_model_back.__doc__)
+                            config.stack.updatesuccess(kk)
+                    else:
+                        logger.warning('{0} exists, assuming OK'.format(outfile))
                 else:
-                    logger.warning('{0} exists, assuming OK'.format(outfile))
+                        logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
+                        logger.critical("Param file {0}, does not exist!".format(param))
+                        print(add_model_back.__doc__)        
+                        config.stack.updatesuccess(kk)
             else:
-                    logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
-                    logger.critical("Param file {0}, does not exist!".format(param))
-                    print(add_model_back.__doc__)        
-                    config.stack.updatesuccess(kk)
+                logger.critical("Model file not found. Exit!".format(unwfile))
+                print(add_model_back.__doc__)  
+                config.stack.updatesuccess(kk)
+                print(add_model_back.__doc__)
+
         else:
-            logger.critical("Model file not found. Exit!".format(unwfile))
-            print(add_model_back.__doc__)  
+            logger.critical('flat_model() does not seem to have been done... Exit!')
             config.stack.updatesuccess(kk)
-            sys.exit()
+            print(add_model_back.__doc__)         
 
     return config.getconfig(kk)
 
