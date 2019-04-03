@@ -33,6 +33,10 @@ import matplotlib.cm as cm
 from pylab import *
 import docopt
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
+
 # read arguments
 arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
