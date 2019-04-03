@@ -83,7 +83,6 @@ else:
         rad2mm = np.float(arguments["--rad2mm"])
 
 ds_extension = os.path.splitext(infile)[1]
-print(ds_extension)
 
 if sformat == "ROI_PAC": 
     if (ds_extension == ".unw" or ds_extension ==".hgt"):
