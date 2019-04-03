@@ -30,6 +30,7 @@ _re = re.compile(r"(.*) COL:(.*?) ROW:(.*?) (\d+) (.*)", re.IGNORECASE)
 
 file = open('bridge.in', "w")
 lines = []
+count = 0
 with open(infile) as in_file:
     for i, line in enumerate(in_file):
         if line.strip().startswith("#"):
@@ -41,9 +42,10 @@ with open(infile) as in_file:
         m = _re.match(line)
         if m:
             col, row =  m.group(2).strip(), m.group(4).strip()
-            print(i, col, row)
-            if i % 2:
+            print(count, col, row)
+            if count % 2:
                 file.write("%s %s 0\n" % (str(col), str(row)))
             else:
                 file.write("%s %s " % (str(col), str(row)))
+            count  += 1
 
