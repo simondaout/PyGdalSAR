@@ -70,10 +70,10 @@ Options:
 --fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
 --plot YES/NO           Display plots [default: yes]
---ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
---iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
---jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
---jend VALUE            Column numbers bounding the ramp estimation zone [default: ncol]
+ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
+iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
+jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
+jend VALUE            Column numbers bounding the ramp estimation zone [default: ncol]
 """
 
 print
