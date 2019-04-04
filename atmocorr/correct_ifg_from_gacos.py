@@ -37,7 +37,7 @@ Options:
 --cohpixel=<yes/no>     If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
 --threshold_coh=<value> Thresold on rmspixel for ramp estimation [default: 2.]   
 --plot=<yes|no>         Display results [default: yes]
---format VALUE          Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
+--format VALUE          Format input files: ROI_PAC, GAMMA, GTIFF [default: GAMMA]
 --perc=<value>          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --fitmodel=<yes|no>     If yes, then estimate the proportionlality between gacos and los_map in addition to a polynomial ramp
 --mask=<path>           Mask in .r4 format. Keep only values > threshold_mask. 
@@ -142,7 +142,7 @@ else:
     refend = int(arguments["--refend"])
 
 if arguments["--format"] ==  None:
-    sformat = 'ROI_PAC'
+    sformat = 'GAMMA'
 else:
     sformat = arguments["--format"]
 
@@ -304,8 +304,8 @@ def gacos2ifg(kk):
 
     if sformat == 'GAMMA':
         lines,cols = gm.readpar(int_path)
-        infile1 = int_path +  str(date1) + '.unw'
-        infile2 = int_path +  str(date2) + '.unw'
+        infile1 = int_path +  str(date1) + '_gacos.unw'
+        infile2 = int_path +  str(date2) + '_gacos.unw'
         checkinfile(infile1); checkinfile(infile2)
         gacos1 = gm.readgamma(infile1,int_path)
         gacos2 = gm.readgamma(infile2,int_path)
@@ -359,37 +359,7 @@ def correct_ifg(kk):
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
 
-    if sformat == 'ROI_PAC':
-        folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
-        rscfile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
-        infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
-
-        checkinfile(infile)
-        checkinfile(rscfile)
-
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
-        # Get the band that have the los_map we want
-        ds_band1 = ds.GetRasterBand(1)
-        ds_band2 = ds.GetRasterBand(2)
-
-        los_map = np.zeros((lines,cols))
-        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
-        # los_map[los_map==0] = np.float('NaN')
-        lines, cols = ds.RasterYSize, ds.RasterXSize
-
-    elif sformat == 'GTIFF':
-        infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
-        checkinfile(infile)
-
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
-        # Get the band that have the los_map we want
-        ds_band2 = ds.GetRasterBand(1)
-        lines, cols = ds.RasterYSize, ds.RasterXSize
-
-        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
-        # los_map[los_map==0] = np.float('NaN')
-
-    elif sformat == 'GAMMA':
+    if sformat == 'GAMMA':
         # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
         # par_file = ref 
         lines,cols = gm.readpar(int_path)
