@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-# Author        : Simon DAOUT (ISTerre)
+# Author        : Simon DAOUT (Oxford)
 ################################################################################
 
 """\
@@ -12,12 +12,11 @@ correct_ifg_from_gacos.py
 Correct unwrapped IFGs from Gacos atmospheric models. 
 
 Usage: 
-    correct_ifg_from_gacos.py --int_list=<path> [--int_path=<path>] [--gacos_path=<path>]  [--gacos2los_map=<value>] [--prefix=<value>] [--suffix=<value>] [--rlook=<value>] \
-    [--plot=<yes|no>] [--cohpixel=<yes/no>] [--threshold_coh=<value>] [--refstart=<values>] [--refend=<values>] [--format=<value>]  \
+    correct_ifg_from_gacos.py --int_list=<path> [--int_path=<path>] [--gacos_path=<path>]  [--gacos2los=<value>] [--prefix=<value>] \
+    [--suffix=<value>] [--rlook=<value>] [--plot=<yes|no>] [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
+    [--refstart=<values>] [--refend=<values>] [--format=<value>]  \
     [--ramp=<cst|lin>] [--crop=<values>] [--fitmodel=<yes|no>] [--perc=<value>] [--mask=<path>] \
     [--suffix_output=<value>] [--nproc=<nb_cores>]
-
-    
 
 correct_ifg_from_gacos.py -h | --help
 
@@ -32,16 +31,16 @@ Options:
 --rlook=<value>         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
 --refstart=<value>      Stating line number of the area where phase is set to zero [default: 0] 
 --refend=<value>        Ending line number of the area where phase is set to zero [default: length]
---ramp=<cst|lin|quad>   Estimate a constant, linear or quadratic ramp in x and y in addition to the los/gacos relationship [default: cst].
+--ramp=<cst|lin>        Estimate a constant or linear ramp in x and y [default: cst].
 --crop=<value>          Crop option for empirical estimation (eg: 0,ncol,0,nlign)
---gacos2los_map=<value>    Scaling value between zenithal gacos los_map (m) and desired output (e.g los_map in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504) [default: -920.504]
+--gacos2los=<value>     Scaling value between gacos los_map (m) and desired output (e.g los_map in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504)
 --cohpixel=<yes/no>     If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
 --threshold_coh=<value> Thresold on rmspixel for ramp estimation [default: 2.]   
 --plot=<yes|no>         Display results [default: yes]
 --format VALUE          Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --perc=<value>          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --fitmodel=<yes|no>     If yes, then estimate the proportionlality between gacos and los_map in addition to a polynomial ramp
---mask=<path>           Mask in .r4 format. Keep only values > threshold_mask. [default:None]
+--mask=<path>           Mask in .r4 format. Keep only values > threshold_mask. 
 """
 
 import gdal
@@ -64,8 +63,6 @@ import matplotlib.dates as mdates
 from datetime import datetime
 import time
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-
 
 import docopt
 import shutil
@@ -125,10 +122,10 @@ if arguments["--plot"] ==  None:
 else:
     plot = arguments["--plot"]
 
-if arguments["--gacos2los_map"] ==  None:
-    gacos2los_map = -920.504 
+if arguments["--gacos2los"] ==  None:
+    gacos2los = 1
 else:
-    gacos2los_map = float(arguments["--gacos2los_map"])
+    gacos2los = float(arguments["--gacos2los"])
 
 if arguments["--ramp"] ==  None:
     ramp = 'cst'
@@ -265,10 +262,11 @@ def poolcontext(*arg, **kargs):
 # FUNCTIONS
 #####################################################################################
 
-def correct_ifg(kk):
+
+def gacos2ifg(kk):
     """
-    Function that corrects each ifg from gacos
-    """
+    Function that compute modeled ifgs
+    """ 
 
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
@@ -304,6 +302,93 @@ def correct_ifg(kk):
         los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
         # los_map[los_map==0] = np.float('NaN')
 
+    if sformat == 'GAMMA':
+        lines,cols = gm.readpar(int_path)
+        infile1 = int_path +  str(date1) + '.unw'
+        infile2 = int_path +  str(date2) + '.unw'
+        checkinfile(infile1); checkinfile(infile2)
+        gacos1 = gm.readgamma(infile1,int_path)
+        gacos2 = gm.readgamma(infile2,int_path)
+
+    if arguments["--zone"] ==  None:
+        refzone = [0,cols,0,lines]
+    else:
+        refzone = map(float,arguments["--clean"].replace(',',' ').split())
+    col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
+
+    # extract range and azimuth coordinates from ref or radar file
+    pix_az, pix_rg = np.indices((lines,cols))
+
+    _los_map = np.copy(los_map)
+    _los_map[np.logical_or(gacos2==0,gacos2>=9990)] = np.float('NaN')
+
+    indexref = np.nonzero(
+        np.logical_and(~np.isnan(gacos2),
+        np.logical_and(pix_lin>refstart,
+        np.logical_and(pix_lin<refend,
+        np.logical_and(los_map!=0.0,
+        np.logical_and(pix_col>col_beg, pix_col<col_end
+        ))))))
+   
+    # compute average phase in the ref area 
+    # we want los ref area to be zero
+    cst1 = np.nanmean(gacos1[indexref].flatten())
+    cst2 = np.nanmean(gacos2[indexref].flatten())
+
+    # remove ref frame
+    gacos2 = gacos2 - cst2
+    gacos1 = gacos1 - cst1
+
+    # compute differential los
+    gacosm = (gacos2 - gacos1) * gacos2los
+    # gacosm = (gacos2 - gacos1) * 4 * math.pi / wavelength
+
+    # open gacos corrections
+    gacosf = path + str(date1) + '-' + str(date2) + '_gacosmdel' +'.r4'
+    fid = open(gacosf,'wb')
+    gacosm.flatten().astype('float32').tofile(fid)
+    fid.close()
+
+    del gacosm, gacos2, gacos1
+
+def correct_ifg(kk):
+    """
+    Function that corrects each ifg from gacos
+    """
+
+    date1, date2 = date_1[kk], date_2[kk]
+    idate = str(date1) + '-' + str(date2) 
+
+    if sformat == 'ROI_PAC':
+        folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
+        rscfile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
+        infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
+
+        checkinfile(infile)
+        checkinfile(rscfile)
+
+        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        # Get the band that have the los_map we want
+        ds_band1 = ds.GetRasterBand(1)
+        ds_band2 = ds.GetRasterBand(2)
+
+        los_map = np.zeros((lines,cols))
+        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
+        # los_map[los_map==0] = np.float('NaN')
+        lines, cols = ds.RasterYSize, ds.RasterXSize
+
+    elif sformat == 'GTIFF':
+        infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
+        checkinfile(infile)
+
+        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        # Get the band that have the los_map we want
+        ds_band2 = ds.GetRasterBand(1)
+        lines, cols = ds.RasterYSize, ds.RasterXSize
+
+        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
+        # los_map[los_map==0] = np.float('NaN')
+
     elif sformat == 'GAMMA':
         # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
         # par_file = ref 
@@ -314,7 +399,7 @@ def correct_ifg(kk):
 
     logger.info('lines:{0}, cols:{1}, IFG:{2}:'.format(lines, cols, idate))
 
-    # open gacos correction
+    # open gacos corrections
     gacosf = path + str(date1) + '-' + str(date2) + '_gacosmdel' +'.r4'
     model = np.fromfile(gacosf,dtype=np.float32)
 
@@ -340,7 +425,6 @@ def correct_ifg(kk):
 
     if arguments["--zone"] ==  None:
         refzone = [0,cols,0,lines]
-        col_beg,col_end,line_beg,line_end = 0 , cols, 0., lines
     else:
         refzone = map(float,arguments["--clean"].replace(',',' ').split())
     col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
@@ -387,13 +471,21 @@ def correct_ifg(kk):
         np.logical_and(pix_col>col_beg, pix_col<col_end
         )))))))))))))
 
+    # set los to zero in the ref area too
+    los_ref = los_map[indexref].flatten() 
+    rms_ref = rms_map[indexref].flatten()
+    amp_ref = 1./rms_ref
+    amp_ref = amp_ref/np.nanpercentile(amp_ref,99)
+    cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
+    los_map  = los_map - cst
+    
+    # extract los for empirical estimation
     temp = np.array(index).T
     x = temp[:,0]; y = temp[:,1]
     los_clean = los_map[index].flatten()
     model_clean = model[index].flatten()
 
-    # compute average phase in the ref area 
-    # we want los ref area to be zero
+    # compute average residual los - gacos in the ref area 
     los_ref = los_map[indexref].flatten() - model[indexref].flatten()
     rms_ref = rms_map[indexref].flatten()
     amp_ref = 1./rms_ref
@@ -623,7 +715,7 @@ def correct_ifg(kk):
         dst_band1 = dst_ds.GetRasterBand(1)
         dst_band2 = dst_ds.GetRasterBand(2)
         dst_band1.WriteArray(rms_map,0,0)
-        dst_band2.WriteArray(flatlos,0,0)
+        dst_band2.WriteArray(los_map_flat,0,0)
         shutil.copy(rscfile,outrsc)
         dst_band1.FlushCache()
         dst_band2.FlushCache()
@@ -632,7 +724,7 @@ def correct_ifg(kk):
         outfile = out_path + prefix + str(date1) + '-' + str(date2) + suffix + suffout +  rlook + '.tiff' 
         dst_ds = driver.Create(outfile, cols, lines, 1, gdal.GDT_Float32)
         dst_band2 = dst_ds.GetRasterBand(1)
-        dst_band2.WriteArray(flatlos,0,0)
+        dst_band2.WriteArray(los_map_flat,0,0)
         dst_ds.SetGeoTransform(gt)
         dst_ds.SetProjection(proj)
         dst_band2.FlushCache()
@@ -640,7 +732,7 @@ def correct_ifg(kk):
     elif sformat == 'GAMMA':
         outfile = out_path + prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
         fid = open(outfile, 'wb')
-        flatlos.flatten().astype('>f4').tofile(fid)
+        los_map_flat.flatten().astype('>f4').tofile(fid)
 
     if plot=='yes':
         plt.show()
@@ -680,7 +772,6 @@ cst = np.copy(imd[0])
 for i in range((nmax)):
     bt.append(imd[i]-cst)
 
-
 # open mask file
 if maskfile is not None:
     fid = open(maskfile,'r')
@@ -710,7 +801,14 @@ else:
 # MAIN
 #####################################################################################
 
-# go 
+# compute model IFGs
+with TimeIt():
+    # for kk in range(Nifg):
+    work = range(Nifg)
+    with poolcontext(processes=nproc) as pool:
+        results = pool.map(gacos2ifg, work)
+
+# apply corrections
 with TimeIt():
     # for kk in range(Nifg):
     work = range(Nifg)
