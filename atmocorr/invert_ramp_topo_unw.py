@@ -18,7 +18,7 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
 [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
-[--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] [--perc_topo=<value>] \
+[--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] [--perc_topo=<value>] [--samp=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] 
 
@@ -67,6 +67,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --iend_mask VALUE     Stop line number for the mask [default: None]  
 --perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --perc_topo VALUE     Percentile of hidden elevation pixel for the estimation and clean outliers [default:98.]
+--samp=<value>        Undersampling for empirical estimation [default: 2]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
 --ibeg VALUE          Line number bounding the estimation zone [default: 0]
@@ -1363,8 +1364,6 @@ def empirical_cor(kk):
       nfit_temp=nfit
       ivar_temp=ivar
 
-    # hard-coding subsample 
-    samp = 4
     try:
         sol, corr, rms = estim_ramp(los_map.flatten(),
         los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
@@ -1721,7 +1720,7 @@ if arguments["--ref"] ==  None :
 else:
    ref = arguments["--ref"]
 if ref == None and radar == None:
-    logger.critical('Argument error: Need to give ref or topographic file')
+    print('Argument error: Need to give ref or topographic file')
     sys.exit()
 
 if arguments["--tsinv"] ==  None:
@@ -1768,6 +1767,11 @@ if arguments["--nproc"] == None:
     nproc = 8
 else:
     nproc = int(arguments["--nproc"])
+
+if arguments["--samp"] == None:
+    samp = 2
+else:
+    samp = int(arguments["--samp"])
 
 #####################################################################################
 # INITIALISE 
