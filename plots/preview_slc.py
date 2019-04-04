@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -19,7 +19,7 @@ Options:
   --homedir PATH      Path to home directory  [default: ./]
   --dates_list PATH   Text file containing list of dates [default: baselines.rsc]
   --pixel_ratio Value Pixel ratio [default: 0.25]
-  --look value        Look value [default: 4]
+  --look value        Look value [default: 1]
   --nproc Value       Number of processor [default: 4]
   -h --help           Show this screen
 """
@@ -49,12 +49,19 @@ else:
   pixel_ratio = float(arguments["--pixel_ratio"])
 
 if arguments["--look"] == None:
-  look = 4
+  look = 1
 else:
   look = int(arguments["--look"])
 
+if look > 1:
+  look = '_' + look + 'rlks'
+else:
+  look = ''
+
+look_az = int(look) * float(pixel_ratio)
+
 if arguments["--nproc"] == None:
-  nproc = 1
+  nproc = 4
 else:
   nproc = int(arguments["--nproc"])
 
@@ -72,40 +79,39 @@ else:
 
 def dolook(kk):
   date = dates[kk]
-  infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look)+'rlks.slc'
+  infile = str(date) + '/'+ str(date)+ '_coreg'+str(look)+'.slc'
 
   if os.path.exists(infile):
     pass
   else:
     temp = str(date) + '/'+str(date)+ '_coreg.slc'
-    os.system("look.pl "+str(temp)+" "+str(look))
+    os.system("look.pl "+str(temp)+" "+str(look)+" "+str(look_az))
 
 pool = multiprocessing.Pool(nproc)
-work = [(kk) for kk in xrange(kmax)]
+work = [(kk) for kk in range(kmax)]
 pool.map(dolook, work)
 
 def preview(kk):
     date = dates[kk]
-    infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look)+'rlks.slc'
-    jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(look)+'rlks.jpeg'
+    infile = str(date) + '/'+ str(date)+ '_coreg'+str(look)+'.slc'
+    jpeg = str(date) + '/'+ str(date)+ '_coreg'+str(look)+'.jpeg'
 
     try:
       r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg), shell=True)
       if r != 0:
             raise Exception("nsb_preview_slc failed for date: ", infile)
       else:
-            print 'Create: ', jpeg
+            print('Create: ', jpeg)
     except:
       pass
 
 
 pool = multiprocessing.Pool(nproc)
-work = [(kk) for kk in xrange(kmax)]
+work = [(kk) for kk in range(kmax)]
 pool.map(preview, work)
 
-# print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
 jpeg_files = glob.glob('*/*_coreg*.jpeg')
-print
-print 'Move files into:', outputdir
+print()
+print('Move files into:', outputdir)
 for f in jpeg_files:
     shutil.move(f,outputdir)
