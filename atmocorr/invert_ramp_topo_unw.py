@@ -1393,9 +1393,9 @@ def empirical_cor(kk):
         if radar is not None: 
            # plot phase/elevation
 
-            funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
-            + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
-            sol[12]*((azbins*topobins)**2)
+           funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
+           + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
+           sol[12]*((azbins*topobins)**2)
    
            fig2 = plt.figure(2,figsize=(9,4))
            ax = fig2.add_subplot(1,1,1)
