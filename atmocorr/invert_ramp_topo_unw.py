@@ -1850,27 +1850,31 @@ if radar is not None:
         maxelev,minelev = np.nanpercentile(elev_map,perc_topo),np.nanpercentile(elev_map,100-perc_topo)
 
     # compute slope
-    toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,.1)
+    toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,.5)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
     minslope = np.nanpercentile(slope_map,10)
-    print(minslope)
     
     fig = plt.figure(0,figsize=(12,8))
     ax = fig.add_subplot(1,3,1)
     # hax = ax.imshow(mask, cm.Greys, vmin=0, vmax=seuil)
-    cax = ax.imshow(elev_map, cm.RdBu)
+    cax = ax.imshow(elev_map, cm.RdBu, vmin=minelev, vmax=maxelev)
     setp( ax.get_xticklabels(), visible=False)
     cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+    ax.set_title('DEM',fontsize=6)
 
     ax = fig.add_subplot(1,3,2)
-    cax = ax.imshow(toposmooth, cm.RdBu)
+    cax = ax.imshow(toposmooth, cm.RdBu, vmin=minelev, vmax=maxelev)
     setp( ax.get_xticklabels(), visible=False)
+    ax.set_title('Smooth DEM',fontsize=6)
 
     ax = fig.add_subplot(1,3,3)
-    cax = ax.imshow(slope_map, cm.RdBu)
+    cax = ax.imshow(slope_map, cm.RdBu, vmin=minslope, vmax=np.nanpercentile(slope_map,10))
     setp( ax.get_xticklabels(), visible=False)
-    plt.show()
+    ax.set_title('Mask Slope bellow: {}'.format(minslope),fontsize=6)
+
+    if plot == 'yes':
+        plt.show()
  
 else:
     maxelev,minelev = 1.,-1
