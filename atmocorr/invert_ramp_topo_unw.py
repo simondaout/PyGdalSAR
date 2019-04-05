@@ -1870,7 +1870,7 @@ if radar is not None:
     ax = fig.add_subplot(1,2,2)
     cax = ax.imshow(slope_map, cm.RdBu_r, vmin=minslope, vmax=np.nanpercentile(slope_map,100-perc_slope))
     setp( ax.get_xticklabels(), visible=False)
-    ax.set_title('Mask Slope bellow: {.3f}'.format(minslope),fontsize=6)
+    ax.set_title('Mask Slope bellow: {0:.2f}'.format(minslope),fontsize=8)
 
     if plot == 'yes':
         plt.show()
