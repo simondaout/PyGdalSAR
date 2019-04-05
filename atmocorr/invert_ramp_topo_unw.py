@@ -1219,7 +1219,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
     # plt.imshow(corr)
     # plt.show()
 
-    return sol, corr, rms
+    return sol, corr, rms, rgbins, azbins, topobins, losbins
 
 def empirical_cor(kk):
     """
@@ -1379,7 +1379,7 @@ def empirical_cor(kk):
       ivar_temp=ivar
 
     # try:
-    sol, corr, rms = estim_ramp(los_map.flatten(),
+    sol, corr, rms, rgbins, azbins, topobins, losbins = estim_ramp(los_map.flatten(),
     los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
     temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst)
 
@@ -1390,14 +1390,13 @@ def empirical_cor(kk):
     + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
     sol[12]*((az*elev_clean)**2)
 
-    funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
-    + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
-    sol[12]*((azbins*topobins)**2)
-    print(funcbins) 
-    sys.exit()
-
     if radar is not None: 
        # plot phase/elevation
+
+       funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
+       + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
+       sol[12]*((azbins*topobins)**2)
+       print(funcbins) 
 
        fig2 = plt.figure(2,figsize=(9,4))
        ax = fig2.add_subplot(1,1,1)
@@ -1418,6 +1417,7 @@ def empirical_cor(kk):
           fig2.savefig( int_path + folder + idate+'phase-topo.png', format='PNG')
        else:
           fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
+
 
     #corected map
     #vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
