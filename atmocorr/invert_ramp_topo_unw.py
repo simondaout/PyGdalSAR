@@ -1858,7 +1858,7 @@ if radar is not None:
     toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,.5)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
-    minslope = np.nanpercentile(slope_map,perc_slope)
+    minslope = np.nanpercentile(slope_map,100-perc_slope)
     
     fig = plt.figure(0,figsize=(12,8))
 
@@ -1868,7 +1868,7 @@ if radar is not None:
     ax.set_title('Smoothed DEM',fontsize=6)
 
     ax = fig.add_subplot(1,2,2)
-    cax = ax.imshow(slope_map, cm.RdBu_r, vmin=minslope, vmax=np.nanpercentile(slope_map,100-perc_slope))
+    cax = ax.imshow(slope_map, cm.RdBu_r, vmin=minslope, vmax=np.nanpercentile(slope_map,perc_slope))
     setp( ax.get_xticklabels(), visible=False)
     ax.set_title('Mask Slope bellow: {0:.2f}'.format(minslope),fontsize=8)
 
