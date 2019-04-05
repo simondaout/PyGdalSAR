@@ -1276,18 +1276,7 @@ def empirical_cor(kk):
     np.logical_and(mask>threshold_mask,
     np.logical_and(~np.isnan(los_map),
     np.logical_or(pix_az<ibeg_mask,pix_az>iend_mask)
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    ))
+    ))))))))))))))
     
     indexref = np.nonzero(
     np.logical_and(elev_map<maxelev,
@@ -1303,19 +1292,7 @@ def empirical_cor(kk):
     np.logical_and(mask>threshold_mask,
     np.logical_and(~np.isnan(los_map),
     np.logical_or(pix_az<ibeg_mask,pix_az>iend_mask)
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
+    )))))))))))))
 
     logger.info('line start:{0}, line end:{1} ref area'.format(refstart,refend))
     spacial_mask[index] = np.copy(los_map[index])
