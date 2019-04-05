@@ -1401,7 +1401,7 @@ def empirical_cor(kk):
        ax = fig2.add_subplot(1,1,1)
        z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
        ax.scatter(elev_clean[::10],los_clean[::10] - func[::10], s=0.005, alpha=0.05,rasterized=True)
-       ax.plot(topobins,losbins - funcbins,'-r', lw =.5)
+       # ax.plot(topobins,losbins - funcbins,'-r', lw =.5)
 
        if nfit==0:
             ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
@@ -1895,7 +1895,7 @@ if radar is not None:
         maxelev,minelev = np.nanpercentile(elev_map,perc_topo),np.nanpercentile(elev_map,100-perc_topo)
 
     # compute slope
-    toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,.5)
+    toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,3.)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
     minslope = np.nanpercentile(slope_map,100-perc_slope)
