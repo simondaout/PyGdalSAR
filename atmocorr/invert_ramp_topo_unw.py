@@ -105,6 +105,7 @@ from numpy.lib.stride_tricks import as_strided
 import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
+import scipy.ndimage
 
 import docopt
 import shutil
@@ -176,7 +177,6 @@ def poolcontext(*arg, **kargs):
 #####################################################################################
 # FUNCTIONS
 #####################################################################################
-
 
 def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
     """
@@ -1263,7 +1263,8 @@ def empirical_cor(kk):
     # select points for estimation only: minmax elev, los not NaN, rms<rmsthreshold ....
     index = np.nonzero(
     np.logical_and(elev_map<maxelev,
-    np.logical_and(elev_map>minelev,    
+    np.logical_and(elev_map>minelev,
+    np.logical_and(slope_map>minslope,     
     np.logical_and(los_map!=0, 
     np.logical_and(los_map>minlos,
     np.logical_and(los_map<maxlos,
@@ -1628,6 +1629,15 @@ def apply_cor(kk, sp, sp_inv):
     del los_map, rms_map
 
 #####################################################################################
+# INIT LOG
+#####################################################################################
+
+# logging.basicConfig(level=logging.INFO,\
+logging.basicConfig(level=logging.INFO,\
+        format='%(asctime)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('invert_ramp_topo_unw.log')
+
+#####################################################################################
 # READ INPUT PARAM
 #####################################################################################
 
@@ -1720,7 +1730,7 @@ if arguments["--ref"] ==  None :
 else:
    ref = arguments["--ref"]
 if ref == None and radar == None:
-    print('Argument error: Need to give ref or topographic file')
+    logger.critical('Argument error: Need to give ref or topographic file')
     sys.exit()
 
 if arguments["--tsinv"] ==  None:
@@ -1776,11 +1786,6 @@ else:
 #####################################################################################
 # INITIALISE 
 #####################################################################################
-
-# logging.basicConfig(level=logging.INFO,\
-logging.basicConfig(level=logging.INFO,\
-        format='%(asctime)s -- %(levelname)s -- %(message)s')
-logger = logging.getLogger('invert_ramp_topo_unw.log')
 
 print()
 # read int
@@ -1866,10 +1871,34 @@ if radar is not None:
             elev_map = gm.readgamma(radar)
         
         maxelev,minelev = np.nanpercentile(elev_map,perc_topo),np.nanpercentile(elev_map,100-perc_topo)
+
+    # compute slope
+    toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,.1)
+    Py, Px = np.gradient(toposmooth)
+    slope_map = np.sqrt(Px**2+Py**2)
+    minslope = np.nanpercentile(slope_map,10)
+    print(minslope)
+    
+    fig = plt.figure(0,figsize=(12,8))
+    ax = fig.add_subplot(1,3,1)
+    # hax = ax.imshow(mask, cm.Greys, vmin=0, vmax=seuil)
+    cax = ax.imshow(elev_map, cm.RdBu)
+    setp( ax.get_xticklabels(), visible=False)
+    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+
+    ax = fig.add_subplot(1,3,2)
+    cax = ax.imshow(toposmooth, cm.RdBu)
+    setp( ax.get_xticklabels(), visible=False)
+
+    ax = fig.add_subplot(1,3,3)
+    cax = ax.imshow(slope_map, cm.RdBu)
+    setp( ax.get_xticklabels(), visible=False)
+    plt.show()
  
 else:
     maxelev,minelev = 1.,-1
     elev_map = np.zeros((mlines,mcols))
+    slope_map = np.zeros((mlines,mcols))
 
 # open mask file
 if maskfile is not None:
@@ -2069,10 +2098,7 @@ print('#################################')
 print()
 
 # go 
-import itertools
-
 with TimeIt():
     work = range(Nifg)
     with poolcontext(processes=nproc) as pool:
         pool.map(partial(apply_cor, sp=spint, sp_inv=spint_inv), work)
-        # results = pool.map(apply_cor, itertools.zip(itertools.repeat(spint), itertools.repeat(spint_inv), work))
