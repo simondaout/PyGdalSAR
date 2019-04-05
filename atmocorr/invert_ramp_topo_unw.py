@@ -179,7 +179,7 @@ def poolcontext(*arg, **kargs):
 # FUNCTIONS
 #####################################################################################
 
-def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
+def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
     """
     Empircal estmation function on flatten los vector
     """
@@ -187,14 +187,43 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
     # initialise full vector 
     sol = np.zeros((13))
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
-
     # initialize correction
     corr = np.zeros((mlines,mcols))
+ 
+
+    # lets try to digitize to improve the fit
+    # digitize data in bins, compute median and std
+    bins = np.arange(minlos,maxlos,abs(maxlos-minlos)/500.)
+    inds = np.digitize(los_clean,bins)
+    topobins = []
+    losbins = []
+    losstd = []
+    azbins, rgbins = [], []
+    for j in range(len(bins)-1):
+            uu = np.flatnonzero(inds == j)
+            if len(uu)>100:
+                losbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+
+                # do a small clean within the bin
+                indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
+                    los_clean[uu],2.),los_clean[uu]<np.percentile(los_clean[uu],98.)))
+
+                losstd.append(np.std(los_clean[uu][indice]))
+                topobins.append(np.median(topo_clean[uu][indice]))
+                azbins.append(np.median(az[uu][indice]))
+                rgbins.append(np.median(rg[uu][indice]))
+
+    losbins = np.array(losbins)
+    losstd = np.array(losstd)
+    topobins = np.array(topobins)
+    rgbins, azbins = np.array(rgbins),np.array(azbins)
 
     # create new data matrix with cst    
-    data = np.hstack([los_clean,los_ref])
+    data = np.hstack([losbins,los_ref])
     # give a strong weight for the ref 
-    rms = np.hstack([rms,1e-3])  
+    # rms = np.hstack([rms,1e-3])
+    # need to choose between weigth dispertion or rms ?
+    rms = np.hstack([losstd,1e-3])
 
     if order==0:  
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -222,7 +251,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             if ivar==0 & nfit==0:
                 G=np.zeros((len(data),2))
                 G[:,0] = 1
-                G[:-1,1] = topo_clean
+                G[:-1,1] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -244,8 +273,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             elif ivar==0 & nfit==1:
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:-1,1] = topo_clean
-                G[:-1,2] = topo_clean**2
+                G[:-1,1] = topobins
+                G[:-1,2] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -268,8 +297,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             elif ivar==1 and nfit==0:
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:-1,1] = topo_clean
-                G[:-1,2] = x*topo_clean
+                G[:-1,1] = topobins
+                G[:-1,2] = azbins*topobins
 
                 # ramp inversion 
                 x0 = lst.lstsq(G,data)[0]
@@ -294,9 +323,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),4))
                 G[:,0] = 1
-                G[:-1,1] = topo_clean
-                G[:-1,2] = x*topo_clean
-                G[:-1,3] = (x*topo_clean)**2
+                G[:-1,1] = topobins
+                G[:-1,2] = azbins*topobins
+                G[:-1,3] = (azbins*topobins)**2
 
                 # ramp inversion 
                 x0 = lst.lstsq(G,data)[0]
@@ -324,7 +353,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
         if radar is None:
             G=np.zeros((len(data),2))
-            G[:-1,0] = y
+            G[:-1,0] = rgbins
             G[:-1,1] = 1
 
             # ramp inversion
@@ -348,9 +377,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
         else:
             if ivar==0 & nfit==0:
                 G=np.zeros((len(data),3))
-                G[:,0] = y
+                G[:,0] = rgbins
                 G[:-1,1] = 1
-                G[:-1,2] = topo_clean
+                G[:-1,2] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -372,10 +401,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             if ivar==0 & nfit==1:
                 G=np.zeros((len(data),4))
-                G[:,0] = y
+                G[:,0] = rgbins
                 G[:-1,1] = 1
-                G[:-1,2] = topo_clean
-                G[:-1,3] = topo_clean**2
+                G[:-1,2] = topobins
+                G[:-1,3] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -400,8 +429,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
                 G=np.zeros((len(data),4))
                 G[:-1,0] = y
                 G[:,1] = 1
-                G[:-1,2] = topo_clean
-                G[:-1,3] = topo_clean*x
+                G[:-1,2] = topobins
+                G[:-1,3] = topobins*azbins
 
                 # ramp inversion
                 #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 yz yz**2 
@@ -426,11 +455,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),4))
-                G[:-1,0] = y
+                G[:-1,0] = rgbins
                 G[:,1] = 1
-                G[:-1,2] = topo_clean
-                G[:-1,3] = topo_clean*x
-                G[:-1,4] = (topo_clean*x)**2
+                G[:-1,2] = topobins
+                G[:-1,3] = topobins*azbins
+                G[:-1,4] = (topobins*azbins)**2
 
                 # ramp inversion
                 #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 yz yz**2 
@@ -461,7 +490,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
         if radar is None:
             G=np.zeros((len(data),2))
-            G[:-1,0] = x
+            G[:-1,0] = azbins
             G[:,1] = 1
 
             # ramp inversion
@@ -484,9 +513,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
         else:
             if ivar==0 & nfit==0:
                 G=np.zeros((len(data),3))
-                G[:-1,0] = x
+                G[:-1,0] = azbins
                 G[:,1] = 1
-                G[:-1,2] = topo_clean
+                G[:-1,2] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -508,10 +537,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             if ivar==0 & nfit==1:
                 G=np.zeros((len(data),4))
-                G[:-1,0] = x
+                G[:-1,0] = azbins
                 G[:,1] = 1
-                G[:-1,2] = topo_clean
-                G[:-1,3] = topo_clean**2
+                G[:-1,2] = topobins
+                G[:-1,3] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -534,10 +563,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             
             elif ivar==1 and nfit==0:
                 G=np.zeros((len(data),4))
-                G[:-1,0] = x
+                G[:-1,0] = azbins
                 G[:,1] = 1
-                G[:-1,2] = topo_clean
-                G[:-1,3] = topo_clean*x
+                G[:-1,2] = topobins
+                G[:-1,3] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -561,11 +590,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = x
+                G[:-1,0] = azbins
                 G[:,1] = 1
-                G[:-1,2] = topo_clean
-                G[:-1,3] = topo_clean*x
-                G[:-1,4] = (topo_clean*x)**2
+                G[:-1,2] = topobins
+                G[:-1,3] = topobins*azbins
+                G[:-1,4] = (topobins*azbins)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -594,8 +623,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
         if radar is None:
             G=np.zeros((len(data),3))
-            G[:-1,0] = y
-            G[:-1,1] = x
+            G[:-1,0] = rgbins
+            G[:-1,1] = azbins
             G[:,2] = 1
 
             # ramp inversion
@@ -619,10 +648,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
         else:
             if ivar==0 and nfit==0:
                 G=np.zeros((len(data),4))
-                G[:-1,0] = y
-                G[:-1,1] = x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
+                G[:-1,3] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -645,11 +674,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             if ivar==0 and nfit==1:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = y
-                G[:-1,1] = x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean**2
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -673,11 +702,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             
             elif ivar==1 and nfit==0:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = y
-                G[:-1,1] = x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean*x
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -702,12 +731,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),6))
-                G[:-1,0] = y
-                G[:-1,1] = x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean*x
-                G[:-1,5] = (topo_clean*x)**2
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins*azbins
+                G[:-1,5] = (topobins*azbins)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -739,9 +768,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
         if radar is None:
             G=np.zeros((len(data),4))
-            G[:-1,0] = y
-            G[:-1,1] = x
-            G[:-1,2] = y*x
+            G[:-1,0] = rgbins
+            G[:-1,1] = azbins
+            G[:-1,2] = rgbins*azbins
             G[:,3] = 1
 
             # ramp inversion
@@ -766,11 +795,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
         else:
             if ivar==0 and nfit==0:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = y
-                G[:-1,1] = x
-                G[:-1,2] = y*x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
+                G[:-1,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:-1,4] = topo_clean
+                G[:-1,4] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -794,12 +823,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             if ivar==0 and nfit==1:
                 G=np.zeros((len(data),6))
-                G[:-1,0] = y
-                G[:-1,1] = x
-                G[:-1,2] = y*x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
+                G[:-1,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:-1,4] = topo_clean
-                G[:-1,5] = topo_clean**2
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -824,12 +853,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==1 and nfit==0:
                 G=np.zeros((len(data),6))
-                G[:-1,0] = y
-                G[:-1,1] = x
-                G[:-1,2] = y*x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
+                G[:-1,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:-1,4] = topo_clean
-                G[:-1,5] = topo_clean*x
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -855,13 +884,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),7))
-                G[:-1,0] = y
-                G[:-1,1] = x
-                G[:-1,2] = y*x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
+                G[:-1,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:-1,4] = topo_clean
-                G[:-1,5] = topo_clean*x
-                G[:-1,6] = (topo_clean*x)**2
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins*azbins
+                G[:-1,6] = (topobins*azbins)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -892,8 +921,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
         if radar is None:
             G=np.zeros((len(data),3))
-            G[:-1,0] = y**2
-            G[:-1,1] = y
+            G[:-1,0] = rgbins**2
+            G[:-1,1] = rgbins
             G[:-1,2] = 1
 
             # ramp inversion
@@ -917,10 +946,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
         else:
             if ivar==0 and nfit==0:
                 G=np.zeros((len(data),4))
-                G[:-1,0] = y**2
-                G[:-1,1] = y
+                G[:-1,0] = rgbins**2
+                G[:-1,1] = rgbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
+                G[:-1,3] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -943,11 +972,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==0 and nfit==1:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = y**2
-                G[:-1,1] = y
+                G[:-1,0] = rgbins**2
+                G[:-1,1] = rgbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean**2
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -971,11 +1000,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             
             elif ivar==1 and nfit==0:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = y**2
-                G[:-1,1] = y
+                G[:-1,0] = rgbins**2
+                G[:-1,1] = rgbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean*x
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1000,12 +1029,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),6))
-                G[:-1,0] = y**2
-                G[:-1,1] = y
+                G[:-1,0] = rgbins**2
+                G[:-1,1] = rgbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean*x
-                G[:-1,5] = (topo_clean*x)**2
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins*azbins
+                G[:-1,5] = (topobins*azbins)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1035,8 +1064,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
         if radar is None:
             G=np.zeros((len(data),3))
-            G[:-1,0] = x**2
-            G[:-1,1] = x
+            G[:-1,0] = azbins**2
+            G[:-1,1] = azbins
             G[:,2] = 1
 
             # ramp inversion
@@ -1060,10 +1089,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
         else:
             if ivar==0 and nfit==0:
                 G=np.zeros((len(data),4))
-                G[:-1,0] = x**2
-                G[:-1,1] = x
+                G[:-1,0] = azbins**2
+                G[:-1,1] = azbins
                 G[:,3] = 1
-                G[:-1,4] = topo_clean
+                G[:-1,4] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1086,11 +1115,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==0 and nfit==1:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = x**2
-                G[:-1,1] = x
+                G[:-1,0] = azbins**2
+                G[:-1,1] = azbins
                 G[:,3] = 1
-                G[:-1,4] = topo_clean
-                G[:-1,5] = topo_clean**2
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1114,11 +1143,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
             
             elif ivar==1 and nfit==0:
                 G=np.zeros((len(data),5))
-                G[:-1,0] = x**2
-                G[:-1,1] = x
+                G[:-1,0] = azbins**2
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean*x
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1143,12 +1172,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,los_ref):
 
             elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),6))
-                G[:-1,0] = x**2
-                G[:-1,1] = x
+                G[:-1,0] = azbins**2
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean*x
-                G[:-1,5] = (topo_clean*x)**2
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins*azbins
+                G[:-1,5] = (topobins*azbins)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
