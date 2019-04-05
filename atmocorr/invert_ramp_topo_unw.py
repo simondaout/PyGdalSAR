@@ -1856,20 +1856,14 @@ if radar is not None:
     minslope = np.nanpercentile(slope_map,10)
     
     fig = plt.figure(0,figsize=(12,8))
-    ax = fig.add_subplot(1,3,1)
-    # hax = ax.imshow(mask, cm.Greys, vmin=0, vmax=seuil)
-    cax = ax.imshow(elev_map, cm.RdBu, vmin=minelev, vmax=maxelev)
-    setp( ax.get_xticklabels(), visible=False)
-    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
-    ax.set_title('DEM',fontsize=6)
 
-    ax = fig.add_subplot(1,3,2)
+    ax = fig.add_subplot(1,2,1)
     cax = ax.imshow(toposmooth, cm.RdBu, vmin=minelev, vmax=maxelev)
     setp( ax.get_xticklabels(), visible=False)
-    ax.set_title('Smooth DEM',fontsize=6)
+    ax.set_title('Smoothed DEM',fontsize=6)
 
-    ax = fig.add_subplot(1,3,3)
-    cax = ax.imshow(slope_map, cm.RdBu, vmin=minslope, vmax=np.nanpercentile(slope_map,10))
+    ax = fig.add_subplot(1,2,1)
+    cax = ax.imshow(slope_map, cm.RdBu, vmin=minslope, vmax=np.nanpercentile(slope_map,90))
     setp( ax.get_xticklabels(), visible=False)
     ax.set_title('Mask Slope bellow: {}'.format(minslope),fontsize=6)
 
