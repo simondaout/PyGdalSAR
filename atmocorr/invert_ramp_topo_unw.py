@@ -1378,98 +1378,98 @@ def empirical_cor(kk):
       nfit_temp=nfit
       ivar_temp=ivar
 
-    try:
-        sol, corr, rms = estim_ramp(los_map.flatten(),
-        los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
-        temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst)
+    # try:
+    sol, corr, rms = estim_ramp(los_map.flatten(),
+    los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
+    temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst)
 
-        logger.info('RMS: {0} '.format(rms))
+    logger.info('RMS: {0} '.format(rms))
 
-        # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
-        func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
-        + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
-        sol[12]*((az*elev_clean)**2)
+    # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
+    func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
+    + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
+    sol[12]*((az*elev_clean)**2)
 
-        if radar is not None: 
-           # plot phase/elevation
+    if radar is not None: 
+       # plot phase/elevation
 
-           funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
-           + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
-           sol[12]*((azbins*topobins)**2)
-   
-           fig2 = plt.figure(2,figsize=(9,4))
-           ax = fig2.add_subplot(1,1,1)
-           z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
-           ax.scatter(elev_clean[::10],los_clean[::10] - func[::10], s=0.005, alpha=0.05,rasterized=True)
-           ax.plot(topobins,losbins - funcbins,'-r', lw =.5)
+       funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
+       + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
+       sol[12]*((azbins*topobins)**2)
 
-           if nfit==0:
-                ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
-           else:
-                ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{0:.3f}*z**2 + {1:.3f}*z + \
-                    {1:.3f}'.format(sol[10],sol[9],sol[8]))
+       fig2 = plt.figure(2,figsize=(9,4))
+       ax = fig2.add_subplot(1,1,1)
+       z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
+       ax.scatter(elev_clean[::10],los_clean[::10] - func[::10], s=0.005, alpha=0.05,rasterized=True)
+       ax.plot(topobins,losbins - funcbins,'-r', lw =.5)
 
-           ax.set_xlabel('Elevation (m)')
-           ax.set_ylabel('LOS (rad)')
-           plt.legend(loc='best')
-           if sformat == 'ROI_PAC':
-              fig2.savefig( int_path + folder + idate+'phase-topo.png', format='PNG')
-           else:
-              fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
+       if nfit==0:
+            ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
+       else:
+            ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{0:.3f}*z**2 + {1:.3f}*z + \
+                {1:.3f}'.format(sol[10],sol[9],sol[8]))
 
-        #corected map
-        #vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
-        vmax = np.nanpercentile(los_clean,95)
-        vmin = np.nanpercentile(los_clean,5)
+       ax.set_xlabel('Elevation (m)')
+       ax.set_ylabel('LOS (rad)')
+       plt.legend(loc='best')
+       if sformat == 'ROI_PAC':
+          fig2.savefig( int_path + folder + idate+'phase-topo.png', format='PNG')
+       else:
+          fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
 
-        fig = plt.figure(3,figsize=(11,4))
+    #corected map
+    #vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
+    vmax = np.nanpercentile(los_clean,95)
+    vmin = np.nanpercentile(los_clean,5)
 
-        ax = fig.add_subplot(1,4,1)
-        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None,alpha=1.)
-        ax.set_title('LOS')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
+    fig = plt.figure(3,figsize=(11,4))
 
-        ax = fig.add_subplot(1,4,2)
-        cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
-        ax.set_title('LOS ESTIMATION')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
+    ax = fig.add_subplot(1,4,1)
+    hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None,alpha=1.)
+    ax.set_title('LOS')
+    setp( ax.get_xticklabels(), visible=None)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
 
-        ax = fig.add_subplot(1,4,3)
-        cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
-        ax.set_title('RAMP+TOPO')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
+    ax = fig.add_subplot(1,4,2)
+    cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
+    ax.set_title('LOS ESTIMATION')
+    setp( ax.get_xticklabels(), visible=None)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
 
-        # for plot we can clean
-        k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
-        corr[k] = 0.
+    ax = fig.add_subplot(1,4,3)
+    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
+    ax.set_title('RAMP+TOPO')
+    setp( ax.get_xticklabels(), visible=None)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
 
-        ax = fig.add_subplot(1,4,4)
-        hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-        cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
-        ax.set_title('CORR LOS')
-        setp( ax.get_xticklabels(), visible=None)
-        fig.colorbar(cax, orientation='vertical',aspect=10)
-        fig.tight_layout()
+    # for plot we can clean
+    k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
+    corr[k] = 0.
 
-        if sformat == 'ROI_PAC':
-            fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
-        else:
-            fig.savefig(out_path + idate +'corrections.png', format='PNG')
+    ax = fig.add_subplot(1,4,4)
+    hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
+    cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
+    ax.set_title('CORR LOS')
+    setp( ax.get_xticklabels(), visible=None)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
+    fig.tight_layout()
 
-        if plot=='yes':
-            plt.show()
+    if sformat == 'ROI_PAC':
+        fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
+    else:
+        fig.savefig(out_path + idate +'corrections.png', format='PNG')
 
-        plt.close('all')
-        del corr
+    if plot=='yes':
+        plt.show()
 
-    except:
-        logger.critical('Impossible estimation on IFG: {}'.format(idate))
-        sol = np.zeros((13))
-        rms = 10e6
+    plt.close('all')
+    del corr
+
+    # except:
+    #     logger.critical('Impossible estimation on IFG: {}'.format(idate))
+    #     sol = np.zeros((13))
+    #     rms = 10e6
     
     los_map, rms_map
     del los_clean, rms_clean
