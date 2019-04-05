@@ -17,8 +17,8 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 [--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
-[--cohpixel=<yes/no>] [--threshold_coh=<value>] \
-[--ibeg_mask=<value>] [--iend_mask=<value>] [--perc=<value>] [--perc_topo=<value>] [--samp=<value>] \
+[--cohpixel=<yes/no>] [--threshold_coh=<value>] [--ibeg_mask=<value>] [--iend_mask=<value>] \
+[--perc=<value>] [--perc_topo=<value>] [--perc_slope=<value>] [--samp=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
 [<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] 
 
@@ -67,6 +67,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --iend_mask VALUE     Stop line number for the mask [default: None]  
 --perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --perc_topo VALUE     Percentile of hidden elevation pixel for the estimation and clean outliers [default:98.]
+--perc_slope VALUE    Percentile of hidden slope-elevation pixel for the estimation and clean outliers [default:98.]
 --samp=<value>        Undersampling for empirical estimation [default: 2]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
@@ -1741,6 +1742,10 @@ if arguments["--perc"] ==  None:
     perc = 98.
 else:
     perc = float(arguments["--perc"])
+if arguments["--perc_slope"] ==  None:
+    perc_slope = 98.
+else:
+    perc_slope = float(arguments["--perc_slope"])
 if arguments["--plot"] ==  None:
     plot = 'no'
 else:
@@ -1853,19 +1858,19 @@ if radar is not None:
     toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,.5)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
-    minslope = np.nanpercentile(slope_map,10)
+    minslope = np.nanpercentile(slope_map,perc_slope)
     
     fig = plt.figure(0,figsize=(12,8))
 
     ax = fig.add_subplot(1,2,1)
-    cax = ax.imshow(toposmooth, cm.RdBu, vmin=minelev, vmax=maxelev)
+    cax = ax.imshow(toposmooth, cm.RdBu_r, vmin=minelev, vmax=maxelev)
     setp( ax.get_xticklabels(), visible=False)
     ax.set_title('Smoothed DEM',fontsize=6)
 
-    ax = fig.add_subplot(1,2,1)
-    cax = ax.imshow(slope_map, cm.RdBu, vmin=minslope, vmax=np.nanpercentile(slope_map,90))
+    ax = fig.add_subplot(1,2,2)
+    cax = ax.imshow(slope_map, cm.RdBu_r, vmin=minslope, vmax=np.nanpercentile(slope_map,100-perc_slope))
     setp( ax.get_xticklabels(), visible=False)
-    ax.set_title('Mask Slope bellow: {}'.format(minslope),fontsize=6)
+    ax.set_title('Mask Slope bellow: {.3f}'.format(minslope),fontsize=6)
 
     if plot == 'yes':
         plt.show()
