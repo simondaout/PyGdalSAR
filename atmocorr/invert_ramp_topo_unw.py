@@ -193,8 +193,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
 
     # lets try to digitize to improve the fit
     # digitize data in bins, compute median and std
-    bins = np.arange(minlos,maxlos,abs(maxlos-minlos)/500.)
-    inds = np.digitize(los_clean,bins)
+    bins = np.arange(minelev,maxelev,abs(maxelev-minelev)/500.)
+    inds = np.digitize(topo_clean,bins)
     topobins = []
     losbins = []
     losstd = []
@@ -202,14 +202,14 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
     for j in range(len(bins)-1):
             uu = np.flatnonzero(inds == j)
             if len(uu)>100:
-                losbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+                topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
 
                 # do a small clean within the bin
                 indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
                     los_clean[uu],2.),los_clean[uu]<np.percentile(los_clean[uu],98.)))
 
                 losstd.append(np.std(los_clean[uu][indice]))
-                topobins.append(np.median(topo_clean[uu][indice]))
+                losbins.append(np.median(los_clean[uu][indice]))
                 azbins.append(np.median(az[uu][indice]))
                 rgbins.append(np.median(rg[uu][indice]))
 
