@@ -1396,6 +1396,7 @@ def empirical_cor(kk):
        funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
        + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
        sol[12]*((azbins*topobins)**2)
+       print(funcbins) 
 
        fig2 = plt.figure(2,figsize=(9,4))
        ax = fig2.add_subplot(1,1,1)
@@ -1471,7 +1472,6 @@ def empirical_cor(kk):
     #     sol = np.zeros((13))
     #     rms = 10e6
     
-    los_map, rms_map
     del los_clean, rms_clean
     del elev_clean
     del az, rg
