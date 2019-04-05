@@ -190,33 +190,39 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
     # initialize correction
     corr = np.zeros((mlines,mcols))
  
+    if radar is None:
+        losbins = los_clean
+        losstd = rms
+        topobins = topo_clean
+        rgbins, azbins = rg, az
 
-    # lets try to digitize to improve the fit
-    # digitize data in bins, compute median and std
-    bins = np.arange(minelev,maxelev,abs(maxelev-minelev)/500.)
-    inds = np.digitize(topo_clean,bins)
-    topobins = []
-    losbins = []
-    losstd = []
-    azbins, rgbins = [], []
-    for j in range(len(bins)-1):
-            uu = np.flatnonzero(inds == j)
-            if len(uu)>100:
-                topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+    else:
+        # lets try to digitize to improve the fit
+        # digitize data in bins, compute median and std
+        bins = np.arange(minelev,maxelev,abs(maxelev-minelev)/500.)
+        inds = np.digitize(topo_clean,bins)
+        topobins = []
+        losbins = []
+        losstd = []
+        azbins, rgbins = [], []
+        for j in range(len(bins)-1):
+                uu = np.flatnonzero(inds == j)
+                if len(uu)>100:
+                    topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
 
-                # do a small clean within the bin
-                indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
-                    los_clean[uu],2.),los_clean[uu]<np.percentile(los_clean[uu],98.)))
+                    # do a small clean within the bin
+                    indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
+                        los_clean[uu],2.),los_clean[uu]<np.percentile(los_clean[uu],98.)))
 
-                losstd.append(np.std(los_clean[uu][indice]))
-                losbins.append(np.median(los_clean[uu][indice]))
-                azbins.append(np.median(az[uu][indice]))
-                rgbins.append(np.median(rg[uu][indice]))
+                    losstd.append(np.std(los_clean[uu][indice]))
+                    losbins.append(np.median(los_clean[uu][indice]))
+                    azbins.append(np.median(az[uu][indice]))
+                    rgbins.append(np.median(rg[uu][indice]))
 
-    losbins = np.array(losbins)
-    losstd = np.array(losstd)
-    topobins = np.array(topobins)
-    rgbins, azbins = np.array(rgbins),np.array(azbins)
+        losbins = np.array(losbins)
+        losstd = np.array(losstd)
+        topobins = np.array(topobins)
+        rgbins, azbins = np.array(rgbins),np.array(azbins)
 
     # create new data matrix with cst    
     data = np.hstack([losbins,los_ref])
@@ -1386,11 +1392,16 @@ def empirical_cor(kk):
 
         if radar is not None: 
            # plot phase/elevation
+
+            funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
+            + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
+            sol[12]*((azbins*topobins)**2)
    
            fig2 = plt.figure(2,figsize=(9,4))
            ax = fig2.add_subplot(1,1,1)
            z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
            ax.scatter(elev_clean[::10],los_clean[::10] - func[::10], s=0.005, alpha=0.05,rasterized=True)
+           ax.plot(topobins,losbins - funcbins,'-r', lw =.5)
 
            if nfit==0:
                 ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
