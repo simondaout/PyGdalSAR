@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
@@ -15,7 +14,7 @@ Usage:
     correct_ifg_from_gacos.py --int_list=<path> [--int_path=<path>] [--gacos_path=<path>]  [--gacos2los=<value>] [--prefix=<value>] \
     [--suffix=<value>] [--rlook=<value>] [--plot=<yes|no>] [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
     [--refstart=<values>] [--refend=<values>] [--format=<value>]  \
-    [--ramp=<cst|lin>] [--crop=<values>] [--fitmodel=<yes|no>] [--perc=<value>] [--mask=<path>] \
+    [--ramp=<cst|lin>] [--crop=<values>] [--fitmodel=<yes|no>] [--perc=<value>]  \
     [--suffix_output=<value>] [--nproc=<nb_cores>]
 
 correct_ifg_from_gacos.py -h | --help
@@ -40,23 +39,19 @@ Options:
 --format VALUE          Format input files: ROI_PAC, GAMMA, GTIFF [default: GAMMA]
 --perc=<value>          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --fitmodel=<yes|no>     If yes, then estimate the proportionlality between gacos and los_map in addition to a polynomial ramp
---mask=<path>           Mask in .r4 format. Keep only values > threshold_mask. 
 """
 
 import gdal
 gdal.UseExceptions()
 
-import sys,os
+import sys,os,logging
 import numpy as np
 import scipy.optimize as opt
 import scipy.linalg as lst
 from numpy.lib.stride_tricks import as_strided
+from os import environ
 
 import matplotlib
-if environ["TERM"].startswith("screen"):
-    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
-from pylab import *
-import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
@@ -90,9 +85,9 @@ else:
     int_path=arguments["--int_path"] + '/'
 
 if arguments["--gacos_path"] ==  None:
-   path = "./GACOS/"
+   gacos_path = "./GACOS/"
 else:
-   path = arguments["--gacos_path"]
+   gacos_path = arguments["--gacos_path"] + '/'
 
 if arguments["--refstart"] == None:
     refstart = 0
@@ -117,10 +112,22 @@ if arguments["--rlook"] == None:
 else:
     rlook = '_' + arguments["--rlook"] + 'rlks'
 
-if arguments["--plot"] ==  None:
-    plot = 'yes'
+if arguments["--nproc"] == None:
+    nproc = 2
 else:
-    plot = arguments["--plot"]
+    nproc = int(arguments["--nproc"])
+
+if arguments["--plot"] ==  'yes':
+    plot = 'yes'
+    logger.warning('plot is yes. Set nproc to 1')
+    nproc = 1
+    if environ["TERM"].startswith("screen"):
+        matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
+else:
+    plot = 'no'
+    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
 
 if arguments["--gacos2los"] ==  None:
     gacos2los = 1
@@ -137,7 +144,7 @@ if arguments["--refstart"] == None:
 else:
     refstart = int(arguments["--refstart"])
 if arguments["--refend"] == None:
-    refend = nlign
+    refend = 200
 else:
     refend = int(arguments["--refend"])
 
@@ -145,14 +152,6 @@ if arguments["--format"] ==  None:
     sformat = 'GAMMA'
 else:
     sformat = arguments["--format"]
-
-if arguments["--rmspixel"] ==  None:
-    rms = np.ones((nlign,ncol))
-else:
-    rmsf = arguments["--rmspixel"]
-    rms = np.fromfile(rmsf,dtype=np.float32).reshape((nlign,ncol))
-    plt.imshow(rms)
-    #plt.show()
 
 if arguments["--perc"] ==  None:
     perc = 98.
@@ -178,20 +177,6 @@ if arguments["--crop"] ==  None:
     crop = False
 else:
     crop = map(float,arguments["--crop"].replace(',',' ').split())
-
-if arguments["--nproc"] == None:
-    nproc = 8
-else:
-    nproc = int(arguments["--nproc"])
-
-if arguments["--mask"] ==  None or not os.path.exists(arguments["--mask"]):
-    maskfile = None
-else:
-    maskfile = arguments["--mask"]
-if arguments["--threshold_mask"] ==  None:
-    threshold_mask = -1
-else:
-    threshold_mask = float(arguments["--threshold_mask"])
 
 if arguments["--suffix_output"] ==  None:
     suffout = '_gacos'
@@ -246,9 +231,9 @@ class TimeIt(ContextDecorator):
         print('Time process: {0}s'.format((datetime.now() - self.start).total_seconds()))
 
 def checkinfile(file):
-    if path.exists(file) is False:
+    if os.path.exists(file) is False:
         logger.critical("File: {0} not found, Exit !".format(file))
-        print("File: {0} not found in {1}, Exit !".format(file,getcwd()))
+        print("File: {0} not found in {1}, Exit !".format(file,os.getcwd()))
 
 # create generator for pool
 @contextmanager
@@ -271,41 +256,11 @@ def gacos2ifg(kk):
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
 
-    if sformat == 'ROI_PAC':
-        folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
-        rscfile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.rsc'
-        infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
-
-        checkinfile(infile)
-        checkinfile(rscfile)
-
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
-        # Get the band that have the los_map we want
-        ds_band1 = ds.GetRasterBand(1)
-        ds_band2 = ds.GetRasterBand(2)
-
-        los_map = np.zeros((lines,cols))
-        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
-        # los_map[los_map==0] = np.float('NaN')
-        lines, cols = ds.RasterYSize, ds.RasterXSize
-
-    elif sformat == 'GTIFF':
-        infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
-
-        checkinfile(infile)
-
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
-        # Get the band that have the los_map we want
-        ds_band2 = ds.GetRasterBand(1)
-        lines, cols = ds.RasterYSize, ds.RasterXSize
-
-        los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
-        # los_map[los_map==0] = np.float('NaN')
-
     if sformat == 'GAMMA':
-        lines,cols = gm.readpar(int_path)
-        infile1 = int_path +  str(date1) + '_gacos.unw'
-        infile2 = int_path +  str(date2) + '_gacos.unw'
+        import gamma as gm
+        lines,cols = gm.readpar(gacos_path)
+        infile1 = gacos_path +  str(date1) + '_crop.ztd.unw'
+        infile2 = gacos_path +  str(date2) + '_crop.ztd.unw'
         checkinfile(infile1); checkinfile(infile2)
         gacos1 = gm.readgamma(infile1,int_path)
         gacos2 = gm.readgamma(infile2,int_path)
@@ -321,6 +276,7 @@ def gacos2ifg(kk):
 
     _los_map = np.copy(los_map)
     _los_map[np.logical_or(gacos2==0,gacos2>=9990)] = np.float('NaN')
+    _los_map[np.logical_or(gacos1==0,gacos1>=9990)] = np.float('NaN')
 
     indexref = np.nonzero(
         np.logical_and(~np.isnan(gacos2),
@@ -344,7 +300,7 @@ def gacos2ifg(kk):
     # gacosm = (gacos2 - gacos1) * 4 * math.pi / wavelength
 
     # open gacos corrections
-    gacosf = path + str(date1) + '-' + str(date2) + '_gacosmdel' +'.r4'
+    gacosf = gacos_path + str(date1) + '-' + str(date2) + '_gacosmdel' +'.r4'
     fid = open(gacosf,'wb')
     gacosm.flatten().astype('float32').tofile(fid)
     fid.close()
@@ -370,28 +326,24 @@ def correct_ifg(kk):
     logger.info('lines:{0}, cols:{1}, IFG:{2}:'.format(lines, cols, idate))
 
     # open gacos corrections
-    gacosf = path + str(date1) + '-' + str(date2) + '_gacosmdel' +'.r4'
+    gacosf = gacos_path + str(date1) + '-' + str(date2) + '_gacosmdel' +'.r4'
     model = np.fromfile(gacosf,dtype=np.float32)
 
     # load coherence or whatever
-    spacial_mask = np.ones((lines,cols))*np.float('NaN')
     rms_map = np.ones((lines,cols))
 
     if rmsf=='yes':
-    try:
-        if sformat == 'ROI_PAC':
-            rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
-            k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
-            rms_map[k] = float('NaN')
-        elif sformat == 'GAMMA':
-            rmsfile=  int_path + str(date1) + '_' + str(date2) + '.filt.cc'
-            rms_map = gm.readgamma(rmsfile,int_path)
+        try:
+            if sformat == 'ROI_PAC':
+                rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:lines,:cols]
+                k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
+                rms_map[k] = float('NaN')
+            elif sformat == 'GAMMA':
+                rmsfile=  int_path + str(date1) + '_' + str(date2) + '.filt.cc'
+                rms_map = gm.readgamma(rmsfile,int_path)
 
-    except:
-        logger.warning('Coherence file cannot be read')
-
-    # los_map_flat = as_strided(maps_flat[:,:,l])
-    # model = as_strided(gacos[:,:,l])
+        except:
+            logger.warning('Coherence file cannot be read')
 
     if arguments["--zone"] ==  None:
         refzone = [0,cols,0,lines]
@@ -442,6 +394,7 @@ def correct_ifg(kk):
         )))))))))))))
 
     # set los to zero in the ref area too
+    # weights pixels by rms
     los_ref = los_map[indexref].flatten() 
     rms_ref = rms_map[indexref].flatten()
     amp_ref = 1./rms_ref
@@ -614,90 +567,70 @@ def correct_ifg(kk):
     # model = gacos + ramp
     model_flat[:,:,l] = gacos[:,:,l] + remove_ramp
 
-    # Refer los_map again (just to check)
-    rms_ref = rms[indexref].flatten()
-    amp_ref = 1./rms_ref
-    amp_ref = amp_ref/np.nanmax(amp_ref)
-    cst = np.nansum(los_map_flat[indexref]*amp_ref) / np.nansum(amp_ref)
-    print 'Average phase within ref area, iter=2:', cst 
-    los_map_flat = los_map_flat - cst
+    # # Refer los_map again (just to check)
+    # rms_ref = rms[indexref].flatten()
+    # amp_ref = 1./rms_ref
+    # amp_ref = amp_ref/np.nanmax(amp_ref)
+    # cst = np.nansum(los_map_flat[indexref]*amp_ref) / np.nansum(amp_ref)
+    # print 'Average phase within ref area, iter=2:', cst 
+    # los_map_flat = los_map_flat - cst
 
     # compute variance flatten los_map
     var[l] = np.sqrt(np.nanmean(los_map_flat**2))
     print 'Var: ', var[l]
 
+    
+    # initiate figure depl
+    fig = plt.figure(nfigure,figsize=(14,7))
+    nfigure += 1
+    ax = fig.add_subplot(3,2,1)
+    im = ax.imshow(los_map,cmap=cmap,vmax=losmax,vmin=losmin)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('los_map {}'.format(idates[l]),fontsize=6)
+
+    # initiate figure depl
+    ax = fig.add_subplot(3,2,2)
+    im = ax.imshow(model,cmap=cmap,vmax=losmax,vmin=losmin)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Model {}'.format(idates[l]),fontsize=6)
+    
+    # initiate figure depl
+    ax = fig.add_subplot(3,2,3)
+    im = ax.imshow(model_flat[:,:,l],cmap=cmap)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Flatten Model {}'.format(idates[l]),fontsize=6)
+
+    # initiate figure depl
+    ax = fig.add_subplot(3,2,4)
+    im = ax.imshow(los_map_flat,cmap=cmap,vmax=losmax,vmin=losmin)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Correct los_map {}'.format(idates[l]),fontsize=6)
+
+    ax = fig.add_subplot(3,2,5)
+    g = np.linspace(np.nanmax(model_clean),np.nanmin(model_clean),100)
+    ax.scatter(model_clean,los_clean - funct, s=0.005, alpha=0.1, rasterized=True)
+    ax.plot(modelbins,losbins - functbins,'-r', lw =.5)
+    ax.plot(g,f*g,'-r', lw =4.)
+    ax.set_ylim([(los_clean-funct).min(),(los_clean-funct).max()])
+    ax.set_xlim([model_clean.min(),model_clean.max()])
+    ax.set_xlabel('GACOS ZTD')
+    ax.set_ylabel('LOS delay')
+    ax.set_title('los_map/Model')
+
+    fig.tight_layout()
+    fig.savefig('{}-gacos-cor.png'.format(idates[l]), format='PNG',dpi=150)
+
     if plot == 'yes':
-        # initiate figure depl
-        fig = plt.figure(nfigure,figsize=(14,7))
-        nfigure += 1
-        ax = fig.add_subplot(3,2,1)
-        im = ax.imshow(los_map,cmap=cmap,vmax=losmax,vmin=losmin)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('los_map {}'.format(idates[l]),fontsize=6)
-
-        # initiate figure depl
-        ax = fig.add_subplot(3,2,2)
-        im = ax.imshow(model,cmap=cmap,vmax=losmax,vmin=losmin)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Model {}'.format(idates[l]),fontsize=6)
-        
-        # initiate figure depl
-        ax = fig.add_subplot(3,2,3)
-        im = ax.imshow(model_flat[:,:,l],cmap=cmap)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Flatten Model {}'.format(idates[l]),fontsize=6)
-
-        # initiate figure depl
-        ax = fig.add_subplot(3,2,4)
-        im = ax.imshow(los_map_flat,cmap=cmap,vmax=losmax,vmin=losmin)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Correct los_map {}'.format(idates[l]),fontsize=6)
-
-        ax = fig.add_subplot(3,2,5)
-        g = np.linspace(np.nanmax(model_clean),np.nanmin(model_clean),100)
-        ax.scatter(model_clean,los_clean - funct, s=0.005, alpha=0.1, rasterized=True)
-        ax.plot(modelbins,losbins - functbins,'-r', lw =.5)
-        ax.plot(g,f*g,'-r', lw =4.)
-        ax.set_ylim([(los_clean-funct).min(),(los_clean-funct).max()])
-        ax.set_xlim([model_clean.min(),model_clean.max()])
-        ax.set_xlabel('GACOS ZTD')
-        ax.set_ylabel('LOS delay')
-        ax.set_title('los_map/Model')
-
-        fig.tight_layout()
-        fig.savefig('{}-gacos-cor.png'.format(idates[l]), format='PNG',dpi=150)
         plt.show()
         # sys.exit()
-
-    # save new int
-    if sformat == 'ROI_PAC':
-        outfile = int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout +  rlook + '.unw'  
-        outrsc = int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout +  rlook + '.unw.rsc'
-        dst_ds = driver.Create(outfile, cols, lines, 2, gdal.GDT_Float32)
-        dst_band1 = dst_ds.GetRasterBand(1)
-        dst_band2 = dst_ds.GetRasterBand(2)
-        dst_band1.WriteArray(rms_map,0,0)
-        dst_band2.WriteArray(los_map_flat,0,0)
-        shutil.copy(rscfile,outrsc)
-        dst_band1.FlushCache()
-        dst_band2.FlushCache()
-
-    elif sformat == 'GTIFF':
-        outfile = out_path + prefix + str(date1) + '-' + str(date2) + suffix + suffout +  rlook + '.tiff' 
-        dst_ds = driver.Create(outfile, cols, lines, 1, gdal.GDT_Float32)
-        dst_band2 = dst_ds.GetRasterBand(1)
-        dst_band2.WriteArray(los_map_flat,0,0)
-        dst_ds.SetGeoTransform(gt)
-        dst_ds.SetProjection(proj)
-        dst_band2.FlushCache()
 
     elif sformat == 'GAMMA':
         outfile = out_path + prefix + str(date1) + '_' + str(date2) + suffix +  suffout + rlook + '.unw' 
@@ -723,7 +656,6 @@ logging.basicConfig(level=logging.INFO,\
         format='%(asctime)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('correct_ifg_from_gacos.log')
 
-print()
 # read int
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
 Nifg=len(date_1)
@@ -741,31 +673,6 @@ cst = np.copy(imd[0])
 # compute temporal baseline for TS inv
 for i in range((nmax)):
     bt.append(imd[i]-cst)
-
-# open mask file
-if maskfile is not None:
-    fid = open(maskfile,'r')
-    maski = np.fromfile(fid,dtype=np.float32)[:cols*lines]
-    mask = maski.reshape((lines,cols))
-    k = np.nonzero(mask<threshold_mask)
-    spacial_mask = np.copy(mask)
-    spacial_mask[k] = float('NaN')
-
-    if plot=='yes':
-
-      fig = plt.figure(0,figsize=(5,4))
-      ax = fig.add_subplot(1,1,1)
-      cax = ax.imshow(spacial_mask,cmap=cm.jet)
-      ax.set_title('Mask')
-      setp( ax.get_xticklabels(), visible=None)
-      fig.colorbar(cax, orientation='vertical',aspect=10)
-      plt.show()
-      fid.close()
-
-else:
-    mask = np.zeros((lines,cols))
-    threshold_mask = -1
-
 
 #####################################################################################
 # MAIN
