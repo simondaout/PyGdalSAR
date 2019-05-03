@@ -89,6 +89,7 @@ try:
   os.remove(os.path.join(outputdir, "interf_pair_success.txt"))
 except: 
   pass
+  
 def preview(kk):
     successf = open(os.path.join(outputdir, "interf_pair_success.txt"), "a")
     failf =  open(os.path.join(outputdir, "interf_pair_problems.txt"), "a")

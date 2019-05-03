@@ -7,6 +7,7 @@
 #
 ############################################
 # Author        : Mathieu Volat 
+#                 Simon Daout
 ############################################
 
 """\
@@ -17,7 +18,7 @@ Display and Cut image file (.unw/.int/.r4/.tiff)
 Usage: plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
 [--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] 
        plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
-[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>]
+[--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>]
 
 
 Options:
@@ -30,11 +31,12 @@ Options:
 --format=<value>      Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --cpt==<value>        Indicate colorscale for phase
 --wrap=<value>        Wrapped phase between value for unwrapped files 
---lectfile=<file>      Path of the lect.in file for r4 format
+--lectfile=<file>     Path of the lect.in file for r4 format
+--parfile=<file>      Path of the .par file of GAMMA
 --rad2mm=<value>      Convert data [default: 1]
 --tile=<value>        Title plot 
---vmax              Max colorscale [default: 98th percentile]
---vmin              Min colorscale [default: 2th percentile]
+--vmax                Max colorscale [default: 98th percentile]
+--vmin                Min colorscale [default: 2th percentile]
 """
 
 from __future__ import print_function
@@ -118,9 +120,14 @@ elif sformat == "GTIFF":
 
 elif sformat == 'GAMMA':
     import gamma as gm
-    par_file =  '.par'
-    nlines,ncols = gm.readpar()
-    phi = gm.readgamma(infile)
+    if arguments["--parfile"] ==  None:
+        par_file =  arguments["--parfile"]
+        nlines,ncols = gm.readpar(par=par_file)
+        phi = gm.readgamma(infile,par=par_file)
+    else:
+        nlines,ncols = gm.readpar()
+        phi = gm.readgamma(infile)
+    
 
 if arguments["<ibeg>"] ==  None:
     ibeg = 0
@@ -215,5 +222,5 @@ except:
 
 # Display the data
 ##ax.set_rasterized(True)
-fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
+# fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
 plt.show()

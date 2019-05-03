@@ -3231,7 +3231,7 @@ subroutine listing
       endif
       endif
    enddo
-   write(*,*)'image ',Im_ini(i),' vue ',Im_num_ini(i),' fois'
+   write(*,*)'image ',Im_ini(i),' seen ',Im_num_ini(i),' times'
    enddo
    if(irepIm.gt.1.and.niter.lt.10)then
    do i=1,Simage_ini
@@ -3254,7 +3254,7 @@ subroutine listing
 
    Simage=COUNT(Im_num_ini>=irepIm)
    Ninterf=COUNT(flag_Im1_Im2_ini)
-   write(*,*)'nb d images ',Simage,' nb d interfero ',Ninterf
+   write(*,*)' nb images ',Simage,' nb ifgs ',Ninterf
 
    allocate(Im(Simage),Im1_Im2(Ninterf,2),Im_s(Simage),flag_Im1_Im2_comb(Ninterf))
    allocate(baselr(Ninterf),Im_num(Simage),niveau_eau(Simage),base_im(Simage))

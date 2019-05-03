@@ -690,14 +690,16 @@ def flat_atmo(config, kk):
     with Cd(config.stack.getpath(kk)):
         infile = config.stack.getname(kk) + '.int';  checkinfile(infile)
         corfile = config.stack.getcor(kk)
-        filtfile = config.stack.getfiltSW(kk) + '.int';  checkinfile(filtfile)
+        filtfile = config.stack.getfiltSW(kk) + '.int'
         stratfile = config.stack.getstratfile(kk) + '.unw' 
+        topfile = path.splitext(infile)[0] + '.top'
 
         # filt must be done before changing name
         if path.exists(filtfile) == False:
             logger.info('{0} does not exist'.format(filtfile))
             # call filter function
             filterSW(config,kk)
+            checkinfile(filtfile)
 
         # update names
         prefix, suffix = config.stack.getfix(kk)
@@ -723,7 +725,7 @@ def flat_atmo(config, kk):
     with Cd(config.stack.getpath(kk)):
 
         if force:
-            rm(outfile)
+            rm(outfile); rm(topfile)
         do = checkoutfile(config,outfile)
         if do:
             logger.info("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
@@ -752,7 +754,6 @@ def flat_atmo(config, kk):
         z = z - float(config.z_ref)
         phi = phi*0.00020944
 
-        topfile = path.splitext(infile)[0] + '.top'
         b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
 
         if ((config.jend_mask > config.jbeg_mask) or (config.iend_mask > config.ibeg_mask)) and config.ivar<2 :
@@ -1087,9 +1088,9 @@ def unwrapping(config,kk):
                 # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
                 # unwrapped firt filtSWfile and then add high frequency of filtROIfile
                 logger.info("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.04)+" "+str(config.threshold_unw)+" 0")
+                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.03)+" "+str(config.threshold_unw)+" 0")
                 r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.04)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
+                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.03)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
                 if r != 0:
                     print(unwrapping.__doc__)
                     logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))

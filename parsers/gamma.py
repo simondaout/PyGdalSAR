@@ -28,14 +28,16 @@ def _parseParameterFile(filename):
     return dict((i[0][:-1],i[1:]) for i in raw_segs)
 
 
-def _getParameters(path, log=False):
+def _getParameters(path, par=None, log=False):
     required_slc = ['nlines', 'width']
     required_int = ['range_samples','azimuth_lines']
 
     # path = op.dirname(op.realpath(path))
-    # print(path,%s/*par' % path')
-    par_files = glob.glob('%s/*par' % path)
-    # print(par_files)
+    if par == None:
+        par_files = glob.glob('%s/*par' % path)
+    else:
+        par_files = os.path.join(path, par)
+
 
     for file in par_files:
         params = _parseParameterFile(file)
@@ -51,7 +53,7 @@ def _getParameters(path, log=False):
                     'Parameter file does not hold required parameters')             
 
 
-def readpar(par_file='./'):
+def readpar(path='./', par=None):
         """
         :params filename: Gamma software parameter file
         :type filename: str
@@ -63,14 +65,14 @@ def readpar(par_file='./'):
         :raises: ImportError
         """
         
-        params = _getParameters(par_file,log=True)
+        params = _getParameters(path,par,log=True)
         nrows = int(params['range_samples'][0]) 
         nlines = int(params['azimuth_lines'][0])
         return nlines,nrows
 
-def readgamma(filename,par_file='./'):
+def readgamma(filename,path='./', par=None):
 
-        params = _getParameters(par_file,log=True)
+        params = _getParameters(path,par,log=True)
         nrows = int(params['range_samples'][0]) 
         nlines = int(params['azimuth_lines'][0])
         

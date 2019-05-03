@@ -134,8 +134,15 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     do_sig = int(0)
     # print (sigma, weight)
     if len(sigma) != kmax:
-      print('Error: sigma file not the same size that the number of interferograms')
-      sys.exit()
+      w2 = []
+      for j in xrange((kmax)):
+        for i in xrange(len(sigma)):
+          if (bid[i]==date_1[j]) and  (bid2[i]==date_2[j]):
+              w2.append(weight[i])
+      if len(w2) != kmax:
+         print('Error: sigma file not the same size that the number of interferograms')
+         sys.exit()
+      weigth = np.array(w2)
     else:
       wf = open(os.path.join(tsdir, "list_pair"), "w")
       for i in xrange((kmax)):
@@ -234,8 +241,10 @@ else:
 
 
 # Write the input file
-f = open(os.path.join(tsdir, "input_inv_send"), "w")
-f.write("""\
+name = os.path.join(tsdir, "input_inv_send")
+if os.path.exists(name) is False:
+    f = open(os.path.join(tsdir, "input_inv_send"), "w")
+    f.write("""\
 0.003  #  temporal smoothing weight, gamma liss **2 (if <0.0001, no smoothing)
 0      #   mask pixels with large RMS misclosure  (y=0;n=1)
 1.7    #  threshold for the mask on RMS misclosure (in same unit as input files)
@@ -267,6 +276,6 @@ list_pair
 1      #  smoothing by Laplacian, computed with a scheme at 3pts (0) or 5pts (1) ?
 2      #  weigthed smoothing by the average time step (y :0 ; n : 1, int : 2) ?
 1      # put the first derivative to zero (y :0 ; n : 1)?
-""" % (iformat, do_sig))
-f.close()
+    """ % (iformat, do_sig))
+    f.close()
 

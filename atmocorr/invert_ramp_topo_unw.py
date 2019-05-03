@@ -67,7 +67,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --iend_mask VALUE     Stop line number for the mask [default: None]  
 --perc VALUE          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --perc_topo VALUE     Percentile of hidden elevation pixel for the estimation and clean outliers [default:98.]
---perc_slope VALUE    Percentile of hidden slope-elevation pixel for the estimation and clean outliers [default:98.]
+--perc_slope VALUE    Percentile of hidden slope-elevation pixel for the estimation and clean outliers [default:92.]
 --samp=<value>        Undersampling for empirical estimation [default: 2]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
@@ -88,15 +88,12 @@ import os
 
 # plot
 import matplotlib
-if environ["TERM"].startswith("screen"):
-    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
-from pylab import *
-import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 from datetime import datetime
 import time
+import logging
 
 # numpy
 import numpy as np
@@ -926,10 +923,11 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
         if radar is None:
-            G=np.zeros((len(data),3))
+            G=np.zeros((len(data),4))
             G[:-1,0] = rgbins**2
             G[:-1,1] = rgbins
-            G[:-1,2] = 1
+            G[:-1,2] = azbins
+            G[:-1,3] = 1
 
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
@@ -939,23 +937,25 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
             except:
                 pars = x0
-            sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]
-            logger.info('Remove ramp %f r**2 %f r  + %f'%(pars[0],pars[1],pars[2]))
+            sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]
+            logger.info('Remove ramp %f r**2 %f r + %f az + %f'%(pars[0],pars[1],pars[2],pars[3]))
 
             # build total G matrix
-            G=np.zeros((len(los),3))
+            G=np.zeros((len(los),4))
             for i in range(mlines):
                 G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
                 G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg 
-            G[:,2] = 1
+                G[i*mcols:(i+1)*mcols,2] = i - ibeg 
+            G[:,3] = 1
 
         else:
             if ivar==0 and nfit==0:
-                G=np.zeros((len(data),4))
+                G=np.zeros((len(data),5))
                 G[:-1,0] = rgbins**2
                 G[:-1,1] = rgbins
-                G[:,2] = 1
-                G[:-1,3] = topobins
+                G[:-1,2] = azbins
+                G[:,3] = 1
+                G[:-1,4] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -965,82 +965,26 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
-                sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]
-                logger.info('Remove ramp %f r**2, %f r  + %f + %f z'%(pars[0],pars[1],pars[2],pars[3]))
+                sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]
+                logger.info('Remove ramp %f r**2, %f r + %f az + %f + %f z'%(pars[0],pars[1],pars[2],pars[3],pars[4]))
 
                 # build total G matrix
-                G=np.zeros((len(los),4))
+                G=np.zeros((len(los),5))
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
                     G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
-                G[:,2] = 1
-                G[:,3] = elev_map.flatten()
+                    G[i*mcols:(i+1)*mcols,2] = i - ibeg
+                G[:,3] = 1
+                G[:,4] = elev_map.flatten()
 
             elif ivar==0 and nfit==1:
-                G=np.zeros((len(data),5))
-                G[:-1,0] = rgbins**2
-                G[:-1,1] = rgbins
-                G[:,2] = 1
-                G[:-1,3] = topobins
-                G[:-1,4] = topobins**2
-
-                # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-                except:
-                    pars = x0
-                sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[10] = pars[-1]
-                logger.info('Remove ramp %f r**2, %f r  + %f + %f z + %f z**2'%(pars[0],pars[1],pars[2],pars[3],pars[4]))
-
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                for i in range(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
-                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg 
-                G[:,2] = 1
-                G[:,3] = elev_map.flatten()
-                G[:,4] = elev_map.flatten()**2
-            
-            elif ivar==1 and nfit==0:
-                G=np.zeros((len(data),5))
-                G[:-1,0] = rgbins**2
-                G[:-1,1] = rgbins
-                G[:,2] = 1
-                G[:-1,3] = topobins
-                G[:-1,4] = topobins*azbins
-
-                # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                try:
-                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
-                except:
-                    pars = x0
-                sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]
-                logger.info('Remove ramp %f r**2, %f r  + %f + %f z + %f z*az'%(pars[0],pars[1],pars[2],pars[3],pars[4]))
-
-                # build total G matrix
-                G=np.zeros((len(los),5))
-                G[:,2] = 1
-                G[:,3] = elev_map.flatten()
-                G[:,4] = elev_map.flatten()
-                for i in range(mlines):
-                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)) - jbeg)**2
-                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
-                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
-
-            elif ivar==1 and nfit==1:
                 G=np.zeros((len(data),6))
                 G[:-1,0] = rgbins**2
                 G[:-1,1] = rgbins
-                G[:,2] = 1
-                G[:-1,3] = topobins
-                G[:-1,4] = topobins*azbins
-                G[:-1,5] = (topobins*azbins)**2
+                G[:-1,2] = azbins
+                G[:,3] = 1
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1050,20 +994,83 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref):
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
                 except:
                     pars = x0
-                sol[1] = pars[0]; sol[2] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]; sol[12] = pars[5]
-                logger.info('Remove ramp %f r**2, %f r  + %f + %f z + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5]))
+                sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[10] = pars[-1]
+                logger.info('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5]))
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                G[:,2] = 1
-                G[:,3] = elev_map.flatten()
+                for i in range(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols))-jbeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg 
+                    G[i*mcols:(i+1)*mcols,2] *= i - ibeg
+                G[:,3] = 1
                 G[:,4] = elev_map.flatten()
                 G[:,5] = elev_map.flatten()**2
+            
+            elif ivar==1 and nfit==0:
+                G=np.zeros((len(data),6))
+                G[:-1,0] = rgbins**2
+                G[:-1,1] = rgbins
+                G[:-1,2] = azbins
+                G[:,3] = 1
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins*azbins
+
+                # ramp inversion
+                x0 = lst.lstsq(G,data)[0]
+                try:
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+                except:
+                    pars = x0
+                sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[11] = pars[5]
+                logger.info('Remove ramp %f r**2, %f r   + %f az + %f + %f z + %f z*az'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5]))
+
+                # build total G matrix
+                G=np.zeros((len(los),6))
+                G[:,3] = 1
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)) - jbeg)**2
                     G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
-                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
-                    G[i*mcols:(i+1)*mcols,5] *= (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,2] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,5] *= i - ibeg
+
+            elif ivar==1 and nfit==1:
+                G=np.zeros((len(data),7))
+                G[:-1,0] = rgbins**2
+                G[:-1,1] = rgbins
+                G[:-1,2] = azbins
+                G[:,3] = 1
+                G[:-1,4] = topobins
+                G[:-1,5] = topobins*azbins
+                G[:-1,6] = (topobins*azbins)**2
+
+                # ramp inversion
+                x0 = lst.lstsq(G,data)[0]
+                try:
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+                except:
+                    pars = x0
+                sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[11] = pars[5]; sol[12] = pars[6]
+                logger.info('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6]))
+
+                # build total G matrix
+                G=np.zeros((len(los),7))
+                G[:,3] = 1
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
+                for i in range(mlines):
+                    G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)) - jbeg)**2
+                    G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
+                    G[i*mcols:(i+1)*mcols,2] = i - ibeg
+                    G[i*mcols:(i+1)*mcols,5] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,6] *= (i-ibeg)**2
 
     elif order==6:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1429,19 +1436,19 @@ def empirical_cor(kk):
     hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
     cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None,alpha=1.)
     ax.set_title('LOS')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,4,2)
     cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
     ax.set_title('LOS ESTIMATION')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,4,3)
     cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin)
     ax.set_title('RAMP+TOPO')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
 
     # for plot we can clean
@@ -1452,7 +1459,7 @@ def empirical_cor(kk):
     hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
     cax = ax.imshow(los_map - corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
     ax.set_title('CORR LOS')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.tight_layout()
 
@@ -1555,9 +1562,9 @@ def apply_cor(kk, sp, sp_inv):
     # reset to 0 areas where no data (might change after time series inversion?)
     flatlos = los_map - corr_inv
     flatlos[los_map==0], rms_map[los_map==0] = 0.0, 0.0
-    flatlos[isnan(flatlos)],rms_map[isnan(flatlos)] = 0.0, 0.0
-    flatlos[isnan(los_map)],rms_map[isnan(los_map)] = 0.0, 0.0
-    rms_map[isnan(rms_map)],flatlos[isnan(rms_map)] = 0.0, 0.0
+    flatlos[np.isnan(flatlos)],rms_map[np.isnan(flatlos)] = 0.0, 0.0
+    flatlos[np.isnan(los_map)],rms_map[np.isnan(los_map)] = 0.0, 0.0
+    rms_map[np.isnan(rms_map)],flatlos[np.isnan(rms_map)] = 0.0, 0.0
     
     zone = as_strided(flatlos[refstart:refend,:])
     amp = as_strided(rms_map[refstart:refend,:])
@@ -1571,7 +1578,7 @@ def apply_cor(kk, sp, sp_inv):
     # give small weights to small uncoherent vectors
     cst = np.nansum(zone[index]*amp[index]) / np.nansum(amp[index])
     
-    if isnan(cst):
+    if np.isnan(cst):
         pass
     else:
         flatlos = flatlos - cst
@@ -1593,7 +1600,7 @@ def apply_cor(kk, sp, sp_inv):
         dst_band2 = dst_ds.GetRasterBand(1)
         dst_band2.WriteArray(flatlos,0,0)
         dst_ds.SetGeoTransform(gt)
-        dst_ds.SetProjection(proj)
+        dst_ds.plt.setprojection(proj)
         dst_band2.FlushCache()
 
     elif sformat == 'GAMMA':
@@ -1604,29 +1611,27 @@ def apply_cor(kk, sp, sp_inv):
 
     _los_map = np.copy(flatlos)
     _los_map[los_map==0] = np.float('NaN')
-    maxlos,minlos=np.nanpercentile(_los_map,perc),np.nanpercentile(_los_map,(100-perc))
-    vmax = np.max(np.array([abs(maxlos),abs(minlos)]))
-    # vmax = np.percentile(los_map, 98)
-
+    vmin,vmax=np.nanpercentile(_los_map,2),np.nanpercentile(_los_map,98)
+    
     ax = fig.add_subplot(1,4,1)
-    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
+    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=0.7,interpolation=None)
     ax.set_title('LOS')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
 
     ax = fig.add_subplot(1,4,2)
-    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
+    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=0.7,interpolation=None)
     ax.set_title('RAMP+TOPO ORIG')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
 
     ax = fig.add_subplot(1,4,3)
-    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
+    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=0.7,interpolation=None)
     ax.set_title('RAMP+TOPO RECONST.')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
 
     ax = fig.add_subplot(1,4,4)
     cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
     ax.set_title('CORR LOS RECONST.')
-    setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_xticklabels(), visible=None)
     fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.tight_layout()
 
@@ -1783,33 +1788,45 @@ if arguments["--perc"] ==  None:
 else:
     perc = float(arguments["--perc"])
 if arguments["--perc_slope"] ==  None:
-    perc_slope = 98.
+    perc_slope = 92.
 else:
     perc_slope = float(arguments["--perc_slope"])
-if arguments["--plot"] ==  None:
-    plot = 'no'
+
+if arguments["--nproc"] ==  None:
+    nproc = 2
 else:
-    plot = str(arguments["--plot"])
+    nproc = int(arguments["--nproc"])
+
+if arguments["--plot"] ==  'yes':
+    plot = 'yes'
+    logger.warning('plot is yes. Set nproc to 1')
+    nproc = 1
+    if environ["TERM"].startswith("screen"):
+        matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
+else:
+    plot = 'no'
+    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
+
 if arguments["--suffix_output"] ==  None:
     suffout = '_corrunw'
 else:
     suffout = arguments["--suffix_output"]
-
-if arguments["--nproc"] == None:
-    nproc = 8
-else:
-    nproc = int(arguments["--nproc"])
 
 if arguments["--samp"] == None:
     samp = 2
 else:
     samp = int(arguments["--samp"])
 
+# print(nproc, plot)
+# sys.exit()
+
 #####################################################################################
 # INITIALISE 
 #####################################################################################
 
-print()
+# print()
 # read int
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
 Nifg=len(date_1)
@@ -1904,12 +1921,12 @@ if radar is not None:
 
     ax = fig.add_subplot(1,2,1)
     cax = ax.imshow(toposmooth, cm.RdBu_r, vmin=minelev, vmax=maxelev)
-    setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
     ax.set_title('Smoothed DEM',fontsize=6)
 
     ax = fig.add_subplot(1,2,2)
     cax = ax.imshow(slope_map, cm.RdBu_r, vmin=minslope, vmax=np.nanpercentile(slope_map,perc_slope))
-    setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
     ax.set_title('Mask Slope bellow: {0:.2f}'.format(minslope),fontsize=8)
 
     if plot == 'yes':
@@ -1935,7 +1952,7 @@ if maskfile is not None:
       ax = fig.add_subplot(1,1,1)
       cax = ax.imshow(spacial_mask,cmap=cm.jet)
       ax.set_title('Mask')
-      setp( ax.get_xticklabels(), visible=None)
+      plt.setp( ax.get_xticklabels(), visible=None)
       fig.colorbar(cax, orientation='vertical',aspect=10)
       plt.show()
       fid.close()
@@ -2082,7 +2099,7 @@ if tsinv=='yes':
     # compute summ of weights
     sig_ = 1./w1 + 1./w2 + 1./w3 
 
-    for j in range(3,shape(spint_inv)[1]):
+    for j in range(3,np.shape(spint_inv)[1]):
 
         d = np.zeros(((Nifg+1)))
         sig = np.ones(((Nifg+1)))

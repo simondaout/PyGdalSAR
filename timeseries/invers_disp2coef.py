@@ -40,7 +40,7 @@ Options:
 --threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
---slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), default: None
+--slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), [default: None]
 --vector PATH           Path to the vector text files containing a value for each dates
 --seasonal YES/NO       If yes, add seasonal terms in the inversion
 --semianual YES/NO      If yes, add semianual terms in the inversion
@@ -297,11 +297,14 @@ if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
 
 if arguments["--slowslip"] == None:
-    sse=[]
+    sse, sse_time, sse_car = [], [], []
 else:
-    sse = map(float,arguments["--slowslip"].replace(',',' ').split())
-sse_time = sse[::2]
-sse_car = sse[1::2]
+    try:
+        sse = map(float,arguments["--slowslip"].replace(',',' ').split())
+        sse_time = sse[::2]
+        sse_car = sse[1::2]
+    except:
+        sse_time, sse_car = [], []
 
 if arguments["--vector"] != None:
     vectf = arguments["--vector"].replace(',',' ').split()
