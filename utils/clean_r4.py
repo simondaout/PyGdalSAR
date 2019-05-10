@@ -15,7 +15,8 @@ clean_r4.py
 Clean a r4 file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
-[--perc=<value>] [--clean=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] 
+[--perc=<value>] [--clean=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] \
+[--ramp=<yes/no>] [--ref=<jstart,jend>]
 
 Options:
 -h --help           Show this screen.
@@ -28,12 +29,15 @@ Options:
 --clean VALUE       Crop option with smoothing of boundaries [default: 0,ncol,0,nlign]
 --buff VALUE        Number of pixels for crop smothing  (default: 50)
 --perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
+--ramp<yes/no>      If yes estimate a quadratic ramp in range
+--ref=<jstart,jend> Set to zero displacements from jstart to jend
 """
 
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-
+import scipy.optimize as opt
+import scipy.linalg as lst
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -66,13 +70,22 @@ if arguments["--perc"] ==  None:
 else:
     perc = float(arguments["--perc"])
 
+if arguments["--ramp"] == None:
+    ramp = 'no'
+else:
+    ramp = arguments["--ramp"]
+
+if arguments["--ref"] == None:
+    refstart, refend = None,None
+else:
+    ref = map(int,arguments["--ref"].replace(',',' ').split())
+    refstart,refend = ref[0], ref[1]
+
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
 fid = open(infile, 'r')
-m = np.fromfile(fid,dtype=np.float32)
+m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
 # m[m==0.0] = np.float('NaN')
-nlign = int(len(m)/ncol)
-m = m.reshape((nlign,ncol)) 
 
 # clean
 maxlos,minlos=np.nanpercentile(m,perc),np.nanpercentile(m,(100-perc))
@@ -92,14 +105,52 @@ if maskf is not 'no':
 else:
     mask = np.zeros((nlign,ncol))
 
+if ramp=='yes':
+    index = np.nonzero(~np.isnan(mf))
+    temp = np.array(index).T
+    mi = m[index].flatten()
+    az = temp[:,0]; rg = temp[:,1]
+
+    G=np.zeros((len(mi),4))
+    G[:,0] = rg**2
+    G[:,1] = rg
+    G[:,2] = az
+    G[:,3] = 1
+
+    x0 = lst.lstsq(G,mi)[0]
+    _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+    _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
+
+    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
+    print 'Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d)
+
+    G=np.zeros((len(mask.flatten()),4))
+    for i in xrange(nlign):
+        G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
+        G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
+        G[i*ncol:(i+1)*ncol,2] = i
+    G[:,3] = 1
+    temp = (mf.flatten() - np.dot(G,pars))
+    mf=temp.reshape(nlign,ncol)
+
+if (refstart is not None) and (refend is not None):
+    cst = np.nanmean(mf[refstart:refend,:])
+    mf = mf - cst
+
 # crop
 if arguments["--clean"] ==  None:
     crop = [0,ncol,0,nlign]
 else:
     crop = map(float,arguments["--clean"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+if iend>ncol:
+    iend=ncol
+if jend>nlign:
+    jend=nlign
 
-if (iend-ibeg<ncol) or (jend-jbeg<nlign):
+if iend-ibeg<ncol or jend-jbeg<nlign:
     if arguments["--buff"] ==  None:
         buf = 50
     else:
@@ -137,13 +188,10 @@ if (iend-ibeg<ncol) or (jend-jbeg<nlign):
           for i in xrange(jbeg,jend):
             mf[i,ibeg2-(buf-j)] = mf[i,ibeg2-(buf-j)] - mf[i,ibeg2-(buf-j)]*(np.float(j+1)/buf)
 
-    mf[jbeg1:jend1,:] = 0.0
-    mf[jbeg2:jend2,:] = 0.0
-    mf[:,ibeg1:iend1] = 0.0
-    mf[:,ibeg2:iend2] = 0.0
-
-# mf[jbeg+buf:jend-buf,ibeg+buf:iend-buf] = np.float('NaN')
-
+    mf[jbeg1:jend1,:] = np.float('NaN')
+    mf[jbeg2:jend2,:] = np.float('NaN')
+    mf[:,ibeg1:iend1] = np.float('NaN')
+    mf[:,ibeg2:iend2] = np.float('NaN')
 #plt.imshow(mf)
 #plt.show()
 #sys.exit()
@@ -153,14 +201,14 @@ fid3 = open(outfile,'wb')
 mf.flatten().astype('float32').tofile(fid3)
 
 # Plot
-vmax = np.nanpercentile(m,98) 
+vmax = np.nanpercentile(mf,98) 
 # vmax= 2.
 vmin = -vmax
 
 fig = plt.figure(0,figsize=(12,8))
 ax = fig.add_subplot(1,4,1)
 # hax = ax.imshow(mask, cm.Greys, vmin=0, vmax=seuil)
-cax = ax.imshow(m, cm.RdBu,vmin=vmin, vmax=vmax)
+cax = ax.imshow(mf, cm.RdBu,vmin=vmin, vmax=vmax)
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
 cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
