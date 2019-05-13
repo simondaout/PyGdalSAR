@@ -374,8 +374,10 @@ for l in xrange((N)):
     amp_ref = amp_ref/np.nanpercentile(amp_ref,99)
     print 'Ref area set to zero:', refstart,refend
     # weigth average of the phase
+    rg_ref, az_ref,model_ref = np.nanmean(pix_col[indexref]),np.nanmean(pix_lin[indexref]),np.nanmean(model[indexref])
     cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
     print 'Average phase within ref area:', cst
+    logger.info('Average rg: {0}, az:{1}, topo:{2}, within ref area'.format(np.int(rg_ref), np.int(az_ref), np.int(model_ref)))
 
     # digitize data in bins, compute median and std
     bins = np.arange(gacosmin,gacosmax,abs(gacosmax-gacosmin)/500.)
@@ -431,6 +433,8 @@ for l in xrange((N)):
         G[:-1,0] = xbins
         G[:-1,1] = ybins
         G[:,2] = 1
+        G[-1,0] = az_ref
+        G[-1,1] = rg_ref
 
         x0 = lst.lstsq(G,d)[0]
         # print x0
@@ -475,6 +479,11 @@ for l in xrange((N)):
         G[:-1,3] = ybins
         G[:,4] = 1
         G[:-1,5] = modelbins
+        G[-1,0] = az_ref**2
+        G[-1,1] = az_ref
+        G[-1,2] = rg_ref**2
+        G[-1,3] = rg_ref
+        G[-1,5] = modelref
 
         x0 = lst.lstsq(G,d)[0]
         # print x0
