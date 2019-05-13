@@ -221,6 +221,6 @@ except:
     pass
 
 # Display the data
-##ax.set_rasterized(True)
-# fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
+ax.set_rasterized(True)
+fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
 plt.show()
