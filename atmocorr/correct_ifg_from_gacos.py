@@ -39,6 +39,7 @@ Options:
 --format VALUE          Format input files: ROI_PAC, GAMMA, GTIFF [default: GAMMA]
 --perc=<value>          Percentile of hidden LOS pixel for the estimation and clean outliers [default:98.]
 --fitmodel=<yes|no>     If yes, then estimate the proportionlality between gacos and los_map in addition to a polynomial ramp
+--nproc=<values>            number of processor (default: 1)
 """
 
 import gdal
@@ -113,7 +114,7 @@ else:
     rlook = '_' + arguments["--rlook"] + 'rlks'
 
 if arguments["--nproc"] == None:
-    nproc = 2
+    nproc = 1
 else:
     nproc = int(arguments["--nproc"])
 
