@@ -2070,6 +2070,7 @@ else:
     maxelev,minelev = 1.,-1
     elev_map = np.zeros((mlines,mcols))
     slope_map = np.zeros((mlines,mcols))
+    minslope = -1
 
 # open mask file
 if maskfile is not None:

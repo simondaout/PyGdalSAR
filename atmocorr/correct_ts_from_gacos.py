@@ -56,6 +56,7 @@ try:
     from nsbas import docopt
 except:
     import docopt
+    
 # read arguments
 arguments = docopt.docopt(__doc__)
 
