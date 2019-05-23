@@ -47,7 +47,7 @@ basis functions [default: 1.]
 --iref                  colum numbers of the reference pixel [default: None] 
 --jref                  lign number of the reference pixel [default: None]
 --bounds                yMin,yMax time series plots 
---dateslim              Datemin,Datemax time series plots 
+--dateslim              Datemin,Datemax time series  
 """
 
 # numpy
@@ -75,7 +75,7 @@ from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
-from datetime import datetime
+from datetime import datetime as datetimes
 import datetime
 import time
 
@@ -219,6 +219,16 @@ class vector(pattern):
     def g(self,index):
         return self.func[index]
 
+def date2dec(dates):
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetimes.strptime('{}'.format(date),'%Y%m%d')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        times.append(year + dec)
+    return times
+
 
 ########################################################################
 
@@ -286,7 +296,7 @@ if arguments["--coseismic"] ==  None:
 else:
     cos = map(float,arguments["--coseismic"].replace(',',' ').split())
 if arguments["--postseismic"] ==  None:
-    pos = []
+    pos = np.zeros(len(cos))
 else:
     pos = map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split())
 
@@ -358,8 +368,20 @@ ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
 
 # load images_retenues file
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
 N = len(dates)
+
+if arguments["--dateslim"] is not  None:
+    dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+    datemin = date2dec(dmin)
+    datemax = date2dec(dmax)
+else:
+    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    dmax = str(datemax) + '0101'
+    dmin = str(datemin) + '0101'
+
+# clean dates
+indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
+nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
 # ATTENTION: here i convert rad to mm
@@ -369,11 +391,6 @@ print 'Number of line in the cube: ', cube.shape
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
 maps = cube.reshape((nlign,ncol,N))
-print 'Reshape cube: ', maps.shape
-
-# plt.imshow(maps[:,:,-1],vmax=np.nanpercentile(maps[:,:,-1],50))
-# plt.show()
-# sys.exit()
 
 # set to NaN lakes and ocean, new image ref.
 cst = np.copy(maps[:,:,imref])
@@ -381,10 +398,11 @@ for l in xrange((N)):
     d = as_strided(maps[:,:,l])
     maps[:,:,l] = maps[:,:,l] - cst
 
-# get some info about the cube
-# print np.nanmedian(cube), np.nanmax(cube), np.nanmin(cube)
-# print np.nanpercentile(cube,95),np.nanpercentile(cube,5)
-# maxrmsd = np.nanpercentile(cube,85) - np.nanmedian(cube)
+# new number of dates
+N = len(dates)
+maps = as_strided(maps[:,:,indexd])
+print 'Reshape cube: ', maps.shape
+
 
 # arbitrary set the max rms at pi/2
 if len(cos) > 0:
@@ -406,12 +424,14 @@ if apsf is not None:
     minaps= np.nanpercentile(inaps,2)
     index = flatnonzero(inaps<minaps)
     inaps[index] = minaps
+    inaps = inaps[indexd]
     print 'Output uncertainties for first iteration:', inaps
 
 if vectf is not None:
     v = np.zeros((len(vectf),N))
     for i in xrange(len(vectf)):
-        v[i,:] = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
+        v[i,:] = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')[indexd]
+
 
 if infof is not None:
     extension = os.path.splitext(infof)[1]
@@ -451,8 +471,8 @@ for i in xrange((Npix)):
     ax.text(ipix[i],jpix[i],i)
 plt.suptitle('Black cross: pixels, red cross: reference point')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
-#plt.show()
-#sys.exit()
+# plt.show()
+# sys.exit()
 
 # 0
 basis=[
@@ -671,16 +691,14 @@ for jj in xrange((Npix)):
     print '---------------------------------------'
     print 
 
-    x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-    #hardcoding for my plots
-    #dmin= 20030101
+    x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
     if arguments["--dateslim"] is not  None:
         dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
     else:
         dmax = str(datemax) + '0101'
         dmin = str(datemin) + '0101'
-    xmin = datetime.datetime.strptime('{}'.format(dmin),'%Y%m%d')
-    xmax = datetime.datetime.strptime('{}'.format(dmax),'%Y%m%d')
+    xmin = datetimes.strptime('{}'.format(dmin),'%Y%m%d')
+    xmax = datetimes.strptime('{}'.format(dmax),'%Y%m%d')
     xlim=date2num(np.array([xmin,xmax]))
 
     # extract data
@@ -837,7 +855,7 @@ for jj in xrange((Npix)):
 
     # plot model
     if inter=='yes':
-        ax.plot(t,model-model_dem,'-r',label='{} mm/yr'.format(m[indexinter]))
+        ax.plot(t,model-model_dem,'-r',label='{:.2f} mm/yr'.format(m[indexinter]))
         ax3.plot(t,model-model_lin-model_dem,'-r')
     else:
         ax.plot(t,model-model_dem,'-r')

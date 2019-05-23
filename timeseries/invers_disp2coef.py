@@ -21,7 +21,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
-[--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
+[--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] [--dateslim=<values>]  \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>]
 
 invers_disp2coef.py -h | --help
@@ -70,6 +70,7 @@ Options:
 --plot YES/NO           Display plots [default: yes]
 --refstart VALUE        Stating line number of the area where phase is set to zero [default: None]
 --refend VALUE          Ending line number of the area where phase is set to zero [default: None]
+--dateslim              Datemin,Datemax time series  
 ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
 iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
 jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
@@ -102,7 +103,7 @@ from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
-from datetime import datetime
+from datetime import datetime as datetimes
 
 try:
     from nsbas import docopt
@@ -250,6 +251,16 @@ class vector(pattern):
 
     def g(self,index):
         return self.func[index]
+
+def date2dec(dates):
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetimes.strptime('{}'.format(date),'%Y%m%d')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        times.append(year + dec)
+    return times
 
 ################################
 # Initialization
@@ -490,34 +501,43 @@ cmap.set_bad('white')
 
 # load images_retenues file
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+N = len(dates)
+baseref = base[imref]
 
-N=len(dates)
-print 'Number images: ', N
-datemin, datemax = np.int(np.nanmin(dates)), np.int(np.nanmax(dates))+1
+if arguments["--dateslim"] is not  None:
+    dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+    datemin = date2dec(dmin)
+    datemax = date2dec(dmax)
+else:
+    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    dmax = str(datemax) + '0101'
+    dmin = str(datemin) + '0101'
+
+# clean dates
+indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
+nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
 cubei = np.fromfile(cubef,dtype=np.float32)
-
 # extract
 cube = as_strided(cubei[:nlign*ncol*N])
 print 'Number of line in the cube: ', cube.shape
-
-# !!! remove crazy values !!!
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
-#cube[kk] = 0
-
 maps = cube.reshape((nlign,ncol,N))
 print 'Reshape cube: ', maps.shape
 # set at NaN zero values for all dates
 # kk = np.nonzero(maps[:,:,-1]==0)
-# ref displacements to ref date
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     maps[:,:,l] = maps[:,:,l] - cst
     if l != imref:
         index = np.nonzero(maps[:,:,l]==0.0)
         maps[:,:,l][index] = np.float('NaN')
+
+N=len(dates)
+print 'Number images: ', N
+maps = as_strided(maps[:,:,indexd])
 
 # fig = plt.figure(0)
 # plt.imshow(cst,vmax=1,vmin=-1)
@@ -638,7 +658,7 @@ fig = plt.figure(nfigure,figsize=(10,4))
 nfigure = nfigure + 1
 ax = fig.add_subplot(1,2,1)
 # convert idates to num
-x = [date2num(datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
+x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
 # format the ticks
 ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
 ax.plot(x,base,"ro",label='Baseline history of the {} images'.format(N))
@@ -847,7 +867,7 @@ for i in xrange(len(sse_time)):
 kernels=[]
 
 if dem=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=base[imref],bp=base))
+   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=baseref,bp=base))
    indexdem = index
    index = index + 1
 
