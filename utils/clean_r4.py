@@ -208,7 +208,7 @@ vmin = -vmax
 fig = plt.figure(0,figsize=(12,8))
 ax = fig.add_subplot(1,4,1)
 # hax = ax.imshow(mask, cm.Greys, vmin=0, vmax=seuil)
-cax = ax.imshow(mf, cm.RdBu,vmin=vmin, vmax=vmax)
+cax = ax.imshow(m, cm.RdBu,vmin=vmin, vmax=vmax)
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
 cbar = fig.colorbar(cax, orientation='vertical',aspect=9)

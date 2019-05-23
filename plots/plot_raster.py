@@ -43,7 +43,10 @@ from __future__ import print_function
 import os, sys
 
 # docopt (command line parser)
-from nsbas import docopt
+try:
+    from nsbas import docopt
+except:
+    import docopt
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided

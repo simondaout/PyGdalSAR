@@ -32,7 +32,7 @@ Job list is: erai look_int replace_amp filterSW filterROI flatr flat_atmo flat_m
 """
 
 from __future__ import print_function
-import shutil
+import shutil, sys
 from os import path, environ, system, chdir, remove, getcwd, listdir, symlink
 import matplotlib
 if environ["TERM"].startswith("screen"):
@@ -47,11 +47,15 @@ import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
 # from nsbas import docopt, gdal, procparser, subprocess
-import subprocess, docopt, gdal, procparser
+import subprocess, gdal, procparser
 gdal.UseExceptions()
 import filecmp
 from operator import methodcaller
 import collections
+try:
+    from nsbas import docopt
+except:
+    import docopt
 
 ##################################################################################
 ###  Extras functions and context maganers
@@ -109,6 +113,7 @@ def checkoutfile(config,file):
         w,l = computesize(config,file)
         if w > 0 :
             do = False
+            logger.warning('{0} exists, assuming OK'.format(file))
     except:
         pass
     return do
@@ -165,6 +170,23 @@ def go(config,job,nproc):
         
     return results
 
+def run(cmd):
+    """
+    Runs a shell command, and print it before running.
+
+    Arguments:
+        cmd: string to be passed to a shell
+
+    Both stdout and stderr of the shell in which the command is run are those
+    of the parent process.
+    """
+
+    logger.info(cmd)
+    r = subprocess.call(cmd, shell=True, stdout=sys.stdout, stderr=subprocess.STDOUT,
+        env=environ)
+    if r != 0:
+        logger.critical(r)
+    return
 
 ##################################################################################
 ###  Define Job, IFG, Images and FiltFlatUnw classes  
@@ -207,9 +229,10 @@ class Job():
         print('Choose them in the order that you want')
 
 class PileInt:
-    def __init__(self,dates1, dates2, prefix, suffix, Rlooks_int, Rlooks_unw, look, filterstyle ,dir):
+    def __init__(self,dates1, dates2, prefix, suffix, Rlooks_int, Rlooks_unw, look, filterstyle ,dir, EraDir):
         self.dates1, self.dates2 = dates1, dates2
         self.dir = dir
+        self.EraDir = EraDir
         self.filterstyle = filterstyle
         self.prefix = prefix
         self.suffix = suffix
@@ -276,13 +299,20 @@ class PileInt:
 
     def getmodelfile(self,kk):
         ''' Return model file name 
-        Supposed model computed on the Rlooks_unw IFG...
+        Assume model computed on the Rlooks_unw IFG...
         '''
         return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.strat'
 
+    def geterafiles(self,kk):
+        ''' Return ERA model file names '''
+        mdel1 = str(self.EraDir) + str(self._ifgs[kk].date1) + '_mdel' + '_' + self.Rlooks_unw + 'rlks' + '.unw'
+        mdel2 = str(self.EraDir) + str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_unw + 'rlks' + '.unw'
+        mdel12 = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_unw + 'rlks' + '.unw'
+        return  mdel1, mdel2, mdel12
+
     def getflatrfile(self,kk):
         ''' Return stratified file name 
-        Supposed estimation computed on the Rlooks_int IFG...
+        Assume estimation computed on the Rlooks_int IFG...
         '''
         return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flatr'
 
@@ -360,14 +390,14 @@ class FiltFlatUnw:
     """
 
     def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False):
-        (self.ListInterfero, self.SARMasterDir, self.IntDir,
+        (self.ListInterfero, self.SARMasterDir, self.IntDir, self.EraDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
         self.filterStrength,
         self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref,
-        self.seedx, self.seedy,self.threshold_unw,self.unw_method,
+        self.seedx, self.seedy,self.threshold_unw,self.threshold_unfilt,self.unw_method,
         ) = map(str, params)
 
         # initialise prefix, suffix
@@ -389,7 +419,7 @@ class FiltFlatUnw:
 
         # define list of interferograms
         dates1, dates2=np.loadtxt(self.ListInterfero,comments="#",unpack=True,usecols=(0,1),dtype='i,i') 
-        self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.Rlooks_int, self.Rlooks_unw, self.look,self.filterstyle, self.IntDir)
+        self.stack = PileInt(dates1,dates2,self.prefix,self.suffix,self.Rlooks_int, self.Rlooks_unw, self.look,self.filterstyle, self.IntDir, self.EraDir)
         self.stack.info()
         self.Nifg = len(self.stack)
 
@@ -412,10 +442,11 @@ def look_file(config,file):
     
     dirname, filename = path.split(path.abspath(file)) 
     with Cd(dirname):
-        logger.info("look.pl "+str(filename)+" "+str(config.rlook))
-        r= subprocess.call("look.pl "+str(filename)+" "+str(config.rlook)+" >> log_look.txt" , shell=True)
-        if r != 0:
-            logger.critical(' Can''t look file {0} in {1} look'.format(filename,config.rlook))
+        try:
+            run("look.pl "+str(filename)+" "+str(config.rlook)+" > log_look.txt")
+        except Exception as e:
+            logger.critical(e)
+            config.stack.updatesuccess(kk)
             print(look_file.__doc__)
 
 def computesize(config,file):
@@ -434,7 +465,39 @@ def computesize(config,file):
         print(computesize.__doc__)
 
 def erai(config,kk):
-    return
+    '''ERA Atmospheric corrections applied before filtering and unwrapping
+    Requiered proc parameter: EraDir '''
+    
+    with Cd(config.stack.getpath(kk)):
+        infile = config.stack.getname(kk)+ '.int'; checkinfile(infile)
+        rscfile = infile + '.rsc'
+        erafiles = config.stack.geterafiles(kk)
+        checkinfile(erafiles[0]); checkinfile(erafiles[1]); 
+
+        # update names
+        prefix, suffix = config.stack.getfix(kk)
+        newsuffix = suffix + '_era'
+        config.stack.updatefix(kk,prefix,newsuffix)
+        outfile = config.stack.getname(kk) + '.int'
+        outrsc = outfile + '.rsc' 
+        copyrsc(rscfile,outrsc)
+
+        if force:
+            rm(outfile)
+        # check if not done
+        do = checkoutfile(config,outfile)
+        if do:
+            try:
+                run("add_rmg.pl "+str(erafiles[0])+" "+str(erafiles[1])+" "+str(erafiles[2])+" -1 0 > log_erai.txt" )
+                checkinfile(erafiles[2])
+                run("removeModel.pl "+str(infile)+" "+str(erafiles[2])+" "+str(outfile)+" >> log_erai.txt")
+
+            except Exception as e:
+                logger.critical(e)
+                config.stack.updatesuccess(kk)
+                print(erai.__doc__)
+
+    return config.getconfig(kk)
 
 def replace_amp(config, kk):
     ''' Replace amplitude by coherence'''
@@ -463,34 +526,15 @@ def replace_amp(config, kk):
         do = checkoutfile(config,outfile)
         if do:
             try:
-                logger.info("rmg2mag_phs "+str(corfile)+" tmp cor "+str(width))
-                r1 = subprocess.call("rmg2mag_phs "+str(corfile)+" tmp cor "+str(width)+"  >> log_replaceAMP.txt", shell=True)
-                if r1 != 0:
-                    logger.critical(r1)
-                    logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
-
-                logger.info("cpx2mag_phs "+str(infile)+" tmp2 phs "+str(width))
-                r2 = subprocess.call("cpx2mag_phs "+str(infile)+" tmp2 phs "+str(width)+"  >> log_replaceAMP.txt", shell=True)
-                if (r2) != 0:
-                    logger.critical(r2)
-                    logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
-
-                logger.info("mag_phs2cpx cor phs "+str(outfile)+" "+str(width))
-                r3 = subprocess.call("mag_phs2cpx cor phs "+str(outfile)+" "+str(width)+"  >> log_replaceAMP.txt", shell=True)
-                if (r3) != 0:
-                    logger.critical(r3)
-                    logger.critical('Replace Amplitude by Cohrence for IFG: {} Failed!'.format(infile))
-
-                if r1 != 0 or r2 != 0 or r3 != 0 :
-                    config.stack.updatesuccess(kk)
-
+                run("rmg2mag_phs "+str(corfile)+" tmp cor "+str(width)+" > log_replaceAMP.txt")
+                run("cpx2mag_phs "+str(infile)+" tmp2 phs "+str(width)+" >> log_replaceAMP.txt")
+                run("mag_phs2cpx cor phs "+str(outfile)+" "+str(width)+" >> log_replaceAMP.txt")
                 rm('tmp'); rm('tmp2'); rm('phs'); rm('cor')
 
-            except:
+            except Exception as e:
+                logger.critical(e)
+                config.stack.updatesuccess(kk)
                 print(replace_amp.__doc__)
-
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
 
     return config.getconfig(kk)
 
@@ -514,22 +558,16 @@ def filterSW(config, kk):
         do = checkoutfile(config,outfile)
         if do:
          try:
-            logger.info('Filter {0} with {1} filter type'.format(infile,config.filterstyle))
-            r = subprocess.call("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
-                    +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
-            if r != 0:
-                logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
-                print(filterSW.__doc__)
-                config.stack.updatesuccess(kk)
-
+            run("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
+                    +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle)+"> log_filtSW.txt")
             if path.exists(filtrsc) == False:
                 copyrsc(inrsc,filtrsc)
-         except:
+         except Exception as e:
+            logger.critical(e)
             logger.critical('Filtering {0} with {1} filter type Failed!'.format(infile,config.filterstyle))
-            print(filterSW.__doc__)
             config.stack.updatesuccess(kk)
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
+            print(filterSW.__doc__)
+            
 
     return config.getconfig(kk)
 
@@ -558,22 +596,13 @@ def filterROI(config, kk):
         do = checkoutfile(config,filtfile)
         if do:
           try:
-            logger.info("myadapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength))
-            r = subprocess.call("myadapt_filt "+str(infile)+" "+str(filtfile)+" "\
-                    +str(width)+" 0.25"+" "+str(config.filterStrength)+"  >> log_filtROI.txt", shell=True)
-            if r != 0:
-                logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
-                print(filterROI.__doc__)
-                config.stack.updatesuccess(kk)
-
-          except:
+            run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength)+"> log_filtROI.txt")
+          except Exception as e:
+            logger.critical(e)
             logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
-            print(filterROI.__doc__)
             config.stack.updatesuccess(kk)
-           
-        else:
-            logger.warning('{0} exists, assuming OK'.format(filtfile))
-
+            print(filterROI.__doc__)
+            
     return config.getconfig(kk)
         
 def flatr(config,kk):
@@ -610,16 +639,14 @@ def flatr(config,kk):
             rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
-            logger.info("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(config.nfit_range)+" "+str(config.thresh_amp_range))
-            r = subprocess.call("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(config.nfit_range)+" "+str(config.thresh_amp_range)+"  >> log_flatenrange.txt", shell=True)
-            if r != 0:
+            try:
+                run("flatten_range "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
+                " "+str(config.nfit_range)+" "+str(config.thresh_amp_range)+" > log_flatr.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
                 print(flatr.__doc__) 
                 config.stack.updatesuccess(kk)
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
 
         force_link(param,newparam)
 
@@ -665,16 +692,14 @@ def flata(config,kk):
         print(outfile)
         do = checkoutfile(config,outfile)
         if do:
-            logger.info("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az))
-            r = subprocess.call("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az), shell=True)
-            if r != 0:
+            try:
+                run("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
+                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az)+" > log_flata.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
                 print(flata.__doc__)
                 config.stack.updatesuccess(kk)
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
 
         force_link(param,newparam)
 
@@ -728,18 +753,15 @@ def flat_atmo(config, kk):
             rm(outfile); rm(topfile)
         do = checkoutfile(config,outfile)
         if do:
-            logger.info("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
+            try:
+                run("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
                 +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" "+str(config.thresh_amp_atmo)+" "+\
-                str(stratfile))
-            r = subprocess.call("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
-                +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" "+str(config.thresh_amp_atmo)+" "+\
-                str(stratfile)+" >> log_flattopo.txt", shell=True)
-            if r != 0:
+                str(stratfile)+" > log_flatatmo.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Flatten topo failed for int. {0} Failed!".format(infile))
                 print(flat_atmo.__doc__)
                 config.stack.updatesuccess(kk)
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
         
         inrsc = infile + '.rsc'
         outrsc = outfile + '.rsc'
@@ -797,10 +819,13 @@ def flat_atmo(config, kk):
             infileunw = path.splitext(infile)[0] + '.unw'
             rm(infileunw)
 
-            logger.info("cpx2rmg.pl "+str(infile)+" "+str(infileunw))
-            r1 = subprocess.call("cpx2rmg.pl "+str(infile)+" "+str(infileunw), shell=True)
-            if r1 != 0:
+            try: 
+                run("cpx2rmg.pl "+str(infile)+" "+str(infileunw)+" >> log_flatatmo.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Failed to convert {0} to .unw".format(infile))
+                print(flat_atmo.__doc__)
+                config.stack.updatesuccess(kk)
 
             inrsc = infile + '.rsc'
             outrsc = infileunw + '.rsc'
@@ -808,12 +833,14 @@ def flat_atmo(config, kk):
 
             # remove strat file created by flatten_topo and write
             rm(stratfile)
-            logger.info("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
-                    +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref))
-            r2 = subprocess.call("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
-                    +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref)+" >> log_flattopo.txt", shell=True)
-            if r2 != 0:
+            try:
+                run("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
+                    +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref)+" >> log_flatatmo.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Failed creating stratified file: {0}".format(stratfile))
+                print(flat_atmo.__doc__)
+                config.stack.updatesuccess(kk)
 
             outrsc = stratfile + '.rsc'
             copyrsc(inrsc,outrsc)
@@ -821,23 +848,25 @@ def flat_atmo(config, kk):
             # remove model created by flatten_topo and run
             rm(outfile)
             rm(filtout)
-            logger.info("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile))
-            r3 = subprocess.call("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile), shell=True)
-            if r3 != 0:
+            try:
+                run("removeModel.pl "+str(infile)+" "+str(stratfile)+" "+str(outfile)+" >> log_flatatmo.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Failed removing stratified file: {0} from IFG {1}: ".format(stratfile,infile))
+                print(flat_atmo.__doc__)
+                config.stack.updatesuccess(kk)
 
             corfile = config.stack.getcor(kk)
             corbase = path.splitext(corfile)[0]
-            logger.info("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
-                +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle))
-            r4 = subprocess.call("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
-                +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle), shell=True)
-            if r4 != 0:
+            try:
+                run("nsb_SWfilter.pl "+str(path.splitext(outfile)[0])+" "+str(path.splitext(filtout)[0])+" "+str(corbase)\
+                +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle)+" >> log_flatatmo.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical("Failed filtering IFG {0}: ".format(outfile))
-
-            if r1 != 0 or r2 != 0 or r3 != 0 or r4 != 0:
                 config.stack.updatesuccess(kk)
-
+                print(flat_atmo.__doc__)
+                
         else:
             z_select = z; phi_select = phi
             # I dont understand ivar=0
@@ -903,16 +932,15 @@ def flat_model(config,kk):
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
-                logger.info("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
-                    +" "+str(config.thresh_amp_atmo))
-                r = subprocess.call("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
-                    +" "+str(config.thresh_amp_atmo)+" >> log_flatmodel.txt", shell=True)
-                if r != 0:
+                try:
+                    run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
+                    +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
+                except Exception as e:
+                    logger.critical(e)
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
                     print(flat_model.__doc__)
                     config.stack.updatesuccess(kk)
-            else:
-                logger.warning('{0} exists, assuming OK'.format(outfile))
+
         else:
             logger.critical('Model file is not defined. Exit!')
             sys.exit()
@@ -949,21 +977,16 @@ def colin(config,kk):
             rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
-            logger.info('Replace Amplitude by colinearity on IFG: {0}'.format(infile))
-            copyrsc(infile,'temp')
-            logger.info("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
-                " 3 0.0001 2")
-            r = subprocess.call("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
-                " 3 0.0001 2  >> log_flatenrange.txt", shell=True)
-            if r != 0:
+            try:
+                copyrsc(infile,'temp')
+                run("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
+                " 3 0.0001 2 > log_colin.txt")
+                rm('temp')
+            except Exception as e:
+                logger.critical(e)
                 logger.critical('Failed replacing Amplitude by colinearity on IFG: {0}'.format(infile))
                 print(colin.__doc__)
                 config.stack.updatesuccess(kk)
-            # clean
-            rm('temp')
-
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
 
     return config.getconfig(kk)
 
@@ -1001,25 +1024,23 @@ def look_int(config,kk):
             rm(outfile)
         do = checkoutfile(config,outfile)
         if do:
-            logger.info("look.pl "+str(infile)+" "+str(config.rlook))
-            r= subprocess.call("look.pl "+str(infile)+" "+str(config.rlook)+" >> log_look.txt" , shell=True)
-            if r != 0:
+            try:
+                run("look.pl "+str(infile)+" "+str(config.rlook)+" > log_look.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
                 print(look_int.__doc__)
                 config.stack.updatesuccess(kk)
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))
         
         do = checkoutfile(config,outcor)
         if do:
-            logger.info("look.pl "+str(corfile)+" "+str(config.rlook))
-            r = subprocess.call("look.pl "+str(corfile)+" "+str(config.rlook)+" >> log_look.txt", shell=True)
-            if r != 0:
+            try:
+                run("look.pl "+str(corfile)+" "+str(config.rlook)+" >> log_look.txt")
+            except Exception as e:
+                logger.critical(e)
                 logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
                 print(look_int.__doc__)
                 config.stack.updatesuccess(kk)
-        else:
-            logger.warning('{0} exists, assuming OK'.format(outfile))        
                 
         # update size
         width,length = computesize(config,outfile)
@@ -1029,7 +1050,8 @@ def look_int(config,kk):
 
 def unwrapping(config,kk):
     ''' Unwrap function from strating seedx, seedy
-    if unw_method: mpd, MP.DOIN algorthim (Grandin et al., 2012). Requiered: threshold_unw, filterSW, filterROI
+    if unw_method: mpd, MP.DOIN algorthim (Grandin et al., 2012). Requiered: threshold_unw, filterSW, filterROI, threshold_unfilt
+    Unwrapped firt filtSWfile and then add high frequency of filtROIfile
     if unw_method: roi, ROIPAC algorthim. Requiered threshold_unw, filterROI
     '''
 
@@ -1078,59 +1100,37 @@ def unwrapping(config,kk):
                     filterSW(config, kk)
                     checkinfile(filtSWfile)
                     logger.info("length.pl "+str(filtSWfile))
-                    r = subprocess.call("length.pl "+str(filtSWfile), shell=True)
+                    run("length.pl "+str(filtSWfile))
 
                 if path.exists(bridgefile) == False:
                     wf = open(bridgefile,"w")
                     wf.write("1  1  1  1  0  0")
                     wf.close()
 
-                # my_deroul_interf has ana additional input parameter for threshold on amplitude infile (normally colinearity)
-                # unwrapped firt filtSWfile and then add high frequency of filtROIfile
-                logger.info("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.03)+" "+str(config.threshold_unw)+" 0")
-                r = subprocess.call("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(0.03)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
-                if r != 0:
-                    print(unwrapping.__doc__)
-                    logger.critical("Failed unwrapping with MP.DOIN algorthim (Grandin et al., 2012)".format(unwfile))
-                    config.stack.updatesuccess(kk)
+                # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
+                run("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
+                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" 0 > log_unw.txt")
+                
+                # logger.info("deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
+                #     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unw)+" 0")
+                # r = subprocess.call("deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
+                #     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
 
             if config.unw_method == 'roi':
 
                 logger.info("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
                 mask = path.splitext(filtSWfile)[0] + '_msk'
 
-                logger.info("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02))
-                r1 = subprocess.call("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+"  >> log_unw.txt", shell=True)
-                if r1 != 0:
-                    print(unwrapping.__doc__)
-                    logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
+                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+" > log_unw.txt")
+                run("new_cut.pl "+str(path.splitext(filtROIfile)[0])+" >> log_unw.txt")
+                run("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
+                    +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+" >> log_unw.txt")
 
-                logger.info("new_cut.pl "+str(path.splitext(filtROIfile)[0]))
-                r2 = subprocess.call("new_cut.pl "+str(path.splitext(filtROIfile)[0])+"  >> log_unw.txt", shell=True)
-                if r2 != 0:
-                    print(unwrapping.__doc__)
-                    logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-
-                logger.info("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
-                    +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy))
-                r3 = subprocess.call("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
-                    +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+"  >> log_unw.txt",shell=True)
-                if r3 != 0:
-                    print(unwrapping.__doc__)
-                    logger.critical("Failed unwrapping IFG {0} with ROIPAC algorithm ".format(unwfile))
-
-                if r1 != 0 or r2 != 0 or r3 != 0: 
-                    config.stack.updatesuccess(kk)
-
-          except:
+          except Exception as e:
+            logger.critical(e)
             print(unwrapping.__doc__)
             logger.critical("Failed unwrapping IFG {0} ".format(unwfile))
             config.stack.updatesuccess(kk)
-
-        else:
-            logger.warning('{0} exists, assuming OK'.format(unwfiltROI))
 
     return config.getconfig(kk)
 
@@ -1164,21 +1164,14 @@ def add_atmo_back(config,kk):
                 rm(outfile)
             do = checkoutfile(config,outfile)
             if do:
-                logger.info("length.pl "+str(unwfile))
-                r = subprocess.call("length.pl "+str(unwfile), shell=True)
-
-                logger.info("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile))
-                r = subprocess.call("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+\
-                     " >> log_flatenrange.txt", shell=True)
-                if r != 0:
+                try:
+                    run("length.pl "+str(unwfile))
+                    run("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(stratfile)+" >> log_flatatmo.txt")
+                except Exception as e:
+                    logger.critical(e)
                     logger.critical('Failed adding back {0} on IFG: {1}'.format(stratfile,unwfile))
                     config.stack.updatesuccess(kk)
                     print(add_atmo_back.__doc__)
-
-            else:
-                logger.warning('{0} exists, assuming OK'.format(outfile))
-                config.stack.updatesuccess(kk)
-                print(add_atmo_back.__doc__)
 
         else:
             logger.critical('flat_atmo() does not seem to have been done... Exit!')
@@ -1221,20 +1214,15 @@ def add_flatr_back(config,kk):
                     rm(outfile)
                 do = checkoutfile(config,outfile)
                 if do:
-
-                    logger.info("length.pl "+str(unwfile))
-                    r = subprocess.call("length.pl "+str(unwfile), shell=True)
-
-                    logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
-                    r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
-                         " >> log_flatenrange.txt", shell=True)
-                    if r != 0:
+                    try:
+                        run("length.pl "+str(unwfile))
+                        run("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+" >> log_flatr.txt")
+                    except Exception as e:
+                        logger.critical(e)
                         logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                         config.stack.updatesuccess(kk)
                         print(add_flatr_back.__doc__)
 
-                else:
-                    logger.warning('{0} exists, assuming OK'.format(outfile))
             else:
                 logger.critical('Param file {0} does not exist. Exit!'.format(param))
                 config.stack.updatesuccess(kk)
@@ -1281,19 +1269,15 @@ def add_flata_back(config,kk):
             do = checkoutfile(config,outfile)
             if do:
                 if path.exists(outfile) == False:
-
-                    logger.info("length.pl "+str(unwfile))
-                    r = subprocess.call("length.pl "+str(unwfile), shell=True)
-
-                    logger.info("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor))
-                    r = subprocess.call("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+\
-                         " >> log_flatenrange.txt", shell=True)
-                    if r != 0:
+                    try:
+                        run("length.pl "+str(unwfile))
+                        run("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+" >> log_flata.txt")
+                    except Exception as e:
+                        logger.critical(e)
                         logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
                         config.stack.updatesuccess(kk)
                         print(add_flata_back.__doc__)
-                else:
-                    logger.warning('{0} exists, assuming OK'.format(outfile))
+
             else:
                 logger.critical('Param file {0} does not exist. Exit!'.format(param))
                 config.stack.updatesuccess(kk)
@@ -1336,18 +1320,14 @@ def add_model_back(config,kk):
                 if path.exists(param) is True:
                     do = checkoutfile(config,outfile)
                     if do:
-
-                        logger.info("length.pl "+str(unwfile))
-                        r = subprocess.call("length.pl "+str(unwfile), shell=True)
-
-                        logger.info("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param))
-                        r = subprocess.call("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt", shell=True)
-                        if r != 0:
+                        try:
+                            run("length.pl "+str(unwfile))
+                            run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
+                        except Exception as e:
+                            logger.critical(e)
                             logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
                             print(add_model_back.__doc__)
                             config.stack.updatesuccess(kk)
-                    else:
-                        logger.warning('{0} exists, assuming OK'.format(outfile))
                 else:
                         logger.critical("Unflatten model for int. {0} Failed!".format(unwfile))
                         logger.critical("Param file {0}, does not exist!".format(param))
@@ -1440,6 +1420,7 @@ else:
 # but like this it run fine all the time
 proc_defaults = {
     "IntDir": "int",
+    "EraDir": "ERA",
     "ListInterfero": "interf_pair.rsc",
     "Rlooks_int": "2",
     "Rlooks_unw": "4",
@@ -1456,7 +1437,8 @@ proc_defaults = {
     "SWwindowsize": "8",
     "filterStrength": "2", # strenght filter roi
     "unw_method": "roi",
-    "threshold_unw": "0.35", # filtered colinearity 
+    "threshold_unw": "0.35", # threshold on filtered colinearity 
+    "threshold_unfilt": "0.03", # threshold on colinearity 
     "seedx": "50", # starting col for unw
     "seedy": "50", # starting line for unw
     }
@@ -1477,26 +1459,28 @@ if arguments["--list_int"] == None:
 else:
     ListInterfero = path.abspath(home)+'/'+arguments["--list_int"]
 SARMasterDir = path.abspath(home)+'/'+proc["SarMasterDir"]
+EraDir = path.abspath(home)+'/'+proc["EraDir"]
 
 print('Proc File parameters:')
-print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n\
-    Rlooks_int: {3}, Rlooks_unw: {4}\n\
-    nfit_range: {5}, thresh_amp_range: {6}\n\
-    nfit_az: {7}, thresh_amp_az: {8}\n\
-    filterstyle : {9}, SWwindowsize: {10}, SWamplim: {11}\n\
-    filterStrength : {12}\n\
-    nfit_topo: {13}, thresh_amp_topo: {14}, ivar: {15}, z_ref: {16}\n\
-    seedx: {17}, seedy: {18}, threshold_unw: {19}, unw_method: {20}'.\
-    format(ListInterfero,SARMasterDir,IntDir,\
+print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
+    Rlooks_int: {4}, Rlooks_unw: {5}\n\
+    nfit_range: {6}, thresh_amp_range: {7}\n\
+    nfit_az: {8}, thresh_amp_az: {9}\n\
+    filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
+    filterStrength : {13}\n\
+    nfit_topo: {14}, thresh_amp_topo: {15}, ivar: {16}, z_ref: {17}\n\
+    seedx: {18}, seedy: {19}, threshold_unw: {20}, threshold_unfilt: {21} unw_method: {22}'.\
+    format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
     proc["filterStrength"],\
     proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],\
-    proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["unw_method"]\
+    proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"]\
     ))
 print()
+
 if arguments["-v"]:
     # give me the time to read terminal
     time.sleep(3)
@@ -1570,14 +1554,14 @@ else:
 # RUN
 for p in jobs:
     postprocess = FiltFlatUnw(
-        [ListInterfero,SARMasterDir,IntDir,
+        [ListInterfero,SARMasterDir,IntDir,EraDir,
         proc["Rlooks_int"], proc["Rlooks_unw"], 
         proc["nfit_range"], proc["thresh_amp_range"],
         proc["nfit_az"], proc["thresh_amp_az"],
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
         proc["filterStrength"],
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
-        proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["unw_method"]], 
+        proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, force=force
         ) 
 
