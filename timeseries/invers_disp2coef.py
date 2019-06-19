@@ -1687,7 +1687,6 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*y + b*x + c + e*topo_clean*x
-                print np.nanmin(topo_clean), np.nanmax(topo_clean)
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x,'-r', lw =4.)
