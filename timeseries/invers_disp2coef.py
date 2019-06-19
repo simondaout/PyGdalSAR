@@ -1042,13 +1042,41 @@ for ii in xrange(niter):
 
       # initialize topo
       topo = np.zeros((nlign,ncol))
-      ramp = np.zeros((nlign,ncol))
-
-      if radar is not None:
-        # calc elevi as los
-        elev_temp = np.matrix.copy(elevi)
-      
+      ramp = np.zeros((nlign,ncol))      
       data = np.copy(los_clean)
+
+      # y: range, x: azimuth
+      if radar is None:
+          topobins = topo_clean
+          rgbins, azbins = y, x
+
+      else:
+          # lets try to digitize to improve the fit
+          # digitize data in bins, compute median and std
+          bins = np.arange(mintopo,maxtopo,abs(maxtopo-mintopo)/500.)
+          inds = np.digitize(topo_clean,bins)
+          topobins = []
+          losbins = []
+          losstd = []
+          azbins, rgbins = [], []
+          for j in range(len(bins)-1):
+                  uu = np.flatnonzero(inds == j)
+                  if len(uu)>100:
+                      topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+
+                      # do a small clean within the bin
+                      indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
+                          los_clean[uu],2.),los_clean[uu]<np.percentile(los_clean[uu],98.)))
+
+                      losstd.append(np.std(los_clean[uu][indice]))
+                      losbins.append(np.median(los_clean[uu][indice]))
+                      azbins.append(np.median(x[uu][indice]))
+                      rgbins.append(np.median(y[uu][indice]))
+
+          data = np.array(losbins)
+          rms = np.array(losstd)
+          topobins = np.array(topobins)
+          rgbins, azbins = np.array(rgbins),np.array(azbins)
     
       if order==0:
 
@@ -1065,7 +1093,7 @@ for ii in xrange(niter):
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),2))
                 G[:,0] = 1
-                G[:,1] = topo_clean
+                G[:,1] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1077,14 +1105,16 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),2))
                 G[:,0] = 1
-                G[:,1] = elev_temp
+                G[:,1] = elevi
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1096,8 +1126,8 @@ for ii in xrange(niter):
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = topo_clean**2
+                G[:,1] = topobins
+                G[:,2] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1109,15 +1139,17 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,b*x+c*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 G[:,0] = 1
-                G[:,1] = elev_temp
-                G[:,2] = elev_temp**2
+                G[:,1] = elevi
+                G[:,2] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1128,8 +1160,8 @@ for ii in xrange(niter):
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topo_clean
-                G[:,2] = x*topo_clean
+                G[:,1] = topobins
+                G[:,2] = azbins*topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1141,15 +1173,17 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a + c*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a + c*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 G[:,0] = 1
-                G[:,1] = elev_temp
-                G[:,2] = elev_temp
+                G[:,1] = elevi
+                G[:,2] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
 
@@ -1162,9 +1196,9 @@ for ii in xrange(niter):
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),4))
                 G[:,0] = 1
-                G[:,1] = x*topo_clean
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
+                G[:,1] = azbins*topobins
+                G[:,2] = topobins
+                G[:,3] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1176,16 +1210,18 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a + b*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a + b*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,0] = 1
-                G[:,1] = elev_temp
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp**2
+                G[:,1] = elevi
+                G[:,2] = elevi
+                G[:,3] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,1] *= (i - ibegref)
 
@@ -1199,7 +1235,7 @@ for ii in xrange(niter):
 
         if radar is None:
             G=np.zeros((len(data),2))
-            G[:,0] = y
+            G[:,0] = rgbins
             G[:,1] = 1
 
             # ramp inversion
@@ -1225,9 +1261,9 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),3))
-                G[:,0] = y
+                G[:,0] = rgbins
                 G[:,1] = 1
-                G[:,2] = topo_clean
+                G[:,2] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1239,8 +1275,10 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*y + b
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a*rgbins + b
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1248,7 +1286,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                 G[:,1] = 1
-                G[:,2] = elev_temp
+                G[:,2] = elevi
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1260,10 +1298,10 @@ for ii in xrange(niter):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
-                G[:,0] = y
+                G[:,0] = rgbins
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
+                G[:,2] = topobins
+                G[:,3] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1274,9 +1312,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b
+                funcbins = a*rgbins+ b
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1284,8 +1324,8 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                 G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp**2
+                G[:,2] = elevi
+                G[:,3] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1297,10 +1337,10 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
-                G[:,0] = y
+                G[:,0] = rgbins
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
+                G[:,2] = topobins
+                G[:,3] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1311,16 +1351,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b + d*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b + d*topo_clean*x
+                funcbins = a*rgbins+ b + d*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
+                G[:,2] = elevi
+                G[:,3] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
@@ -1336,11 +1378,11 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
-                G[:,0] = y
+                G[:,0] = rgbins
                 G[:,1] = 1
-                G[:,2] = topo_clean*x
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
+                G[:,2] = topobins*azbins
+                G[:,3] = topobins
+                G[:,4] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1351,17 +1393,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b + c*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b + c*topo_clean*x
+                funcbins = a*rgbins+ b + c*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp**2
+                G[:,2] = elevi
+                G[:,3] = elevi
+                G[:,4] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
@@ -1378,7 +1422,7 @@ for ii in xrange(niter):
       elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
         if radar is None:
             G=np.zeros((len(data),2))
-            G[:,0] = x
+            G[:,0] = azbins
             G[:,1] = 1
 
             # ramp inversion
@@ -1405,9 +1449,9 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),3))
-                G[:,0] = x
+                G[:,0] = azbins
                 G[:,1] = 1
-                G[:,2] = topo_clean
+                G[:,2] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1419,8 +1463,10 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*x + b
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a*azbins + b
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1428,7 +1474,7 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
                 G[:,1] = 1
-                G[:,2] = elev_temp
+                G[:,2] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -1441,10 +1487,10 @@ for ii in xrange(niter):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
-                G[:,0] = x
+                G[:,0] = azbins
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean**2
+                G[:,2] = topobins
+                G[:,3] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1456,8 +1502,10 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*x + b
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a*azbins + b
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x + d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1465,8 +1513,8 @@ for ii in xrange(niter):
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
                 G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp**2
+                G[:,2] = elevi
+                G[:,3] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1478,10 +1526,10 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
-                G[:,0] = x
+                G[:,0] = azbins
                 G[:,1] = 1
-                G[:,2] = topo_clean
-                G[:,3] = topo_clean*x
+                G[:,2] = topobins
+                G[:,3] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1493,15 +1541,17 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*x + b + d*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a*azbins + b + d*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
+                G[:,2] = elevi
+                G[:,3] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = i - ibegref
                     G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
@@ -1517,11 +1567,11 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
-                G[:,0] = x
+                G[:,0] = azbins
                 G[:,1] = 1
-                G[:,2] = topo_clean*x
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean**2
+                G[:,2] = topobins*azbins
+                G[:,3] = topobins
+                G[:,4] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1533,16 +1583,18 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*x + b + c*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a*azbins + b + c*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
-                G[:,2] = elev_temp
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp**2
+                G[:,2] = elevi
+                G[:,3] = elevi
+                G[:,4] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = i - ibegref
                     G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
@@ -1558,8 +1610,8 @@ for ii in xrange(niter):
       elif order==3: # Remove a ramp ay+bx+c for each maps
         if radar is None:
             G=np.zeros((len(data),3))
-            G[:,0] = y
-            G[:,1] = x
+            G[:,0] = rgbins
+            G[:,1] = azbins
             G[:,2] = 1
 
             # ramp inversion
@@ -1588,10 +1640,10 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),4))
-                G[:,0] = y
-                G[:,1] = x
+                G[:,0] = rgbins
+                G[:,1] = azbins
                 G[:,2] = 1
-                G[:,3] = topo_clean
+                G[:,3] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1602,9 +1654,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c
+                funcbins = a*rgbins+ b*azbins + c
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1613,7 +1667,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
                 G[:,2] = 1
-                G[:,3] = elev_temp
+                G[:,3] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -1626,11 +1680,11 @@ for ii in xrange(niter):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),5))
-                G[:-1,0] = y
-                G[:-1,1] = x
+                G[:-1,0] = rgbins
+                G[:-1,1] = azbins
                 G[:,2] = 1
-                G[:-1,3] = topo_clean
-                G[:-1,4] = topo_clean**2
+                G[:-1,3] = topobins
+                G[:-1,4] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1642,9 +1696,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c
+                funcbins = a*rgbins+ b*azbins + c
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1653,8 +1709,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
                 G[:,2] = 1
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp**2
+                G[:,3] = elevi
+                G[:,4] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1666,11 +1722,11 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),5))
-                G[:,0] = y
-                G[:,1] = x
+                G[:,0] = rgbins
+                G[:,1] = azbins
                 G[:,2] = 1
-                G[:,3] = topo_clean
-                G[:,4] = topo_clean*x
+                G[:,3] = topobins
+                G[:,4] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1686,16 +1742,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c + e*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c + e*topo_clean*x
+                funcbins = a*rgbins+ b*azbins + c + e*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,2] = 1
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp
+                G[:,3] = elevi
+                G[:,4] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
@@ -1712,12 +1770,12 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = y
-                G[:,1] = x
+                G[:,0] = rgbins
+                G[:,1] = azbins
                 G[:,2] = 1
-                G[:,3] = topo_clean*x
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
+                G[:,3] = topobins*azbins
+                G[:,4] = topobins
+                G[:,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1728,17 +1786,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c + d*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c + d*topo_clean*x
+                funcbins = a*rgbins+ b*azbins + c + d*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,2] = 1
-                G[:,3] = elev_temp
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
+                G[:,3] = elevi
+                G[:,4] = elevi
+                G[:,5] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
@@ -1755,9 +1815,9 @@ for ii in xrange(niter):
       elif order==4:
         if radar is None:
             G=np.zeros((len(data),4))
-            G[:,0] = y
-            G[:,1] = x
-            G[:,2] = y*x
+            G[:,0] = rgbins
+            G[:,1] = azbins
+            G[:,2] = rgbins*azbins
             G[:,3] = 1
 
             # ramp inversion
@@ -1785,11 +1845,11 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),5))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
+                G[:,4] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1801,9 +1861,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*x*y + d
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*x*y+ d
+                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1813,7 +1875,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
                     G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
                 G[:,3] = 1
-                G[:,4] = elev_temp
+                G[:,4] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -1826,12 +1888,12 @@ for ii in xrange(niter):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
+                G[:,4] = topobins
+                G[:,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1843,9 +1905,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*x*y + d
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*x*y+ d
+                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1855,8 +1919,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
                     G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
+                G[:,4] = elevi
+                G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1868,12 +1932,12 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
+                G[:,4] = topobins
+                G[:,5] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1885,16 +1949,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*x*y + d + f*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*x*y+ d + f*topo_clean*x
+                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + f*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
+                G[:,4] = elevi
+                G[:,5] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
@@ -1912,13 +1978,13 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = rgbins*azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean*x
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
+                G[:,4] = topobins*azbins
+                G[:,5] = topobins
+                G[:,6] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1930,17 +1996,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*x*y + d + e*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*x*y+ d + e*topo_clean*x
+                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + e*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
+                G[:,4] = elevi
+                G[:,5] = elevi
+                G[:,6] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
@@ -1959,9 +2027,9 @@ for ii in xrange(niter):
 
         if radar is None:
             G=np.zeros((len(data),4))
-            G[:,0] = y**2
-            G[:,1] = y
-            G[:,2] = x
+            G[:,0] = rgbins**2
+            G[:,1] = rgbins
+            G[:,2] = azbins
             G[:,3] = 1
 
             # ramp inversion
@@ -1992,11 +2060,11 @@ for ii in xrange(niter):
             if (ivar==0 and nfit==0):
 
                 G=np.zeros((len(data),5))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
+                G[:,0] = rgbins**2
+                G[:,1] = rgbins
+                G[:,2] = azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
+                G[:,4] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2007,9 +2075,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y**2 + b*y+ c*x + d
+                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2019,7 +2089,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
                     G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                 G[:,3] = 1
-                G[:,4] = elev_temp
+                G[:,4] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -2032,12 +2102,12 @@ for ii in xrange(niter):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
+                G[:,0] = rgbins**2
+                G[:,1] = rgbins
+                G[:,2] = azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
+                G[:,4] = topobins
+                G[:,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2048,9 +2118,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y**2 + b*y+ c*x + d
+                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
 
@@ -2061,8 +2133,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
                     G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
+                G[:,4] = elevi
+                G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2075,12 +2147,12 @@ for ii in xrange(niter):
             elif (ivar==1 and nfit==0):
 
                 G=np.zeros((len(data),6))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
+                G[:,0] = rgbins**2
+                G[:,1] = rgbins
+                G[:,2] = azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
+                G[:,4] = topobins
+                G[:,5] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2091,16 +2163,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d + f*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y**2 + b*y+ c*x + d + f*topo_clean*x
+                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + f*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
+                G[:,4] = elevi
+                G[:,5] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
@@ -2119,13 +2193,13 @@ for ii in xrange(niter):
             elif (ivar==1 and nfit==1):
 
                 G=np.zeros((len(data),7))
-                G[:,0] = y**2
-                G[:,1] = y
-                G[:,2] = x
+                G[:,0] = rgbins**2
+                G[:,1] = rgbins
+                G[:,2] = azbins
                 G[:,3] = 1
-                G[:,4] = topo_clean*x
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
+                G[:,4] = topobins*azbins
+                G[:,5] = topobins
+                G[:,6] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2136,17 +2210,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*y**2 + b*y + c*x + d + e*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y**2 + b*y+ c*x + d + e*topo_clean*x
+                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + e*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
+                G[:,4] = elevi
+                G[:,5] = elevi
+                G[:,6] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
@@ -2167,9 +2243,9 @@ for ii in xrange(niter):
       elif order==6:
         if radar is None:
             G=np.zeros((len(data),4))
-            G[:,0] = x**2
-            G[:,1] = x
-            G[:,2] = y
+            G[:,0] = azbins**2
+            G[:,1] = azbins
+            G[:,2] = rgbins
             G[:,3] = 1
 
             # ramp inversion
@@ -2198,11 +2274,11 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0) :
                 G=np.zeros((len(data),5))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
+                G[:,4] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2213,9 +2289,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y+ d
+                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2225,7 +2303,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,1] = i -  ibegref
                     G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
                 G[:,3] = 1
-                G[:,4] = elev_temp
+                G[:,4] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -2238,12 +2316,12 @@ for ii in xrange(niter):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean**2
+                G[:,4] = topobins
+                G[:,5] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2254,9 +2332,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y+ d
+                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2266,8 +2346,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,1] = i -  ibegref
                     G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp**2
+                G[:,4] = elevi
+                G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2279,12 +2359,12 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins
                 G[:,3] = 1
-                G[:,4] = topo_clean
-                G[:,5] = topo_clean*x
+                G[:,4] = topobins
+                G[:,5] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2295,16 +2375,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d + f*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y+ d + f*topo_clean*x
+                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + f*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
+                G[:,4] = elevi
+                G[:,5] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i -  ibegref
@@ -2322,13 +2404,13 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),7))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins
                 G[:,3] = 1
-                G[:,4] = topo_clean*x
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
+                G[:,4] = topobins*azbins
+                G[:,5] = topobins
+                G[:,6] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2339,17 +2421,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y + d + e*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y+ d + e*topo_clean*x
+                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + e*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elev_temp
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
+                G[:,4] = elevi
+                G[:,5] = elevi
+                G[:,6] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i -  ibegref
@@ -2368,10 +2452,10 @@ for ii in xrange(niter):
       elif order==7:
         if radar is None:
             G=np.zeros((len(data),5))
-            G[:,0] = x**2
-            G[:,1] = x
-            G[:,2] = y**2
-            G[:,3] = y
+            G[:,0] = azbins**2
+            G[:,1] = azbins
+            G[:,2] = rgbins**2
+            G[:,3] = rgbins
             G[:,4] = 1
 
             # ramp inversion
@@ -2401,12 +2485,12 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit ==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins**2
+                G[:,3] = rgbins
                 G[:,4] = 1
-                G[:,5] = topo_clean
+                G[:,5] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2417,9 +2501,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y**2 + d*x+ e
+                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2430,7 +2516,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
                 G[:,4] = 1
-                G[:,5] = elev_temp
+                G[:,5] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -2443,13 +2529,13 @@ for ii in xrange(niter):
 
             if (ivar==0 and nfit ==1):
                 G=np.zeros((len(data),7))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins**2
+                G[:,3] = rgbins
                 G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
+                G[:,5] = topobins
+                G[:,6] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2460,9 +2546,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y**2 + d*y+ e
+                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2473,8 +2561,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
                 G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
+                G[:,5] = elevi
+                G[:,6] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2486,13 +2574,13 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit ==0):
                 G=np.zeros((len(data),7))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins**2
+                G[:,3] = rgbins
                 G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean*x
+                G[:,5] = topobins
+                G[:,6] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2503,16 +2591,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e + g*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y**2 + d*y+ e + g*topo_clean*x
+                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + g*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
+                G[:,5] = elevi
+                G[:,6] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
@@ -2531,14 +2621,14 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = x**2
-                G[:,1] = x
-                G[:,2] = y**2
-                G[:,3] = y
+                G[:,0] = azbins**2
+                G[:,1] = azbins
+                G[:,2] = rgbins**2
+                G[:,3] = rgbins
                 G[:,4] = 1
-                G[:,5] = topo_clean*x
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean**2
+                G[:,5] = topobins*azbins
+                G[:,6] = topobins
+                G[:,7] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2549,17 +2639,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y + e + f*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**2 + b*x + c*y**2 + d*y+ e + f*topo_clean*x
+                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + f*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp**2
+                G[:,5] = elevi
+                G[:,6] = elevi
+                G[:,7] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
@@ -2578,11 +2670,11 @@ for ii in xrange(niter):
       elif order==8:
         if radar is None:
             G=np.zeros((len(data),6))
-            G[:,0] = x**3
-            G[:,1] = x**2
-            G[:,2] = x
-            G[:,3] = y**2
-            G[:,4] = y
+            G[:,0] = azbins**3
+            G[:,1] = azbins**2
+            G[:,2] = azbins
+            G[:,3] = rgbins**2
+            G[:,4] = rgbins
             G[:,5] = 1
 
             # ramp inversion
@@ -2613,13 +2705,13 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),7))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
+                G[:,0] = azbins**3
+                G[:,1] = azbins**2
+                G[:,2] = azbins
+                G[:,3] = rgbins**2
+                G[:,4] = rgbins
                 G[:,5] = 1
-                G[:,6] = topo_clean
+                G[:,6] = topobins
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2630,9 +2722,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
+                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2644,7 +2738,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
                 G[:,5] = 1
-                G[:,6] = elev_temp
+                G[:,6] = elevi
 
 
                 res = los - np.dot(G,pars)
@@ -2657,14 +2751,14 @@ for ii in xrange(niter):
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
+                G[:,0] = azbins**3
+                G[:,1] = azbins**2
+                G[:,2] = azbins
+                G[:,3] = rgbins**2
+                G[:,4] = rgbins
                 G[:,5] = 1
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean**2
+                G[:,6] = topobins
+                G[:,7] = topobins**2
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2675,9 +2769,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
+                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2689,8 +2785,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
                     G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
                 G[:,5] = 1
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp**2
+                G[:,6] = elevi
+                G[:,7] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2703,14 +2799,14 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),8))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
+                G[:,0] = azbins**3
+                G[:,1] = azbins**2
+                G[:,2] = azbins
+                G[:,3] = rgbins**2
+                G[:,4] = rgbins
                 G[:,5] = 1
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean*x
+                G[:,6] = topobins
+                G[:,7] = topobins*azbins
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2721,16 +2817,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + h*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + h*topo_clean*x
+                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + h*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,5] = 1
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp
+                G[:,6] = elevi
+                G[:,7] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
@@ -2750,15 +2848,15 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),9))
-                G[:,0] = x**3
-                G[:,1] = x**2
-                G[:,2] = x
-                G[:,3] = y**2
-                G[:,4] = y
+                G[:,0] = azbins**3
+                G[:,1] = azbins**2
+                G[:,2] = azbins
+                G[:,3] = rgbins**2
+                G[:,4] = rgbins
                 G[:,5] = 1
-                G[:,6] = topo_clean*x
-                G[:,7] = topo_clean
-                G[:,8] = topo_clean
+                G[:,6] = topobins*azbins
+                G[:,7] = topobins
+                G[:,8] = topobins
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2769,17 +2867,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,i,idates[l])
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y + f + g*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + g*topo_clean*x
+                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + g*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,h*x+i*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),9))
                 G[:,5] = 1
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp
-                G[:,8] = elev_temp**2
+                G[:,6] = elevi
+                G[:,7] = elevi
+                G[:,8] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
@@ -2799,10 +2899,10 @@ for ii in xrange(niter):
       elif order==9:
         if radar is None:
             G=np.zeros((len(data),5))
-            G[:,0] = y
-            G[:,1] = x
-            G[:,2] = (y*x)**2
-            G[:,3] = y*x
+            G[:,0] = rgbins
+            G[:,1] = azbins
+            G[:,2] = (rgbins*azbins)**2
+            G[:,3] = rgbins*azbins
             G[:,4] = 1
 
             # ramp inversion
@@ -2831,12 +2931,12 @@ for ii in xrange(niter):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = (rgbins*azbins)**2
+                G[:,3] = rgbins*azbins
                 G[:,4] = 1
-                G[:,5] = topo_clean
+                G[:,5] = topobins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2848,9 +2948,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funcbins = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
+                funct = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2861,7 +2963,7 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
                     G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
                 G[:,4] = 1
-                G[:,5] = elev_temp
+                G[:,5] = elevi
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2873,13 +2975,13 @@ for ii in xrange(niter):
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),7))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = (rgbins*azbins)**2
+                G[:,3] = rgbins*azbins
                 G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean**2
+                G[:,5] = topobins
+                G[:,6] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2891,9 +2993,11 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
+                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2904,8 +3008,8 @@ for ii in xrange(niter):
                     G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
                     G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
                 G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp**2
+                G[:,5] = elevi
+                G[:,6] = elevi**2
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2917,13 +3021,13 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),7))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = (rgbins*azbins)**2
+                G[:,3] = rgbins*azbins
                 G[:,4] = 1
-                G[:,5] = topo_clean
-                G[:,6] = topo_clean*x
+                G[:,5] = topobins
+                G[:,6] = topobins*azbins
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2935,16 +3039,18 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + g*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + g*topo_clean*x
+                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + g*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
                 ax.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
+                G[:,5] = elevi
+                G[:,6] = elevi
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
@@ -2962,14 +3068,14 @@ for ii in xrange(niter):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = y
-                G[:,1] = x
-                G[:,2] = (y*x)**2
-                G[:,3] = y*x
+                G[:,0] = rgbins
+                G[:,1] = azbins
+                G[:,2] = (rgbins*azbins)**2
+                G[:,3] = rgbins*azbins
                 G[:,4] = 1
-                G[:,5] = topo_clean*x
-                G[:,6] = topo_clean
-                G[:,7] = topo_clean**2
+                G[:,5] = topobins*azbins
+                G[:,6] = topobins
+                G[:,7] = topobins**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2981,17 +3087,19 @@ for ii in xrange(niter):
                 print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
 
                 # plot phase/elev
-                funct = a*y + b*x + c*(x*y)**2 + d*x*y + e + f*topo_clean*x
-                x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
+                funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + f*topo_clean*x
+                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + f*topobins*azbins
+                x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax.plot(x,g*x+h*azbins**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
-                G[:,5] = elev_temp
-                G[:,6] = elev_temp
-                G[:,7] = elev_temp**2
+                G[:,5] = elevi
+                G[:,6] = elevi
+                G[:,7] = elevi**2
                 for i in xrange(nlign):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
                     G[i*ncol:(i+1)*ncol,1] = i - ibegref
@@ -3010,9 +3118,6 @@ for ii in xrange(niter):
       # flata = (los - np.dot(G,pars)).reshape(nlign,ncol)
       flata = los.reshape(nlign,ncol) - ramp - topo
       noramps = los.reshape(nlign,ncol) - ramp
-
-      if radar is not None:
-        del elev_temp
 
       return ramp, flata, topo, rms, noramps
  
