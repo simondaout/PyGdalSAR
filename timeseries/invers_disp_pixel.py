@@ -275,10 +275,10 @@ if arguments["--aps"] ==  None:
     apsf = None
 else:
     apsf = arguments["--aps"]
-if arguments["--interseismic"] ==  None:
+if arguments["--linear"] ==  None:
     inter = 'no'
 else:
-    inter = arguments["--interseismic"]
+    inter = arguments["--linear"]
 if arguments["--seasonal"] ==  None:
     seasonal = 'no'
 else:

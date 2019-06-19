@@ -1687,6 +1687,7 @@ for ii in xrange(niter):
 
                 # plot phase/elev
                 funct = a*y + b*x + c + e*topo_clean*x
+                print np.nanmin(topo_clean), np.nanmax(topo_clean)
                 x = np.linspace(np.nanmin(topo_clean), np.nanmax(topo_clean), 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(x,d*x,'-r', lw =4.)
@@ -3029,11 +3030,11 @@ for ii in xrange(niter):
       for l in xrange((N)):
         print
 
-        # no estimation on the ref image set to zero 
-        if l is not imref:
+        # first clean los
+        maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
 
-          # first clean los
-          maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
+        # no estimation on the ref image set to zero 
+        if np.nansum(maps[:,:,l]) != 0:
 
           maxlos,minlos=np.nanpercentile(maps_temp[ibegref:iendref,jbegref:jendref],perc_los),np.nanpercentile(maps_temp[ibegref:iendref,jbegref:jendref],100-perc_los)
           kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
