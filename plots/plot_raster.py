@@ -63,8 +63,6 @@ fig, ax = plt.subplots(1,figsize=(8,10))
 # read arguments
 arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
-# Open phiset (image)
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
 
 if arguments["--cpt"] is  None:
     # cmap=cm.jet 
@@ -90,6 +88,7 @@ else:
 ds_extension = os.path.splitext(infile)[1]
 
 if sformat == "ROI_PAC": 
+    ds = gdal.Open(infile, gdal.GA_ReadOnly)
     if (ds_extension == ".unw" or ds_extension ==".hgt"):
         phase_band = ds.GetRasterBand(2)
         amp_band = ds.GetRasterBand(1)
@@ -114,6 +113,7 @@ if sformat == "ROI_PAC":
         nlines, ncols = ds.RasterYSize, ds.RasterXSize
 
 elif sformat == "GTIFF":
+    ds = gdal.Open(infile, gdal.GA_ReadOnly)
     phase_band = ds.GetRasterBand(1)
     # Attributes
     print("> Driver:   ", ds.GetDriver().ShortName)
@@ -123,14 +123,23 @@ elif sformat == "GTIFF":
 
 elif sformat == 'GAMMA':
     import gamma as gm
-    if arguments["--parfile"] ==  None:
-        par_file =  arguments["--parfile"]
-        nlines,ncols = gm.readpar(par=par_file)
-        phi = gm.readgamma(infile,par=par_file)
+    if ds_extension == ".diff":
+        if arguments["--parfile"] !=  None:
+            par_file =  arguments["--parfile"]
+            nlines,ncols = gm.readpar(par=par_file)
+            phi = gm.readgamma_int(infile,par=par_file)
+        else:
+            nlines,ncols = gm.readpar()
+            phi = gm.readgamma_int(infile)
     else:
-        nlines,ncols = gm.readpar()
-        phi = gm.readgamma(infile)
-    
+        if arguments["--parfile"] !=  None:
+            par_file =  arguments["--parfile"]
+            nlines,ncols = gm.readpar(par=par_file)
+            phi = gm.readgamma(infile,par=par_file)
+        else:
+            nlines,ncols = gm.readpar()
+            phi = gm.readgamma(infile)
+
 
 if arguments["<ibeg>"] ==  None:
     ibeg = 0
@@ -192,8 +201,13 @@ elif sformat == "GTIFF":
     cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm
 
 elif sformat == "GAMMA":
-    cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm
-
+    if ds_extension == ".diff":
+        cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm 
+        cutamp = np.absolute(cutphi)
+        cutphi = np.angle(cutphi)
+        hax = ax.imshow(cutamp, cm.Greys_r)
+    else:
+        cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm
 
 if arguments["--wrap"] is not None:
     cutphi =  np.mod(cutphi+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
