@@ -405,7 +405,7 @@ class FiltFlatUnw:
 
         # initiliase number of looks
         self.look = look
-        self.rlook = int(int(self.Rlooks_unw) - int(self.Rlooks_int))
+        self.rlook = int(int(self.Rlooks_unw) / int(self.Rlooks_int))
 
         # initialise model to be removed from wrapped int
         self.model = model
