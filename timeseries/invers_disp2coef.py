@@ -16,7 +16,7 @@ Spatial and temporal inversions of the time series delay maps (used depl_cumule 
 At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal),
 (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
-Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--refstart=<value>] [--refend=<value>] [--interseismic=<yes/no>] [--threshold_rmsd=<value>] \
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--refstart=<value>] [--refend=<value>] [--linear=<yes/no>] [--threshold_rmsd=<value>] \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
@@ -34,8 +34,8 @@ Options:
 --aps PATH              Path to the APS file giving an input error to each dates [default: No weigthing if no spatial estimation or misfit spatial estimation used as input uncertianties]
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
---interseismic YES/NO   Add a linear function in the inversion
---threshold_rmsd VALUE  If interseismic = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
+--linear YES/NO         Add a linear function in the inversion [default:yes]
+--threshold_rmsd VALUE  If linear = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), [default: None]
@@ -50,7 +50,7 @@ Options:
 4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e,
 8: ay**2+by+cx**3+dx**2+ex+f, 9: ax+by+cxy**2+dxy+e
 --niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, while for the next itarations, uncertainties are equals to the global RMS of the previous iteration for each map [default: 1]
---spatialiter  YES/NO   If yes iterate the spatial estimations at each iterations (defined by niter) on the maps minus the temporal terms (ie. interseismic, coseismic...) [default: no]
+--spatialiter  YES/NO   If yes iterate the spatial estimations at each iterations (defined by niter) on the maps minus the temporal terms (ie. linear, coseismic...) [default: no]
 --sampling VALUE        Downsampling factor [default: 1]
 --imref VALUE           Reference image number [default: 1]
 --mask PATH             Path to mask file in r4 or tif format for the spatial estimations (Keep only values > threshold_mask for ramp estimation).
@@ -280,10 +280,10 @@ if arguments["--aps"] ==  None:
     apsf = 'no'
 else:
     apsf = arguments["--aps"]
-if arguments["--interseismic"] ==  None:
-    inter = 'no'
+if arguments["--linear"] ==  None:
+    inter = 'yes'
 else:
-    inter = arguments["--interseismic"]
+    inter = arguments["--linear"]
 if arguments["--seasonal"] ==  None:
     seasonal = 'no'
 else:

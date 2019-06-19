@@ -8,10 +8,10 @@
 """\
 invers_disp_pixel.py
 -------------
-Temporal inversions of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
+Temporal decomposition of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--interseismic=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
+[--linear=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
 
@@ -20,15 +20,15 @@ Options:
 
 -h --help               Show this screen
 --ncols VALUE           Pixel column numbers (eg. 200,400,450) 
---nligns VALUE          Pixel lign numbers  (eg. 1200,1200,3000) 
+--nligns VALUE          Pixel lines numbers  (eg. 1200,1200,3000) 
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
 --list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
 --windowrefsize VALUE      Number of pixels around the referenced pixel defining the window [default: windowsize]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
---interseismic PATH     Add a linear function to the inversion
---threshold_rmsd VALUE  If interseismic = yes: first try inversion with ref/interseismic/dem only, if RMDS inversion > threshold_rmsd then add other 
+--linear PATH     Add a linear function to the inversion
+--threshold_rmsd VALUE  If linear = yes: first try inversion with ref/linear/dem only, if RMDS inversion > threshold_rmsd then add other 
 basis functions [default: 1.] 
 --coseismic PATH        Add heaviside functions to the inversion .Indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 

@@ -440,7 +440,7 @@ for jj in xrange((manifold.Npoints)):
     for disp, sigma, name in zip(pt.d, pt.sigmad, pt.comp):
         ax = fig.add_subplot(len(pt.comp),1,i+1)
         ax.plot(pt.t, disp, 'o', color=colors[i], ms=2)
-        ax.errorbar(pt.t,disp,yerr=sigma,ecolor=colors[i],fmt=None, alpha=0.1)
+        ax.errorbar(pt.t,disp,yerr=sigma,ecolor=colors[i],fmt='none', alpha=0.1)
         ax.set_ylabel('{} (m)'.format(name))
         # ax.legend(loc='best',fontsize='small')
         ax.grid(True)
@@ -499,7 +499,7 @@ for jj in xrange((manifold.Npoints)):
     for disp, sigma,model_lin, name in zip(pt.d_lin, pt.sigmad, md_lin, pt.comp):
         ax = fig2.add_subplot(len(pt.comp),1,i+1)
         ax.plot(pt.t, disp, 'o', color=colors[i], ms=2)
-        ax.errorbar(pt.t,disp,yerr=sigma, ecolor=colors[i], fmt=None, alpha=0.1)
+        ax.errorbar(pt.t,disp,yerr=sigma, ecolor=colors[i], fmt='none', alpha=0.1)
         ax.plot(tdec,model_lin,'-r')
         ax.set_ylabel('{} (m)'.format(name))
         # ax.legend(loc='best',fontsize='small')
