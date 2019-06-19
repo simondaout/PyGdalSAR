@@ -35,7 +35,7 @@ Options:
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
 --linear YES/NO         Add a linear function in the inversion [default:yes]
---threshold_rmsd VALUE  If linear = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions [default: 1.]
+--threshold_rmsd VALUE  If linear = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions (Depricate) [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), [default: None]
@@ -3294,21 +3294,22 @@ for ii in xrange(niter):
 
                 rmsd = maxrmsd + 1
 
-                if inter=='yes' and iteration is True:
-                    Glin=np.zeros((kk,2+Mker))
-                    for l in xrange((2)):
-                        Glin[:,l]=basis[l].g(tabx)
-                    for l in xrange((Mker)):
-                        Glin[:,2+l]=kernels[l].g(k)
+                # remove this rmsd threshold for the moment
+                # if inter=='yes' and iteration is True:
+                #     Glin=np.zeros((kk,2+Mker))
+                #     for l in xrange((2)):
+                #         Glin[:,l]=basis[l].g(tabx)
+                #     for l in xrange((Mker)):
+                #         Glin[:,2+l]=kernels[l].g(k)
 
-                    mt,sigmamt = consInvert(Glin,taby,inaps[k],cond=rcond)
+                #     mt,sigmamt = consInvert(Glin,taby,inaps[k],cond=rcond)
 
-                    # compute rmsd
-                    mdisp[k] = np.dot(Glin,mt)
-                    # sum sur toutes les dates
-                    # rmsd = np.sum(abs((disp[k] - mdisp[k])/inaps[k]))/kk  S
-                    rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)
-                    # print i,j,rmsd,maxrmsd
+                #     # compute rmsd
+                #     mdisp[k] = np.dot(Glin,mt)
+                #     # sum sur toutes les dates
+                #     # rmsd = np.sum(abs((disp[k] - mdisp[k])/inaps[k]))/kk  S
+                #     rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)
+                #     # print i,j,rmsd,maxrmsd
 
                 G=np.zeros((kk,M))
                 for l in xrange((Mbasis)):

@@ -29,7 +29,7 @@ Options:
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
 --linear PATH     Add a linear function to the inversion
 --threshold_rmsd VALUE  If linear = yes: first try inversion with ref/linear/dem only, if RMDS inversion > threshold_rmsd then add other 
-basis functions [default: 1.] 
+basis functions (Depricate) [default: 1.] 
 --coseismic PATH        Add heaviside functions to the inversion .Indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
@@ -575,29 +575,27 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        
+        print 'ineq=no: SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond)
         try:
           U,eignv,V = lst.svd(A, full_matrices=False)
-          s = np.diag(eignv)
-          print 
+          s = np.diag(eignv) 
           print 'Eigenvalues:', eignv
           index = np.nonzero(s<cond)
           inv = lst.inv(s)
           inv[index] = 0.
           fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-          print 'SVD solution:', fsoln
-          print
         except:
           fsoln = lst.lstsq(A,b,rcond=cond)[0]
+        print 'SVD solution:', fsoln
 
 
     else:
 
+        print 'ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.'
         Ain = np.delete(A,indexpo,1)
         try:
           U,eignv,V = lst.svd(Ain, full_matrices=False)
-          s = np.diag(eignv)
-          print 
+          s = np.diag(eignv) 
           print 'Eigenvalues:', eignv
           index = np.nonzero(s<cond)
           inv = lst.inv(s)
@@ -605,6 +603,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
           mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
         except:
           mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+        print 'SVD solution:', mtemp
           
         # print mtemp
         # print indexpo
@@ -613,13 +612,14 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
             mtemp = np.insert(mtemp,indexpo[z],0)
             # print mtemp
         minit = np.copy(mtemp)
-        print 'Prior model:', minit
-        print
+        # print 'Prior model:', minit
         # # initialize bounds
         mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
 
         # We here define bounds for postseismic to be the same sign than coseismic
         # and coseisnic inferior or egal to the coseimic initial 
+        if len(indexco)>0:
+          print 'ineq=yes: Impose postseismic to be the same sign than coseismic'
         for i in xrange(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
@@ -639,7 +639,6 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         fsoln = res[0]
 	
         print 'Optimization:', fsoln
-        print
 
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
@@ -653,8 +652,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
 
-    print 'model errors:'
-    print sigmam
+    print 'model errors:', sigmam
 
     return fsoln,sigmam
 
@@ -724,7 +722,8 @@ for jj in xrange((Npix)):
     taby = disp[k] 
     bp = base[k]
     sigmad = aps  
-    print 'data uncertainties', sigmad    
+    names = []
+    # print 'data uncertainties', sigmad    
 
     # do only this if more than N/2 points left
     if kk > N/6:
@@ -735,36 +734,42 @@ for jj in xrange((Npix)):
         t = time.time()
 
         rmsd = maxrmsd + 1
-        if inter=='yes' and iteration is True:
+        # if inter=='yes' and iteration is True:
 
-            Glin=np.zeros((kk,2+Mker))
-            for l in xrange((2)):
-                Glin[:,l]=basis[l].g(tabx)
-            for l in xrange((Mker)):
-                Glin[:,2+l]=kernels[l].g(k)
+        #     Glin=np.zeros((kk,2+Mker))
+        #     for l in xrange((2)):
+        #         Glin[:,l]=basis[l].g(tabx)
+        #         names.append(basis[l].reduction)
+        #     for l in xrange((Mker)):
+        #         Glin[:,2+l]=kernels[l].g(k)
+        #         names.append(kernels[l].reduction)
 
-            # print k
-            # print sigmad
-            # print taby
-            mt,sigmamt = consInvert(Glin,taby,sigmad[k],cond=rcond)
+        #     # print k
+        #     # print sigmad
+        #     # print taby
+        #     print 'First inversion with linear term only. Complete inversion if rmsd>threshold_rmsd'
+        #     print 'basis functions:', names
+        #     mt,sigmamt = consInvert(Glin,taby,sigmad[k],cond=rcond)
             
-            # compute rmsd
-            mdisp[k] = np.dot(Glin,mt)
+        #     # compute rmsd
+        #     mdisp[k] = np.dot(Glin,mt)
 
-            # rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k])/inaps[k],2))/kk) 
-            rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk) 
+        #     # rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k])/inaps[k],2))/kk) 
+        #     rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk) 
+        #     print 'rmsd:', rmsd
+        #     print 
 
-            print 
-            print 'rmsd:', rmsd
-            print 
-
+        names = []
         G=np.zeros((kk,M))
         for l in xrange((Mbasis)):
             G[:,l]=basis[l].g(tabx)
+            names.append(basis[l].reduction)
         for l in xrange((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
+            names.append(kernels[l].reduction)
 
         if rmsd >= maxrmsd or inter!='yes': 
+            print 'basis functions:', names
             mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq)
 
         # rebuild full vectors
