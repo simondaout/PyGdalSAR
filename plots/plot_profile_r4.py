@@ -16,7 +16,7 @@ plot_profile_r4.py
 Plot profiles for r4 files (slope_corr_var, APS_*, DEF_* ...) given a strike, an origin and the size of the profile
 
 Usage: plot_profile_r4.py [--lectfile=<path>] [--demfile=<path>] [--outfile=<path>] \
-[--ramp=<None/all/north/south>] [--cst=<value>] --name=<path> --strike=<value> <x0> <y0> <w> <l>
+[--ramp=<None/all/pos/neg>] [--rad2mm=<value>] [--cst=<value>] --name=<path> --strike=<value> <x0> <y0> <w> <l>
 plot_slope.py -h | --help
 
 Options:
@@ -25,11 +25,12 @@ Options:
 --demfile PATH      Path of the dem file [default: lect.in]
 --name PATH         Path of the slope file
 --outfile PATH      Create a flatten r4 file
---ramp VALUE        flatten profrile to the north (if ramp=north), south (if ramp=north), or all the profile (if ramp=all) [default: None]
+--ramp VALUE        flatten profile to the postitive distances (if ramp=pos), negative distances (if ramp=neg), or all the profile (if ramp=all) [default: None]
 --cst VALUE         Shift the displacements by an optional cst [default:0]
 --strike VALUE      Azimuth of the profile
 --x0,y0 VALUES      Origine of the profile
 --w,l VALUES        Width and Length of the profile
+--rad2mm=<value>      Convert data [default: 4.4563]
 """
 
 # os
@@ -57,20 +58,16 @@ if arguments["--demfile"] ==  None:
     plotdem = 'no'
 else:
     plotdem = 'yes'
-if arguments["--ramp"] ==  'south':
-    ramp = 'south'
-elif arguments["--ramp"] ==  'north':
-    ramp = 'north'
-elif arguments["--ramp"] ==  'all':
-    ramp = 'all'
-else:
-    ramp = None
+
 if arguments["--cst"] ==  None:
    cst = 0
 else:
    cst = float(arguments["--cst"])
 
-rad2mm = 4.4563
+if arguments["--rad2mm"] ==  None:
+        rad2mm = 4.4563
+else:
+        rad2mm = np.float(arguments["--rad2mm"])
 
 x0 = int(arguments["<x0>"])
 y0 = int(arguments["<y0>"])
@@ -134,14 +131,14 @@ if plotdem is 'yes':
     itopo = np.delete(iitopo,index)
 
 # estimate ramp
-if ramp is 'north':
+if arguments["--ramp"] is 'pos':
     kk = np.nonzero((iyp>0))
-elif ramp is 'south':
+elif arguments["--ramp"] is 'neg':
     kk = np.nonzero((iyp<0))
-elif ramp is 'all':
+elif arguments["--ramp"] is 'all':
     kk = np.arange(len(iyp))
 
-if ramp is not None:
+if arguments["--ramp"] is not None:
     temp_los = ilos[kk]
     temp_yp = iyp[kk]
     G=np.zeros((len(temp_los),2))
@@ -152,7 +149,7 @@ if ramp is not None:
     pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),temp_los)
     a = pars[0]; b = pars[1]
     blos = a*iyp + b - cst
-    print 'Remove ramp estimate on the {}: '.format(ramp)
+    print 'Remove ramp estimated on the {}: '.format(arguments["--ramp"])
     print '%f yperp  + %f  '%(a,b)
     print
     ilos = ilos - blos
