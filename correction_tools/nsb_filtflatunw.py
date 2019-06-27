@@ -381,7 +381,7 @@ class PileInt:
 class FiltFlatUnw:
     """ Create a class FiltFlatUnw defining all the post-procesing functions 
     list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
-    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, filterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref,
+    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref,
     seedx, seedy.threshold_unw, unw_method
     Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask (default: 0.)
     defining the boundary of the mask zone for emprical estimations
@@ -395,7 +395,7 @@ class FiltFlatUnw:
         self.nfit_range, self.thresh_amp_range,
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
-        self.filterStrength,
+        self.FilterStrength,self.Filt_method,
         self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref,
         self.seedx, self.seedy,self.threshold_unw,self.threshold_unfilt,self.unw_method,
         ) = map(str, params)
@@ -573,11 +573,12 @@ def filterSW(config, kk):
 
 def filterROI(config, kk):
     ''' ROI-PAC Filter function
-    Requiered proc file parameter: filterStrength
+    Requiered proc file parameter: FilterStrength, Filt_method
     '''
 
     with Cd(config.stack.getpath(kk)):
 
+        inbase = config.stack.getname(kk)
         infile = config.stack.getname(kk) + '.int'; checkinfile(infile)
         inrsc = infile + '.rsc'
         # get width and compute if not already done
@@ -586,6 +587,7 @@ def filterROI(config, kk):
             width,length = computesize(config,infile)
             config.stack.updatesize(kk,width,length)
 
+        filtbase = config.stack.getfiltROI(kk)
         filtfile = config.stack.getfiltROI(kk) + '.int'
         filtrsc = filtfile + '.rsc'
         if path.exists(filtrsc) == False:
@@ -596,10 +598,11 @@ def filterROI(config, kk):
         do = checkoutfile(config,filtfile)
         if do:
           try:
-            run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.filterStrength)+"> log_filtROI.txt")
+            #run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.FilterStrength)+"> log_filtROI.txt")
+            run("filter.pl "+str(inbase)+" "+str(config.FilterStrength)+" "+str(config.Filt_method)+" "+str(filtbase)+"> log_filtROI.txt")
           except Exception as e:
             logger.critical(e)
-            logger.critical('Failed filtering {0} with ROI-PAC adaptative filter Failed!'.format(infile))
+            logger.critical('Failed filtering {0} with ROI-PAC filter Failed!'.format(infile))
             config.stack.updatesuccess(kk)
             print(filterROI.__doc__)
             
@@ -979,8 +982,10 @@ def colin(config,kk):
         if do:
             try:
                 copyrsc(infile,'temp')
+                #run("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
+                #" 3 0.0001 2 > log_colin.txt")
                 run("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
-                " 3 0.0001 2 > log_colin.txt")
+                " 3 0.1 0 > log_colin.txt")
                 rm('temp')
             except Exception as e:
                 logger.critical(e)
@@ -1061,6 +1066,7 @@ def unwrapping(config,kk):
 
         infile = config.stack.getname(kk)+ '.int';  checkinfile(infile)
         inrsc = infile + '.rsc'
+        corfile = config.stack.getcor(kk); checkinfile(corfile)
         filtSWfile = config.stack.getfiltSW(kk)+ '.int'
         filtROIfile = config.stack.getfiltROI(kk)+ '.int'
 
@@ -1121,10 +1127,29 @@ def unwrapping(config,kk):
                 logger.info("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
                 mask = path.splitext(filtSWfile)[0] + '_msk'
 
-                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+" > log_unw.txt")
-                run("new_cut.pl "+str(path.splitext(filtROIfile)[0])+" >> log_unw.txt")
+                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+" > log_unw_roi.txt")
+                run("new_cut.pl "+str(path.splitext(filtROIfile)[0])+" >> log_unw_roi.txt")
                 run("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
-                    +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+" >> log_unw.txt")
+                    +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+" >> log_unw_roi.txt")
+
+            if config.unw_method == 'icu':
+
+                logger.info("Unwraped IFG:{0} with ICU algorithm ".format(unwfile))
+                mask = path.splitext(filtSWfile)[0] + '_msk'
+                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+" > log_unw_icu.txt")
+
+                run("icu.pl "+str(path.splitext(infile)[0])+str(path.splitext(filtROIfile)[0])\
+                    +" "+str(path.splitext(corfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])+" "+str(config.Filt_method)+" "+str(config.FilterStrength)+" "+"Phase_Sigma"+" 5 "+str(config.threshold_unw)+" >> log_unw_icu.txt")
+
+            if config.unw_method == 'snaphu':
+
+                logger.info("Unwraped IFG:{0} with SNAPHU algorithm ".format(unwfile))
+                mask = path.splitext(filtSWfile)[0] + '_msk'
+                run("snaphu_mcf.pl smooth "+str(path.splitext(infile)[0])+" "+str(path.splitext(infile)[0])+" "+str(mask)+" "+str(path.splitext(corfile)[0])+" "+str(config.threshold_unw)+ " > log_unw_snaphu.txt")
+                snaphu_file = "lp_" + path.splitext(filtSWfile)[0] 
+                run("lowpass.pl "+str(path.splitext(filtROIfile)[0])+" "+str(path.splitext(corfile)[0])+" "+str(snaphu_file)+" 3 Phase_Sigma > log_unw_icu.txt")
+                snaphu_file = "lp_" + path.splitext(filtSWfile)[0] + "_phsig"
+                run("snaphu_mcf.pl smooth "+str(path.splitext(filtROIfile)[0])+" "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(snaphu_file)+" "+str(config.threshold_unw)+" > log_unw_snaphu.txt")
 
           except Exception as e:
             logger.critical(e)
@@ -1435,7 +1460,8 @@ proc_defaults = {
     "filterstyle": "SWc",
     "SWamplim": "0.05",
     "SWwindowsize": "8",
-    "filterStrength": "2", # strenght filter roi
+    "FilterStrength": "0.75", # strenght filter roi
+    "Filt_method": "psfilt", # could be: adapt_filt
     "unw_method": "roi",
     "threshold_unw": "0.35", # threshold on filtered colinearity 
     "threshold_unfilt": "0.03", # threshold on colinearity 
@@ -1467,15 +1493,15 @@ print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
     nfit_range: {6}, thresh_amp_range: {7}\n\
     nfit_az: {8}, thresh_amp_az: {9}\n\
     filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
-    filterStrength : {13}\n\
-    nfit_topo: {14}, thresh_amp_topo: {15}, ivar: {16}, z_ref: {17}\n\
-    seedx: {18}, seedy: {19}, threshold_unw: {20}, threshold_unfilt: {21} unw_method: {22}'.\
+    FilterStrength : {13}, Filt_method : {14}\n\
+    nfit_topo: {15}, thresh_amp_topo: {16}, ivar: {17}, z_ref: {18}\n\
+    seedx: {19}, seedy: {20}, threshold_unw: {21}, threshold_unfilt: {22} unw_method: {23}'.\
     format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
-    proc["filterStrength"],\
+    proc["FilterStrength"],proc["Filt_method"],\
     proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],\
     proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"]\
     ))
@@ -1559,7 +1585,7 @@ for p in jobs:
         proc["nfit_range"], proc["thresh_amp_range"],
         proc["nfit_az"], proc["thresh_amp_az"],
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
-        proc["filterStrength"],
+        proc["FilterStrength"], proc["Filt_method"], 
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, force=force
