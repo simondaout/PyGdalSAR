@@ -16,21 +16,24 @@ plot_profile_r4.py
 Plot profiles for r4 files (slope_corr_var, APS_*, DEF_* ...) given a strike, an origin and the size of the profile
 
 Usage: plot_profile_r4.py [--lectfile=<path>] [--demfile=<path>] [--outfile=<path>] \
-[--ramp=<None/all/pos/neg>] [--rad2mm=<value>] [--cst=<value>] --name=<path> --strike=<value> <x0> <y0> <w> <l>
+[--ramp=<None/all/pos/neg>] [--rad2mm=<value>] [--cst=<value>] [--vmin=<value>] [--vmax=<value>] \
+--infile=<path> --strike=<value> <x0> <y0> <w> <l>
 plot_slope.py -h | --help
 
 Options:
 -h --help           Show this screen.
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --demfile PATH      Path of the dem file [default: lect.in]
---name PATH         Path of the slope file
+--infile PATH       Path of the input file
 --outfile PATH      Create a flatten r4 file
 --ramp VALUE        flatten profile to the postitive distances (if ramp=pos), negative distances (if ramp=neg), or all the profile (if ramp=all) [default: None]
 --cst VALUE         Shift the displacements by an optional cst [default:0]
 --strike VALUE      Azimuth of the profile
 --x0,y0 VALUES      Origine of the profile
 --w,l VALUES        Width and Length of the profile
---rad2mm=<value>      Convert data [default: 4.4563]
+--rad2mm=<value>    Convert data [default: -4.4563] (sign - for positive toward the sat.)
+--vmax                Max colorscale [default: 98th percentile]
+--vmin                Min colorscale [default: 2th percentile]
 """
 
 # os
@@ -74,7 +77,7 @@ y0 = int(arguments["<y0>"])
 w = int(arguments["<w>"])
 l = int(arguments["<l>"])
 
-infile = arguments["--name"]
+infile = arguments["--infile"]
 
 # Read number of col, lines from lect.in
 lectfile = arguments["--lectfile"]
@@ -85,8 +88,8 @@ str=(float(arguments["--strike"])*math.pi)/180
 s=[math.sin(str),math.cos(str),0]
 n=[math.cos(str),-math.sin(str),0]
 
-# Load data and convert in mm/yr
-los = -np.fromfile(arguments["--name"],np.float32)*rad2mm
+# Load data and convert data
+los = -np.fromfile(arguments["--infile"],np.float32)*rad2mm
 # clean los
 kk = np.flatnonzero(np.logical_or(los==0, los==9999))
 #kk = np.flatnonzero(los>9990)
@@ -169,13 +172,15 @@ else:
      sar.astype('float32').tofile(fid)
      fid.close()
 
-# get min max
-# vmax = np.mean(ilos) + 2*np.nanstd(ilos)
-# vmin = np.mean(ilos) - 2*np.nanstd(ilos)
-vmax = np.nanpercentile(ilos,99.9)
-vmin = np.nanpercentile(ilos,.1)
-#vmax=2
-#vmin=-3
+if arguments["--vmax"] is not  None:
+    vmax = np.float(arguments["--vmax"])
+else:
+    vmax = np.nanpercentile(ilos,99.)
+if arguments["--vmin"] is not  None:
+    vmin = np.float(arguments["--vmin"])
+else:
+    vmin = np.nanpercentile(ilos,1.)
+
 
 # plot profile
 if plotdem is 'yes':
@@ -216,12 +221,12 @@ if plotdem is 'yes':
     ax2.set_ylim([vmin,vmax])
     ax2.plot(distance,moy_los-std_los,lw=1,color='gray')
     ax2.plot(distance,moy_los+std_los,lw=1,color='gray')
-    ax2.plot(distance,moy_los,lw=2,color='black',label='{}'.format(arguments["--name"]))
+    ax2.plot(distance,moy_los,lw=2,color='black',label='{}'.format(arguments["--infile"]))
     ymin,ymax=ax2.get_ylim()
     ax2.plot([0,0],[ymin,ymax],color='red')
     ax2.legend(loc=3)
     ax2.set_xlabel('distance to the fault')
-    ax2.set_ylabel('LOS (Positive toward the Sat., mm)')
+    ax2.set_ylabel('LOS (Positive toward the Sat., mm/yr)')
 
 else: 
     bins = np.arange(min(iyp),max(iyp),2)
@@ -233,8 +238,13 @@ else:
         uu = np.flatnonzero(inds == j)
         if len(uu)>0:
             distance.append(bins[j] + (bins[j+1] - bins[j])/2.)
-            std_los.append(np.std(ilos[uu]))
-            moy_los.append(np.mean(ilos[uu]))
+
+            # do a small clean within the bin
+            indice = np.flatnonzero(np.logical_and(ilos[uu]>np.percentile(\
+                ilos[uu],2.),ilos[uu]<np.percentile(ilos[uu],98.)))
+
+            std_los.append(np.std(ilos[uu][indice]))
+            moy_los.append(np.mean(ilos[uu][indice]))
     distance, moy_los, std_los = np.array(distance), np.array(moy_los), np.array(std_los)
 
     # maxpro = moy_los.max() + 4*np.mean(std_los)
@@ -246,7 +256,7 @@ else:
     ax1.set_ylim([vmin,vmax])
     ax1.plot(distance,moy_los-std_los,lw=1,color='gray')
     ax1.plot(distance,moy_los+std_los,lw=1,color='gray')
-    ax1.plot(distance,moy_los,lw=2,color='black',label='{}'.format(arguments["--name"]))
+    ax1.plot(distance,moy_los,lw=2,color='black',label='{}'.format(arguments["--infile"]))
     ymin,ymax=ax1.get_ylim()
     ax1.plot([0,0],[ymin,ymax],color='red')
     ax1.legend(loc='best',fontsize='x-small')

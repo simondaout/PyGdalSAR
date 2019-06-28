@@ -1082,10 +1082,15 @@ for ii in xrange(niter):
 
         if radar is None:
             
-            a = np.nanmean(data)
-            print 'Remove ref frame %f  for date: %i'%(a,idates[l])
-            ramp = np.ones((nlign,ncol))*a
-            rms = np.sqrt(np.nanmean((los-a)**2))
+            # a = np.nanmean(data)
+            # print 'Remove ref frame %f  for date: %i'%(a,idates[l])
+            # ramp = np.ones((nlign,ncol))*a
+            # rms = np.sqrt(np.nanmean((los-a)**2))
+            # print 'RMS:', rms
+
+            a = 0.
+            ramp = np.zeros((nlign,ncol))
+            rms = np.sqrt(np.nanmean((los)**2))
             print 'RMS:', rms
 
         else:

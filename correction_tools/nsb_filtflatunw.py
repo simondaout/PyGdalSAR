@@ -598,8 +598,8 @@ def filterROI(config, kk):
         do = checkoutfile(config,filtfile)
         if do:
           try:
-            #run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.FilterStrength)+"> log_filtROI.txt")
-            run("filter.pl "+str(inbase)+" "+str(config.FilterStrength)+" "+str(config.Filt_method)+" "+str(filtbase)+"> log_filtROI.txt")
+            run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.FilterStrength)+"> log_filtROI.txt")
+            # run("filter.pl "+str(inbase)+" "+str(config.FilterStrength)+" "+str(config.Filt_method)+" "+str(filtbase)+"> log_filtROI.txt")
           except Exception as e:
             logger.critical(e)
             logger.critical('Failed filtering {0} with ROI-PAC filter Failed!'.format(infile))
@@ -1125,9 +1125,13 @@ def unwrapping(config,kk):
             if config.unw_method == 'roi':
 
                 logger.info("Unwraped IFG:{0} with ROIPAC algorithm ".format(unwfile))
-                mask = path.splitext(filtSWfile)[0] + '_msk'
+                mask = path.splitext(filtROIfile)[0] + '_msk'
+                cut = path.splitext(filtROIfile)[0] + '_cut.flg'
 
-                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+" > log_unw_roi.txt")
+                if force:
+                    rm(mask); rm(cut)
+
+                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.0001)+" > log_unw_roi.txt")
                 run("new_cut.pl "+str(path.splitext(filtROIfile)[0])+" >> log_unw_roi.txt")
                 run("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+" >> log_unw_roi.txt")
@@ -1135,16 +1139,22 @@ def unwrapping(config,kk):
             if config.unw_method == 'icu':
 
                 logger.info("Unwraped IFG:{0} with ICU algorithm ".format(unwfile))
-                mask = path.splitext(filtSWfile)[0] + '_msk'
+                mask = path.splitext(filtROIfile)[0] + '_msk'
+                if force:
+                    rm(mask)
+
                 run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.02)+" > log_unw_icu.txt")
 
-                run("icu.pl "+str(path.splitext(infile)[0])+str(path.splitext(filtROIfile)[0])\
+                run("icu.pl "+str(path.splitext(infile)[0])+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(path.splitext(corfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])+" "+str(config.Filt_method)+" "+str(config.FilterStrength)+" "+"Phase_Sigma"+" 5 "+str(config.threshold_unw)+" >> log_unw_icu.txt")
 
             if config.unw_method == 'snaphu':
 
                 logger.info("Unwraped IFG:{0} with SNAPHU algorithm ".format(unwfile))
-                mask = path.splitext(filtSWfile)[0] + '_msk'
+                mask = path.splitext(filtROIfile)[0] + '_msk'
+                if force:
+                    rm(mask)
+
                 run("snaphu_mcf.pl smooth "+str(path.splitext(infile)[0])+" "+str(path.splitext(infile)[0])+" "+str(mask)+" "+str(path.splitext(corfile)[0])+" "+str(config.threshold_unw)+ " > log_unw_snaphu.txt")
                 snaphu_file = "lp_" + path.splitext(filtSWfile)[0] 
                 run("lowpass.pl "+str(path.splitext(filtROIfile)[0])+" "+str(path.splitext(corfile)[0])+" "+str(snaphu_file)+" 3 Phase_Sigma > log_unw_icu.txt")
@@ -1461,7 +1471,7 @@ proc_defaults = {
     "SWamplim": "0.05",
     "SWwindowsize": "8",
     "FilterStrength": "0.75", # strenght filter roi
-    "Filt_method": "psfilt", # could be: adapt_filt
+    "Filt_method": "adapt_filt", # could be: adapt_filt
     "unw_method": "roi",
     "threshold_unw": "0.35", # threshold on filtered colinearity 
     "threshold_unfilt": "0.03", # threshold on colinearity 

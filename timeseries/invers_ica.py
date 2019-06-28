@@ -14,7 +14,9 @@
 invers_ica.py
 InSAR Time Series ICA decomposition
 
-Usage: invers_ica.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--imref=<value>]  [--n_comp=<values>]  [--crop=<values>] [--resize=<values>] [--type=<space/time>] [--demfile=<path>] [--events=<values>] [--save_resize=<yes/no>] [--save_matrix=<yes/no>] [--smooth=<yes/no>] [--plot=<yes/no>] [--outdir=<path>]
+Usage: invers_ica.py [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--imref=<value>]  [--n_comp=<values>]  [--crop=<values>] \
+[--resize=<values>] [--type=<space/time>] [--demfile=<path>] [--events=<values>] [--save_resize=<yes/no>] [--save_matrix=<yes/no>] \
+[--smooth=<yes/no>] [--plot=<yes/no>] [--outdir=<path>]
 
 invers_ica.py -h | --help
 
@@ -110,7 +112,7 @@ def resize_2d_nonan(array,factor):
     if not (xsize %factor_x == 0 or ysize % factor_y == 0) :
         raise NameError('Factors must be intger multiple of array shape')
 
-    new_xsize, new_ysize = xsize/factor_x, ysize/factor_y
+    new_xsize, new_ysize = np.int(xsize/factor_x), np.int(ysize/factor_y)
 
     new_array = np.empty([new_xsize, new_ysize])
     new_array[:] = np.nan # this saves us an assignment in the loop below
@@ -388,9 +390,9 @@ S2 = S2[~np.any(np.isnan(S2), axis=1)]
 fig=plt.figure(3,figsize=(12,5))
 for i in range(n_comp):
     ax = fig.add_subplot(1,n_comp,1+i)
-    xmin = np.nanpercentile(S[:,i], 1)
-    xmax = np.nanpercentile(S[:,i], 99)
-    plt.xlim(xmin= xmin, xmax = xmax)
+    # xmin = np.nanpercentile(S[:,i], 1)
+    # xmax = np.nanpercentile(S[:,i], 99)
+    # plt.xlim(xmin= xmin, xmax = xmax)
     ax.hist(S2[:,i], 200,density=True)
 
 fig.suptitle('PDFs eigenvectors'.format(type_decomp))

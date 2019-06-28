@@ -36,12 +36,10 @@ def _getParameters(path, par=None, log=False):
     if par == None:
         par_files = glob.glob('%s/*par' % path)
     else:
-        par_files = os.path.join(path, par)
-
+        par_files = [os.path.join(path, par)]
 
     for file in par_files:
         params = _parseParameterFile(file)
-        # print (params)
 
         if check_required(required_int, params)\
               or check_required(required_slc, params):
@@ -77,5 +75,13 @@ def readgamma(filename,path='./', par=None):
         nlines = int(params['azimuth_lines'][0])
         
         return np.fromfile(filename, dtype='>f4').reshape(nlines, nrows)
+
+def readgamma_int(filename,path='./', par=None):
+
+        params = _getParameters(path,par,log=True)
+        nrows = int(params['range_samples'][0]) 
+        nlines = int(params['azimuth_lines'][0])
+        
+        return np.fromfile(filename, dtype='>c8').reshape(nlines, nrows)
 
 

@@ -238,31 +238,29 @@ for l in xrange((N)):
         d[index] = np.float('NaN')
     maps[mibeg:miend,mjbeg:mjend,l] = np.float('NaN')
 
-if arguments["--vmax"] ==  None:
-    vmax = np.nanpercentile(maps, 98)*4.4563
-else:
-    vmax = np.float(arguments["--vmax"])
-
-if arguments["--vmin"] ==  None:
-    vmin = np.nanpercentile(maps, 2)*4.4563 
-else:
-    vmin = np.float(arguments["--vmin"])
 
 # save clean ts
 fid = open(outfile, 'wb')
-maps.flatten().astype('float32').tofile(fid)
+maps[ibeg:iend,jbeg:jend,:].flatten().astype('float32').tofile(fid)
 fid.close()
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
 
-# vmax = np.abs([np.nanmedian(maps[:,:,-1]) + 1.*np.nanstd(maps[:,:,-1]),\
-#     np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
-# vmin = -vmax
+if arguments["--vmax"] ==  None:
+    vmax = np.nanpercentile(maps, 98)
+else:
+    vmax = np.float(arguments["--vmax"])
+
+if arguments["--vmin"] ==  None:
+    vmin = np.nanpercentile(maps, 2)
+else:
+    vmin = np.float(arguments["--vmin"])
+
 
 for l in xrange((N)):
-    d = as_strided(maps[ibeg:iend,jbeg:jend,l])*4.4563
+    d = as_strided(maps[ibeg:iend,jbeg:jend,l])
     #ax = fig.add_subplot(1,N,l+1)
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     #cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
