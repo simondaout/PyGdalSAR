@@ -16,7 +16,7 @@ plot_profile_r4.py
 Plot profiles for r4 files (slope_corr_var, APS_*, DEF_* ...) given a strike, an origin and the size of the profile
 
 Usage: plot_profile_r4.py [--lectfile=<path>] [--demfile=<path>] [--outfile=<path>] \
-[--ramp=<None/all/pos/neg>] [--rad2mm=<value>] [--cst=<value>] [--vmin=<value>] [--vmax=<value>] \
+[--ramp=<None/all/pos/neg>] [--rad2mm=<value>] [--cst=<value>] [--vmin=<value>] [--vmax=<value>] [--cpt=<values>] \
 --infile=<path> --strike=<value> <x0> <y0> <w> <l>
 plot_slope.py -h | --help
 
@@ -27,11 +27,12 @@ Options:
 --infile PATH       Path of the input file
 --outfile PATH      Create a flatten r4 file
 --ramp VALUE        flatten profile to the postitive distances (if ramp=pos), negative distances (if ramp=neg), or all the profile (if ramp=all) [default: None]
---cst VALUE         Shift the displacements by an optional cst [default:0]
+--cst VALUE         Shift the displacements by an optional constant [default:0]
 --strike VALUE      Azimuth of the profile
 --x0,y0 VALUES      Origine of the profile
 --w,l VALUES        Width and Length of the profile
 --rad2mm=<value>    Convert data [default: -4.4563] (sign - for positive toward the sat.)
+--cpt==<value>        Indicate colorscale for phase
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
 """
@@ -43,13 +44,16 @@ from os import path
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+import scipy.optimize as opt
+import scipy.linalg as lst
 
 # plot modules
 from pylab import *
+from pylab import setp
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib as mpl
-
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 # docopt (command line parser)
 import docopt
 
@@ -68,9 +72,16 @@ else:
    cst = float(arguments["--cst"])
 
 if arguments["--rad2mm"] ==  None:
-        rad2mm = 4.4563
+        rad2mm = -4.4563
 else:
         rad2mm = np.float(arguments["--rad2mm"])
+
+if arguments["--cpt"] is  None:
+    # cmap=cm.jet 
+    cmap=cm.rainbow
+else:
+    cmap=arguments["--cpt"]
+cmap.set_bad('white')
 
 x0 = int(arguments["<x0>"])
 y0 = int(arguments["<y0>"])
@@ -89,7 +100,7 @@ s=[math.sin(str),math.cos(str),0]
 n=[math.cos(str),-math.sin(str),0]
 
 # Load data and convert data
-los = -np.fromfile(arguments["--infile"],np.float32)*rad2mm
+los = np.fromfile(arguments["--infile"],np.float32)*rad2mm
 # clean los
 kk = np.flatnonzero(np.logical_or(los==0, los==9999))
 #kk = np.flatnonzero(los>9990)
@@ -134,14 +145,14 @@ if plotdem is 'yes':
     itopo = np.delete(iitopo,index)
 
 # estimate ramp
-if arguments["--ramp"] is 'pos':
-    kk = np.nonzero((iyp>0))
-elif arguments["--ramp"] is 'neg':
-    kk = np.nonzero((iyp<0))
-elif arguments["--ramp"] is 'all':
-    kk = np.arange(len(iyp))
-
 if arguments["--ramp"] is not None:
+    if arguments["--ramp"]=='pos':
+        kk = np.nonzero((iyp>0))
+    elif arguments["--ramp"]=='neg':
+        kk = np.nonzero((iyp<0))
+    elif arguments["--ramp"]=='all':
+        kk = np.arange(len(iyp))
+
     temp_los = ilos[kk]
     temp_yp = iyp[kk]
     G=np.zeros((len(temp_los),2))
@@ -149,7 +160,14 @@ if arguments["--ramp"] is not None:
     G[:,1] = 1
 
     # remove ramp
-    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),temp_los)
+    pars = lst.lstsq(G,temp_los)[0]
+    try:
+        _func = lambda x: np.sum(((np.dot(G,x)-temp_los))**2)
+        _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-temp_los))
+        pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
+    except:
+        pass
+    
     a = pars[0]; b = pars[1]
     blos = a*iyp + b - cst
     print 'Remove ramp estimated on the {}: '.format(arguments["--ramp"])
@@ -175,11 +193,11 @@ else:
 if arguments["--vmax"] is not  None:
     vmax = np.float(arguments["--vmax"])
 else:
-    vmax = np.nanpercentile(ilos,99.)
+    vmax = np.nanpercentile(ilos,98.)
 if arguments["--vmin"] is not  None:
     vmin = np.float(arguments["--vmin"])
 else:
-    vmin = np.nanpercentile(ilos,1.)
+    vmin = np.nanpercentile(ilos,2.)
 
 
 # plot profile
@@ -281,26 +299,22 @@ vmin -= cst
 # plot map profile
 ax2=fig.add_subplot(1,2,2)
 #cax2 = ax2.imshow(insar[y0-w:y0+w,x0-w:x0+w],cmap=cm.jet,vmax=vmax,vmin=vmin,extent=None)
-cax2 = ax2.imshow(insar,cmap=cm.jet,vmax=vmax,vmin=vmin,extent=None)
+cax2 = ax2.imshow(insar,cmap=cmap,vmax=vmax,vmin=vmin,alpha=0.6)
 #ax2.plot(xp[:],yp[:],color='black',lw=1.)
 ax2.legend(loc=3)
 setp( ax2.get_xticklabels(), visible=False)
 ax2.set_title('Velocity map and profile')
 # add colorbar
-cbar = fig.colorbar(cax2,fraction=0.3,shrink=.5)
+divider = make_axes_locatable(ax2)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax2, cax=c)
 
 # plot map
 ax3=fig.add_subplot(1,2,1)
-cax3 = ax3.imshow(insar,cmap=cm.jet,vmax=vmax,vmin=vmin,extent=None)
+cax3 = ax3.imshow(insar,cmap=cmap,vmax=vmax,vmin=vmin,extent=None,alpha=0.6)
 ax3.plot(xp[:],yp[:],color='black',lw=1.)
 ax3.legend(loc=3)
 setp( ax3.get_xticklabels(), visible=False)
-#ax3.set_title('Velocity Map')
-
-# add colorbar
-#cbar = fig.colorbar(cax3)
-#cbar = fig.colorbar(cax3,ticks=[-1, 0, 1])
-#cbar.ax.set_yticklabels(['< -{}'.format(vmax), '0', '> {}'.format(vmax)])# vertically oriented colorbar
 
 
 fig.savefig(name+'_map_profile.eps', format='EPS')

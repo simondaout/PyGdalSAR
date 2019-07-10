@@ -219,8 +219,8 @@ elif (arguments["--vmax"] is not None) or (arguments["--vmin"] is not None):
     if arguments["--vmin"] is not  None:
         vmin = np.float(arguments["--vmin"])
 else:
-    vmax = np.nanpercentile(cutphi,95)
-    vmin = np.nanpercentile(cutphi,5)
+    vmax = np.nanpercentile(cutphi,98)
+    vmin = np.nanpercentile(cutphi,2)
 
 cax = ax.imshow(cutphi, cmap, interpolation=None,vmax=vmax,vmin=vmin,alpha=0.6)
 

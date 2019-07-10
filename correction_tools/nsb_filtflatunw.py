@@ -754,8 +754,9 @@ def flat_atmo(config, kk):
 
         if force:
             rm(outfile); rm(topfile)
-        do = checkoutfile(config,outfile)
-        if do:
+        do1 = checkoutfile(config,outfile)
+        do2 = checkoutfile(config,stratfile)
+        if ((do1==True) or (do2==True)):
             try:
                 run("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
                 +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" "+str(config.thresh_amp_atmo)+" "+\
@@ -1175,16 +1176,20 @@ def add_atmo_back(config,kk):
     with Cd(config.stack.getpath(kk)):
 
         # look strat file
-        stratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
-        look_file(config,stratfile)
+        instratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
         
         # update look unw in case not done already
         config.stack.updatelook(kk,config.Rlooks_unw)
+        
+        stratfile = config.stack.getstratfile(kk) + '.unw'
+        if force:
+          rm(stratfile)
+        look_file(config,instratfile); checkinfile(stratfile)
+        
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
         if "_flatz" in unwfile:
-            stratfile = config.stack.getstratfile(kk) + '.unw'; checkinfile(stratfile)
             unwrsc = unwfile + '.rsc'
 
             # update names
@@ -1552,10 +1557,10 @@ Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 # init logger 
 if arguments["-v"]:
     logging.basicConfig(level=logging.DEBUG,\
-        format='%(asctime)s -- %(levelname)s -- %(message)s')
+        format='%(filename)s -- line %(lineno)s -- %(levelname)s -- %(message)s')
 else:
     logging.basicConfig(level=logging.INFO,\
-        format='%(asctime)s -- %(levelname)s -- %(message)s')
+        format='%(filename)s -- line %(lineno)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('filtflatunw_log.log')
 
 # initialise job list
