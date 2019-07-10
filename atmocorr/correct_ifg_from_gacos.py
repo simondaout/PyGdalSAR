@@ -414,10 +414,8 @@ def correct_ifg(kk):
     rms_ref = rms_map[indexref].flatten()
     amp_ref = 1./rms_ref
     amp_ref = amp_ref/np.nanpercentile(amp_ref,99)
-    print 'Ref area set to zero:', refstart,refend
     # weigth average of the phase
     cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
-    print 'Average phase within ref area:', cst
 
     # digitize los_map in bins, compute median and std
     bins = np.arange(gacosmin,gacosmax,abs(gacosmax-gacosmin)/500.)
@@ -465,13 +463,12 @@ def correct_ifg(kk):
     elif (ramp == 'lin' and  fitmodel=='no'):
         # here we want to minimize los_map-gacos = ramp
         # invers both digitized los_map and ref frame together
-        d = np.hstack([losbins-modelbins,cst])
-        # give a strong weigth to ref frame
-        sigmad = np.hstack([losstd,1e-3])       
+        d = losbins-modelbins
+        sigmad = losstd
 
         G=np.zeros((len(d),3))
-        G[:-1,0] = xbins
-        G[:-1,1] = ybins
+        G[:,0] = xbins
+        G[:,1] = ybins
         G[:,2] = 1
 
         x0 = lst.lstsq(G,d)[0]
@@ -506,17 +503,16 @@ def correct_ifg(kk):
     elif fitmodel=='yes':
         # invers both digitized los_map and ref frame together
         # here we invert los_map = a*gacos + ramp
-        d = np.hstack([losbins,cst])
-        # give a strong weigth to ref frame
-        sigmad = np.hstack([losstd,1e-3])       
+        d = losbins
+        sigmad = losstd   
             
         G=np.zeros((len(d),6))
-        G[:-1,0] = xbins**2
-        G[:-1,1] = xbins
-        G[:-1,2] = ybins**2
-        G[:-1,3] = ybins
+        G[:,0] = xbins**2
+        G[:,1] = xbins
+        G[:,2] = ybins**2
+        G[:,3] = ybins
         G[:,4] = 1
-        G[:-1,5] = modelbins
+        G[:,5] = modelbins
 
         x0 = lst.lstsq(G,d)[0]
         # print x0
@@ -568,19 +564,21 @@ def correct_ifg(kk):
     # model = gacos + ramp
     model_flat[:,:,l] = gacos[:,:,l] + remove_ramp
 
-    # # Refer los_map again (just to check)
-    # rms_ref = rms[indexref].flatten()
-    # amp_ref = 1./rms_ref
-    # amp_ref = amp_ref/np.nanmax(amp_ref)
-    # cst = np.nansum(los_map_flat[indexref]*amp_ref) / np.nansum(amp_ref)
-    # print 'Average phase within ref area, iter=2:', cst 
-    # los_map_flat = los_map_flat - cst
+    # Refer los_map again (just to check)
+    rms_ref = rms[indexref].flatten()
+    amp_ref = 1./rms_ref
+    amp_ref = amp_ref/np.nanmax(amp_ref)
+    cst = np.nansum(los_map_flat[indexref]*amp_ref) / np.nansum(amp_ref)
+    print 'Ref. area set to zero:', refstart,refend
+    print 'Average phase within ref. area:', cst 
+    los_map_flat = los_map_flat - cst
+    los_map_flat[np.isnan(los_map)] = np.float('NaN')
+    los_map_flat[los_map_flat>999.]= np.float('NaN')
 
     # compute variance flatten los_map
     var[l] = np.sqrt(np.nanmean(los_map_flat**2))
     print 'Var: ', var[l]
 
-    
     # initiate figure depl
     fig = plt.figure(nfigure,figsize=(14,7))
     nfigure += 1

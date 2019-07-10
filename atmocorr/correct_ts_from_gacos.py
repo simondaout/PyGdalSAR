@@ -373,12 +373,11 @@ for l in xrange((N)):
     rms_ref = rms[indexref].flatten()
     amp_ref = 1./rms_ref
     amp_ref = amp_ref/np.nanpercentile(amp_ref,99)
-    print 'Ref area set to zero:', refstart,refend
     # weigth average of the phase
     rg_ref, az_ref,model_ref = np.nanmean(pix_col[indexref]),np.nanmean(pix_lin[indexref]),np.nanmean(model[indexref])
     cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
-    print 'Average phase within ref area:', cst
-    logger.info('Average rg: {0}, az:{1}, topo:{2}, within ref area'.format(np.int(rg_ref), np.int(az_ref), np.int(model_ref)))
+    # print 'Average phase within ref area:', cst
+    # logger.info('Average rg: {0}, az:{1}, topo:{2}, within ref area'.format(np.int(rg_ref), np.int(az_ref), np.int(model_ref)))
 
     # digitize data in bins, compute median and std
     bins = np.arange(gacosmin,gacosmax,abs(gacosmax-gacosmin)/500.)
@@ -426,16 +425,13 @@ for l in xrange((N)):
     elif (ramp == 'lin' and  fitmodel=='no'):
         # here we want to minimize data-gacos = ramp
         # invers both digitized data and ref frame together
-        d = np.hstack([losbins-modelbins,cst])
-        # give a strong weigth to ref frame
-        sigmad = np.hstack([losstd,1e-3])       
+        d = losbins-modelbins
+        sigmad = losstd  
 
         G=np.zeros((len(d),3))
-        G[:-1,0] = xbins
-        G[:-1,1] = ybins
+        G[:,0] = xbins
+        G[:,1] = ybins
         G[:,2] = 1
-        G[-1,0] = az_ref
-        G[-1,1] = rg_ref
 
         x0 = lst.lstsq(G,d)[0]
         # print x0
@@ -469,22 +465,16 @@ for l in xrange((N)):
     elif fitmodel=='yes':
         # invers both digitized data and ref frame together
         # here we invert data = a*gacos + ramp
-        d = np.hstack([losbins,cst])
-        # give a strong weigth to ref frame
-        sigmad = np.hstack([losstd,1e-3])       
+        d = losbins
+        sigmad = losstd   
             
         G=np.zeros((len(d),6))
-        G[:-1,0] = xbins**2
-        G[:-1,1] = xbins
-        G[:-1,2] = ybins**2
-        G[:-1,3] = ybins
+        G[:,0] = xbins**2
+        G[:,1] = xbins
+        G[:,2] = ybins**2
+        G[:,3] = ybins
         G[:,4] = 1
-        G[:-1,5] = modelbins
-        G[-1,0] = az_ref**2
-        G[-1,1] = az_ref
-        G[-1,2] = rg_ref**2
-        G[-1,3] = rg_ref
-        G[-1,5] = modelref
+        G[:,5] = modelbins
 
         x0 = lst.lstsq(G,d)[0]
         # print x0
@@ -530,8 +520,8 @@ for l in xrange((N)):
     # correction
     # data_flat = data - (gacos + ramp)
     data_flat[:,:] = data - remove
-    data_flat[np.isnan(data)] = np.float('NaN')
-    data_flat[data_flat>999.]= np.float('NaN')
+    # data_flat[np.isnan(data)] = np.float('NaN')
+    # data_flat[data_flat>999.]= np.float('NaN')
     
     # model = gacos + ramp
     model_flat[:,:,l] = gacos[:,:,l] + remove_ramp
@@ -541,8 +531,11 @@ for l in xrange((N)):
     amp_ref = 1./rms_ref
     amp_ref = amp_ref/np.nanmax(amp_ref)
     cst = np.nansum(data_flat[indexref]*amp_ref) / np.nansum(amp_ref)
-    print 'Average phase within ref area, iter=2:', cst 
+    print 'Ref area set to zero:', refstart,refend
+    print 'Average phase within ref area:', cst 
     data_flat = data_flat - cst
+    data_flat[np.isnan(data)] = np.float('NaN')
+    data_flat[data_flat>999.]= np.float('NaN')
 
     # compute variance flatten data
     var[l] = np.sqrt(np.nanmean(data_flat**2))
