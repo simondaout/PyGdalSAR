@@ -19,7 +19,7 @@ options:
   --nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
-  --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list =replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
+  --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list = check_look/replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
 Job list is: erai look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
@@ -266,6 +266,14 @@ class PileInt:
     def getfix(self,kk):
         return self._ifgs[kk].prefix, self._ifgs[kk].suffix
 
+    def get_default_name(self,kk):
+        ''' Return interfergram file name at 2looks'''
+        return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_2rlks'
+
+    def get_default_cor(self,kk):
+        ''' Return cohrence file name at 2looks'''
+        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_2rlks.cor'
+
     def getname(self,kk):
         ''' Return interfergram file name '''
         return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  \
@@ -448,6 +456,47 @@ def look_file(config,file):
             logger.critical(e)
             config.stack.updatesuccess(kk)
             print(look_file.__doc__)
+
+def check_look(config,kk):
+    ''' This function aims at multilooking all your IFGs and radar file to Rlooks_int. 
+    To be used at a first stage of the processing if you want to corrrect your wrapped Ifgs to a higher look that the look they have been generated.
+    Attention: Default hardcoding factor of Rlooks_int-2. Igs are assumed to be generated at 2looks.. need to add a new argument to change that.
+    Requiered parameters:  Rlooks_int
+    '''
+
+    with Cd(config.stack.getpath(kk)):
+
+        infile = config.stack.get_default_name(kk) + '.int'; checkinfile(infile)
+        corfile = config.stack.get_default_cor(kk); checkinfile(corfile)
+
+        outfile =  config.stack.getname(kk) + '.int'
+        outcor =  config.stack.getcor(kk)
+
+        do = checkoutfile(config,outfile)
+        if do:
+            try:
+                run("look.pl "+str(infile)+" "+str(config.rlook)+" > log_look.txt")
+            except Exception as e:
+                logger.critical(e)
+                logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
+                print(look_pre.__doc__)
+                config.stack.updatesuccess(kk)
+        
+        do = checkoutfile(config,outcor)
+        if do:
+            try:
+                run("look.pl "+str(corfile)+" "+str(look_factor)+" >> log_look.txt")
+            except Exception as e:
+                logger.critical(e)
+                logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
+                print(look_pre.__doc__)
+                config.stack.updatesuccess(kk)
+                
+        # update size
+        width,length = computesize(config,outfile)
+        config.stack.updatesize(kk,width,length)
+
+        return config.getconfig(kk)
 
 def computesize(config,file):
     ''' Extract width anf length with gdal
@@ -754,9 +803,8 @@ def flat_atmo(config, kk):
 
         if force:
             rm(outfile); rm(topfile)
-        do1 = checkoutfile(config,outfile)
-        do2 = checkoutfile(config,stratfile)
-        if ((do1==True) or (do2==True)):
+        do = checkoutfile(config,outfile)
+        if do:
             try:
                 run("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
                 +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" "+str(config.thresh_amp_atmo)+" "+\
@@ -782,27 +830,27 @@ def flat_atmo(config, kk):
 
         b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
 
-        if ((config.jend_mask > config.jbeg_mask) or (config.iend_mask > config.ibeg_mask)) and config.ivar<2 :
-            sys.exit(0)
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask))) and int(config.ivar)<2 :
+            
             b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
 
             index = np.nonzero(
-            np.logical_and(coh>config.thresh_amp_atmo,
+            np.logical_and(coh>np.float(config.thresh_amp_atmo),
             np.logical_and(deltaz>75.,
-            np.logical_and(np.logical_or(i<config.ibeg_mask,pix_az>config.iend_mask),
-            np.logical_or(j<config.jbeg_mask,j>config.jend_mask),
+            np.logical_and(np.logical_or(i<int(config.ibeg_mask),j>int(config.iend_mask)),
+            np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
             ))))
 
             phi_select = phi[index]
             z_select = z[index]
 
-            if config.nfit_atmo == -1:
+            if config.nfit_atmo == str(-1):
                 b1 = np.nanmedian(phi_select)
                 fit = z_select*b1
-            elif config.nfit_atmo == 0:
+            elif config.nfit_atmo == str(0):
                 b1 = np.nanmean(phi_select)
                 fit = z_select*b1
-            elif config.nfit_atmo == 1:
+            elif config.nfit_atmo == str(1):
                 from sklearn.linear_model import LinearRegression
                 model = LinearRegression()
                 model.fit(z_select, phi_select)
@@ -817,7 +865,9 @@ def flat_atmo(config, kk):
             
             # save median phase/topo
             strattxt = path.splitext(infile)[0] + '_strat.top'
-            np.savetxt(strattxt, np.array([b1, b2, b3, b4]), header='# z   |   z**2   |   z**3   |   z**4  ' ,  fmt=('%.8f','%.8f','%.8f','%.8f'))
+            wf = open(strattxt, "w")
+            wf.write("  %.8f  %.8f  %.8f  %.8f  %.8f  %.8f\n" % (b1, b2, b3, b4, 0, 0))
+            wf.close()
             
             # clean and prepare for write strat
             infileunw = path.splitext(infile)[0] + '.unw'
@@ -839,7 +889,7 @@ def flat_atmo(config, kk):
             rm(stratfile)
             try:
                 run("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
-                    +" "+str(nfit_atmo)+" "+str(ivar)+" "+str(config.z_ref)+" >> log_flatatmo.txt")
+                    +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" >> log_flatatmo.txt")
             except Exception as e:
                 logger.critical(e)
                 logger.critical("Failed creating stratified file: {0}".format(stratfile))
@@ -884,7 +934,7 @@ def flat_atmo(config, kk):
         fig = plt.figure(0)
         ax = fig.add_subplot(1,1,1)
         # lets not plot dphi but phi
-        ax.plot(z,phi*z,'.',alpha=.6)
+        ax.plot(z,phi*z,'.',label='all points',alpha=.4)
         ax.plot(z_select,phi_select*z_select,'.',label='selected points',alpha=.6)
         ax.plot(z_select,fit-cst,'-r',lw=3,label='Fit: {0:.3f}z + {1:.3f}z**2 + {2:.3f}z**3 + {3:.3f}z**4'.format(b1,b2,b3,b4))
         ax.set_xlabel('Elevation (m)')
@@ -1176,20 +1226,16 @@ def add_atmo_back(config,kk):
     with Cd(config.stack.getpath(kk)):
 
         # look strat file
-        instratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
+        stratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
+        look_file(config,stratfile)
         
         # update look unw in case not done already
         config.stack.updatelook(kk,config.Rlooks_unw)
-        
-        stratfile = config.stack.getstratfile(kk) + '.unw'
-        if force:
-          rm(stratfile)
-        look_file(config,instratfile); checkinfile(stratfile)
-        
 
         # the final product is always filtROI
         unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
         if "_flatz" in unwfile:
+            stratfile = config.stack.getstratfile(kk) + '.unw'; checkinfile(stratfile)
             unwrsc = unwfile + '.rsc'
 
             # update names
@@ -1238,8 +1284,7 @@ def add_flatr_back(config,kk):
             param = config.stack.getflatrfile(kk)
             unwrsc = unwfile + '.rsc'
 
-            # assume flatr done on Rlooks_int...but it is always the case?
-            look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
+            # look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
 
             # update names
             prefix, suffix = config.stack.getfix(kk)
@@ -1256,7 +1301,7 @@ def add_flatr_back(config,kk):
                 if do:
                     try:
                         run("length.pl "+str(unwfile))
-                        run("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+" >> log_flatr.txt")
+                        run("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(config.rlook)+" >> log_flatr.txt")
                     except Exception as e:
                         logger.critical(e)
                         logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
@@ -1294,7 +1339,7 @@ def add_flata_back(config,kk):
             unwrsc = unwfile + '.rsc'
 
             # assume flatr done on Rlooks_int...but it is always the case?
-            look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
+            # look_factor = int(config.Rlooks_unw) / int(config.Rlooks_int)
 
             # update names
             prefix, suffix = config.stack.getfix(kk)
@@ -1311,7 +1356,7 @@ def add_flata_back(config,kk):
                 if path.exists(outfile) == False:
                     try:
                         run("length.pl "+str(unwfile))
-                        run("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(look_factor)+" >> log_flata.txt")
+                        run("correct_rgaz_unw.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --param="+str(param)+" --rlook_factor="+str(config.rlook)+" >> log_flata.txt")
                     except Exception as e:
                         logger.critical(e)
                         logger.critical('Failed adding back {0} on IFG: {1}'.format(param,unwfile))
@@ -1557,10 +1602,10 @@ Image = collections.namedtuple('Image', 'date decimal_date temporal_baseline')
 # init logger 
 if arguments["-v"]:
     logging.basicConfig(level=logging.DEBUG,\
-        format='%(filename)s -- line %(lineno)s -- %(levelname)s -- %(message)s')
+        format='%(asctime)s -- %(levelname)s -- %(message)s')
 else:
     logging.basicConfig(level=logging.INFO,\
-        format='%(filename)s -- line %(lineno)s -- %(levelname)s -- %(message)s')
+        format='%(asctime)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('filtflatunw_log.log')
 
 # initialise job list
@@ -1603,7 +1648,8 @@ for p in jobs:
         proc["FilterStrength"], proc["Filt_method"], 
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"]], 
-        prefix=prefix, suffix=suffix, look=look, model=model, force=force
+        prefix=prefix, suffix=suffix, look=look, model=model, force=force, 
+        ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask,
         ) 
 
     print()
