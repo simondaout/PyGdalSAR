@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -102,7 +102,7 @@ else:
 nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 # nb images
 N=len(dates)
-print 'Number images: ', N
+print('Number images: ', N)
 
 # plot diplacements maps
 fig, ax = plt.subplots(1)
@@ -121,7 +121,7 @@ lat,lon = ds_geo[3]+ds_geo[5]*pix_az, ds_geo[0]+ds_geo[1]*pix_rg
 minx,maxx,maxy,miny = ds_geo[0], ds_geo[0]+ ds_geo[1]*ds.RasterXSize, ds_geo[3], ds_geo[3]+ds_geo[5]*ds.RasterYSize  
 
 if arguments["--geocrop"] is not  None:
-    geocrop = map(float,arguments["--geocrop"].replace(',',' ').split())
+    geocrop = list(map(float,arguments["--geocrop"].replace(',',' ').split()))
     latbeg,latend,lonbeg,lonend = float(geocrop[0]),float(geocrop[1]),float(geocrop[2]),float(geocrop[3])
 else:
     latbeg,latend,lonbeg,lonend = miny,maxy,minx,maxx
@@ -149,10 +149,10 @@ m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=1)
 def f(i):
     global idates
 
-    plt.title(idates[i],fontsize=6)
+    # plt.title(idates[i])
     infile = 'geo_'+str(idates[i])+'_'+str(i)+'.unw'
     rscfile = 'geo_'+str(idates[i])+'_'+str(i)+'.unw.rsc'
-    print 'Read image {}: {}'.format(i,infile)
+    print('Read image {}: {}'.format(i,infile))
 
     ds = gdal.Open(infile, gdal.GA_ReadOnly)
     ds_band2 = ds.GetRasterBand(2)
@@ -174,9 +174,11 @@ im = ax.imshow(f(i),extent=(minx,maxx,miny,maxy),cmap=cmap,\
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=c)
-
-# m.drawparallels(np.arange(latbeg,latend,.5),linewidth=0.05,dashes=[1, 0],zorder=3)
-# m.drawmeridians(np.arange(lonbeg,lonend,.5),linewidth=0.05,dashes=[1, 0],zorder=3)
+# fig.colorbar(im, orientation='vertical',aspect=10)
+m.drawparallels(np.arange(latbeg,latend,.5),linewidth=0.05,dashes=[1, 0],zorder=3)
+m.drawmeridians(np.arange(lonbeg,lonend,.5),linewidth=0.05,dashes=[1, 0],zorder=3)
+m.drawparallels(np.arange(latbeg,latend,.5),labels=[1,0,0,0],zorder=3)
+m.drawmeridians(np.arange(lonbeg,lonend,.5),labels=[0,0,0,1],zorder=3)
 # plt.show()
 # sys.exit()
 
@@ -188,7 +190,7 @@ def updatefig(frame):
     return im,
 
 # Animate
-ani = animation.FuncAnimation(fig, updatefig, frames=range(1,N),  interval=200, blit=True)
+ani = animation.FuncAnimation(fig, updatefig, frames=range(1,2*N),  interval=600, blit=True)
 
 if arguments["--output"] is not None:
     base = os.path.splitext(arguments["--output"])[0]
