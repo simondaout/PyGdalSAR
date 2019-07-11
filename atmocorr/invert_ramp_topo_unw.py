@@ -2063,9 +2063,9 @@ logger.info('read input files list_coeff_ramps.txt and corection_matrix')
 
 # load spint
 if sformat == 'ROI_PAC':
-    date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m=np.loadtxt('list_coeff_ramps_{}.txt'.format(suffout),comments="#",unpack=True,dtype='i,i,f,f,f,f,f,f,f,f,f,f,f,f,f,f')
+    date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m=np.loadtxt('list_coeff_ramps{}.txt'.format(suffout),comments="#",unpack=True,dtype='i,i,f,f,f,f,f,f,f,f,f,f,f,f,f,f')
 else:
-    date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m=np.loadtxt(out_path+'list_coeff_ramps_{}.txt'.format(suffout),comments="#",unpack=True,dtype='i,i,f,f,f,f,f,f,f,f,f,f,f,f,f,f')
+    date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m=np.loadtxt(out_path+'list_coeff_ramps{}.txt'.format(suffout),comments="#",unpack=True,dtype='i,i,f,f,f,f,f,f,f,f,f,f,f,f,f,f')
 spint = np.vstack([date_1,date_2,length,a,b,c,d,e,f,g,h,i,j,k,l,m]).T
 rec_spint = np.copy(spint)
 
