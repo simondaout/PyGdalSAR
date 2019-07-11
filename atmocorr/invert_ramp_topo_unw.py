@@ -2054,12 +2054,12 @@ if estim=='yes':
     if sformat == 'ROI_PAC':
         np.savetxt('rms{}.txt'.format(suffout), rmsint, header='# date1   |   dates2   |   RMS', fmt=('%i','%i','%.8f'))
     else:
-        np.savetxt(out_path+'rms_{}.txt'.format(suffout), rmsint, header='# date1   |   dates2   |   RMS', fmt=('%i','%i','%.8f'))
+        np.savetxt(out_path+'rms{}.txt'.format(suffout), rmsint, header='# date1   |   dates2   |   RMS', fmt=('%i','%i','%.8f'))
 
 #####################################################################################
 
 print()
-logger.info('read input files list_coeff_ramps.txt and corection_matrix')
+logger.info('read input files list_coeff_ramps.txt')
 
 # load spint
 if sformat == 'ROI_PAC':
