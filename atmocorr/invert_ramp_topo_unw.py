@@ -93,6 +93,7 @@ import matplotlib
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime
 import time
 import logging
@@ -1577,6 +1578,7 @@ def apply_cor(kk, sp, sp_inv):
     else:
         flatlos = flatlos - cst
         corr_inv = corr_inv + cst
+        corr = corr + cst
     logger.info('Remove reference frame: {}'.format(cst))
 
     # reset to 0 areas where no data (might change after time series inversion?)
@@ -1610,30 +1612,49 @@ def apply_cor(kk, sp, sp_inv):
 
     fig = plt.figure(5,figsize=(9,4))
 
-    _los_map = np.copy(flatlos)
+    _los_map = np.copy(los_map)
     _los_map[los_map==0] = np.float('NaN')
-    vmin,vmax=np.nanpercentile(_los_map,.5),np.nanpercentile(_los_map,99.5)
+    vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
     
     ax = fig.add_subplot(1,4,1)
-    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=0.7,interpolation=None)
+    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
     ax.set_title('LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,4,2)
-    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=0.7,interpolation=None)
-    ax.set_title('RAMP+TOPO ORIG')
+    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    ax.set_title('RAMP+TOPO ORIG.')
     plt.setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,4,3)
-    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=0.7,interpolation=None)
+    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
     ax.set_title('RAMP+TOPO RECONST.')
     plt.setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+    _los_map = np.copy(flatlos)
+    _los_map[los_map==0] = np.float('NaN')
+    vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
 
     ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=0.7,interpolation=None)
-    ax.set_title('CORR LOS RECONST.')
+    cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    ax.set_title('CORRECTED LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
     fig.tight_layout()
 
     if sformat == 'ROI_PAC':
@@ -2073,7 +2094,7 @@ rec_spint = np.copy(spint)
 if sformat == 'ROI_PAC':
     rmsint = np.loadtxt('rms{}.txt'.format(suffout),comments="#")
 else:
-    rmsint = np.loadtxt('rms{}.txt'.format(suffout),comments="#")
+    rmsint = np.loadtxt(out_path+'rms{}.txt'.format(suffout),comments="#")
 
 ####################################################################################
 
