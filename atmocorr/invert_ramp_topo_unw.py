@@ -20,7 +20,7 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 [--cohpixel=<yes/no>] [--threshold_coh=<value>] [--ibeg_mask=<value>] [--iend_mask=<value>] \
 [--perc=<value>] [--perc_topo=<value>] [--min_topo=<value>] [--max_topo=<value>] [--perc_slope=<value>] [--samp=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
-[<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] 
+[<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] [--cpt=<path>] 
 
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
@@ -77,6 +77,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --iend VALUE          Line number bounding the estimation zone [default: mlines]
 --jbeg VALUE          Column numbers bounding the estimation zone [default: 0]
 --jend VALUE          Column numbers bounding the estimation zone [default: mcols] 
+--cpt==<path>         Indicate colormap for plots [default: cm.rainbows]
 """
 
 
@@ -94,6 +95,8 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.colors import LinearSegmentedColormap
+
 from datetime import datetime
 import time
 import logging
@@ -1220,7 +1223,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
     # plt.imshow(corr)
     # plt.show()
 
-    return sol, corr, rms, rgbins, azbins, topobins, losbins
+    return sol, corr, rms, rgbins, azbins, topobins, losbins, losstd
 
 def empirical_cor(kk):
     """
@@ -1383,7 +1386,7 @@ def empirical_cor(kk):
       ivar_temp=ivar
 
     # try:
-    sol, corr, rms, rgbins, azbins, topobins, losbins = estim_ramp(los_map.flatten(),
+    sol, corr, rms, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
     los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
     temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
 
@@ -1406,6 +1409,7 @@ def empirical_cor(kk):
        z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
        ax.scatter(elev_clean[::5],los_clean[::5] - func[::5], s=0.005, alpha=0.05,rasterized=True)
        ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+       ax.fill_between(topobins,losbins-losstd-funcbins,losbins+losstd-funcbins,color='red',alpha=0.3,label='sliding RMS')
 
        if nfit==0:
             ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
@@ -1428,23 +1432,36 @@ def empirical_cor(kk):
     fig = plt.figure(3,figsize=(11,4))
 
     ax = fig.add_subplot(1,4,1)
-    hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None,alpha=.8)
+    cax = ax.imshow(los_map,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,4,2)
-    cax = ax.imshow(spacial_mask,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None)
+    cax = ax.imshow(spacial_mask,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('LOS ESTIMATION')
     plt.setp( ax.get_xticklabels(), visible=None)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+    _los_map = np.copy(corr)
+    _los_map[los_map==0] = np.float('NaN')
+    vmax = np.nanpercentile(_los_map,98)
+    vmin = np.nanpercentile(_los_map,2)
 
     ax = fig.add_subplot(1,4,3)
-    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,interpolation=None)
+    cax = ax.imshow(corr,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('RAMP+TOPO')
     plt.setp( ax.get_xticklabels(), visible=None)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
 
     # for plot we can clean
     k = np.nonzero(np.logical_or(los_map==0.,abs(los_map)>999.))
@@ -1458,10 +1475,13 @@ def empirical_cor(kk):
 
     ax = fig.add_subplot(1,4,4)
     hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
-    cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
+    cax = ax.imshow(flatlos,cmap=cmap,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
     ax.set_title('CORR LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
     fig.tight_layout()
 
     if sformat == 'ROI_PAC':
@@ -1617,7 +1637,7 @@ def apply_cor(kk, sp, sp_inv):
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
     
     ax = fig.add_subplot(1,4,1)
-    cax = ax.imshow(los_map,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    cax = ax.imshow(los_map,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
     ax.set_title('LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
@@ -1626,7 +1646,7 @@ def apply_cor(kk, sp, sp_inv):
     plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,4,2)
-    cax = ax.imshow(corr,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    cax = ax.imshow(corr,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
     ax.set_title('RAMP+TOPO ORIG.')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
@@ -1635,7 +1655,7 @@ def apply_cor(kk, sp, sp_inv):
     plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,4,3)
-    cax = ax.imshow(corr_inv,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    cax = ax.imshow(corr_inv,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
     ax.set_title('RAMP+TOPO RECONST.')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
@@ -1648,7 +1668,7 @@ def apply_cor(kk, sp, sp_inv):
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
 
     ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(flatlos,cmap=cm.gist_rainbow,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    cax = ax.imshow(flatlos,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
     ax.set_title('CORRECTED LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
@@ -1841,6 +1861,14 @@ if arguments["--samp"] == None:
 else:
     samp = int(arguments["--samp"])
 
+if arguments["--cpt"] is  None:
+    cmap=cm.rainbow
+else:  
+    try:
+        cmap = LinearSegmentedColormap.from_list(arguments["--cpt"].split("/")[-1].split('.')[0], np.loadtxt(arguments["--cpt"]))
+    except:
+        cmap=arguments["--cpt"]
+
 # print(nproc, plot)
 # sys.exit()
 
@@ -1980,10 +2008,12 @@ if maskfile is not None:
 
       fig = plt.figure(0,figsize=(5,4))
       ax = fig.add_subplot(1,1,1)
-      cax = ax.imshow(spacial_mask,cmap=cm.jet)
+      cax = ax.imshow(spacial_mask,cmap=cmap)
       ax.set_title('Mask')
       plt.setp( ax.get_xticklabels(), visible=None)
-      fig.colorbar(cax, orientation='vertical',aspect=10)
+      divider = make_axes_locatable(ax)
+      c = divider.append_axes("right", size="5%", pad=0.05)
+      plt.colorbar(cax, cax=c)
       plt.show()
       fid.close()
 
