@@ -1449,11 +1449,7 @@ def empirical_cor(kk):
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
 
-    _los_map = np.copy(corr)
-    _los_map[los_map==0] = np.float('NaN')
-    vmax = np.nanpercentile(_los_map,98)
-    vmin = np.nanpercentile(_los_map,2)
-
+    # colormap correction must be same than data!!
     ax = fig.add_subplot(1,4,3)
     cax = ax.imshow(corr,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('RAMP+TOPO')
