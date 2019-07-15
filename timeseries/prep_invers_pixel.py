@@ -143,11 +143,10 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
          print('Error: sigma file not the same size that the number of interferograms')
          sys.exit()
       weigth = np.array(w2)
-    else:
-      wf = open(os.path.join(tsdir, "list_pair"), "w")
-      for i in xrange((kmax)):
+    wf = open(os.path.join(tsdir, "list_pair"), "w")
+    for i in xrange((kmax)):
         wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
-      wf.close()
+    wf.close()
 elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      print('Weigth interferograms based on their baselines with Btc:{} and Bpc:{}'.format(btc,bpc))
      do_sig = int(0)
