@@ -1,7 +1,7 @@
-bin
 build
 *.eps
 depl_cumule_noramps
 depl_cumule_flat
 *.pyc
-__init__.py
+parsers/__init__.py
+parsers/*.pyc
