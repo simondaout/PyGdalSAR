@@ -112,6 +112,7 @@ def resize_2d_nonan(array,factor):
     if not (xsize %factor_x == 0 or ysize % factor_y == 0) :
         raise NameError('Factors must be intger multiple of array shape')
 
+    # new_xsize, new_ysize = xsize/factor_x, ysize/factor_y
     new_xsize, new_ysize = np.int(xsize/factor_x), np.int(ysize/factor_y)
 
     new_array = np.empty([new_xsize, new_ysize])
