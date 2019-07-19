@@ -107,7 +107,7 @@ kk = np.flatnonzero(np.logical_or(los==0, los==9999))
 los[kk] = float('NaN')
 
 if plotdem is 'yes':
-    dem = np.fromfile(arguments["--demfile"],np.float32)/1000
+    dem = np.fromfile(arguments["--demfile"],np.float32)[:ncol*nlign]/1000
 
 # reshape in 2d matrix 
 insar = los.reshape((nlign,ncol))

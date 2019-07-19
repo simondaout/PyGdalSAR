@@ -17,7 +17,7 @@ Plot georeferenced file in RMG or Tif format with optional DEM or ARCGISIMAGE
 
 Usage: plot_geots.py --infile=<value> [--vmin=<value>] [--vmax=<value>] \
 [--geocrop=<values>] [--wrap=<values>] [--cpt=<values>] [--dem=<values>] \
-[--coeff=<values>] [--plot=<yes/no>] [--rad2mm=<value>]
+[--coeff=<values>] [--plot=<yes/no>] [--rad2mm=<value>] [--outfile=<name>]
 
 Options:
 -h --help           Show this screen.
@@ -25,12 +25,13 @@ Options:
 --geocrop VALUE     Crop in geo coordiantes [default: latmin,latmax,lonmin,lonmax]
 --vmax              Max colorscale [default: 90th percentile]
 --vmin              Min colorscale [default: 10th percentile]
---cpt		    Indicate colorscale
---wrap 	VALUE	    Wrapped phase between value [default: no]
---dem 		    Path to DEM file
---coeff		    Optional value to scale data 
+--cpt               Indicate colorscale
+--wrap  VALUE       Wrapped phase between value [default: no]
+--dem               Path to DEM file
+--coeff             Optional value to scale data 
 --plot              Display results [default: yes] 
 --rad2mm            Scaling value between input data (rad) and desired output [default: -4.4563]
+--outfile           Give a name to output file
 """
 
 # gdal
@@ -48,7 +49,7 @@ import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.basemap import Basemap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from matplotlib.colors import LinearSegmentedColormap
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -56,15 +57,18 @@ arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
 
 if arguments["--cpt"] is  None:
-	# cmap=cm.jet 
-	cmap=cm.rainbow
-else:
-	cmap=arguments["--cpt"]
+    cmap=cm.rainbow
+else:  
+    try:
+        cmap = LinearSegmentedColormap.from_list(arguments["--cpt"].split("/")[-1].split('.')[0], np.loadtxt(arguments["--cpt"]))
+
+    except:
+        cmap=arguments["--cpt"]
 
 if arguments["--coeff"] is  None:
-	vel2disp=1
+  vel2disp=1
 else:
-	vel2disp=np.float(arguments["--coeff"])
+  vel2disp=np.float(arguments["--coeff"])
 
 if arguments["--plot"] ==  None:
     plot = 'yes'
@@ -77,18 +81,22 @@ else:
     rad2mm = float(arguments["--rad2mm"])  
 
 ds_extension = os.path.splitext(infile)[1]
+print(ds_extension)  
 
 if ds_extension == ".unw":
-	ds = gdal.Open(infile, gdal.GA_ReadOnly)
-	ds_band1 = ds.GetRasterBand(1)
-	ds_band2 = ds.GetRasterBand(2)
-	los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp
-	amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-	los[amp==0] = np.float('NaN')
-if ds_extension == ".tif":
-	ds = gdal.Open(infile, gdal.GA_ReadOnly)
-	ds_band1 = ds.GetRasterBand(1)
-	los = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp
+  ds = gdal.Open(infile, gdal.GA_ReadOnly)
+  ds_band1 = ds.GetRasterBand(1)
+  ds_band2 = ds.GetRasterBand(2)
+  los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp
+  amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+  los[amp==0] = np.float('NaN')
+
+if (ds_extension == ".tif") or (ds_extension == ".tiff"):
+  ds = gdal.Open(infile, gdal.GA_ReadOnly)
+  ds_band1 = ds.GetRasterBand(1)
+  los = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp
+
+los[los==255] = float('NaN')
 
 ds_geo=ds.GetGeoTransform()
 print 'Read infile:', infile
@@ -111,20 +119,20 @@ kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(los), np.abs(los)<999.),lo
 mprim = los[kk]
 
 if arguments["--vmax"] ==  None:
-	vmax = np.nanpercentile(mprim, 90)
+  vmax = np.nanpercentile(mprim, 90)
 else:
-	vmax = np.float(arguments["--vmax"])
+  vmax = np.float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
-	vmin = np.nanpercentile(mprim, 10)
+  vmin = np.nanpercentile(mprim, 10)
 else:
-	vmin = np.float(arguments["--vmin"])
+  vmin = np.float(arguments["--vmin"])
 
-if arguments["--wrap"] is not None:	
-	los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
-	# los = los - nanmean(los)
-	vmax=float(arguments["--wrap"])
-	vmin=-vmax
+if arguments["--wrap"] is not None: 
+  los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
+  # los = los - nanmean(los)
+  vmax=float(arguments["--wrap"])
+  vmin=-vmax
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(8,5))
@@ -197,9 +205,9 @@ try:
   divider = make_axes_locatable(ax)
   c = divider.append_axes("right", size="5%", pad=0.05)
   plt.colorbar(cax, cax=c)
-	# fig.colorbar(cax, orientation='vertical',aspect=10)
+  # fig.colorbar(cax, orientation='vertical',aspect=10)
 except:
-	pass
+  pass
 
 # fig.savefig(basename+'.tiff', format='tiff',dpi=180)
 fig.savefig(outfile, format='PDF',dpi=180)
