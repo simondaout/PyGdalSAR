@@ -75,14 +75,19 @@ if arguments["--ramp"] == None:
 else:
     ramp = arguments["--ramp"]
 
-if arguments["--ref"] == None:
-    refstart, refend = None,None
-else:
-    ref = map(int,arguments["--ref"].replace(',',' ').split())
-    refstart,refend = ref[0], ref[1]
-
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
+
+if arguments["--ref"] == None:
+    lin_start, lin_jend, col_start, col_jend = None,None,None,None
+else:
+    ref = map(int,arguments["--ref"].replace(',',' ').split())
+    try:
+        lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
+    except:
+        lin_start,lin_end = ref[0], ref[1]
+        col_start, col_end = 0, ncol
+
 fid = open(infile, 'r')
 m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
 # m[m==0.0] = np.float('NaN')
@@ -135,8 +140,8 @@ if ramp=='yes':
     temp = (mf.flatten() - np.dot(G,pars))
     mf=temp.reshape(nlign,ncol)
 
-if (refstart is not None) and (refend is not None):
-    cst = np.nanmean(mf[refstart:refend,:])
+if (arguments["--ref"] is not None) :
+    cst = np.nanmean(mf[lin_start:lin_end,col_start:col_end])
     mf = mf - cst
 
 # crop
