@@ -77,7 +77,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --iend VALUE          Line number bounding the estimation zone [default: mlines]
 --jbeg VALUE          Column numbers bounding the estimation zone [default: 0]
 --jend VALUE          Column numbers bounding the estimation zone [default: mcols] 
---cpt==<path>         Indicate colormap for plots [default: cm.rainbows]
+--cpt==<path>         Indicate colormap for plots [default: cm.rainbow]
 """
 
 
