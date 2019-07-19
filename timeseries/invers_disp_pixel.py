@@ -705,11 +705,11 @@ for jj in xrange((Npix)):
       infm = np.nanmean(info[j-w:j+w+1,i-w:i+w+1])
     if iref is not None:
         windref = as_strided(maps[jref-wref:jref+wref+1,iref-wref:iref+wref+1,:])
-        dispref = np.nanmean(windref,axis=(0,1))
+        dispref = np.nanmedian(windref,axis=(0,1))
     else:
         dispref = np.zeros((N))
 
-    disp = np.nanmean(wind,axis=(0,1)) - dispref
+    disp = np.nanmedian(wind,axis=(0,1)) - dispref
     #aps = np.nanstd(wind,axis=(0,1))
 
     # inversion model
