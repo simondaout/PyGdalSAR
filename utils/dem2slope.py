@@ -27,7 +27,7 @@ Options:
 --lat VALUE.    	Average latitude
 """
 
-import gdal
+import gdal, os
 import scipy.ndimage
 import docopt
 import numpy as np
@@ -43,22 +43,34 @@ heading = float(arguments["--heading"])*np.pi/180
 lat = float(arguments["--lat"])
 
 # read input
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
-ds_band = ds.GetRasterBand(1)
-topo = ds_band.ReadAsArray()
+ds_extension = os.path.splitext(infile)[1]
+if (ds_extension == ".r4" or ds_extension == ""):
+	fid = open(infile, 'r')
+	ncols, nlines = map(int, open('lect.in').readline().split(None, 2)[0:2])
+	topo = np.fromfile(fid,dtype=np.float32)[:nlines*ncols].reshape((nlines,ncols))
+	fid.close()
+else:
+	ds = gdal.Open(infile, gdal.GA_ReadOnly)
+	ds_band = ds.GetRasterBand(1)
+	topo = ds_band.ReadAsArray()
 
-# create output file
-drv = gdal.GetDriverByName('GTiff')
-ds2 = drv.CreateCopy(outfile,ds)
-ds2_band = ds2.GetRasterBand(1)
 
 topo = ds_band.ReadAsArray()
 toposmooth = scipy.ndimage.filters.gaussian_filter(topo,.1)
 Py, Px = np.gradient(toposmooth,90,90*np.cos(lat*np.pi/180))
 slope = np.sqrt(Px**2+Py**2)
 slopelos = (np.cos(heading)*Px+np.sin(heading)*Py)/np.sin(look)
-ds2_band.WriteArray(slopelos)
-del ds2
+
+if (ds_extension == ".r4" or ds_extension == ""):
+	fid1 = open(outfile,'wb')
+	slopelos.flatten().astype('float32').tofile(fid1)
+else:
+	# create output file
+	drv = gdal.GetDriverByName('GTiff')
+	ds2 = drv.CreateCopy(outfile,ds)
+	ds2_band = ds2.GetRasterBand(1)
+	ds2_band.WriteArray(slopelos)
+	del ds2
 
 # ibeg,iend=600,900
 # jbeg,jend=900,1200
