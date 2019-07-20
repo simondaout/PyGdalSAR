@@ -120,7 +120,7 @@ if arguments["--refend"] == None:
     refend = nlign
 else:
     refend = int(arguments["--refend"])
-   col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
+    col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
 
 if arguments["--rmspixel"] ==  None:
     rms = np.ones((nlign,ncol))
