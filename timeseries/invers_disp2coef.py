@@ -16,12 +16,12 @@ Spatial and temporal inversions of the time series delay maps (used depl_cumule 
 At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal),
 (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
-Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--refstart=<value>] [--refend=<value>] [--linear=<yes/no>] [--threshold_rmsd=<value>] \
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--ref=<jstart,jend,istart,iend> ] [--refstart=<value>] [--refend=<value>] [--linear=<yes/no>] [--threshold_rmsd=<value>] \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
-[--crop=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] [--dateslim=<values>]  \
+[--crop=<values>] [--crop_emp=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] [--dateslim=<values>]  \
 [<ibeg>] [<iend>] [<jbeg>] [<jend>]
 
 invers_disp2coef.py -h | --help
@@ -62,19 +62,17 @@ Options:
 --aspect PATH           Path to aspect file in r4 or tif format: take into account the slope orientation in the phase/topo relationship [default: None].
 --perc_los VALUE        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:98.]
 --perc_topo VALUE       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:90.]
---crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
 --ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
 --fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
 --plot YES/NO           Display plots [default: yes]
---refstart VALUE        Stating line number of the area where phase is set to zero [default: None]
---refend VALUE          Ending line number of the area where phase is set to zero [default: None]
+--refstart VALUE        Depricate - Stating line number of the area where phase is set to zero [default: None] 
+--refend VALUE          Depricate - Ending line number of the area where phase is set to zero [default: None]
+--ref=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero - Overwrite refstart/refend [default: None] 
 --dateslim              Datemin,Datemax time series  
-ibeg VALUE            Line numbers bounding the ramp estimation zone [default: 0]
-iend VALUE            Line numbers bounding the ramp estimation zone [default: nlign]
-jbeg VALUE            Column numbers bounding the ramp estimation zone [default: 0]
-jend VALUE            Column numbers bounding the ramp estimation zone [default: ncol]
+--crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
+--crop_emp VALUE    Define a region of interest for the spatial estimatiom (ramp+phase/topo) [default: 0,nlign,0,ncol]
 """
 
 print
@@ -325,18 +323,27 @@ else:
     vectf = []
     vect = None
 
-if arguments["--refstart"] == None:
-    refstart = None
-else:
-    refstart = int(arguments["--refstart"])
-
-if arguments["--refend"] == None:
-    refend = None
-else:
-    refend = int(arguments["--refend"])
-
 # read lect.in
 ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
+
+if arguments["--refstart"] == None:
+    lin_start = None
+else:
+    lin_start = int(arguments["--refstart"])
+if arguments["--refend"] == None:
+    lin_end = None
+else:
+    lin_end = int(arguments["--refend"])
+
+if arguments["--ref"] == None:
+    lin_start, lin_jend, col_start, col_jend = None,None,None,None
+else:
+    ref = map(int,arguments["--ref"].replace(',',' ').split())
+    try:
+        lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
+    except:
+        lin_start,lin_end = ref[0], ref[1]
+        col_start, col_end = 0, ncol
 
 if arguments["--niter"] ==  None:
     niter = 1
@@ -403,22 +410,11 @@ else:
     crop = map(float,arguments["--crop"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
-if arguments["<ibeg>"] ==  None:
-    ibegref = 0
+if arguments["--crop_emp"] ==  None:
+    crop_emp = [0,nlign,0,ncol]
 else:
-    ibegref = int(arguments["<ibeg>"])
-if arguments["<iend>"] ==  None:
-    iendref = nlign
-else:
-    iendref = int(arguments["<iend>"])
-if arguments["<jbeg>"] ==  None:
-    jbegref = 0
-else:
-    jbegref = int(arguments["<jbeg>"])
-if arguments["<jend>"] ==  None:
-    jendref = ncol
-else:
-    jendref = int(arguments["<jend>"])
+    crop_emp = map(float,arguments["--crop"].replace(',',' ').split())
+ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 if arguments["--cond"] ==  None:
     rcond = 1e-3
@@ -539,6 +535,9 @@ N=len(dates)
 print 'Number images: ', N
 maps = as_strided(maps[:,:,indexd])
 
+# clean
+del cube, cubei 
+
 # fig = plt.figure(0)
 # plt.imshow(cst,vmax=1,vmin=-1)
 # fig = plt.figure(1)
@@ -641,18 +640,6 @@ if rmsf is not None:
 else:
     rmsmap = np.ones((nlign,ncol))
 
-#fig, ax = plt.subplots(1)
-#plt.imshow(rmsmap[:,:], vmax=1, vmin=0)
-#plt.show()
-#sys.exit()
-
-# plot last date
-#fig, ax = plt.subplots(1)
-#plt.imshow(maps[:,:,-1], vmax=1, vmin=-1)
-#plt.title('Last image')
-#plt.show()
-#sys.exit()
-
 # plot bperp vs time
 fig = plt.figure(nfigure,figsize=(10,4))
 nfigure = nfigure + 1
@@ -678,13 +665,13 @@ fig.savefig('baseline.eps', format='EPS',dpi=150)
 np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
 
 if maskfile is not None:
-    los_temp = as_strided(mask[ibegref:iendref,jbegref:jendref]).flatten()
+    los_temp = as_strided(mask[ibeg_emp:iend_emp,jbeg_emp:jend_emp]).flatten()
 
     if rampmask=='yes':
         print 'Flatten mask...'
-        temp = [(i,j) for i in xrange(iendref-ibegref) for j in xrange(jendref-jbegref) \
-        if np.logical_and((math.isnan(los_temp[i*(jendref-jbegref)+j]) is False), \
-            (los_temp[i*(jendref-jbegref)+j]>seuil))]
+        temp = [(i,j) for i in xrange(iend_emp-ibeg_emp) for j in xrange(jend_emp-jbeg_emp) \
+        if np.logical_and((math.isnan(los_temp[i*(jend_emp-jbeg_emp)+j]) is False), \
+            (los_temp[i*(jend_emp-jbeg_emp)+j]>seuil))]
 
         temp2 = np.array(temp)
         x = temp2[:,0]; y = temp2[:,1]
@@ -703,21 +690,21 @@ if maskfile is not None:
 
         G=np.zeros((len(maski),4))
         for i in xrange(nlign):
-            G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-            G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbegref
-            G[i*ncol:(i+1)*ncol,2] = i - ibegref
+            G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
+            G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbeg_emp
+            G[i*ncol:(i+1)*ncol,2] = i - ibeg_emp
         G[:,3] = 1
         mask_flat = (maski - np.dot(G,pars)).reshape(nlign,ncol)
         mask_flat = mask_flat - np.nanmean(mask_flat)
 
     else:
         # if rampmask is no yes then  mask_flat is mask and los_clean is selected area mask without NaN
-        temp = [(i,j) for i in xrange(iendref-ibegref) for j in xrange(jendref-jbegref) \
-        if math.isnan(los_temp[i*(jendref-jbegref)+j]) is False]
+        temp = [(i,j) for i in xrange(iend_emp-ibeg_emp) for j in xrange(jend_emp-jbeg_emp) \
+        if math.isnan(los_temp[i*(jend_emp-jbeg_emp)+j]) is False]
 
         temp2 = np.array(temp)
         x = temp2[:,0]; y = temp2[:,1]
-        los_clean = los_temp[x*(jendref-jbegref)+y]
+        los_clean = los_temp[x*(jend_emp-jbeg_emp)+y]
 
         # remove 0 values
         kk = np.flatnonzero(np.logical_or(maski==0, maski==9999))
@@ -735,10 +722,10 @@ if maskfile is not None:
 
     # mask maps if necessary for temporal inversion
     if tempmask=='yes':
-        kk = np.nonzero(mask_flat[ibegref:iendref,jbegref:jendref]<seuil)
+        kk = np.nonzero(mask_flat[ibeg_emp:iend_emp,jbeg_emp:jend_emp]<seuil)
         for l in xrange((N)):
             # clean only selected area
-            d = as_strided(maps[ibegref:iendref,jbegref:jendref,l])
+            d = as_strided(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,l])
             d[kk] = np.float('NaN')
 
     # plots
@@ -775,8 +762,8 @@ if maskfile is not None:
 nfigure+=1
 fig = plt.figure(nfigure,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
-vmax = np.nanpercentile(maps[:,:,-1],98.)
-vmin = np.nanpercentile(maps[:,:,-1],2.)
+vmax = np.nanpercentile(maps[:,:,-1],99.8)
+vmin = np.nanpercentile(maps[:,:,-1],.2)
 # vmax = np.abs([np.nanmedian(maps[:,:,-1]) + 1.*np.nanstd(maps[:,:,-1]),\
 #     np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
 # vmin = -vmax
@@ -1190,7 +1177,7 @@ for ii in xrange(niter):
                 G[:,1] = elevi
                 G[:,2] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1228,7 +1215,7 @@ for ii in xrange(niter):
                 G[:,2] = elevi
                 G[:,3] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,1] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,1] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1254,7 +1241,7 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),2))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
             G[:,1] = 1
 
             res = los - np.dot(G,pars)
@@ -1289,7 +1276,7 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[:,1] = 1
                 G[:,2] = elevi
 
@@ -1327,7 +1314,7 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi**2
@@ -1369,8 +1356,8 @@ for ii in xrange(niter):
                 G[:,2] = elevi
                 G[:,3] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -1412,8 +1399,8 @@ for ii in xrange(niter):
                 G[:,3] = elevi
                 G[:,4] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1441,7 +1428,7 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),2))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
             G[:,1] = 1
 
 
@@ -1477,7 +1464,7 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
                 G[:,1] = 1
                 G[:,2] = elevi
 
@@ -1516,7 +1503,7 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi**2
@@ -1558,8 +1545,8 @@ for ii in xrange(niter):
                 G[:,2] = elevi
                 G[:,3] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -1601,8 +1588,8 @@ for ii in xrange(niter):
                 G[:,3] = elevi
                 G[:,4] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1632,8 +1619,8 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),3))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)
             G[:,2] = 1
 
             res = los - np.dot(G,pars)
@@ -1669,8 +1656,8 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
                 G[:,2] = 1
                 G[:,3] = elevi
 
@@ -1711,8 +1698,8 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
                 G[:,2] = 1
                 G[:,3] = elevi
                 G[:,4] = elevi**2
@@ -1757,9 +1744,9 @@ for ii in xrange(niter):
                 G[:,3] = elevi
                 G[:,4] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -1802,9 +1789,9 @@ for ii in xrange(niter):
                 G[:,4] = elevi
                 G[:,5] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -1833,9 +1820,9 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),4))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
             G[:,3] = 1
 
             res = los - np.dot(G,pars)
@@ -1873,9 +1860,9 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
 
@@ -1917,9 +1904,9 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi**2
@@ -1964,10 +1951,10 @@ for ii in xrange(niter):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,5] *=  (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                    G[i*ncol:(i+1)*ncol,5] *=  (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -2012,10 +1999,10 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,4] *=  (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                    G[i*ncol:(i+1)*ncol,4] *=  (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2045,9 +2032,9 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),4))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
+                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbeg_emp
+                G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
             G[:,3] = 1
 
 
@@ -2087,9 +2074,9 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
 
@@ -2131,9 +2118,9 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi**2
@@ -2178,10 +2165,10 @@ for ii in xrange(niter):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2226,10 +2213,10 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbegref
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2261,9 +2248,9 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),4))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)
-                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)
+                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
             G[:,3] = 1
 
 
@@ -2301,9 +2288,9 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
                 G[:,3] = 1
                 G[:,4] = elevi
 
@@ -2344,9 +2331,9 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi**2
@@ -2390,10 +2377,10 @@ for ii in xrange(niter):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -2437,10 +2424,10 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibegref
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2471,10 +2458,10 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),5))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
-                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+                G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
+                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
             G[:,4] = 1
 
 
@@ -2513,10 +2500,10 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
                 G[:,4] = 1
                 G[:,5] = elevi
 
@@ -2558,10 +2545,10 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi**2
@@ -2606,11 +2593,11 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,6] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -2655,11 +2642,11 @@ for ii in xrange(niter):
                 G[:,6] = elevi
                 G[:,7] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2690,11 +2677,11 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),6))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbegref)
+                G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
+                G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
+                G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
+                G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbeg_emp)
             G[:,5] = 1
 
 
@@ -2734,11 +2721,11 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
+                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
                 G[:,5] = 1
                 G[:,6] = elevi
 
@@ -2781,11 +2768,11 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
+                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
                 G[:,5] = 1
                 G[:,6] = elevi
                 G[:,7] = elevi**2
@@ -2832,12 +2819,12 @@ for ii in xrange(niter):
                 G[:,6] = elevi
                 G[:,7] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,7] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
+                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,7] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
@@ -2858,7 +2845,7 @@ for ii in xrange(niter):
                 G[:,5] = 1
                 G[:,6] = topobins*azbins
                 G[:,7] = topobins
-                G[:,8] = topobins
+                G[:,8] = topobins**2
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2883,12 +2870,12 @@ for ii in xrange(niter):
                 G[:,7] = elevi
                 G[:,8] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibegref)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibegref)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibegref)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbegref)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
+                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
+                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,6] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -2918,10 +2905,10 @@ for ii in xrange(niter):
             # build total G matrix
             G=np.zeros((len(los),5))
             for i in xrange(nlign):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
+                G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
             G[:,4] = 1
 
             res = los - np.dot(G,pars)
@@ -2960,10 +2947,10 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
+                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
                 G[:,4] = 1
                 G[:,5] = elevi
 
@@ -3005,10 +2992,10 @@ for ii in xrange(niter):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
+                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi**2
@@ -3054,11 +3041,11 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
+                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                    G[i*ncol:(i+1)*ncol,6] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -3094,7 +3081,7 @@ for ii in xrange(niter):
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
                 ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,g*x+h*azbins**2,'-r', lw =4.)
+                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
@@ -3103,11 +3090,11 @@ for ii in xrange(niter):
                 G[:,6] = elevi
                 G[:,7] = elevi**2
                 for i in xrange(nlign):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbegref
-                    G[i*ncol:(i+1)*ncol,1] = i - ibegref
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibegref) * (np.arange((ncol))-jbegref))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibegref) * (np.arange((ncol))-jbegref)
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibegref)
+                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
+                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
+                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
@@ -3142,15 +3129,15 @@ for ii in xrange(niter):
         # no estimation on the ref image set to zero 
         if np.nansum(maps[:,:,l]) != 0:
 
-          maxlos,minlos=np.nanpercentile(maps_temp[ibegref:iendref,jbegref:jendref],perc_los),np.nanpercentile(maps_temp[ibegref:iendref,jbegref:jendref],100-perc_los)
+          maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],perc_los),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-perc_los)
           kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
           maps_temp[kk] = np.float('NaN')
 
           #noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
           #print 'Accepted noise level in the ramp optimisation:', noise_level
 
-          itemp = ibegref
-          for lign in xrange(ibegref,iendref,10):
+          itemp = ibeg_emp
+          for lign in xrange(ibeg_emp,iend_emp,10):
               # find the begining of the image
               if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
                   itemp = lign
@@ -3194,18 +3181,18 @@ for ii in xrange(niter):
           topo_clean = elev[index].flatten()
           rms_clean = rmsmap[index].flatten()
           
-          # print itemp, iendref
+          # print itemp, iend_emp
           #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
-          if flat>5 and iendref-itemp < .6*(iendref-ibegref):
+          if flat>5 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
               print 'Image too short in comparison to master, set flat to 5'
               temp_flat=5
-          # elif flat>5 and iendref-itemp < ncol:
+          # elif flat>5 and iend_emp-itemp < ncol:
           #     print 'Lenght image inferior to width, set flat to 5'
           #     temp_flat=5
           else:
               temp_flat=flat
 
-          if ivar>0 and iendref-itemp < .6*(iendref-ibegref):
+          if ivar>0 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
             print
             print 'Image too short in comparison to master, set ivar to 0'
             ivar_temp=0
@@ -3228,8 +3215,8 @@ for ii in xrange(niter):
           topo = as_strided(maps_topo[:,:,l])
           topo[kk] = float('NaN')
           
-          if (refstart is not None) and (refend is not None):
-            try:
+          if (lin_start is not None) and (lin_end is not None):
+            # try:
               indexref = np.nonzero(np.logical_and(elev<maxtopo,
               np.logical_and(elev>mintopo,
                   np.logical_and(mask_flat>seuil,
@@ -3239,33 +3226,34 @@ for ii in xrange(niter):
                       np.logical_and(rmsmap<seuil_rms,
                       np.logical_and(rmsmap>1.e-6,
                       np.logical_and(~np.isnan(maps_temp),
-                      np.logical_and(pix_az>refstart,
-                      np.logical_and(pix_az<refend,
-                      np.logical_and(pix_rg>jbeg,
-                      np.logical_and(pix_rg<jend, 
+                      np.logical_and(pix_az>lin_start,
+                      np.logical_and(pix_az<lin_end,
+                      np.logical_and(pix_rg>col_start,
+                      np.logical_and(pix_rg<col_end, 
                           slope>0.,
                       ))))))))))))
                       ))
               
               ## Set data to zero in the ref area
               zone = as_strided(maps_flata[:,:,l])
-              los_ref2 = zone[indexref]
+              los_ref2 = zone[indexref].flatten()
               rms_ref = rmsmap[indexref].flatten()
               amp_ref = 1./rms_ref
               amp_ref = amp_ref/np.nanmax(amp_ref)
               # weigth avera of the phase
               cst = np.nansum(los_ref2*amp_ref) / np.nansum(amp_ref)
-              print 'Average phase within ref area:{0} between refstart:{1} and refend:{2}:'.format(cst,refstart,refend)
+              print 'Average phase within ref area:{0}:'.format(cst)
               if np.isnan(cst):
                 cst = 0.
               maps_ramp[:,:,l], maps_flata[:,:,l], maps_noramps[:,:,l] = maps_ramp[:,:,l] + cst, maps_flata[:,:,l] - cst, maps_noramps[:,:,l] - cst 
               del zone
-            except:
-              pass
+            # except:
+            #   pass
           
           del los_clean
           del rms_clean
           del topo_clean
+          del maps_temp
 
       # plot corrected ts
       nfigure +=1
@@ -3361,7 +3349,6 @@ for ii in xrange(niter):
     if seasonal=='yes' or semianual=='yes' or inter=='yes' or vect != None:
         models_trends = np.zeros((nlign,ncol,N))
         models_detrends = np.zeros((nlign,ncol,N))
-
 
     # ligns = [2014,2157,1840,1960,1951]
     # cols = [100,117,843,189,43]
@@ -3525,6 +3512,12 @@ if fulloutput=='yes':
         cube_noramps.flatten().astype('float32').tofile(fid)
         fid.close()
 
+# clean memory
+try:
+  del cube_flata, cube_noramps
+except:
+  pass
+
 # # save APS
 # print
 # print 'Saving APS in liste_images_aps.txt'
@@ -3545,22 +3538,18 @@ nfigure +=1
 fig = plt.figure(nfigure,figsize=(14,10))
 fig.subplots_adjust(hspace=.001,wspace=0.01)
 
-nfigure +=1
-figall = plt.figure(nfigure,figsize=(20,9))
-figall.subplots_adjust(hspace=0.00001,wspace=0.001)
+# nfigure +=1
+# figall = plt.figure(nfigure,figsize=(20,9))
+# figall.subplots_adjust(hspace=0.00001,wspace=0.001)
 
-nfigure +=1
-figclr = plt.figure(nfigure)
-
-# plot color map
-ax = figclr.add_subplot(1,1,1)
-cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
-setp( ax.get_xticklabels(), visible=False)
-cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
-figclr.savefig('colorscale.eps', format='EPS',dpi=150)
-
-# vmax = np.abs([np.nanmedian(data) + 2*nanstd(data),np.nanmedian(data) - 2*nanstd(data)]).max()
-# vmin = -vmax
+# nfigure +=1
+# figclr = plt.figure(nfigure)
+# # plot color map
+# ax = figclr.add_subplot(1,1,1)
+# cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+# setp( ax.get_xticklabels(), visible=False)
+# cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
+# figclr.savefig('colorscale.eps', format='EPS',dpi=150)
 
 for l in xrange((N)):
     data = as_strided(maps[ibeg:iend,jbeg:jend,l])
@@ -3578,43 +3567,43 @@ for l in xrange((N)):
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     axres = figres.add_subplot(4,int(N/4)+1,l+1)
 
-    axall = figall.add_subplot(6,N,l+1)
-    axall.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
-    axall.set_title(idates[l],fontsize=6)
-    setp(axall.get_xticklabels(), visible=False)
-    setp(axall.get_yticklabels(), visible=False)
-    if l==0:
-        axall.set_ylabel('DATA')
-    axall = figall.add_subplot(6,N,l+1+N)
-    axall.imshow(ramp,cmap=cmap,vmax=vmax,vmin=vmin)
-    setp(axall.get_xticklabels(), visible=False)
-    setp(axall.get_yticklabels(), visible=False)
-    if l==0:
-        axall.set_ylabel('RAMP')
-    axall = figall.add_subplot(6,N,l+1+2*N)
-    axall.imshow(tropo,cmap=cmap,vmax=vmax,vmin=vmin)
-    setp(axall.get_xticklabels(), visible=False)
-    setp(axall.get_yticklabels(), visible=False)
-    if l==0:
-        axall.set_ylabel('TROP0')
-    axall = figall.add_subplot(6,N,l+1+3*N)
-    axall.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
-    setp(axall.get_xticklabels(), visible=False)
-    setp(axall.get_yticklabels(), visible=False)
-    if l==0:
-        axall.set_ylabel('FLATTEN DATA')
-    axall = figall.add_subplot(6,N,l+1+4*N)
-    axall.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-    setp(axall.get_xticklabels(), visible=False)
-    setp(axall.get_yticklabels(), visible=False)
-    if l==0:
-        axall.set_ylabel('MODEL')
-    axall = figall.add_subplot(6,N,l+1+5*N)
-    axall.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-    setp(axall.get_xticklabels(), visible=False)
-    setp(axall.get_yticklabels(), visible=False)
-    if l==0:
-        axall.set_ylabel('RES')
+    # axall = figall.add_subplot(6,N,l+1)
+    # axall.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
+    # axall.set_title(idates[l],fontsize=6)
+    # setp(axall.get_xticklabels(), visible=False)
+    # setp(axall.get_yticklabels(), visible=False)
+    # if l==0:
+    #     axall.set_ylabel('DATA')
+    # axall = figall.add_subplot(6,N,l+1+N)
+    # axall.imshow(ramp,cmap=cmap,vmax=vmax,vmin=vmin)
+    # setp(axall.get_xticklabels(), visible=False)
+    # setp(axall.get_yticklabels(), visible=False)
+    # if l==0:
+    #     axall.set_ylabel('RAMP')
+    # axall = figall.add_subplot(6,N,l+1+2*N)
+    # axall.imshow(tropo,cmap=cmap,vmax=vmax,vmin=vmin)
+    # setp(axall.get_xticklabels(), visible=False)
+    # setp(axall.get_yticklabels(), visible=False)
+    # if l==0:
+    #     axall.set_ylabel('TROP0')
+    # axall = figall.add_subplot(6,N,l+1+3*N)
+    # axall.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
+    # setp(axall.get_xticklabels(), visible=False)
+    # setp(axall.get_yticklabels(), visible=False)
+    # if l==0:
+    #     axall.set_ylabel('FLATTEN DATA')
+    # axall = figall.add_subplot(6,N,l+1+4*N)
+    # axall.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
+    # setp(axall.get_xticklabels(), visible=False)
+    # setp(axall.get_yticklabels(), visible=False)
+    # if l==0:
+    #     axall.set_ylabel('MODEL')
+    # axall = figall.add_subplot(6,N,l+1+5*N)
+    # axall.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
+    # setp(axall.get_xticklabels(), visible=False)
+    # setp(axall.get_yticklabels(), visible=False)
+    # if l==0:
+    #     axall.set_ylabel('RES')
 
     cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
     caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
@@ -3691,18 +3680,24 @@ for l in xrange((N)):
 
 fig.suptitle('Time series models')
 figres.suptitle('Time series residuals')
-figall.suptitle('Time series inversion')
+# figall.suptitle('Time series inversion')
 fig.savefig('models.eps', format='EPS',dpi=150)
 figres.savefig('residuals.eps', format='EPS',dpi=150)
-figall.savefig('timeseries.eps', format='EPS',dpi=150)
+# figall.savefig('timeseries.eps', format='EPS',dpi=150)
 if plot=='yes':
     plt.show()
 plt.close('all')
 
+# clean memory
+del maps_ramp, maps_flata, maps_topo, maps_noramps
+try:
+  del models_detrends, models_trends
+except:
+  pass 
+
 #######################################################
 # Save functions in binary file
 #######################################################
-
 
 if geotiff is not None:
     for l in xrange((Mbasis)):
