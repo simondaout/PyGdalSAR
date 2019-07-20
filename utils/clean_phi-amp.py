@@ -17,7 +17,7 @@ Clean amplitude and phase maps obtained with the  seasonal decomposition
 and wrapped phase between 0 to 2pi
 
 Usage: clean_phi-amp.py [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--topofile=<path>] \
-[--sigampfile=<path>] [--sigphifile=<path>] [--lectfile=<path>] [--theshold_amp=<value>] [--perc_sig=<value>] \
+[--sigampfile=<path>] [--sigphifile=<path>] [--lectfile=<path>] [--threshold_amp=<value>] [--perc_sig=<value>] \
 [--outampfile=<path>] [--outphifile=<path>] 
 
 
@@ -115,12 +115,13 @@ phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 
-if arguments["--theshold_amp"] ==  None:
+if arguments["--threshold_amp"] ==  None:
     threshold_amp = 1.5
 else:
-    threshold_amp = np.float(arguments["--theshold_amp"])
-# I just want to clean the phase to check timing for high amplitudes
+    threshold_amp = np.float(arguments["--threshold_amp"])
 phi_map[amp_map<threshold_amp] = np.float('NaN')
+lin_map[amp_map<threshold_amp] = np.float('NaN')
+
 # convert phi between 0 and 2pi
 phi[phi<0] = phi[phi<0] + 2*np.pi
 
@@ -136,15 +137,15 @@ phi_map.flatten().astype('float32').tofile(fid2)
 fid2.close()
 
 # initiate figure amp and phase
-rad2mm=-4.456
+# rad2mm=-4.456
 
 ax = fig_ampphi.add_subplot(1,3,1)
 cmap = cm.rainbow
 if dem is not False:
     cax = ax.imshow(dem,cmap=cm.Greys,zorder=1)
 # no point to take negatif amplitude
-im = ax.imshow(np.ma.array(amp_map*-rad2mm, mask=np.isnan(amp_map)),cmap=cmap,vmin=threshold_amp*-rad2mm,\
-    vmax=np.nanpercentile(amp_map*-rad2mm,98), alpha=0.8, zorder=2)
+im = ax.imshow(np.ma.array(amp_map, mask=np.isnan(amp_map)),cmap=cmap,vmin=threshold_amp,\
+    vmax=np.nanpercentile(amp_map,98), alpha=0.8, zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -165,8 +166,8 @@ cpt = '/home/cometsoft/PyGdalSAR/contrib/python/colormaps/roma.txt'
 cmap = LinearSegmentedColormap.from_list(cpt.split("/")[-1].split('.')[0], np.loadtxt(cpt))
 if dem is not False:
     cax = ax.imshow(dem,cmap=cm.Greys,zorder=1)
-vmax = np.nanpercentile(lin_map*rad2mm,95)
-im = ax.imshow(np.ma.array(lin_map*rad2mm, mask=np.isnan(lin_map)),vmin=-vmax,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2)
+vmax = np.nanpercentile(lin_map,95)
+im = ax.imshow(np.ma.array(lin_map, mask=np.isnan(lin_map)),vmin=-vmax,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
