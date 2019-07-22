@@ -16,7 +16,7 @@ Spatial and temporal inversions of the time series delay maps (used depl_cumule 
 At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal),
 (3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
 
-Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--ref=<jstart,jend,istart,iend> ] [--refstart=<value>] [--refend=<value>] [--linear=<yes/no>] [--threshold_rmsd=<value>] \
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--ref=<jstart,jend,istart,iend> ] [--refstart=<value>] [--refend=<value>] [--linear=<yes/no>]  \
 [--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
@@ -36,7 +36,6 @@ Options:
 --rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
 --threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
 --linear YES/NO         Add a linear function in the inversion [default:yes]
---threshold_rmsd VALUE  If linear = yes: first try inversion without coseismic and postseismic, if RMDS inversion > threshold_rmsd then add other basis functions (Depricate) [default: 1.]
 --coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), [default: None]
@@ -99,11 +98,11 @@ import matplotlib
 if environ["TERM"].startswith("screen"):
     matplotlib.use('Agg')
 #matplotlib.use('TkAgg') # Must be before importing matplotlib.pyplot or pylab!
-from pylab import *
-import matplotlib.pyplot as plt
+# from pylab import *
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
 from datetime import datetime as datetimes
+from pylab import date2num
 
 try:
     from nsbas import docopt
@@ -433,9 +432,9 @@ if arguments["--threshold_mask"] ==  None:
 else:
     seuil = float(arguments["--threshold_mask"])
 if arguments["--threshold_rms"] ==  None:
-    seuil_rms = 1.
+    threshold_rms = 1.
 else:
-    seuil_rms = float(arguments["--threshold_rms"])
+    threshold_rms = float(arguments["--threshold_rms"])
 if arguments["--tempmask"] ==  None:
     tempmask = 'no'
 else:
@@ -473,19 +472,11 @@ if arguments["--ineq"] ==  None:
     ineq = 'no'
 else:
     ineq = arguments["--ineq"]
-if arguments["--threshold_rmsd"] ==  None:
-    maxrmsd = 0.
-else:
-    maxrmsd = float(arguments["--threshold_rmsd"])
+
 if arguments["--fulloutput"] ==  None:
     fulloutput = 'no'
 else:
     fulloutput = arguments["--fulloutput"]
-
-if arguments["--plot"] ==  None:
-    plot = 'yes'
-else:
-    plot = arguments["--plot"]
 
 if arguments["--cube"] ==  None:
     cubef = "depl_cumule"
@@ -527,15 +518,22 @@ if arguments["--perc_los"] ==  None:
 else:
     perc_los = float(arguments["--perc_los"])
 
-if len(cos) > 0:
-    logger.info('Define a maximal RMSD for adding coseismic and postseismic basis functions in the inversion')
-    logger.info('Max RMSD:{}'.format(maxrmsd))
-
 if arguments["--nproc"] ==  None:
-    nproc = 1
+    nproc = 4
 else:
     nproc = int(arguments["--nproc"])
 
+if arguments["--plot"] ==  'yes':
+    plot = 'yes'
+    logger.warning('plot is yes. Set nproc to 1')
+    nproc = 1
+    if environ["TERM"].startswith("screen"):
+        matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
+else:
+    plot = 'no'
+    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
 
 if arguments["--crop"] ==  None:
     crop = [0,nlines,0,ncol]
@@ -627,8 +625,8 @@ if maskfile is not None:
       fid = open(maskfile,'r')
       maski = np.fromfile(fid,dtype=np.float32)*scale
       fid.close()
-    maski = maski[:(iend-ibeg)*(jend-jbeg)]
-    mask = maski.reshape((iend-ibeg,jend-jbeg))
+    mask = maski.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+    maski = mask.flatten()
 else:
     mask_flat = np.ones((iend-ibeg,jend-jbeg))
     mask = np.ones((iend-ibeg,jend-jbeg))
@@ -648,13 +646,14 @@ if radar is not None:
       elevi = np.fromfile(fid,dtype=np.float32)
       fid.close()
 
-    elevi = elevi[:(iend-ibeg)*(jend-jbeg)]
+    elevi = elevi[:nlines*ncols]
     # fig = plt.figure(10)
     # plt.imshow(elevi.reshape(iend-ibeg,jend-jbeg)[ibeg:iend,jbeg:jend])
-    elev = elevi.reshape((iend-ibeg,jend-jbeg))
+    elev = elevi.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     elev[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(elev)>9999.)
     elev[kk] = float('NaN')
+    elevi = elev.flatten()
     # fig = plt.figure(11)
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
     # plt.show()
@@ -675,11 +674,12 @@ if aspect is not None:
       fid = open(aspect,'r')
       aspecti = np.fromfile(fid,dtype=np.float32)
       fid.close()
-    aspecti = aspecti[:(iend-ibeg)*(jend-jbeg)]
-    slope = aspecti.reshape((iend-ibeg,jend-jbeg))
+    aspecti = aspecti[:nlines*ncols]
+    slope = aspecti.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     slope[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(slope>9999.))
     slope[kk] = float('NaN')
+    aspecti = slope.flatten()
     # print slope[slope<0]
     # fig = plt.figure(11)
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
@@ -694,7 +694,7 @@ if rmsf is not None:
     rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap>999.))
     rmsmap[kk] = float('NaN')
-    kk = np.nonzero(rmsmap>seuil_rms)
+    kk = np.nonzero(rmsmap>threshold_rms)
     spacial_mask = np.copy(rmsmap)
     spacial_mask[kk] = float('NaN')
     fig = plt.figure(nfigure,figsize=(9,4))
@@ -702,7 +702,7 @@ if rmsf is not None:
     ax = fig.add_subplot(1,1,1)
     cax = ax.imshow(spacial_mask,cmap=cmap)
     ax.set_title('Mask on spatial estimation based on RMSpixel')
-    setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
     fig.colorbar(cax, orientation='vertical',aspect=10)
     del spacial_mask
     # if plot=='yes':
@@ -710,6 +710,7 @@ if rmsf is not None:
 else:
     rmsmap = np.ones((iend-ibeg,jend-jbeg))
     spacial_mask = np.ones((iend-ibeg,jend-jbeg))
+    threshold_rms = 2.
 
 # plot bperp vs time
 fig = plt.figure(nfigure,figsize=(10,4))
@@ -795,25 +796,25 @@ if maskfile is not None:
     # plots
     nfigure+=1
     fig = plt.figure(nfigure,figsize=(7,6))
-    vmax = np.abs([np.nanmedian(mask_flat) + nanstd(mask_flat),\
-        np.nanmedian(mask_flat) - nanstd(mask_flat)]).max()
+    vmax = np.abs([np.nanmedian(mask_flat) + np.nanstd(mask_flat),\
+        np.nanmedian(mask_flat) - np.nanstd(mask_flat)]).max()
     vmin = -vmax
 
     ax = fig.add_subplot(1,3,1)
     cax = ax.imshow(mask,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title('Original Mask')
-    setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
 
     ax = fig.add_subplot(1,3,2)
     cax = ax.imshow(mask_flat,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title('Flat Mask')
-    setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,3,3)
     cax = ax.imshow(mask_flat_clean,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title('Final Mask')
-    setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.savefig('mask.eps', format='EPS',dpi=150)
     del mask_flat_clean
@@ -836,11 +837,11 @@ for l in range((N)):
     d = as_strided(maps[:,:,l])
     #ax = fig.add_subplot(1,N,l+1)
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    #cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
+    #cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)ftem
     cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(idates[l],fontsize=6)
-    setp( ax.get_xticklabels(), visible=False)
-    setp( ax.get_yticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_yticklabels(), visible=False)
 
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
@@ -978,7 +979,7 @@ else:
     # maxinaps = np.nanmax(inaps)
     # inaps= inaps/maxinaps
     minaps= np.nanpercentile(inaps,2)
-    index = flatnonzero(inaps<minaps)
+    index = np.flatnonzero(inaps<minaps)
     inaps[index] = minaps
     logger.info('Output uncertainties for first iteration: {}'.format(inaps))
     print
@@ -3154,10 +3155,10 @@ def empirical_cor(l):
   Function that preapare and run empirical estimaton for each interferogram kk
   """
   
-  global maps, models, elev, perc_topo, maxtopo, mintopo
-  global mask_flat, seuil, rmsmap, seuil_rms, slope, radar
-  global flat, iend_emp, ibeg_emp, ivar, nfit
-  global lin_start, lin_end, col_start,col_end
+  # global maps, models, elev, perc_topo, maxtopo, mintopo
+  # global mask_flat, seuil, rmsmap, threshold_rms, slope, radar
+  # global flat, iend_emp, ibeg_emp, ivar, nfit
+  # global lin_start, lin_end, col_start,col_end
 
   # first clean los
   maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
@@ -3184,9 +3185,7 @@ def empirical_cor(l):
         maxtopo,mintopo = 2, 0
     logger.debug('Max-Min topo: {0}-{1}'.format(maxtopo,mintopo))
 
-    if rmsf is None:
-        seuil_rms = 2
-    logger.debug('Threshold RMS: {}'.format(seuil_rms))
+    logger.debug('Threshold RMS: {}'.format(threshold_rms))
 
     # selection pixels
     index = np.nonzero(np.logical_and(elev<maxtopo,
@@ -3195,7 +3194,7 @@ def empirical_cor(l):
             np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<seuil_rms,
+                np.logical_and(rmsmap<threshold_rms,
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(pix_az>ibeg,
@@ -3244,7 +3243,7 @@ def empirical_cor(l):
             np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<seuil_rms,
+                np.logical_and(rmsmap<threshold_rms,
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(pix_az>lin_start,
@@ -3291,6 +3290,75 @@ def empirical_cor(l):
 
   return map_ramp, map_flata, map_topo, rms, map_noramps 
 
+def temporal_decomp(pix):
+    j = pix  % (jend-jbeg)
+    i = int(pix/(jend-jbeg))
+
+    # Initialisation
+    mdisp=np.ones((N))*float('NaN')
+    mlin=np.ones((N))*float('NaN')
+    mseas=np.ones((N))*float('NaN')
+    mvect=np.ones((N))*float('NaN')
+    disp = as_strided(maps_flata[i,j,:])
+    k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
+    # do not take into account NaN data
+    kk = len(k)
+    tabx = dates[k]
+    taby = disp[k]
+    bp = base[k]
+
+    naps_tmp = np.zeros((N))
+    aps_tmp = np.zeros((N))
+
+    # Inisilize m to zero
+    m = np.zeros((M))
+    sigmam = np.ones((M))*float('NaN')
+
+    if kk > N/6:
+        G=np.zeros((kk,M))
+        # Build G family of function k1(t),k2(t),...,kn(t): #
+        #                                                   #
+        #           |k1(0) .. kM(0)|                        #
+        # Gfamily = |k1(1) .. kM(1)|                        #
+        #           |..    ..  ..  |                        #
+        #           |k1(N) .. kM(N)|                        #
+        #                                                   #
+
+        G=np.zeros((kk,M))
+        for l in range((Mbasis)):
+            G[:,l]=basis[l].g(tabx)
+        for l in range((Mker)):
+            G[:,Mbasis+l]=kernels[l].g(k)
+
+        # inversion
+        m,sigmam = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
+
+        # forward model in original order
+        mdisp[k] = np.dot(G,m)
+
+        # compute aps for each dates
+        # aps_tmp = pow((disp[k]-mdisp[k])/inaps[k],2)
+        # dont weight by inaps to be consistent from one iteration to the other
+        aps_tmp[k] = abs((disp[k]-mdisp[k]))
+
+        # # # remove NaN value for next iterations (but normally no NaN?)
+        # index = np.flatnonzero(np.logical_or(np.isnan(aps_tmp),aps_tmp==0))
+        # aps_tmp[index] = 1.0 # 1 is a bad misfit
+
+        # count number of pixels per dates
+        naps_tmp[k] = naps_tmp[k] + 1.0
+
+        # Build seasonal and linear models
+        if inter=='yes':
+            mlin[k] = np.dot(G[:,indexinter],m[indexinter])
+        if seasonal=='yes':
+            mseas[k] = np.dot(G[:,indexseas:indexseas+2],m[indexseas:indexseas+2])
+        if arguments["--vector"] != None:
+            mvect[k] = np.dot(G[:,indexvect],m[indexvect])
+
+    return m, sigmam, mdisp, mlin, mseas, mvect, aps_tmp, naps_tmp
+
+
 # initialization
 maps_flata = np.copy(maps)
 models = np.zeros((iend-ibeg,jend-jbeg,N))
@@ -3303,9 +3371,9 @@ rms = np.zeros((N))
 
 for ii in range(niter):
     print()
-    logger.info('---------------')
-    logger.info('iteration: {}'.format(ii))
-    logger.info('---------------')
+    print('---------------')
+    print('iteration: {}'.format(ii))
+    print('---------------')
 
     #############################
     # SPATIAL ITERATION N  ######
@@ -3317,35 +3385,35 @@ for ii in range(niter):
       nfigure +=1
       fig = plt.figure(nfigure,figsize=(14,10))
     
-    # if iteration = 0 or spatialiter > 0, then spatial estimation
+    # if iteration = 0 or spatialiter==yes, then spatial estimation
     if (ii==0) or (spatialiter=='yes') :
 
       print() 
       #########################################
-      print('#################################')
+      print('---------------')
       print('Empirical estimations')
-      print('#################################')
+      print('---------------')
       #########################################
       print()
     
       # # Loop over the dates
-      for l in range((N)):
-        maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
+      # for l in range((N)):
+      #   maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
 
-      # output = []
-      # with TimeIt():
-      #     # for kk in range(Nifg):
-      #     work = range(N)
-      #     with poolcontext(processes=nproc) as pool:
-      #         results = pool.map(empirical_cor, work)
-      #     output.append(results)
+      output = []
+      with TimeIt():
+          # for kk in range(Nifg):
+          work = range(N)
+          with poolcontext(processes=nproc) as pool:
+              results = pool.map(empirical_cor, work)
+              # maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = results[0][l]
+              # TypeError: cannot unpack non-iterable int object
+          output.append(results)
 
-      #     # fetch results
-      #     # return map_ramp, map_flata, map_topo, rms, map_noramps 
-      #     for l in range(N):
-      #         print(output[0][l])
-      #         maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = output[0][l]
-      #     del output
+          # fetch results
+          for l in range(N):
+              maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = output[0][l]
+          del output
 
       # plot corrected ts
       nfigure +=1
@@ -3355,10 +3423,10 @@ for ii in range(niter):
           axd = figd.add_subplot(4,int(N/4)+1,l+1)
           caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
           axd.set_title(idates[l],fontsize=6)
-          setp(axd.get_xticklabels(), visible=False)
-          setp(axd.get_yticklabels(), visible=False)
-      setp(axd.get_xticklabels(), visible=False)
-      setp(axd.get_yticklabels(), visible=False)
+          plt.setp(axd.get_xticklabels(), visible=False)
+          plt.setp(axd.get_yticklabels(), visible=False)
+      plt.setp(axd.get_xticklabels(), visible=False)
+      plt.setp(axd.get_yticklabels(), visible=False)
       figd.colorbar(caxd, orientation='vertical',aspect=10)
       figd.suptitle('Corrected time series maps')
       fig.tight_layout()
@@ -3373,10 +3441,10 @@ for ii in range(niter):
               axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
               caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
               axtopo.set_title(idates[l],fontsize=6)
-              setp(axtopo.get_xticklabels(), visible=False)
-              setp(axtopo.get_yticklabels(), visible=False)
-              setp(axtopo.get_xticklabels(), visible=False)
-              setp(axtopo.get_yticklabels(), visible=False)
+              plt.setp(axtopo.get_xticklabels(), visible=False)
+              plt.setp(axtopo.get_yticklabels(), visible=False)
+              plt.setp(axtopo.get_xticklabels(), visible=False)
+              plt.setp(axtopo.get_yticklabels(), visible=False)
           figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
           figtopo.suptitle('Time series RAMPS+TOPO')
           fig.tight_layout()
@@ -3392,10 +3460,10 @@ for ii in range(niter):
               axref = figref.add_subplot(4,int(N/4)+1,l+1)
               caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
               axref.set_title(idates[l],fontsize=6)
-              setp(axref.get_xticklabels(), visible=False)
-              setp(axref.get_yticklabels(), visible=False)
-          setp(axref.get_xticklabels(), visible=False)
-          setp(axref.get_yticklabels(), visible=False)
+              plt.setp(axref.get_xticklabels(), visible=False)
+              plt.setp(axref.get_yticklabels(), visible=False)
+          plt.setp(axref.get_xticklabels(), visible=False)
+          plt.setp(axref.get_yticklabels(), visible=False)
           figref.suptitle('Time series RAMPS')
           figref.colorbar(caxref, orientation='vertical',aspect=10)
           fig.tight_layout()
@@ -3412,11 +3480,11 @@ for ii in range(niter):
         logger.info('Use RMS empirical estimation as uncertainties for time decomposition')
         inaps = np.copy(rms)
         logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-        # scale between 0 and 1 for threshold_rmsd
+        # scale between 0 and 1 
         maxaps = np.nanmax(inaps)
         inaps = inaps/maxaps
         minaps= np.nanpercentile(inaps,2)
-        index = flatnonzero(inaps<minaps)
+        index = np.flatnonzero(inaps<minaps)
         inaps[index] = minaps
         np.savetxt('rms_empcor.txt', inaps.T)
         del rms
@@ -3425,8 +3493,13 @@ for ii in range(niter):
     # TEMPORAL ITERATION N #
     ########################
 
+    print() 
+    #########################################
+    print('---------------')
+    print('Time Decomposition')
+    print('---------------')
+    #########################################
     print()
-    logger.info('Time decomposition..')
 
     # initialize aps for each images to 1
     aps = np.ones((N))
@@ -3435,141 +3508,57 @@ for ii in range(niter):
 
     # reiinitialize maps models
     models = np.zeros((iend-ibeg,jend-jbeg,N))
+    models_trends = np.zeros((iend-ibeg,jend-jbeg,N))
+    models_seas = np.zeros((iend-ibeg,jend-jbeg,N))
+    models_lin = np.zeros((iend-ibeg,jend-jbeg,N))
+    models_vect = np.zeros((iend-ibeg,jend-jbeg,N))
 
-    if seasonal=='yes' or semianual=='yes' or inter=='yes' or vect != None:
-        models_trends = np.zeros((iend-ibeg,jend-jbeg,N))
-        models_detrends = np.zeros((iend-ibeg,jend-jbeg,N))
+    output = []
+    with TimeIt():
+        work = range(0,(iend-ibeg)*(jend-jbeg),sampling)
+        with poolcontext(processes=nproc) as pool:
+            results = pool.map(temporal_decomp, work)
+        output.append(results)
 
-    # ligns = [2014,2157,1840,1960,1951]
-    # cols = [100,117,843,189,43]
-    # for i,j in zip(ligns,cols):
+        # fetch results
+        for pix in range(0,(iend-ibeg)*(jend-jbeg),sampling):
+            j = pix  % (jend-jbeg)
+            i = int(pix/(jend-jbeg))
+            
+            # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, aps_pix, naps_pix = temporal_decomp(pix)
+            m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, aps_pix, naps_pix = output[0][pix]
+          
+            aps = aps + aps_pix
+            n_aps = n_aps + naps_pix
 
-    for i in range(0,iend-ibeg,sampling):
-        for j in range(0,jend-jbeg,sampling):
+            # save m
+            for l in range((Mbasis)):
+                basis[l].m[i,j] = m[l]
+                basis[l].sigmam[i,j] = sigmam[l]
 
-            # Initialisation
-            mdisp=np.ones((N))*float('NaN')
-            #!!!!!
-            disp = as_strided(maps_flata[i,j,:])
-            # disp = as_strided(maps[i,j,:])
+            for l in range((Mker)):
+                kernels[l].m[i,j] = m[Mbasis+l]
+                kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
 
-            k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
-            # do not take into account NaN data
-            kk = len(k)
-            tabx = dates[k]
-            taby = disp[k]
-            bp = base[k]
-
-            # Inisilize m to zero
-            m = np.zeros((M))
-            sigmam = np.ones((M))*float('NaN')
-
-            if kk > N/6:
-                G=np.zeros((kk,M))
-                # Build G family of function k1(t),k2(t),...,kn(t): #
-                #                                                   #
-                #           |k1(0) .. kM(0)|                        #
-                # Gfamily = |k1(1) .. kM(1)|                        #
-                #           |..    ..  ..  |                        #
-                #           |k1(N) .. kM(N)|                        #
-                #                                                   #
-
-                rmsd = maxrmsd + 1
-
-                # remove this rmsd threshold for the moment
-                # if inter=='yes' and iteration is True:
-                #     Glin=np.zeros((kk,2+Mker))
-                #     for l in range((2)):
-                #         Glin[:,l]=basis[l].g(tabx)
-                #     for l in range((Mker)):
-                #         Glin[:,2+l]=kernels[l].g(k)
-
-                #     mt,sigmamt = consInvert(Glin,taby,inaps[k],cond=rcond)
-
-                #     # compute rmsd
-                #     mdisp[k] = np.dot(Glin,mt)
-                #     # sum sur toutes les dates
-                #     # rmsd = np.sum(abs((disp[k] - mdisp[k])/inaps[k]))/kk  S
-                #     rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)
-                #     # print i,j,rmsd,maxrmsd
-
-                G=np.zeros((kk,M))
-                for l in range((Mbasis)):
-                    G[:,l]=basis[l].g(tabx)
-                for l in range((Mker)):
-                    G[:,Mbasis+l]=kernels[l].g(k)
-
-                # if only ref + seasonal: ref + cos + sin
-                #print rmsd
-                if rmsd >= maxrmsd or inter!='yes':
-                    mt,sigmamt = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
-
-                # rebuild full vectors
-                if Mker>0:
-                    m[Mbasis:],sigmam[Mbasis:] = mt[-Mker:],sigmamt[-Mker:]
-                    m[:mt.shape[0]-Mker],sigmam[:mt.shape[0]-Mker] = mt[:-Mker],sigmamt[:-Mker]
-                else:
-                    sigmam[:mt.shape[0]] = sigmamt
-                    m[:mt.shape[0]] = mt
-
-                # save m
-                for l in range((Mbasis)):
-                    basis[l].m[i,j] = m[l]
-                    basis[l].sigmam[i,j] = sigmam[l]
-
-                for l in range((Mker)):
-                    kernels[l].m[i,j] = m[Mbasis+l]
-                    kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
-
-                # forward model in original order
-                mdisp[k] = np.dot(G,m)
-
-                # compute aps for each dates
-                # aps_tmp = pow((disp[k]-mdisp[k])/inaps[k],2)
-                aps_tmp = abs((disp[k]-mdisp[k]))/inaps[k]
-
-                # # remove NaN value for next iterations (but normally no NaN?)
-                index = np.flatnonzero(np.logical_or(np.isnan(aps_tmp),aps_tmp==0))
-                aps_tmp[index] = 1.0 # 1 is a bad misfit
-
-                # save total aps of the map
-                aps[k] = aps[k] + aps_tmp
-
-                # count number of pixels per dates
-                n_aps[k] = n_aps[k] + 1.0
-
-                # save new aps for each maps
-                # maps_aps[i,j,k] = aps_tmp
-
-                # fill maps models
-                models[i,j,:] = mdisp
-
-                # Build seasonal and linear models
-                if inter=='yes':
-                    models_detrends[i,j,k] = models_detrends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
-
-                if inter=='yes':
-                    models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexinter],m[indexinter])
-                if arguments["--vector"] != None:
-                    models_trends[i,j,k] = models_trends[i,j,k] + np.dot(G[:,indexvect],m[indexvect])
+        del output
 
     # convert aps in rad
     aps = aps/n_aps
     # aps = np.sqrt(abs(aps/n_aps))
+
+    # remove low aps to avoid over-fitting in next iter
     minaps= np.nanpercentile(aps,2)
-    index = flatnonzero(aps<minaps)
+    index = np.flatnonzero(aps<minaps)
     aps[index] = minaps
 
     print('Dates      APS     # of points')
     for l in range(N):
-        print (idates[l], aps[l], n_aps[l])
+        print (idates[l], aps[l], np.int(n_aps[l]))
     np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
     # set apsf is yes for iteration
     apsf=='yes'
     # update aps for next iterations
     inaps = np.copy(aps)
-
-# del maps_aps
 
 #######################################################
 # Save new cubes
@@ -3585,16 +3574,22 @@ cube_flata.flatten().astype('float32').tofile(fid)
 fid.close()
 
 if fulloutput=='yes':
-    if (seasonal=='yes' or semianual=='yes') and (vect != None or inter=='yes'):
+    if (seasonal=='yes'):
         logger.info('Save time series cube without seasonality: {}'.format('depl_cumule_dseas'))
         fid = open('depl_cumule_dseas', 'wb')
-        (maps_flata - models_trends).flatten().astype('float32').tofile(fid)
+        (maps_flata - models_seas).flatten().astype('float32').tofile(fid)
         fid.close()
 
     if inter=='yes':
         fid = open('depl_cumule_dtrend', 'wb')
         logger.info('Save de-trended time series cube: {}'.format('depl_cumule_dtrend'))
-        (maps_flata - models_detrends).flatten().astype('float32').tofile(fid)
+        (maps_flata - models_lin).flatten().astype('float32').tofile(fid)
+        fid.close()
+
+    if arguments["--vector"] != None:
+        fid = open('depl_cumule_dvect', 'wb')
+        logger.info('Save time series cube without vector component: {}'.format('depl_cumule_dvect'))
+        (maps_flata - models_vect).flatten().astype('float32').tofile(fid)
         fid.close()
 
     if flat>0:
@@ -3608,11 +3603,6 @@ try:
   del cube_flata, cube_noramps
 except:
   pass
-
-# # save APS
-# print
-# print 'Saving APS in liste_images_aps.txt'
-# np.savetxt('liste_images_aps.txt', np.vstack([idates,dates,aps]).T,header='#dates #dates_dec #aps', fmt=('%i', '%.6f', '%.6f'))
 
 # create MAPS directory to save .r4
 if fulloutput=='yes':
@@ -3634,14 +3624,14 @@ fig.subplots_adjust(hspace=.001,wspace=0.01)
 # figall = plt.figure(nfigure,figsize=(20,9))
 # figall.subplots_adjust(hspace=0.00001,wspace=0.001)
 
-# nfigure +=1
-# figclr = plt.figure(nfigure)
-# # plot color map
-# ax = figclr.add_subplot(1,1,1)
-# cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
-# setp( ax.get_xticklabels(), visible=False)
-# cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
-# figclr.savefig('colorscale.eps', format='EPS',dpi=150)
+nfigure +=1
+figclr = plt.figure(nfigure)
+# plot color map
+ax = figclr.add_subplot(1,1,1)
+cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+plt.setp( ax.get_xticklabels(), visible=False)
+cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
+figclr.savefig('colorscale.eps', format='EPS',dpi=150)
 
 for l in range((N)):
     data = as_strided(maps[:,:,l])
@@ -3662,38 +3652,38 @@ for l in range((N)):
     # axall = figall.add_subplot(6,N,l+1)
     # axall.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
     # axall.set_title(idates[l],fontsize=6)
-    # setp(axall.get_xticklabels(), visible=False)
-    # setp(axall.get_yticklabels(), visible=False)
+    # plt.setp(axall.get_xticklabels(), visible=False)
+    # plt.setp(axall.get_yticklabels(), visible=False)
     # if l==0:
     #     axall.set_ylabel('DATA')
     # axall = figall.add_subplot(6,N,l+1+N)
     # axall.imshow(ramp,cmap=cmap,vmax=vmax,vmin=vmin)
-    # setp(axall.get_xticklabels(), visible=False)
-    # setp(axall.get_yticklabels(), visible=False)
+    # plt.setp(axall.get_xticklabels(), visible=False)
+    # plt.setp(axall.get_yticklabels(), visible=False)
     # if l==0:
     #     axall.set_ylabel('RAMP')
     # axall = figall.add_subplot(6,N,l+1+2*N)
     # axall.imshow(tropo,cmap=cmap,vmax=vmax,vmin=vmin)
-    # setp(axall.get_xticklabels(), visible=False)
-    # setp(axall.get_yticklabels(), visible=False)
+    # plt.setp(axall.get_xticklabels(), visible=False)
+    # plt.setp(axall.get_yticklabels(), visible=False)
     # if l==0:
     #     axall.set_ylabel('TROP0')
     # axall = figall.add_subplot(6,N,l+1+3*N)
     # axall.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
-    # setp(axall.get_xticklabels(), visible=False)
-    # setp(axall.get_yticklabels(), visible=False)
+    # plt.setp(axall.get_xticklabels(), visible=False)
+    # plt.setp(axall.get_yticklabels(), visible=False)
     # if l==0:
     #     axall.set_ylabel('FLATTEN DATA')
     # axall = figall.add_subplot(6,N,l+1+4*N)
     # axall.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-    # setp(axall.get_xticklabels(), visible=False)
-    # setp(axall.get_yticklabels(), visible=False)
+    # plt.setp(axall.get_xticklabels(), visible=False)
+    # plt.setp(axall.get_yticklabels(), visible=False)
     # if l==0:
     #     axall.set_ylabel('MODEL')
     # axall = figall.add_subplot(6,N,l+1+5*N)
     # axall.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-    # setp(axall.get_xticklabels(), visible=False)
-    # setp(axall.get_yticklabels(), visible=False)
+    # plt.setp(axall.get_xticklabels(), visible=False)
+    # plt.setp(axall.get_yticklabels(), visible=False)
     # if l==0:
     #     axall.set_ylabel('RES')
 
@@ -3703,11 +3693,11 @@ for l in range((N)):
     ax.set_title(idates[l],fontsize=6)
     axres.set_title(idates[l],fontsize=6)
 
-    setp(ax.get_xticklabels(), visible=False)
-    setp(ax.get_yticklabels(), visible=False)
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
 
-    setp(axres.get_xticklabels(), visible=False)
-    setp(axres.get_yticklabels(), visible=False)
+    plt.setp(axres.get_xticklabels(), visible=False)
+    plt.setp(axres.get_yticklabels(), visible=False)
 
     fig.tight_layout()
 
@@ -3724,28 +3714,28 @@ for l in range((N)):
             band = ds.GetRasterBand(1)
             band.WriteArray(data_flat)
             ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
+            ds.plt.setprojection(proj)
             band.FlushCache()
 
             ds = driver.Create(outdir+'{}_ramp_tropo.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(ramp+tropo)
             ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
+            ds.plt.setprojection(proj)
             band.FlushCache()
 
             ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(model)
             ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
+            ds.plt.setprojection(proj)
             band.FlushCache()
 
             # ds = driver.Create(outdir+'{}_res.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
             # band = ds.GetRasterBand(1)
             # band.WriteArray(res)
             # ds.SetGeoTransform(gt)
-            # ds.SetProjection(proj)
+            # ds.plt.setprojection(proj)
             # band.FlushCache()
 
         else:
@@ -3783,7 +3773,7 @@ plt.close('all')
 # clean memory
 del maps_ramp, maps_flata, maps_topo, maps_noramps
 try:
-  del models_detrends, models_trends
+  del models_trends, model_seas
 except:
   pass 
 
@@ -3799,7 +3789,7 @@ if geotiff is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].m)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3809,7 +3799,7 @@ if geotiff is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].sigmam)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3820,7 +3810,7 @@ if geotiff is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].m)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3830,7 +3820,7 @@ if geotiff is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].sigmam)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3880,7 +3870,7 @@ if seasonal == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3889,7 +3879,7 @@ if seasonal == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3910,7 +3900,7 @@ if seasonal == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3919,7 +3909,7 @@ if seasonal == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3951,7 +3941,7 @@ if semianual == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3960,7 +3950,7 @@ if semianual == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3980,7 +3970,7 @@ if semianual == 'yes':
         ds = driver.Create('phiw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -3988,7 +3978,7 @@ if semianual == 'yes':
         ds = driver.Create('phiw2t_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
+        ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
@@ -4018,8 +4008,8 @@ fig=plt.figure(nfigure,figsize=(14,12))
 ax = fig.add_subplot(1,M,1)
 cax = ax.imshow(basis[0].m,cmap=cmap,vmax=vmax,vmin=vmin)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-setp(ax.get_xticklabels(), visible=False)
-setp(ax.get_yticklabels(), visible=False)
+plt.setp(ax.get_xticklabels(), visible=False)
+plt.setp(ax.get_yticklabels(), visible=False)
 
 # plot linear term
 vmax = np.abs([np.nanpercentile(basis[1].m,98.),np.nanpercentile(basis[1].m,2.)]).max()
@@ -4029,8 +4019,8 @@ ax = fig.add_subplot(1,M,2)
 cax = ax.imshow(basis[1].m,cmap=cmap,vmax=vmax,vmin=vmin)
 ax.set_title(basis[1].reduction)
 cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-setp(ax.get_xticklabels(), visible=False)
-setp(ax.get_yticklabels(), visible=False)
+plt.setp(ax.get_xticklabels(), visible=False)
+plt.setp(ax.get_yticklabels(), visible=False)
 
 # plot others
 for l in range(2,Mbasis):
@@ -4042,8 +4032,8 @@ for l in range(2,Mbasis):
     ax.set_title(basis[l].reduction)
     # add colorbar
     cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-    setp(ax.get_xticklabels(), visible=False)
-    setp(ax.get_yticklabels(), visible=False)
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
 
 for l in range(Mker):
     vmax = np.abs([np.nanpercentile(kernels[l].m,98.),np.nanpercentile(kernels[l].m,2.)]).max()
@@ -4052,8 +4042,8 @@ for l in range(Mker):
     ax = fig.add_subplot(1,M,Mbasis+l+1)
     cax = ax.imshow(kernels[l].m,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(kernels[l].reduction)
-    setp(ax.get_xticklabels(), visible=False)
-    setp(ax.get_yticklabels(), visible=False)
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
     cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
 
 plt.suptitle('Time series decomposition')
