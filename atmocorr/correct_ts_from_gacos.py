@@ -105,12 +105,12 @@ if arguments["--topofile"] ==  None:
 else:
    radar = arguments["--topofile"]
 # read lect.in: size maps
-ncol, nlign = map(int, open('lect.in').readline().split(None, 2)[0:2])
+ncol, nlign = list(map(int, open('lect.in').readline().split(None, 2)[0:2]))
 if arguments["--zone"] ==  None:
     refzone = [0,ncol,0,nlign]
     col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlign
 else:
-    refzone = map(float,arguments["--clean"].replace(',',' ').split())
+    refzone = list(map(float,arguments["--clean"].replace(',',' ').split()))
 
 if arguments["--refstart"] == None:
     refstart = 0
@@ -143,7 +143,7 @@ else:
 if arguments["--crop"] ==  None:
     crop = False
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 N = len(dates)
 
