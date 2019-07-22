@@ -20,7 +20,7 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--ref_zon
 [--cohpixel=<yes/no>] [--threshold_coh=<value>] [--ibeg_mask=<value>] [--iend_mask=<value>] \
 [--perc=<value>] [--perc_topo=<value>] [--min_topo=<value>] [--max_topo=<value>] [--perc_slope=<value>] [--samp=<value>] \
 [--plot=<yes/no>] [--suffix_output=<value>]\
-[<ibeg>] [<iend>] [<jbeg>] [<jend>] [--nproc=<nb_cores>] [--cpt=<path>] 
+[--crop_emp=<values>] [--nproc=<nb_cores>] [--cpt=<path>] 
 
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
@@ -74,11 +74,8 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --samp=<value>        Undersampling for empirical estimation [default: 2]
 --plot yes/no         If yes, plot figures for each ints [default: no]
 --suffix_output value Suffix output file name $prefix$date1-$date2$suffix$suffix_output [default:_corrunw]
---ibeg VALUE          Line number bounding the estimation zone [default: 0]
---iend VALUE          Line number bounding the estimation zone [default: mlines]
---jbeg VALUE          Column numbers bounding the estimation zone [default: 0]
---jend VALUE          Column numbers bounding the estimation zone [default: mcols] 
 --cpt==<path>         Indicate colormap for plots [default: cm.rainbow]
+--crop_emp VALUE    Define a region of interest for the spatial estimatiom (ramp+phase/topo) [default: 0,nlines,0,ncol]
 """
 
 
@@ -2009,35 +2006,26 @@ else:
     mask = np.zeros((mlines,mcols))
     threshold_mask = -1
 
-# define estimation area
-if arguments["<ibeg>"] ==  None:
-  ibeg = 0
+if arguments["--crop_emp"] ==  None:
+    crop_emp = [0,mlines,0,mcols]
 else:
-  ibeg = int(arguments["<ibeg>"])
-if arguments["<iend>"] ==  None:
-  iend = mlines
-else:
-  iend = int(arguments["<iend>"])
-if arguments["<jbeg>"] ==  None:
-  jbeg = 0
-else:
-  jbeg = int(arguments["<jbeg>"])
-if arguments["<jend>"] ==  None:
-  jend = mcols
-else:
-  jend = int(arguments["<jend>"])
+    crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
+    logger.warning('Crop empirical estimation between lines {}-{} and cols:{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
+ibeg,iend,jbeg,jend = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
 
 if arguments["--refstart"] == None:
     lin_start = 0
+    col_start = 0
 else:
     lin_start = int(arguments["--refstart"])
 if arguments["--refend"] == None:
     lin_end = mlines
+    col_end = 0
 else:
     lin_end = int(arguments["--refend"])
 
 if arguments["--ref_zone"] == None:
-    lin_start, lin_jend, col_start, col_jend = 0,mlines,0,mcols
+    lin_start, lin_jend, col_start, col_end = 0,mlines,0,mcols
 else:
     ref = list(map(int,arguments["--ref_zone"].replace(',',' ').split()))
     try:

@@ -392,7 +392,7 @@ else:
     lin_end = int(arguments["--refend"])
 
 if arguments["--ref"] == None:
-    lin_start, lin_jend, col_start, col_jend = None,None,None,None
+    lin_start, lin_jend, col_start, col_end = None,None,None,None
 else:
     ref = list(map(int,arguments["--ref"].replace(',',' ').split()))
     try:
