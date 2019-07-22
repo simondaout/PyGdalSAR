@@ -13,7 +13,7 @@ Estimates atmospheric phase/elevation correlations or/and azimuthal and range ra
 on unwrapped interferograms (ROI_PAC/GAMMA/GTIFF). Temporal inversion of all coeffient with a strong weight for
 small temporal baselines and lage cover interferograms. Reconstruction of the empirical phase correction.
 
-usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=<value>] [--int_path=<path>] [--out_path=<path>] \
+usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--ref_zone=<jstart,jend,istart,iend> ] [--refend=<value>] [--int_path=<path>] [--out_path=<path>] \
 [--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
@@ -27,10 +27,11 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--refend=
 --int_path PATh       Relative path to output interferograms directory
 --refstart VALUE      Stating line number of the area where phase is set to zero [default: 0]
 --refend VALUE        Ending line number of the area where phase is set to zero [default: 200]
+--ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero - Overwrite refstart/refend [default: None] 
 --prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
---ref PATH            Path to reference image to define format and size. Necessary if topofile is None [default:None]     
+--ref PATH            Path to a reference image to define format and size. Necessary if topofile is not given [default:None]     
 --flat PATH           Remove a spatial ramp.If short acquisition, short is automatically set to 3.
 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 
 3: ax+by+c, 4: ax+by+cxy+d 5: ax**2+bx+d, 6: ay**2+by+c
@@ -1273,7 +1274,7 @@ def empirical_cor(kk):
         checkinfile(infile)
         los_map = gm.readgamma(infile,int_path)
 
-    logger.info('lines:{0}, cols:{1}, IFG:{2}:'.format(lines, cols, idate))
+    logger.info('lines:{0}, cols:{1}, IFG:{2}'.format(lines, cols, idate))
 
     # load coherence or whatever
     spacial_mask = np.ones((mlines,mcols))*np.float('NaN')
@@ -1325,16 +1326,15 @@ def empirical_cor(kk):
     np.logical_and(los_map>minlos,
     np.logical_and(los_map<maxlos,
     np.logical_and(rms_map>threshold_rms, 
-    np.logical_and(pix_az>refstart,
-    np.logical_and(pix_az<refend,
-    np.logical_and(pix_rg>jbeg,
-    np.logical_and(pix_rg<jend,
+    np.logical_and(pix_az>lin_start,
+    np.logical_and(pix_az<lin_end,
+    np.logical_and(pix_rg>col_start,
+    np.logical_and(pix_rg<col_end,
     np.logical_and(mask>threshold_mask,
     np.logical_and(~np.isnan(los_map),
     np.logical_or(pix_az<ibeg_mask,pix_az>iend_mask)
     )))))))))))))
 
-    logger.info('line start:{0}, line end:{1} ref area'.format(refstart,refend))
     spacial_mask[index] = np.copy(los_map[index])
 
     # extract range and azimuth coordinates
@@ -1348,7 +1348,10 @@ def empirical_cor(kk):
     los_ref = los_temp[indexref].flatten()
     rms_ref = rms_map[indexref].flatten()
     cst = np.nansum(los_ref*rms_ref) / np.nansum(rms_ref)
+    logger.info('Estimation of a constant within lines {0}-{1} and cols {2}-{3}'.format(lin_start,lin_end,col_start,col_end))
+    logger.info('Average phase within ref area: {0}:'.format(cst))
     rg_ref, az_ref, topo_ref = np.nanmean(pix_rg[indexref]),np.nanmean(pix_az[indexref]),np.nanmean(elev_temp[indexref])
+
 
     # logger.info('Average rg: {0}, az:{1}, topo:{2}, within ref area'.format(np.int(rg_ref), np.int(az_ref), np.int(topo_ref)))
     # sys.exit()
@@ -1579,8 +1582,8 @@ def apply_cor(kk, sp, sp_inv):
     flatlos = los_map - corr_inv
     
     # recompute ref frame
-    zone = as_strided(flatlos[refstart:refend,:])
-    amp = as_strided(rms_map[refstart:refend,:])
+    zone = as_strided(flatlos[lin_start:lin_end,col_start:col_end])
+    amp = as_strided(rms_map[lin_start:lin_end,col_start:col_end])
     minlos, maxlos = np.nanpercentile(zone[abs(zone)>1.e-6],5.), np.nanpercentile(zone[abs(zone)>1.e-6],95.)
     index = np.nonzero(
         np.logical_and(zone>minlos,
@@ -1695,7 +1698,7 @@ def apply_cor(kk, sp, sp_inv):
 
 # logging.basicConfig(level=logging.INFO,\
 logging.basicConfig(level=logging.INFO,\
-        format='%(filename)s -- line %(lineno)s -- %(levelname)s -- %(message)s')
+        format='line %(lineno)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('invert_ramp_topo_unw.log')
 
 #####################################################################################
@@ -1717,16 +1720,6 @@ if arguments["--out_path"] == None:
 else:
     out_path=arguments["--out_path"] + '/'
     makedirs(out_path)
-
-if arguments["--refstart"] == None:
-    refstart = 0
-else:
-    refstart = int(arguments["--refstart"])
-
-if arguments["--refend"] == None:
-    refend = 200
-else:
-    refend = int(arguments["--refend"])
 
 if arguments["--prefix"] == None:
     prefix = ''
@@ -2012,7 +2005,6 @@ if maskfile is not None:
       plt.colorbar(cax, cax=c)
       plt.show()
       fid.close()
-
 else:
     mask = np.zeros((mlines,mcols))
     threshold_mask = -1
@@ -2035,6 +2027,24 @@ if arguments["<jend>"] ==  None:
 else:
   jend = int(arguments["<jend>"])
 
+if arguments["--refstart"] == None:
+    lin_start = 0
+else:
+    lin_start = int(arguments["--refstart"])
+if arguments["--refend"] == None:
+    lin_end = mlines
+else:
+    lin_end = int(arguments["--refend"])
+
+if arguments["--ref_zone"] == None:
+    lin_start, lin_jend, col_start, col_jend = 0,mlines,0,mcols
+else:
+    ref = list(map(int,arguments["--ref_zone"].replace(',',' ').split()))
+    try:
+        lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
+    except:
+        lin_start,lin_end = ref[0], ref[1]
+        col_start, col_end = 0, mcols
 
 #####################################################################################
 # MAIN
