@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -21,8 +21,9 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
 [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
-[--crop=<values>] [--crop_emp=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] [--dateslim=<values>]  \
-[<ibeg>] [<iend>] [<jbeg>] [<jend>]
+[--crop=<values>] [--crop_emp=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
+[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] \
+[<ibeg>] [<iend>] [<jbeg>] [<jend>] 
 
 invers_disp2coef.py -h | --help
 
@@ -71,18 +72,19 @@ Options:
 --refend VALUE          Depricate - Ending line number of the area where phase is set to zero [default: None]
 --ref=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero - Overwrite refstart/refend [default: None] 
 --dateslim              Datemin,Datemax time series  
---crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlign,0,ncol]
---crop_emp VALUE    Define a region of interest for the spatial estimatiom (ramp+phase/topo) [default: 0,nlign,0,ncol]
+--crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlines,0,ncol]
+--crop_emp VALUE    Define a region of interest for the spatial estimatiom (ramp+phase/topo) [default: 0,nlines,0,ncol]
+--nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
 """
 
-print
-print '# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #'
-print '#'                                                                 '#'
-print '#         Linear Inversion of InSAR time series displacements       #'
-print '#         with a decomposition in time                              #'
-print '#'                                                                 '#'
-print '# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #'
-print
+print()
+print('# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #')
+print('#'                                                                 '#')
+print('#         Linear Inversion of InSAR time series displacements       #')
+print('#         with a decomposition in time                              #')
+print('#'                                                                 '#')
+print('# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #')
+print()
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
@@ -108,7 +110,20 @@ try:
 except:
     import docopt
 
-np.warnings.filterwarnings('ignore')
+from contextlib import contextmanager
+from functools import wraps, partial
+import multiprocessing
+import logging
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
+
+# logging.basicConfig(level=logging.INFO,\
+logging.basicConfig(level=logging.INFO,\
+        format='line %(lineno)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('invers_disp2coef.log')
+
 
 ################################
 # Create lib of wavelet functions
@@ -121,7 +136,7 @@ class pattern:
         self.date=date
 
     def info(self):
-        print self.name, self.date
+        print(self.name, self.date)
 
 ### BASIS FUNCTIONS: function of time
 
@@ -175,7 +190,7 @@ class sin2var(pattern):
 
      def g(self,t):
          func=np.zeros(t.size)
-         for i in xrange(t.size):
+         for i in range(t.size):
              func[i]=math.sin(4*math.pi*(t[i]-self.to))
          return func
 
@@ -186,7 +201,7 @@ class cos2var(pattern):
 
      def g(self,t):
          func=np.zeros(t.size)
-         for i in xrange(t.size):
+         for i in range(t.size):
              func[i]=math.cos(4*math.pi*(t[i]-self.to))
          return func
 
@@ -197,7 +212,7 @@ class sinvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.sin(2*math.pi*(t[i]-self.to))
         return func
 
@@ -208,7 +223,7 @@ class cosvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.cos(2*math.pi*(t[i]-self.to))
         return func
 
@@ -232,7 +247,7 @@ class corrdem(pattern):
         self.bp=bp
 
     def info(self):
-        print self.name
+        print(self.name)
 
     def g(self,index):
         func = (self.bp-self.bpo)
@@ -245,7 +260,7 @@ class vector(pattern):
         self.func=vect
 
     def info(self):
-        print self.name
+        print(self.name)
 
     def g(self,index):
         return self.func[index]
@@ -260,9 +275,51 @@ def date2dec(dates):
         times.append(year + dec)
     return times
 
+
+##################################################################################
+###  Extras functions and context maganers
+##################################################################################
+
+# Timer for all the functions
+class ContextDecorator(object):
+    def __call__(self, f):
+        @wraps(f)
+        def decorated(*args, **kwds):
+            with self:
+                try:
+                    return f(*args, **kwds)
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except:
+                    Exception('{0} Failed !'.format(f))
+                    raise
+        return decorated
+
+class TimeIt(ContextDecorator):
+    def __enter__(self):
+        self.start = datetimes.now()
+        logger.info('Starting time process: {0}'.format(self.start))
+    def __exit__(self, type, value, traceback):
+        logger.info('Time process: {0}s'.format((datetimes.now() - self.start).total_seconds()))
+
+
+def checkinfile(file):
+    if path.exists(file) is False:
+        logger.critical("File: {0} not found, Exit !".format(file))
+        logger.info("File: {0} not found in {1}, Exit !".format(file,getcwd()))
+
+# create generator for pool
+@contextmanager
+def poolcontext(*arg, **kargs):
+    pool = multiprocessing.Pool(*arg, **kargs)
+    yield pool
+    pool.terminate()
+    pool.join()
+
 ################################
 # Initialization
 ################################
+
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -297,12 +354,12 @@ else:
 if arguments["--coseismic"] ==  None:
     cos = []
 else:
-    cos = map(float,arguments["--coseismic"].replace(',',' ').split())
+    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
 
 if arguments["--postseismic"] ==  None:
     pos = []
 else:
-    pos = map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split())
+    pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
 
 if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
@@ -311,7 +368,7 @@ if arguments["--slowslip"] == None:
     sse, sse_time, sse_car = [], [], []
 else:
     try:
-        sse = map(float,arguments["--slowslip"].replace(',',' ').split())
+        sse = list(map(float,arguments["--slowslip"].replace(',',' ').split()))
         sse_time = sse[::2]
         sse_car = sse[1::2]
     except:
@@ -324,7 +381,7 @@ else:
     vect = None
 
 # read lect.in
-ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
+ncol, nlines = list(map(int, open(infile).readline().split(None, 2)[0:2]))
 
 if arguments["--refstart"] == None:
     lin_start = None
@@ -338,7 +395,7 @@ else:
 if arguments["--ref"] == None:
     lin_start, lin_jend, col_start, col_jend = None,None,None,None
 else:
-    ref = map(int,arguments["--ref"].replace(',',' ').split())
+    ref = list(map(int,arguments["--ref"].replace(',',' ').split()))
     try:
         lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
     except:
@@ -400,21 +457,9 @@ else:
 if arguments["--imref"] ==  None:
     imref = 0
 elif arguments["--imref"] < 1:
-    print '--imref must be between 1 and Nimages'
+    logger.warning('--imref must be between 1 and Nimages')
 else:
     imref = int(arguments["--imref"]) - 1
-
-if arguments["--crop"] ==  None:
-    crop = [0,nlign,0,ncol]
-else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
-ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-
-if arguments["--crop_emp"] ==  None:
-    crop_emp = [0,nlign,0,ncol]
-else:
-    crop_emp = map(float,arguments["--crop"].replace(',',' ').split())
-ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 if arguments["--cond"] ==  None:
     rcond = 1e-3
@@ -461,7 +506,7 @@ if arguments["--ivar"] == None:
 elif int(arguments["--ivar"]) <  2:
     ivar = int(arguments["--ivar"])
 else:
-    print 'Error: ivar > 1, set ivar to 0'
+    logger.warning('Error: ivar > 1, set ivar to 0')
     ivar = 0
 
 if arguments["--nfit"] == None:
@@ -469,7 +514,7 @@ if arguments["--nfit"] == None:
 elif int(arguments["--nfit"]) <  2:
     nfit = int(arguments["--nfit"])
 else:
-    print 'Error: nfit > 1, set nfit to 0'
+    logger.warning('Error: nfit > 1, set nfit to 0')
     nfit = 0
 
 if arguments["--perc_topo"] ==  None:
@@ -482,20 +527,40 @@ if arguments["--perc_los"] ==  None:
 else:
     perc_los = float(arguments["--perc_los"])
 
-
 if len(cos) > 0:
-    print
-    print 'Define a maximal RMSD for adding coseismic and postseismic basis functions in the inversion'
-    print 'Max RMSD:',  maxrmsd
-    print
+    logger.info('Define a maximal RMSD for adding coseismic and postseismic basis functions in the inversion')
+    logger.info('Max RMSD:{}'.format(maxrmsd))
 
-#######################################################
+if arguments["--nproc"] ==  None:
+    nproc = 1
+else:
+    nproc = int(arguments["--nproc"])
+
+
+if arguments["--crop"] ==  None:
+    crop = [0,nlines,0,ncol]
+else:
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
+    logger.warning('Crop time series data between lines {}-{} and cols:{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
+ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+
+if arguments["--crop_emp"] ==  None:
+    crop_emp = [0,iend-ibeg,0,jend-jbeg]
+else:
+    crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
+    logger.warning('Crop empirical estimation between lines {}-{} and cols:{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
+ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
+
+#####################################################################################
+# INITIALISATION
+#####################################################################################
 
 # cm
 cmap = cm.jet
 cmap.set_bad('white')
 
 # load images_retenues file
+checkinfile(listim)
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 N = len(dates)
 baseref = base[imref]
@@ -514,29 +579,30 @@ indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
 nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
+checkinfile(cubef)
 cubei = np.fromfile(cubef,dtype=np.float32)
 # extract
-cube = as_strided(cubei[:nlign*ncol*N])
-print 'Number of line in the cube: ', cube.shape
+cube = as_strided(cubei[:nlines*ncol*N])
+logger.info('Load time series cube: {0}, with length: {1}'.format(cubef, len(cube)))
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
-maps = cube.reshape((nlign,ncol,N))
-print 'Reshape cube: ', maps.shape
+maps_temp = cube.reshape((nlines,ncol,N))
 # set at NaN zero values for all dates
-# kk = np.nonzero(maps[:,:,-1]==0)
-cst = np.copy(maps[:,:,imref])
-for l in xrange((N)):
-    maps[:,:,l] = maps[:,:,l] - cst
+# kk = np.nonzero(maps_temp[:,:,-1]==0)
+cst = np.copy(maps_temp[:,:,imref])
+for l in range((N)):
+    maps_temp[:,:,l] = maps_temp[:,:,l] - cst
     if l != imref:
-        index = np.nonzero(maps[:,:,l]==0.0)
-        maps[:,:,l][index] = np.float('NaN')
+        index = np.nonzero(maps_temp[:,:,l]==0.0)
+        maps_temp[:,:,l][index] = np.float('NaN')
 
 N=len(dates)
-print 'Number images: ', N
-maps = as_strided(maps[:,:,indexd])
+maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
+logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
+logger.info('Reshape cube: {}'.format(maps.shape))
 
 # clean
-del cube, cubei 
+del cube, cubei, maps_temp
 
 # fig = plt.figure(0)
 # plt.imshow(cst,vmax=1,vmin=-1)
@@ -549,9 +615,9 @@ fig = plt.figure(12)
 nfigure=0
 
 # open mask file
-mask = np.zeros((nlign,ncol))
 if maskfile is not None:
     extension = os.path.splitext(maskfile)[1]
+    checkinfile(maskfile)
     if extension == ".tif":
       ds = gdal.Open(maskfile, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
@@ -561,15 +627,17 @@ if maskfile is not None:
       fid = open(maskfile,'r')
       maski = np.fromfile(fid,dtype=np.float32)*scale
       fid.close()
-    maski = maski[:nlign*ncol]
-    mask = maski.reshape((nlign,ncol))
+    maski = maski[:(iend-ibeg)*(jend-jbeg)]
+    mask = maski.reshape((iend-ibeg,jend-jbeg))
 else:
-    mask_flat = np.ones((nlign,ncol))
+    mask_flat = np.ones((iend-ibeg,jend-jbeg))
+    mask = np.ones((iend-ibeg,jend-jbeg))
+    maski = mask.flatten()
 
-elev = np.zeros((nlign,ncol))
 # open elevation map
 if radar is not None:
     extension = os.path.splitext(radar)[1]
+    checkinfile(radar)
     if extension == ".tif":
       ds = gdal.Open(radar, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
@@ -580,10 +648,10 @@ if radar is not None:
       elevi = np.fromfile(fid,dtype=np.float32)
       fid.close()
 
-    elevi = elevi[:nlign*ncol]
+    elevi = elevi[:(iend-ibeg)*(jend-jbeg)]
     # fig = plt.figure(10)
-    # plt.imshow(elevi.reshape(nlign,ncol)[ibeg:iend,jbeg:jend])
-    elev = elevi.reshape((nlign,ncol))
+    # plt.imshow(elevi.reshape(iend-ibeg,jend-jbeg)[ibeg:iend,jbeg:jend])
+    elev = elevi.reshape((iend-ibeg,jend-jbeg))
     elev[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(elev)>9999.)
     elev[kk] = float('NaN')
@@ -592,22 +660,23 @@ if radar is not None:
     # plt.show()
     # sys.exit()
 else:
-   elev = np.ones((nlign,ncol))
+   elev = np.ones((iend-ibeg,jend-jbeg))
+   elevi = elev.flatten()
 
 if aspect is not None:
     extension = os.path.splitext(aspect)[1]
+    checkinfile(aspect)
     if extension == ".tif":
       ds = gdal.Open(aspect, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
       aspecti = band.ReadAsArray().flatten()
-      # print ds.RasterYSize, ds.RasterXSize
       del ds
     else:
       fid = open(aspect,'r')
       aspecti = np.fromfile(fid,dtype=np.float32)
       fid.close()
-    aspecti = aspecti[:nlign*ncol]
-    slope = aspecti.reshape((nlign,ncol))
+    aspecti = aspecti[:(iend-ibeg)*(jend-jbeg)]
+    slope = aspecti.reshape((iend-ibeg,jend-jbeg))
     slope[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(slope>9999.))
     slope[kk] = float('NaN')
@@ -617,11 +686,12 @@ if aspect is not None:
     # plt.show()
     # sys.exit()
 else:
-    slope = np.ones((nlign,ncol))
+    slope = np.ones((iend-ibeg,jend-jbeg))
+    aspecti = slope.flatten()
 
 if rmsf is not None:
-    rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlign,ncol))
-    rmsmap = rmsmap[:nlign,:ncol]
+    checkinfile(rmsf)
+    rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap>999.))
     rmsmap[kk] = float('NaN')
     kk = np.nonzero(rmsmap>seuil_rms)
@@ -638,7 +708,8 @@ if rmsf is not None:
     # if plot=='yes':
     #    plt.show()
 else:
-    rmsmap = np.ones((nlign,ncol))
+    rmsmap = np.ones((iend-ibeg,jend-jbeg))
+    spacial_mask = np.ones((iend-ibeg,jend-jbeg))
 
 # plot bperp vs time
 fig = plt.figure(nfigure,figsize=(10,4))
@@ -668,8 +739,8 @@ if maskfile is not None:
     los_temp = as_strided(mask[ibeg_emp:iend_emp,jbeg_emp:jend_emp]).flatten()
 
     if rampmask=='yes':
-        print 'Flatten mask...'
-        temp = [(i,j) for i in xrange(iend_emp-ibeg_emp) for j in xrange(jend_emp-jbeg_emp) \
+        logger.info('Flatten mask...')
+        temp = [(i,j) for i in range(iend_emp-ibeg_emp) for j in range(jend_emp-jbeg_emp) \
         if np.logical_and((math.isnan(los_temp[i*(jend_emp-jbeg_emp)+j]) is False), \
             (los_temp[i*(jend_emp-jbeg_emp)+j]>seuil))]
 
@@ -681,7 +752,7 @@ if maskfile is not None:
         # ramp inversion
         pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),los_clean)
         a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-        print 'Remove ramp mask %f x**2 %f x  + %f y + %f for : %s'%(a,b,c,d,maskfile)
+        logger.info('Remove ramp mask %f x**2 %f x  + %f y + %f for : %s'%(a,b,c,d,maskfile))
 
         # remove 0 values
         kk = np.flatnonzero(np.logical_or(maski==0, maski==9999))
@@ -689,28 +760,21 @@ if maskfile is not None:
         maski[kk] = float('NaN')
 
         G=np.zeros((len(maski),4))
-        for i in xrange(nlign):
+        for i in range(nlines):
             G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
             G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbeg_emp
             G[i*ncol:(i+1)*ncol,2] = i - ibeg_emp
         G[:,3] = 1
-        mask_flat = (maski - np.dot(G,pars)).reshape(nlign,ncol)
+        mask_flat = (maski - np.dot(G,pars)).reshape(iend-ibeg,jend-jbeg)
         mask_flat = mask_flat - np.nanmean(mask_flat)
 
     else:
-        # if rampmask is no yes then  mask_flat is mask and los_clean is selected area mask without NaN
-        temp = [(i,j) for i in xrange(iend_emp-ibeg_emp) for j in xrange(jend_emp-jbeg_emp) \
-        if math.isnan(los_temp[i*(jend_emp-jbeg_emp)+j]) is False]
-
-        temp2 = np.array(temp)
-        x = temp2[:,0]; y = temp2[:,1]
-        los_clean = los_temp[x*(jend_emp-jbeg_emp)+y]
 
         # remove 0 values
-        kk = np.flatnonzero(np.logical_or(maski==0, maski==9999))
+        kk = np.flatnonzero(np.logical_or(np.logical_or(maski==0, maski==9999),np.isnan(los_temp)))
         #kk = np.flatnonzero(los==9999)
         maski[kk] = float('NaN')
-        mask_flat = maski.reshape(nlign,ncol)
+        mask_flat = maski.reshape(iend-ibeg,jend-jbeg)
 
     del maski
 
@@ -718,12 +782,12 @@ if maskfile is not None:
     kk = np.flatnonzero(mask_flat<seuil)
     mask_flat_clean=np.copy(mask_flat.flatten())
     mask_flat_clean[kk]=float('NaN')
-    mask_flat_clean = mask_flat_clean.reshape(nlign,ncol)
+    mask_flat_clean = mask_flat_clean.reshape(iend-ibeg,jend-jbeg)
 
     # mask maps if necessary for temporal inversion
     if tempmask=='yes':
         kk = np.nonzero(mask_flat[ibeg_emp:iend_emp,jbeg_emp:jend_emp]<seuil)
-        for l in xrange((N)):
+        for l in range((N)):
             # clean only selected area
             d = as_strided(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,l])
             d[kk] = np.float('NaN')
@@ -768,8 +832,8 @@ vmin = np.nanpercentile(maps[:,:,-1],.2)
 #     np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
 # vmin = -vmax
 
-for l in xrange((N)):
-    d = as_strided(maps[ibeg:iend,jbeg:jend,l])
+for l in range((N)):
+    d = as_strided(maps[:,:,l])
     #ax = fig.add_subplot(1,N,l+1)
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     #cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
@@ -824,7 +888,7 @@ if semianual=='yes':
      index = index + 2
 
 indexco = np.zeros(len(cos))
-for i in xrange(len(cos)):
+for i in range(len(cos)):
     basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
     indexco[i] = index
     index = index + 1
@@ -832,7 +896,7 @@ for i in xrange(len(cos)):
 
 
 indexpo,indexpofull = [],[]
-for i in xrange(len(pos)):
+for i in range(len(pos)):
   if pos[i] > 0. :
     basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
     indexpo.append(int(index))
@@ -845,7 +909,7 @@ indexpofull = np.array(indexpofull)
 
 
 indexsse = np.zeros(len(sse_time))
-for i in xrange(len(sse_time)):
+for i in range(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
     indexsse[i] = int(index)
     index = index + 1
@@ -862,7 +926,7 @@ if arguments["--vector"] != None:
     fig = plt.figure(nfigure,figsize=(6,4))
     nfigure = nfigure + 1
     indexvect = np.zeros(len(vectf))
-    for i in xrange(len(vectf)):
+    for i in range(len(vectf)):
       ax = fig.add_subplot(i+1,1,len(vectf))
       v = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
       kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v))
@@ -879,25 +943,26 @@ indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
 
+print()
 Mbasis=len(basis)
-print 'Number of basis functions:', Mbasis
+logger.info('Number of basis functions: {}'.format(Mbasis))
 Mker=len(kernels)
-print 'Number of kernel functions:', Mker
+logger.info('Number of kernel functions: {}'.format(Mker))
 M = Mbasis + Mker
 
-print
-print 'Basis functions, Time:'
-for i in xrange((Mbasis)):
+print('Basis functions, Time:')
+for i in range((Mbasis)):
     basis[i].info()
-print 'Kernels functions, Time:'
-for i in xrange((Mker)):
+if Mker > 1:
+  print('Kernels functions, Time:')
+for i in range((Mker)):
     kernels[i].info()
 
 # initialize matrix model to NaN
-for l in xrange((Mbasis)):
+for l in range((Mbasis)):
     basis[l].m = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
     basis[l].sigmam = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
-for l in xrange((Mker)):
+for l in range((Mker)):
     kernels[l].m = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
     kernels[l].sigmam = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
 
@@ -907,15 +972,15 @@ if apsf=='no':
 else:
     fimages=apsf
     inaps=np.loadtxt(fimages, comments='#', dtype='f')
-    print
-    print 'Input uncertainties:', inaps
-    print 'Scale input uncertainties between 0 and 1 and set very low values to the 2 percentile to avoid overweighting...'
+    logger.info('Input uncertainties: {}'.format(inaps))
+    logger.info('Scale input uncertainties between 0 and 1 and set very low values to the 2 \
+      percentile to avoid overweighting...')
     # maxinaps = np.nanmax(inaps)
     # inaps= inaps/maxinaps
     minaps= np.nanpercentile(inaps,2)
     index = flatnonzero(inaps<minaps)
     inaps[index] = minaps
-    print 'Output uncertainties for first iteration:', inaps
+    logger.info('Output uncertainties for first iteration: {}'.format(inaps))
     print
 
 # SVD inversion with cut-off eigenvalues
@@ -957,10 +1022,9 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         # prior solution without postseismic 
         Ain = np.delete(A,indexpo,1)
         mtemp = invSVD(Ain,b,cond)
-        #print mtemp
-        
+       
         # rebuild full vector
-        for z in xrange(len(indexpo)):
+        for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
         minit = np.copy(mtemp)
 
@@ -969,7 +1033,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
 
         # We here define bounds for postseismic to be the same sign than coseismic
         # and coseismic inferior or egual to the coseimic initial 
-        for i in xrange(len(indexco)):
+        for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
@@ -977,7 +1041,6 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
         
-        # print mmin,mmax
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
@@ -1001,35 +1064,11 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
 
     return fsoln,sigmam
 
-# initialization
-maps_flata = np.copy(maps)
-models = np.zeros((nlign,ncol,N))
-
-# prepare flatten maps
-maps_ramp = np.zeros((nlign,ncol,N))
-maps_topo = np.zeros((nlign,ncol,N))
-maps_noramps = np.zeros((nlign,ncol,N))
-rms = np.zeros((N))
-
-for ii in xrange(niter):
-    print
-    print '---------------'
-    print 'iteration: ', ii
-    print '---------------'
-
-    #############################
-    # SPATIAL ITERATION N  ######
-    #############################
-
-    print
-    print 'Spatial correction..'
-    print
-
-    def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar):
+def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
       # initialize topo
-      topo = np.zeros((nlign,ncol))
-      ramp = np.zeros((nlign,ncol))      
+      topo = np.zeros((iend-ibeg,jend-jbeg))
+      ramp = np.zeros((iend-ibeg,jend-jbeg))      
       data = np.copy(los_clean)
 
       # y: range, x: azimuth
@@ -1068,17 +1107,11 @@ for ii in xrange(niter):
       if order==0:
 
         if radar is None:
-            
-            # a = np.nanmean(data)
-            # print 'Remove ref frame %f  for date: %i'%(a,idates[l])
-            # ramp = np.ones((nlign,ncol))*a
-            # rms = np.sqrt(np.nanmean((los-a)**2))
-            # print 'RMS:', rms
 
             a = 0.
-            ramp = np.zeros((nlign,ncol))
+            ramp = np.zeros((iend-ibeg,jend-jbeg))
             rms = np.sqrt(np.nanmean((los)**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
         else:
 
@@ -1093,7 +1126,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]
-                print 'Remove ref frame %f + %f z for date: %i'%(a,b,idates[l])
+                logger.info('Remove ref frame %f + %f z for date: %i'%(a,b,idates[l]))
 
                 # plot phase/elev
                 funct = a
@@ -1110,9 +1143,9 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(nlign,ncol)
+                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
 
             elif (ivar==0 and nfit==1):
@@ -1127,7 +1160,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c=pars[2]
-                print 'Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l])
+                print ('Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
                 funct = a
@@ -1145,9 +1178,9 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(nlign,ncol)
+                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),3))
@@ -1161,7 +1194,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]
-                print 'Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l])
+                print ('Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
                 funct = a + c*topo_clean*x
@@ -1176,14 +1209,14 @@ for ii in xrange(niter):
                 G[:,0] = 1
                 G[:,1] = elevi
                 G[:,2] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(nlign,ncol)
+                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),4))
@@ -1198,7 +1231,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,acc=1.e-9,iprint=0)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
+                print ('Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
                 funct = a + b*topo_clean*x
@@ -1214,14 +1247,14 @@ for ii in xrange(niter):
                 G[:,1] = elevi
                 G[:,2] = elevi
                 G[:,3] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,1] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(nlign,ncol)
+                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
       elif order==1: # Remove a range ramp ay+b for each maps (y = col)
 
@@ -1236,19 +1269,19 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]
-            print 'Remove ramp %f r + %f for date: %i'%(a,b,idates[l])
+            print ('Remove ramp %f r + %f for date: %i'%(a,b,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),2))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
             G[:,1] = 1
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1263,7 +1296,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]
-                print 'Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l])
+                print ('Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
                 funct = a*y + b
@@ -1275,18 +1308,18 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[:,1] = 1
                 G[:,2] = elevi
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
@@ -1301,7 +1334,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
-                print 'Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
+                print ('Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b
@@ -1313,7 +1346,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[:,1] = 1
                 G[:,2] = elevi
@@ -1321,11 +1354,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
@@ -1340,7 +1373,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
+                print ('Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b + d*topo_clean*x
@@ -1355,18 +1388,18 @@ for ii in xrange(niter):
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
@@ -1382,7 +1415,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b + c*topo_clean*x
@@ -1398,17 +1431,17 @@ for ii in xrange(niter):
                 G[:,2] = elevi
                 G[:,3] = elevi
                 G[:,4] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
 
       elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
@@ -1423,20 +1456,20 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]
-            print 'Remove ramp %f az + %f for date: %i'%(a,b,idates[l])
+            print ('Remove ramp %f az + %f for date: %i'%(a,b,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),2))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
             G[:,1] = 1
 
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1451,7 +1484,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]
-                print 'Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l])
+                print ('Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
                 funct = a*x + b
@@ -1463,7 +1496,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
                 G[:,1] = 1
                 G[:,2] = elevi
@@ -1471,11 +1504,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
@@ -1490,7 +1523,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l])
+                print ('Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
                 funct = a*x + b
@@ -1502,7 +1535,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
                 G[:,1] = 1
                 G[:,2] = elevi
@@ -1510,11 +1543,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
@@ -1529,7 +1562,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l])
+                print ('Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
                 funct = a*x + b + d*topo_clean*x
@@ -1544,18 +1577,18 @@ for ii in xrange(niter):
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
@@ -1571,7 +1604,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*x + b + c*topo_clean*x
@@ -1587,17 +1620,17 @@ for ii in xrange(niter):
                 G[:,2] = elevi
                 G[:,3] = elevi
                 G[:,4] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==3: # Remove a ramp ay+bx+c for each maps
         if radar is None:
@@ -1614,20 +1647,20 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]
-            print 'Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l])
+            print ('Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),3))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)
             G[:,2] = 1
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1643,7 +1676,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-                print 'Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l])
+                print ('Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c
@@ -1655,7 +1688,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
                 G[:,2] = 1
@@ -1664,11 +1697,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),5))
@@ -1685,7 +1718,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c
@@ -1697,7 +1730,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
                 G[:,2] = 1
@@ -1706,11 +1739,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),5))
@@ -1728,7 +1761,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 # print pars - x0
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
-                print 'Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c + e*topo_clean*x
@@ -1743,7 +1776,7 @@ for ii in xrange(niter):
                 G[:,2] = 1
                 G[:,3] = elevi
                 G[:,4] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
                     G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
@@ -1751,11 +1784,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -1772,7 +1805,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
-                print 'Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c + d*topo_clean*x
@@ -1788,18 +1821,18 @@ for ii in xrange(niter):
                 G[:,3] = elevi
                 G[:,4] = elevi
                 G[:,5] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
                     G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==4:
         if radar is None:
@@ -1815,11 +1848,11 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-            print 'Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l])
+            print ('Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                 G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
@@ -1827,9 +1860,9 @@ for ii in xrange(niter):
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1847,7 +1880,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
 
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*x*y+ d
@@ -1859,7 +1892,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
@@ -1869,11 +1902,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -1891,7 +1924,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*x*y+ d
@@ -1903,7 +1936,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
@@ -1913,11 +1946,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
@@ -1935,7 +1968,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*x*y+ d + f*topo_clean*x
@@ -1950,7 +1983,7 @@ for ii in xrange(niter):
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
@@ -1959,11 +1992,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -1982,7 +2015,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
-                print 'Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*x*y+ d + e*topo_clean*x
@@ -1998,7 +2031,7 @@ for ii in xrange(niter):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 G[:,6] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
@@ -2006,11 +2039,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==5:
 
@@ -2027,11 +2060,11 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-            print 'Remove ramp %f r**2 %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l])
+            print ('Remove ramp %f r**2 %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
                 G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbeg_emp
                 G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2040,9 +2073,9 @@ for ii in xrange(niter):
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
 
@@ -2061,7 +2094,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*y**2 + b*y+ c*x + d
@@ -2073,7 +2106,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2083,11 +2116,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -2104,7 +2137,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*y**2 + b*y+ c*x + d
@@ -2117,7 +2150,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2127,11 +2160,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
 
@@ -2149,7 +2182,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*y**2 + b*y+ c*x + d + f*topo_clean*x
@@ -2164,7 +2197,7 @@ for ii in xrange(niter):
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2172,11 +2205,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
 
             elif (ivar==1 and nfit==1):
@@ -2196,7 +2229,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-                print 'Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*y**2 + b*y+ c*x + d + e*topo_clean*x
@@ -2212,7 +2245,7 @@ for ii in xrange(niter):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 G[:,6] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2220,11 +2253,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
             else:
                 pass
@@ -2243,11 +2276,11 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-            print 'Remove ramp %f az**2 %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l])
+            print ('Remove ramp %f az**2 %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                 G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)
                 G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
@@ -2256,9 +2289,9 @@ for ii in xrange(niter):
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0) :
@@ -2275,7 +2308,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y+ d
@@ -2287,7 +2320,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
@@ -2297,11 +2330,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -2318,7 +2351,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y+ d
@@ -2330,7 +2363,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
@@ -2340,11 +2373,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
@@ -2361,7 +2394,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y+ d + f*topo_clean*x
@@ -2376,7 +2409,7 @@ for ii in xrange(niter):
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
@@ -2385,11 +2418,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -2408,7 +2441,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h = pars[7]
-                print 'Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y+ d + e*topo_clean*x + h*(topo_clean*x)**2
@@ -2425,7 +2458,7 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi**2
                 G[:,7] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
@@ -2434,11 +2467,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
 
       elif order==7:
@@ -2456,11 +2489,11 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-            print 'Remove ramp %f az**2 %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l])
+            print ('Remove ramp %f az**2 %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),5))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                 G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                 G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
@@ -2470,9 +2503,9 @@ for ii in xrange(niter):
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit ==0):
@@ -2490,7 +2523,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*x+ e
@@ -2502,7 +2535,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
@@ -2513,11 +2546,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             if (ivar==0 and nfit ==1):
                 G=np.zeros((len(data),7))
@@ -2535,7 +2568,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y+ e
@@ -2547,7 +2580,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
@@ -2558,11 +2591,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit ==0):
                 G=np.zeros((len(data),7))
@@ -2580,7 +2613,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y+ e + g*topo_clean*x
@@ -2595,7 +2628,7 @@ for ii in xrange(niter):
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
@@ -2605,11 +2638,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -2628,7 +2661,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
-                print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+                print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**2 + b*x + c*y**2 + d*y+ e + f*topo_clean*x
@@ -2644,7 +2677,7 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi
                 G[:,7] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
@@ -2653,11 +2686,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==8:
         if radar is None:
@@ -2675,11 +2708,11 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-            print 'Remove ramp %f az**3 %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l])
+            print ('Remove ramp %f az**3 %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),6))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
                 G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
                 G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2690,9 +2723,9 @@ for ii in xrange(niter):
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0):
@@ -2711,7 +2744,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
@@ -2723,7 +2756,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2735,11 +2768,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -2758,7 +2791,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+                print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
@@ -2770,7 +2803,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2782,11 +2815,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
 
             elif (ivar==1 and nfit==0):
@@ -2806,7 +2839,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+                print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + h*topo_clean*x
@@ -2821,7 +2854,7 @@ for ii in xrange(niter):
                 G[:,5] = 1
                 G[:,6] = elevi
                 G[:,7] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2832,11 +2865,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),10))
@@ -2857,7 +2890,7 @@ for ii in xrange(niter):
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]; k=pars[9]
-                print 'Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l])
+                print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l]))
 
                 # plot phase/elev
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + g*topo_clean*x + k*(topo_clean*x)**2
@@ -2874,7 +2907,7 @@ for ii in xrange(niter):
                 G[:,7] = elevi
                 G[:,8] = elevi**2
                 G[:,9] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
                     G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
                     G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
@@ -2885,11 +2918,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==9:
         if radar is None:
@@ -2906,11 +2939,11 @@ for ii in xrange(niter):
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-            print 'Remove ramp %f r %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l])
+            print ('Remove ramp %f r %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l]))
 
             # build total G matrix
             G=np.zeros((len(los),5))
-            for i in xrange(nlign):
+            for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                 G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
@@ -2919,9 +2952,9 @@ for ii in xrange(niter):
 
             res = los - np.dot(G,pars)
             rms = np.sqrt(np.nanmean(res**2))
-            print 'RMS:', rms
+            logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(nlign,ncol)
+            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
 
         else:
             if (ivar==0 and nfit==0):
@@ -2940,7 +2973,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l])
+                print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
                 funcbins = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
@@ -2952,7 +2985,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
@@ -2962,11 +2995,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),7))
@@ -2985,7 +3018,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
@@ -2997,7 +3030,7 @@ for ii in xrange(niter):
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
@@ -3008,11 +3041,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),7))
@@ -3031,7 +3064,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
 
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l])
+                print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + g*topo_clean*x
@@ -3046,7 +3079,7 @@ for ii in xrange(niter):
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
@@ -3055,11 +3088,11 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -3079,7 +3112,7 @@ for ii in xrange(niter):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
 
-                print 'Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l])
+                print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
                 funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + f*topo_clean*x
@@ -3095,7 +3128,7 @@ for ii in xrange(niter):
                 G[:,5] = elevi
                 G[:,6] = elevi
                 G[:,7] = elevi**2
-                for i in xrange(nlign):
+                for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                     G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
                     G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
@@ -3104,19 +3137,181 @@ for ii in xrange(niter):
 
                 res = los - np.dot(G,pars)
                 rms = np.sqrt(np.nanmean(res**2))
-                print 'RMS:', rms
+                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(nlign,ncol)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(nlign,ncol)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
-      # flata = (los - np.dot(G,pars)).reshape(nlign,ncol)
-      flata = los.reshape(nlign,ncol) - ramp - topo
-      noramps = los.reshape(nlign,ncol) - ramp
+      # flata = (los - np.dot(G,pars)).reshape(iend-ibeg,jend-jbeg)
+      flata = los.reshape(iend-ibeg,jend-jbeg) - ramp - topo
+      noramps = los.reshape(iend-ibeg,jend-jbeg) - ramp
 
       return ramp, flata, topo, rms, noramps
  
-    pix_az, pix_rg = np.indices((nlign,ncol))
+def empirical_cor(l):
+  """
+  Function that preapare and run empirical estimaton for each interferogram kk
+  """
+  
+  global maps, models, elev, perc_topo, maxtopo, mintopo
+  global mask_flat, seuil, rmsmap, seuil_rms, slope, radar
+  global flat, iend_emp, ibeg_emp, ivar, nfit
+  global lin_start, lin_end, col_start,col_end
+
+  # first clean los
+  maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
+
+  # no estimation on the ref image set to zero 
+  if np.nansum(maps[:,:,l]) != 0:
+
+    maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],perc_los),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-perc_los)
+    kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
+    maps_temp[kk] = np.float('NaN')
+
+    itemp = ibeg_emp
+    for lign in range(ibeg_emp,iend_emp,10):
+        if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
+            itemp = lign
+        else:
+            break
+    logger.debug('Begining of the image: {}'.format(itemp))
+
+    if radar is not None:
+        maxtopo,mintopo = np.nanpercentile(elev,perc_topo),np.nanpercentile(elev,100-perc_topo)
+        ax = fig.add_subplot(4,int(N/4)+1,l+1)
+    else:
+        maxtopo,mintopo = 2, 0
+    logger.debug('Max-Min topo: {0}-{1}'.format(maxtopo,mintopo))
+
+    if rmsf is None:
+        seuil_rms = 2
+    logger.debug('Threshold RMS: {}'.format(seuil_rms))
+
+    # selection pixels
+    index = np.nonzero(np.logical_and(elev<maxtopo,
+        np.logical_and(elev>mintopo,
+            np.logical_and(mask_flat>seuil,
+            np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(~np.isnan(rmsmap),
+                np.logical_and(~np.isnan(elev),
+                np.logical_and(rmsmap<seuil_rms,
+                np.logical_and(rmsmap>1.e-6,
+                np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(pix_az>ibeg,
+                np.logical_and(pix_az<iend,
+                np.logical_and(pix_rg>jbeg,
+                np.logical_and(pix_rg<jend, 
+                    slope>0.,
+                    ))))))))
+                ))))))
+
+    # extract coordinates for estimation
+    temp = np.array(index).T
+    x = temp[:,0]; y = temp[:,1]
+    # clean maps
+    los_clean = maps_temp[index].flatten()
+    topo_clean = elev[index].flatten()
+    rms_clean = rmsmap[index].flatten()
+    
+    # print itemp, iend_emp
+    if flat>5 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
+        logger.warning('Image too short in comparison to master, set flat to 5')
+        temp_flat=5
+    else:
+        temp_flat=flat
+
+    if ivar>0 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
+      logger.warning('Image too short in comparison to master, set ivar to 0')
+      ivar_temp=0
+      nfit_temp=0
+    else:
+      ivar_temp=ivar
+      nfit_temp=nfit
+
+    # call ramp estim
+    los = as_strided(maps[:,:,l]).flatten()
+    samp = 1
+
+    map_ramp, map_flata, map_topo, rms, map_noramps = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
+      y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l)
+
+    if (lin_start is not None) and (lin_end is not None):
+      try:
+        indexref = np.nonzero(np.logical_and(elev<maxtopo,
+        np.logical_and(elev>mintopo,
+            np.logical_and(mask_flat>seuil,
+            np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(~np.isnan(rmsmap),
+                np.logical_and(~np.isnan(elev),
+                np.logical_and(rmsmap<seuil_rms,
+                np.logical_and(rmsmap>1.e-6,
+                np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(pix_az>lin_start,
+                np.logical_and(pix_az<lin_end,
+                np.logical_and(pix_rg>col_start,
+                np.logical_and(pix_rg<col_end, 
+                    slope>0.,
+                ))))))))))))
+                ))
+        
+        ## Set data to zero in the ref area
+        zone = as_strided(map_flata[:,:,l])
+        los_ref2 = zone[indexref].flatten()
+        rms_ref = rmsmap[indexref].flatten()
+        amp_ref = 1./rms_ref
+        amp_ref = amp_ref/np.nanmax(amp_ref)
+        # weigth avera of the phase
+        cst = np.nansum(los_ref2*amp_ref) / np.nansum(amp_ref)
+        logger.info('Re-estimation of a constant within lines {0}-{1} and cols {2}-{3}'.format(lin_start,lin_end,col_start,col_end))
+        logger.info('Average phase within ref area: {0}:'.format(cst))
+        if np.isnan(cst):
+          cst = 0.
+        map_ramp, map_flata, map_noramps = map_ramp + cst, map_flata - cst, maps_noramps - cst 
+        del zone
+      except:
+        pass
+
+      del los_clean
+      del rms_clean
+      del topo_clean
+      del maps_temp
+  
+  else:
+    map_flata, map_noramps = np.copy(maps[:,:,l]),np.copy(maps[:,:,l])
+    map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))
+    rms = 1
+
+  # set ramp to NaN to have ramp of the size of the images
+  kk = np.nonzero(np.isnan(map_flata))
+  ramp = as_strided(map_ramp)
+  ramp[kk] = float('NaN')
+  topo = as_strided(map_topo)
+  topo[kk] = float('NaN')
+
+  return map_ramp, map_flata, map_topo, rms, map_noramps 
+
+# initialization
+maps_flata = np.copy(maps)
+models = np.zeros((iend-ibeg,jend-jbeg,N))
+
+# prepare flatten maps
+maps_ramp = np.zeros((iend-ibeg,jend-jbeg,N))
+maps_topo = np.zeros((iend-ibeg,jend-jbeg,N))
+maps_noramps = np.zeros((iend-ibeg,jend-jbeg,N))
+rms = np.zeros((N))
+
+for ii in range(niter):
+    print()
+    logger.info('---------------')
+    logger.info('iteration: {}'.format(ii))
+    logger.info('---------------')
+
+    #############################
+    # SPATIAL ITERATION N  ######
+    #############################
+
+    pix_az, pix_rg = np.indices((iend-ibeg,jend-jbeg))
     # if radar file just initialise figure
     if radar is not None:
       nfigure +=1
@@ -3125,150 +3320,40 @@ for ii in xrange(niter):
     # if iteration = 0 or spatialiter > 0, then spatial estimation
     if (ii==0) or (spatialiter=='yes') :
 
-      # Loop over the dates
-      for l in xrange((N)):
-        print
+      print() 
+      #########################################
+      print('#################################')
+      print('Empirical estimations')
+      print('#################################')
+      #########################################
+      print()
+    
+      # # Loop over the dates
+      for l in range((N)):
+        maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
 
-        # first clean los
-        maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
+      # output = []
+      # with TimeIt():
+      #     # for kk in range(Nifg):
+      #     work = range(N)
+      #     with poolcontext(processes=nproc) as pool:
+      #         results = pool.map(empirical_cor, work)
+      #     output.append(results)
 
-        # no estimation on the ref image set to zero 
-        if np.nansum(maps[:,:,l]) != 0:
-
-          maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],perc_los),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-perc_los)
-          kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-          maps_temp[kk] = np.float('NaN')
-
-          #noise_level=np.nanpercentile(maps_temp,65) - np.nanpercentile(maps_temp,35)
-          #print 'Accepted noise level in the ramp optimisation:', noise_level
-
-          itemp = ibeg_emp
-          for lign in xrange(ibeg_emp,iend_emp,10):
-              # find the begining of the image
-              if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
-                  itemp = lign
-              else:
-                  break
-
-          if radar is not None:
-              maxtopo,mintopo = np.nanpercentile(elev,perc_topo),np.nanpercentile(elev,100-perc_topo)
-              # initialize plot
-              ax = fig.add_subplot(4,int(N/4)+1,l+1)
-          else:
-              maxtopo,mintopo = 2, 0
-
-          if rmsf is None:
-              seuil_rms = 2
-
-          # selection pixels
-          index = np.nonzero(np.logical_and(elev<maxtopo,
-              np.logical_and(elev>mintopo,
-                  np.logical_and(mask_flat>seuil,
-                  np.logical_and(~np.isnan(maps_temp),
-                      np.logical_and(~np.isnan(rmsmap),
-                      np.logical_and(~np.isnan(elev),
-                      np.logical_and(rmsmap<seuil_rms,
-                      np.logical_and(rmsmap>1.e-6,
-                      np.logical_and(~np.isnan(maps_temp),
-                      np.logical_and(pix_az>ibeg,
-                      np.logical_and(pix_az<iend,
-                      np.logical_and(pix_rg>jbeg,
-                      np.logical_and(pix_rg<jend, 
-                          slope>0.,
-                          ))))))))
-                      ))))))
-
-          # extract coordinates for estimation
-          temp = np.array(index).T
-          x = temp[:,0]; y = temp[:,1]
-
-          # clean maps
-          los_clean = maps_temp[index].flatten()
-          topo_clean = elev[index].flatten()
-          rms_clean = rmsmap[index].flatten()
-          
-          # print itemp, iend_emp
-          #4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e, 8: ay**2+by+cx**3+dx**2+ex+f
-          if flat>5 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
-              print 'Image too short in comparison to master, set flat to 5'
-              temp_flat=5
-          # elif flat>5 and iend_emp-itemp < ncol:
-          #     print 'Lenght image inferior to width, set flat to 5'
-          #     temp_flat=5
-          else:
-              temp_flat=flat
-
-          if ivar>0 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
-            print
-            print 'Image too short in comparison to master, set ivar to 0'
-            ivar_temp=0
-            nfit_temp=0
-          else:
-            ivar_temp=ivar
-            nfit_temp=nfit
-
-          # call ramp estim
-          los = as_strided(maps[:,:,l]).flatten()
-          samp = 1
-
-          # print los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp]
-          maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp)
-
-          # set ramp to NaN to have ramp of the size of the images
-          kk = np.nonzero(np.isnan(maps_flata[:,:,l]))
-          ramp = as_strided(maps_ramp[:,:,l])
-          ramp[kk] = float('NaN')
-          topo = as_strided(maps_topo[:,:,l])
-          topo[kk] = float('NaN')
-          
-          if (lin_start is not None) and (lin_end is not None):
-            try:
-              indexref = np.nonzero(np.logical_and(elev<maxtopo,
-              np.logical_and(elev>mintopo,
-                  np.logical_and(mask_flat>seuil,
-                  np.logical_and(~np.isnan(maps_temp),
-                      np.logical_and(~np.isnan(rmsmap),
-                      np.logical_and(~np.isnan(elev),
-                      np.logical_and(rmsmap<seuil_rms,
-                      np.logical_and(rmsmap>1.e-6,
-                      np.logical_and(~np.isnan(maps_temp),
-                      np.logical_and(pix_az>lin_start,
-                      np.logical_and(pix_az<lin_end,
-                      np.logical_and(pix_rg>col_start,
-                      np.logical_and(pix_rg<col_end, 
-                          slope>0.,
-                      ))))))))))))
-                      ))
-              
-              ## Set data to zero in the ref area
-              zone = as_strided(maps_flata[:,:,l])
-              los_ref2 = zone[indexref].flatten()
-              rms_ref = rmsmap[indexref].flatten()
-              amp_ref = 1./rms_ref
-              amp_ref = amp_ref/np.nanmax(amp_ref)
-              # weigth avera of the phase
-              cst = np.nansum(los_ref2*amp_ref) / np.nansum(amp_ref)
-              print 'Re-estimation of a constant within lines {0}-{1} and cols {2}-{3}'.format(lin_start,lin_end,col_start,col_end)
-              print 'Average phase within ref area: {0}:'.format(cst)
-              if np.isnan(cst):
-                cst = 0.
-              maps_ramp[:,:,l], maps_flata[:,:,l], maps_noramps[:,:,l] = maps_ramp[:,:,l] + cst, maps_flata[:,:,l] - cst, maps_noramps[:,:,l] - cst 
-              del zone
-            except:
-              pass
-          
-          del los_clean
-          del rms_clean
-          del topo_clean
-          del maps_temp
+      #     # fetch results
+      #     # return map_ramp, map_flata, map_topo, rms, map_noramps 
+      #     for l in range(N):
+      #         print(output[0][l])
+      #         maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = output[0][l]
+      #     del output
 
       # plot corrected ts
       nfigure +=1
       figd = plt.figure(nfigure,figsize=(14,10))
       figd.subplots_adjust(hspace=0.001,wspace=0.001)
-      for l in xrange((N)):
+      for l in range((N)):
           axd = figd.add_subplot(4,int(N/4)+1,l+1)
-          caxd = axd.imshow(maps_flata[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+          caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
           axd.set_title(idates[l],fontsize=6)
           setp(axd.get_xticklabels(), visible=False)
           setp(axd.get_yticklabels(), visible=False)
@@ -3284,9 +3369,9 @@ for ii in xrange(niter):
           nfigure +=1
           figtopo = plt.figure(nfigure,figsize=(14,10))
           figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-          for l in xrange((N)):
+          for l in range((N)):
               axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-              caxtopo = axtopo.imshow(maps_topo[ibeg:iend,jbeg:jend,l]+maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+              caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
               axtopo.set_title(idates[l],fontsize=6)
               setp(axtopo.get_xticklabels(), visible=False)
               setp(axtopo.get_yticklabels(), visible=False)
@@ -3303,9 +3388,9 @@ for ii in xrange(niter):
           nfigure +=1
           figref = plt.figure(nfigure,figsize=(14,10))
           figref.subplots_adjust(hspace=0.001,wspace=0.001)
-          for l in xrange((N)):
+          for l in range((N)):
               axref = figref.add_subplot(4,int(N/4)+1,l+1)
-              caxref = axref.imshow(maps_ramp[ibeg:iend,jbeg:jend,l],cmap=cmap,vmax=vmax,vmin=vmin)
+              caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
               axref.set_title(idates[l],fontsize=6)
               setp(axref.get_xticklabels(), visible=False)
               setp(axref.get_yticklabels(), visible=False)
@@ -3324,10 +3409,9 @@ for ii in xrange(niter):
     # save rms
     if (apsf=='no' and ii==0):
         # aps from rms
-        print
-        print 'Use RMS empirical estimation as uncertainties for time decomposition'
+        logger.info('Use RMS empirical estimation as uncertainties for time decomposition')
         inaps = np.copy(rms)
-        print 'Set very low values to the 2 percentile to avoid overweighting...'
+        logger.info('Set very low values to the 2 percentile to avoid overweighting...')
         # scale between 0 and 1 for threshold_rmsd
         maxaps = np.nanmax(inaps)
         inaps = inaps/maxaps
@@ -3341,36 +3425,33 @@ for ii in xrange(niter):
     # TEMPORAL ITERATION N #
     ########################
 
-    print
-    print 'Time decomposition..'
-    print
+    print()
+    logger.info('Time decomposition..')
 
     # initialize aps for each images to 1
     aps = np.ones((N))
     n_aps = np.ones((N)).astype(int)
-    print inaps
+    logger.debug('Input uncertainties: {}'.format(inaps))
 
     # reiinitialize maps models
-    models = np.zeros((nlign,ncol,N))
+    models = np.zeros((iend-ibeg,jend-jbeg,N))
 
     if seasonal=='yes' or semianual=='yes' or inter=='yes' or vect != None:
-        models_trends = np.zeros((nlign,ncol,N))
-        models_detrends = np.zeros((nlign,ncol,N))
+        models_trends = np.zeros((iend-ibeg,jend-jbeg,N))
+        models_detrends = np.zeros((iend-ibeg,jend-jbeg,N))
 
     # ligns = [2014,2157,1840,1960,1951]
     # cols = [100,117,843,189,43]
     # for i,j in zip(ligns,cols):
 
-    for i in xrange(ibeg,iend,sampling):
-        for j in xrange(jbeg,jend,sampling):
-            #print j
+    for i in range(0,iend-ibeg,sampling):
+        for j in range(0,jend-jbeg,sampling):
 
             # Initialisation
             mdisp=np.ones((N))*float('NaN')
             #!!!!!
             disp = as_strided(maps_flata[i,j,:])
             # disp = as_strided(maps[i,j,:])
-            # print disp
 
             k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
             # do not take into account NaN data
@@ -3398,9 +3479,9 @@ for ii in xrange(niter):
                 # remove this rmsd threshold for the moment
                 # if inter=='yes' and iteration is True:
                 #     Glin=np.zeros((kk,2+Mker))
-                #     for l in xrange((2)):
+                #     for l in range((2)):
                 #         Glin[:,l]=basis[l].g(tabx)
-                #     for l in xrange((Mker)):
+                #     for l in range((Mker)):
                 #         Glin[:,2+l]=kernels[l].g(k)
 
                 #     mt,sigmamt = consInvert(Glin,taby,inaps[k],cond=rcond)
@@ -3413,9 +3494,9 @@ for ii in xrange(niter):
                 #     # print i,j,rmsd,maxrmsd
 
                 G=np.zeros((kk,M))
-                for l in xrange((Mbasis)):
+                for l in range((Mbasis)):
                     G[:,l]=basis[l].g(tabx)
-                for l in xrange((Mker)):
+                for l in range((Mker)):
                     G[:,Mbasis+l]=kernels[l].g(k)
 
                 # if only ref + seasonal: ref + cos + sin
@@ -3432,13 +3513,13 @@ for ii in xrange(niter):
                     m[:mt.shape[0]] = mt
 
                 # save m
-                for l in xrange((Mbasis)):
-                    basis[l].m[i-ibeg,j-jbeg] = m[l]
-                    basis[l].sigmam[i-ibeg,j-jbeg] = sigmam[l]
+                for l in range((Mbasis)):
+                    basis[l].m[i,j] = m[l]
+                    basis[l].sigmam[i,j] = sigmam[l]
 
-                for l in xrange((Mker)):
-                    kernels[l].m[i-ibeg,j-jbeg] = m[Mbasis+l]
-                    kernels[l].sigmam[i-ibeg,j-jbeg] = sigmam[Mbasis+l]
+                for l in range((Mker)):
+                    kernels[l].m[i,j] = m[Mbasis+l]
+                    kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
 
                 # forward model in original order
                 mdisp[k] = np.dot(G,m)
@@ -3479,10 +3560,9 @@ for ii in xrange(niter):
     index = flatnonzero(aps<minaps)
     aps[index] = minaps
 
-    print
-    print 'Dates      APS     # of points'
-    for l in xrange(N):
-        print idates[l], aps[l], n_aps[l]
+    print('Dates      APS     # of points')
+    for l in range(N):
+        print (idates[l], aps[l], n_aps[l])
     np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
     # set apsf is yes for iteration
     apsf=='yes'
@@ -3496,8 +3576,9 @@ for ii in xrange(niter):
 #######################################################
 
 # create new cube
-cube_flata = maps_flata[ibeg:iend,jbeg:jend,:].flatten()
-cube_noramps = maps_noramps[ibeg:iend,jbeg:jend,:].flatten()
+logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
+cube_flata = maps_flata[:,:,:].flatten()
+cube_noramps = maps_noramps[:,:,:].flatten()
 
 fid = open('depl_cumule_flat', 'wb')
 cube_flata.flatten().astype('float32').tofile(fid)
@@ -3505,17 +3586,20 @@ fid.close()
 
 if fulloutput=='yes':
     if (seasonal=='yes' or semianual=='yes') and (vect != None or inter=='yes'):
+        logger.info('Save time series cube without seasonality: {}'.format('depl_cumule_dseas'))
         fid = open('depl_cumule_dseas', 'wb')
         (maps_flata - models_trends).flatten().astype('float32').tofile(fid)
         fid.close()
 
     if inter=='yes':
         fid = open('depl_cumule_dtrend', 'wb')
+        logger.info('Save de-trended time series cube: {}'.format('depl_cumule_dtrend'))
         (maps_flata - models_detrends).flatten().astype('float32').tofile(fid)
         fid.close()
 
     if flat>0:
         fid = open('depl_cumule_noramps', 'wb')
+        logger.info('Save time series cube without ramps only: {}'.format('depl_cumule_noramps'))
         cube_noramps.flatten().astype('float32').tofile(fid)
         fid.close()
 
@@ -3533,6 +3617,7 @@ except:
 # create MAPS directory to save .r4
 if fulloutput=='yes':
     outdir = './MAPS/'
+    logger.info('Save time series maps in: {}'.format(outdir))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
@@ -3558,18 +3643,18 @@ fig.subplots_adjust(hspace=.001,wspace=0.01)
 # cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
 # figclr.savefig('colorscale.eps', format='EPS',dpi=150)
 
-for l in xrange((N)):
-    data = as_strided(maps[ibeg:iend,jbeg:jend,l])
+for l in range((N)):
+    data = as_strided(maps[:,:,l])
     if Mker>0:
-        data_flat = as_strided(maps_flata[ibeg:iend,jbeg:jend,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
-        model = as_strided(models[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
+        data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
+        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
     else:
-        data_flat = as_strided(maps_flata[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:])
-        model = as_strided(models[ibeg:iend,jbeg:jend,l]) - as_strided(basis[0].m[:,:])
+        data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
+        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
 
     res = data_flat - model
-    ramp = as_strided(maps_ramp[ibeg:iend,jbeg:jend,l])
-    tropo = as_strided(maps_topo[ibeg:iend,jbeg:jend,l])
+    ramp = as_strided(maps_ramp[:,:,l])
+    tropo = as_strided(maps_topo[:,:,l])
 
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     axres = figres.add_subplot(4,int(N/4)+1,l+1)
@@ -3707,8 +3792,10 @@ except:
 #######################################################
 
 if geotiff is not None:
-    for l in xrange((Mbasis)):
-        ds = driver.Create('{}_coeff.tif'.format(basis[l].reduction), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+    for l in range((Mbasis)):
+        outname = '{}_coeff.tif'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].m)
         ds.SetGeoTransform(gt)
@@ -3716,7 +3803,9 @@ if geotiff is not None:
         band.FlushCache()
         del ds
 
-        ds = driver.Create('{}_sigcoeff.tif'.format(basis[l].reduction), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        outname = '{}_sigcoeff.tif'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].sigmam)
         ds.SetGeoTransform(gt)
@@ -3724,8 +3813,10 @@ if geotiff is not None:
         band.FlushCache()
         del ds
 
-    for l in xrange((Mker)):
-        ds = driver.Create('{}_coeff.tif'.format(kernels[l].reduction), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+    for l in range((Mker)):
+        outname = '{}_coeff.tif'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].m)
         ds.SetGeoTransform(gt)
@@ -3733,7 +3824,9 @@ if geotiff is not None:
         band.FlushCache()
         del ds
 
-        ds = driver.Create('{}_sigcoeff.tif'.format(kernels[l].reduction), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        outname = '{}_sigcoeff.tif'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].sigmam)
         ds.SetGeoTransform(gt)
@@ -3742,17 +3835,25 @@ if geotiff is not None:
         del ds
 
 else:
-    for l in xrange((Mbasis)):
-        fid = open('{}_coeff.r4'.format(basis[l].reduction), 'wb')
+    for l in range((Mbasis)):
+        outname = '{}_coeff.r4'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open(outname, 'wb')
         basis[l].m.flatten().astype('float32').tofile(fid)
         fid.close()
-        fid = open('{}_sigcoeff.r4'.format(basis[l].reduction), 'wb')
+        outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open(outname, 'wb')
         basis[l].sigmam.flatten().astype('float32').tofile(fid)
         fid.close()
-    for l in xrange((Mker)):
+    for l in range((Mker)):
+        outname = '{}_coeff.r4'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
         fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
         kernels[l].m.flatten().astype('float32').tofile(fid)
         fid.close()
+        outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
         fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
         kernels[l].sigmam.flatten().astype('float32').tofile(fid)
         fid.close()
@@ -3774,6 +3875,7 @@ if seasonal == 'yes':
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 
     if geotiff is not None:
+        logger.info('Save: {}'.format(outname))
         ds = driver.Create('ampwt_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
@@ -3782,6 +3884,7 @@ if seasonal == 'yes':
         band.FlushCache()
         del ds
 
+        logger.info('Save: {}'.format('ampwt_sigcoeff.tif'))
         ds = driver.Create('ampwt_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
@@ -3791,15 +3894,18 @@ if seasonal == 'yes':
         del ds
 
     else:
+        logger.info('Save: {}'.format('ampwt_coeff.r4'))
         fid = open('ampwt_coeff.r4', 'wb')
         amp.flatten().astype('float32').tofile(fid)
         fid.close()
 
+        logger.info('Save: {}'.format('ampwt_sigcoeff.r4'))
         fid = open('ampwt_sigcoeff.r4', 'wb')
         sigamp.flatten().astype('float32').tofile(fid)
         fid.close()
 
     if geotiff is not None:
+        logger.info('Save: {}'.format('phiwt_coeff.tif'))
         ds = driver.Create('phiwt_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(phi)
@@ -3808,6 +3914,7 @@ if seasonal == 'yes':
         band.FlushCache()
         del ds
 
+        logger.info('Save: {}'.format('phiwt_sigcoeff.tif'))
         ds = driver.Create('phiwt_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigphi)
@@ -3817,10 +3924,12 @@ if seasonal == 'yes':
         del ds
 
     else:
+        logger.info('Save: {}'.format('phiwt_coeff.r4'))
         fid = open('phiwt_coeff.r4', 'wb')
         phi.flatten().astype('float32').tofile(fid)
         fid.close()
 
+        logger.info('Save: {}'.format('phiwt_sigcoeff.r4'))
         fid = open('phiwt_sigcoeff.r4', 'wb')
         sigphi.flatten().astype('float32').tofile(fid)
         fid.close()
@@ -3837,6 +3946,7 @@ if semianual == 'yes':
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 
     if geotiff is not None:
+        logger.info('Save: {}'.format('ampw2t_coeff.tif'))
         ds = driver.Create('ampw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
@@ -3845,6 +3955,7 @@ if semianual == 'yes':
         band.FlushCache()
         del ds
 
+        logger.info('Save: {}'.format('ampw2t_sigcoeff.tif'))
         ds = driver.Create('ampw2t_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
@@ -3854,15 +3965,18 @@ if semianual == 'yes':
         del ds
 
     else:
+        logger.info('Save: {}'.format('ampw2t_coeff.r4'))
         fid = open('ampw2t_coeff.r4', 'wb')
         amp.flatten().astype('float32').tofile(fid)
         fid.close()
 
+        logger.info('Save: {}'.format('ampw2t_sigcoeff.r4'))
         fid = open('ampw2t_sigcoeff.r4', 'wb')
         sigamp.flatten().astype('float32').tofile(fid)
         fid.close()
 
     if geotiff is not None:
+        logger.info('Save: {}'.format('phiw2t_coeff.tif'))
         ds = driver.Create('phiw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
@@ -3870,6 +3984,7 @@ if semianual == 'yes':
         band.FlushCache()
         del ds
 
+        logger.info('Save: {}'.format('phiw2t_sigcoeff.tif'))
         ds = driver.Create('phiw2t_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
@@ -3878,10 +3993,12 @@ if semianual == 'yes':
         del ds
 
     else:
+        logger.info('Save: {}'.format('phiw2t_coeff.r4'))
         fid = open('phiw2t_coeff.r4', 'wb')
         phi.flatten().astype('float32').tofile(fid)
         fid.close()
 
+        logger.info('Save: {}'.format('phiw2t_sigcoeff.r4'))
         fid = open('phiw2t_sigcoeff.r4', 'wb')
         sigphi.flatten().astype('float32').tofile(fid)
         fid.close()
@@ -3928,7 +4045,7 @@ for l in range(2,Mbasis):
     setp(ax.get_xticklabels(), visible=False)
     setp(ax.get_yticklabels(), visible=False)
 
-for l in xrange(Mker):
+for l in range(Mker):
     vmax = np.abs([np.nanpercentile(kernels[l].m,98.),np.nanpercentile(kernels[l].m,2.)]).max()
     vmin = -vmax
 
