@@ -93,7 +93,7 @@ import scipy.optimize as opt
 import scipy.linalg as lst
 import gdal, osr
 import math,sys,getopt
-from os import path, environ
+from os import path, environ, getcwd
 import os
 import matplotlib
 if environ["TERM"].startswith("screen"):
@@ -119,7 +119,6 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
-# logging.basicConfig(level=logging.INFO,\
 logging.basicConfig(level=logging.INFO,\
         format='line %(lineno)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('invers_disp2coef.log')
@@ -467,7 +466,7 @@ else:
 
 logger.debug('Read reference zones: {}'.format(arguments["--ref_zone"]))
 if arguments["--ref_zone"] == None:
-    lin_start, lin_jend, col_start, col_end = None,None,None,None
+    lin_start, lin_end, col_start, col_end = None,None,None,None
 else:
     ref = list(map(int,arguments["--ref_zone"].replace(',',' ').split()))
     try:
@@ -482,16 +481,8 @@ if arguments["--crop"] ==  None:
     crop = [0,nlines,0,ncol]
 else:
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
-    logger.warning('Crop time series data between lines {}-{} and cols:{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
+    logger.warning('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-
-if arguments["--crop_emp"] ==  None:
-    crop_emp = [0,iend-ibeg,0,jend-jbeg]
-else:
-    crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
-    logger.warning('Crop empirical estimation between lines {}-{} and cols:{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
-ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
-
 
 # extract time series
 cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
@@ -513,6 +504,16 @@ N=len(dates)
 maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
 logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
 logger.info('Reshape cube: {}'.format(maps.shape))
+new_lines, new_cols = maps.shape[0], maps.shape[1]
+# print(new_cols, new_lines) 
+# sys.exit(0)
+
+if arguments["--crop_emp"] ==  None:
+    crop_emp = [0,new_lines,0,new_cols]
+else:
+    crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
+    logger.warning('Crop empirical estimation between lines {}-{} and cols {}-{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
+ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
 
 # clean
 del cube, cubei, maps_temp
@@ -524,7 +525,6 @@ del cube, cubei, maps_temp
 # plt.show()
 # sys.exit()
 
-fig = plt.figure(12)
 nfigure=0
 
 # open mask file
@@ -543,8 +543,8 @@ if arguments["--mask"] is not None:
     mask = maski.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     maski = mask.flatten()
 else:
-    mask_flat = np.ones((iend-ibeg,jend-jbeg))
-    mask = np.ones((iend-ibeg,jend-jbeg))
+    mask_flat = np.ones((new_lines,new_cols))
+    mask = np.ones((new_lines,new_cols))
     maski = mask.flatten()
 
 # open elevation map
@@ -563,7 +563,7 @@ if arguments["--topofile"] is not None:
 
     elevi = elevi[:nlines*ncol]
     # fig = plt.figure(10)
-    # plt.imshow(elevi.reshape(iend-ibeg,jend-jbeg)[ibeg:iend,jbeg:jend])
+    # plt.imshow(elevi.reshape(new_lines,new_cols)[ibeg:iend,jbeg:jend])
     elev = elevi.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     elev[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(elev)>9999.)
@@ -579,7 +579,7 @@ if arguments["--topofile"] is not None:
     logger.info('Max-Min topography for empirical estimation: {0}-{1}'.format(maxtopo,mintopo))
 
 else:
-   elev = np.ones((iend-ibeg,jend-jbeg))
+   elev = np.ones((new_lines,new_cols))
    elevi = elev.flatten()
    maxtopo,mintopo = 2, 0 
 
@@ -607,7 +607,7 @@ if arguments["--aspect"] is not None:
     # plt.show()
     # sys.exit()
 else:
-    slope = np.ones((iend-ibeg,jend-jbeg))
+    slope = np.ones((new_lines,new_cols))
     aspecti = slope.flatten()
 
 if arguments["--rmspixel"] is not None:
@@ -629,8 +629,8 @@ if arguments["--rmspixel"] is not None:
     # if plot=='yes':
     #    plt.show()
 else:
-    rmsmap = np.ones((iend-ibeg,jend-jbeg))
-    spacial_mask = np.ones((iend-ibeg,jend-jbeg))
+    rmsmap = np.ones((new_lines,new_cols))
+    spacial_mask = np.ones((new_lines,new_cols))
     threshold_rms = 2.
 
 # plot bperp vs time
@@ -668,7 +668,7 @@ if arguments["--mask"] is not None:
 
         temp2 = np.array(temp)
         x = temp2[:,0]; y = temp2[:,1]
-        los_clean = los_temp[x*(jend-jbeg)+y]
+        los_clean = los_temp[x*(new_cols)+y]
         G=np.zeros((len(los_clean),4))
         G[:,0], G[:,1], G[:,2], G[:,3] = y**2, y, x, 1
         # ramp inversion
@@ -687,7 +687,7 @@ if arguments["--mask"] is not None:
             G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbeg_emp
             G[i*ncol:(i+1)*ncol,2] = i - ibeg_emp
         G[:,3] = 1
-        mask_flat = (maski - np.dot(G,pars)).reshape(iend-ibeg,jend-jbeg)
+        mask_flat = (maski - np.dot(G,pars)).reshape(new_lines,new_cols)
         mask_flat = mask_flat - np.nanmean(mask_flat)
 
     else:
@@ -696,7 +696,7 @@ if arguments["--mask"] is not None:
         kk = np.flatnonzero(np.logical_or(np.logical_or(maski==0, maski==9999),np.isnan(los_temp)))
         #kk = np.flatnonzero(los==9999)
         maski[kk] = float('NaN')
-        mask_flat = maski.reshape(iend-ibeg,jend-jbeg)
+        mask_flat = maski.reshape(new_lines,new_cols)
 
     del maski
 
@@ -704,7 +704,7 @@ if arguments["--mask"] is not None:
     kk = np.flatnonzero(mask_flat<np.float(arguments["--threshold_mask"]))
     mask_flat_clean=np.copy(mask_flat.flatten())
     mask_flat_clean[kk]=float('NaN')
-    mask_flat_clean = mask_flat_clean.reshape(iend-ibeg,jend-jbeg)
+    mask_flat_clean = mask_flat_clean.reshape(new_lines,new_cols)
 
     # mask maps if necessary for temporal inversion
     if arguments["--tempmask"]=='yes':
@@ -770,14 +770,14 @@ fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
 
 # plt.show()
-#sys.exit()
+# sys.exit()
 
 #######################################################
 # Save new lect.in file
 #######################################################
 
 fid = open('lect_ts.in','w')
-np.savetxt(fid, (jend-jbeg,iend-ibeg),fmt='%6i',newline='\t')
+np.savetxt(fid, (new_cols,new_lines),fmt='%6i',newline='\t')
 fid.close()
 
 #######################################################
@@ -911,11 +911,11 @@ for i in range((Mker)):
 
 # initialize matrix model to NaN
 for l in range((Mbasis)):
-    basis[l].m = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
-    basis[l].sigmam = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
+    basis[l].m = np.ones((new_lines,new_cols))*np.float('NaN')
+    basis[l].sigmam = np.ones((new_lines,new_cols))*np.float('NaN')
 for l in range((Mker)):
-    kernels[l].m = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
-    kernels[l].sigmam = np.ones((iend-ibeg,jend-jbeg))*np.float('NaN')
+    kernels[l].m = np.ones((new_lines,new_cols))*np.float('NaN')
+    kernels[l].sigmam = np.ones((new_lines,new_cols))*np.float('NaN')
 
 # initialize qual
 if apsf=='no':
@@ -1015,11 +1015,14 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
 
     return fsoln,sigmam
 
-def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
+def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
+
+      # global new_lines, new_cols
+      # global ibeg_emp, iend_emp, jbeg_emp, jend_emp
 
       # initialize topo
-      topo = np.zeros((iend-ibeg,jend-jbeg))
-      ramp = np.zeros((iend-ibeg,jend-jbeg))      
+      topo = np.zeros((new_lines,new_cols))
+      ramp = np.zeros((new_lines,new_cols))      
       data = np.copy(los_clean)
 
       # y: range, x: azimuth
@@ -1038,7 +1041,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
           azbins, rgbins = [], []
           for j in range(len(bins)-1):
                   uu = np.flatnonzero(inds == j)
-                  if len(uu)>100:
+                  if len(uu)>20:
                       topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
 
                       # do a small clean within the bin
@@ -1054,14 +1057,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
           rms = np.array(losstd)
           topobins = np.array(topobins)
           rgbins, azbins = np.array(rgbins),np.array(azbins)
+
+          if len(data) < 10:
+            logger.critical('Too small area for empirical phase/topo relationship. Re-defined crop values Exit!')
+            sys.exit()
     
       if order==0:
 
         if arguments["--topofile"] is None:
 
             a = 0.
-            ramp = np.zeros((iend-ibeg,jend-jbeg))
-            rms = np.sqrt(np.nanmean((los)**2))
+            ramp = np.zeros((new_lines,new_cols))
+            # rms = np.sqrt(np.nanmean((los)**2))
+            rms = np.nanstd(los)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
         else:
@@ -1083,9 +1091,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,b*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),2))
@@ -1093,10 +1101,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,1] = elevi
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
 
             elif (ivar==0 and nfit==1):
@@ -1117,9 +1126,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,b*x+c*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,b*x+c*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
@@ -1128,10 +1137,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,2] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),3))
@@ -1151,9 +1161,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a + c*topo_clean*x
                 funcbins = a + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,b*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
@@ -1161,13 +1171,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,1] = elevi
                 G[:,2] = elevi
                 for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),4))
@@ -1188,9 +1199,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a + b*topo_clean*x
                 funcbins = a + b*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x+d*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
@@ -1199,13 +1210,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,2] = elevi
                 G[:,3] = elevi**2
                 for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,1] *= (i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,1] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-                topo = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+                topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
       elif order==1: # Remove a range ramp ay+b for each maps (y = col)
 
@@ -1225,14 +1237,15 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
             # build total G matrix
             G=np.zeros((len(los),2))
             for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
             G[:,1] = 1
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1253,9 +1266,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y + b
                 funcbins = a*rgbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
@@ -1265,12 +1278,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,2] = elevi
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
@@ -1291,25 +1305,26 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b
                 funcbins = a*rgbins+ b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x+d*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
@@ -1330,27 +1345,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b + d*topo_clean*x
                 funcbins = a*rgbins+ b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
@@ -1372,9 +1388,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b + c*topo_clean*x
                 funcbins = a*rgbins+ b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -1382,17 +1398,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,2] = elevi
                 G[:,3] = elevi
                 G[:,4] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
 
       elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
@@ -1411,16 +1428,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),2))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
             G[:,1] = 1
 
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1441,25 +1459,26 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
                 G[:,1] = 1
                 G[:,2] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
@@ -1480,25 +1499,26 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x + d*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x + d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] =(i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
@@ -1519,27 +1539,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x + b + d*topo_clean*x
                 funcbins = a*azbins + b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,c*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
                 G[:,2] = elevi
                 G[:,3] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
@@ -1561,9 +1582,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x + b + c*topo_clean*x
                 funcbins = a*azbins + b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -1571,17 +1592,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,2] = elevi
                 G[:,3] = elevi
                 G[:,4] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
       elif order==3: # Remove a ramp ay+bx+c for each maps
         if arguments["--topofile"] is None:
@@ -1602,16 +1624,17 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),3))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)
             G[:,2] = 1
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1623,6 +1646,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
+
                 _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
@@ -1633,26 +1657,27 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,d*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
                 G[:,2] = 1
                 G[:,3] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),5))
@@ -1675,26 +1700,27 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,d*x+e*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
                 G[:,2] = 1
                 G[:,3] = elevi
                 G[:,4] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),5))
@@ -1718,28 +1744,29 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c + e*topo_clean*x
                 funcbins = a*rgbins+ b*azbins + c + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,d*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,2] = 1
                 G[:,3] = elevi
                 G[:,4] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,4] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -1762,9 +1789,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c + d*topo_clean*x
                 funcbins = a*rgbins+ b*azbins + c + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
@@ -1772,18 +1799,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,3] = elevi
                 G[:,4] = elevi
                 G[:,5] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,3] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
       elif order==4:
         if arguments["--topofile"] is None:
@@ -1803,17 +1831,18 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
             G[:,3] = 1
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0):
@@ -1837,27 +1866,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*x*y+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -1881,27 +1911,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*x*y+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
@@ -1925,29 +1956,30 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*x*y+ d + f*topo_clean*x
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
-                    G[i*ncol:(i+1)*ncol,5] *=  (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,5] *=  (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -1972,9 +2004,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*x*y+ d + e*topo_clean*x
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -1982,19 +2014,20 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 G[:,6] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
-                    G[i*ncol:(i+1)*ncol,4] *=  (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,4] *=  (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
       elif order==5:
 
@@ -2015,18 +2048,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
-                G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) - jbeg_emp
-                G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
+                G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) - jbeg_emp
+                G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
             G[:,3] = 1
 
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
 
@@ -2051,27 +2085,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y**2 + b*y+ c*x + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -2094,28 +2129,29 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y**2 + b*y+ c*x + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
 
@@ -2139,28 +2175,29 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y**2 + b*y+ c*x + d + f*topo_clean*x
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
 
             elif (ivar==1 and nfit==1):
@@ -2186,9 +2223,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y**2 + b*y+ c*x + d + e*topo_clean*x
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -2196,19 +2233,20 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,4] = elevi
                 G[:,5] = elevi
                 G[:,6] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = np.arange((ncol)) -  jbeg_emp
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,4] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
             else:
                 pass
@@ -2231,18 +2269,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),4))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)
-                G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)
+                G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
             G[:,3] = 1
 
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0) :
@@ -2265,27 +2304,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
                 G[:,3] = 1
                 G[:,4] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
@@ -2308,27 +2348,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x+f*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
@@ -2351,29 +2392,30 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y+ d + f*topo_clean*x
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
                 G[:,4] = elevi
                 G[:,5] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -2398,9 +2440,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y+ d + e*topo_clean*x + h*(topo_clean*x)**2
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + e*topobins*azbins + h*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
@@ -2409,20 +2451,21 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,5] = elevi
                 G[:,6] = elevi**2
                 G[:,7] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i -  ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,4] *= (i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,7] *= (i - ibeg_emp)**2
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,4] *= (i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,7] *= (i - ibeg_emp)**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
 
       elif order==7:
@@ -2444,19 +2487,20 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),5))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
-                G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
+                G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
             G[:,4] = 1
 
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit ==0):
@@ -2480,28 +2524,29 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y**2 + d*x+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
                 G[:,4] = 1
                 G[:,5] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             if (ivar==0 and nfit ==1):
                 G=np.zeros((len(data),7))
@@ -2525,28 +2570,29 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y**2 + d*y+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit ==0):
                 G=np.zeros((len(data),7))
@@ -2570,30 +2616,31 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y**2 + d*y+ e + g*topo_clean*x
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,6] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -2618,9 +2665,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**2 + b*x + c*y**2 + d*y+ e + f*topo_clean*x
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
@@ -2628,20 +2675,21 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,5] = elevi
                 G[:,6] = elevi
                 G[:,7] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,3] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
       elif order==8:
         if arguments["--topofile"] is None:
@@ -2663,20 +2711,21 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),6))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
-                G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
-                G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
-                G[i*ncol:(i+1)*ncol,4] = (np.arange((ncol)) - jbeg_emp)
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
+                G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
+                G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
+                G[i*new_cols:(i+1)*new_cols,4] = (np.arange((new_cols)) - jbeg_emp)
             G[:,5] = 1
 
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0):
@@ -2701,29 +2750,30 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,g*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
+                    G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
                 G[:,5] = 1
                 G[:,6] = elevi
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -2748,29 +2798,30 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
+                    G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
                 G[:,5] = 1
                 G[:,6] = elevi
                 G[:,7] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
 
             elif (ivar==1 and nfit==0):
@@ -2796,31 +2847,32 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + h*topo_clean*x
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + h*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,g*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,5] = 1
                 G[:,6] = elevi
                 G[:,7] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,7] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
+                    G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,7] *= (i - ibeg_emp)
 
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),10))
@@ -2847,9 +2899,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + g*topo_clean*x + k*(topo_clean*x)**2
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + g*topobins*azbins + k*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,h*x+i*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,h*x+i*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),10))
@@ -2858,22 +2910,23 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,7] = elevi
                 G[:,8] = elevi**2
                 G[:,9] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = (i - ibeg_emp)**3
-                    G[i*ncol:(i+1)*ncol,1] = (i - ibeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,2] =(i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,3] = (np.arange((ncol)) - jbeg_emp)**2
-                    G[i*ncol:(i+1)*ncol,4] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibeg_emp)
-                    G[i*ncol:(i+1)*ncol,9] *= (i - ibeg_emp)**2
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
+                    G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
+                    G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,6] *= (i - ibeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,9] *= (i - ibeg_emp)**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
       elif order==9:
         if arguments["--topofile"] is None:
@@ -2894,18 +2947,19 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
             # build total G matrix
             G=np.zeros((len(los),5))
-            for i in range(nlines):
-                G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
-                G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+            for i in range(new_lines):
+                G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
+                G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
             G[:,4] = 1
 
             res = los - np.dot(G,pars)
-            rms = np.sqrt(np.nanmean(res**2))
+            #rms = np.sqrt(np.nanmean(res**2))
+            rms = np.nanstd(res)
             logger.info('RMS dates %i: %f'%(idates[l], rms))
 
-            ramp = np.dot(G,pars).reshape(iend-ibeg,jend-jbeg)
+            ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
             if (ivar==0 and nfit==0):
@@ -2930,27 +2984,28 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funcbins = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
                 funct = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,e*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
+                    G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,4] = 1
                 G[:,5] = elevi
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),7))
@@ -2975,28 +3030,29 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x+g*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
+                    G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi**2
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),7))
@@ -3021,29 +3077,30 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + g*topo_clean*x
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,f*x,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
                 G[:,5] = elevi
                 G[:,6] = elevi
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
-                    G[i*ncol:(i+1)*ncol,6] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
+                    G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,6] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
@@ -3069,9 +3126,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + f*topo_clean*x
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax.plot(x,g*x+h*x**2,'-r', lw =4.)
+                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
@@ -3079,24 +3136,25 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 G[:,5] = elevi
                 G[:,6] = elevi
                 G[:,7] = elevi**2
-                for i in range(nlines):
-                    G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
-                    G[i*ncol:(i+1)*ncol,1] = i - ibeg_emp
-                    G[i*ncol:(i+1)*ncol,2] = ((i-ibeg_emp) * (np.arange((ncol))-jbeg_emp))**2
-                    G[i*ncol:(i+1)*ncol,3] = (i-ibeg_emp) * (np.arange((ncol))-jbeg_emp)
-                    G[i*ncol:(i+1)*ncol,5] *= (i - ibeg_emp)
+                for i in range(new_lines):
+                    G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
+                    G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
+                    G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
+                    G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
+                    G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
+                #rms = np.sqrt(np.nanmean(res**2))
+                rms = np.nanstd(res)
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
-                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(iend-ibeg,jend-jbeg)
-                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
+                ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
+                topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
-      # flata = (los - np.dot(G,pars)).reshape(iend-ibeg,jend-jbeg)
-      flata = los.reshape(iend-ibeg,jend-jbeg) - ramp - topo
-      noramps = los.reshape(iend-ibeg,jend-jbeg) - ramp
+      # flata = (los - np.dot(G,pars)).reshape(new_lines,new_cols)
+      flata = los.reshape(new_lines,new_cols) - ramp - topo
+      noramps = los.reshape(new_lines,new_cols) - ramp
 
       return ramp, flata, topo, rms, noramps
  
@@ -3104,6 +3162,8 @@ def empirical_cor(l):
   """
   Function that preapare and run empirical estimaton for each interferogram kk
   """
+
+  global fig_dphi
 
   # first clean los
   maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
@@ -3125,7 +3185,7 @@ def empirical_cor(l):
     logger.debug('Begining of the image: {}'.format(itemp))
 
     if arguments["--topofile"] is not None:
-        ax = fig.add_subplot(4,int(N/4)+1,l+1)
+        ax_dphi = fig_dphi.add_subplot(4,int(N/4)+1,l+1)
 
     logger.debug('Threshold RMS: {}'.format(float(arguments["--threshold_rms"])))
 
@@ -3139,13 +3199,17 @@ def empirical_cor(l):
                 np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(maps_temp),
-                np.logical_and(pix_az>ibeg,
-                np.logical_and(pix_az<iend,
-                np.logical_and(pix_rg>jbeg,
-                np.logical_and(pix_rg<jend, 
+                np.logical_and(pix_az>ibeg_emp,
+                np.logical_and(pix_az<iend_emp,
+                np.logical_and(pix_rg>jbeg_emp,
+                np.logical_and(pix_rg<jend_emp, 
                     slope>0.,
                     ))))))))
                 ))))))
+
+    # print (elev[:5],maxtopo, mintopo)
+    # print (ibeg,iend,jbeg,jend)
+    # print (slope[:5])
 
     # extract coordinates for estimation
     temp = np.array(index).T
@@ -3155,6 +3219,13 @@ def empirical_cor(l):
     topo_clean = elev[index].flatten()
     rms_clean = rmsmap[index].flatten()
     
+    logger.debug('Number of points for empirical estimation: {}'.format(len(los_clean)))
+    if len(los_clean) < 1:
+      logger.critical('No points left for empirical estimation. Exit!')
+      logger.critical('threshold RMS: {0}, threshold Mask: {1}, Min-Max LOS: {2}-{3}, Min-Max topo: {4}-{5}, lines: {6}-{7}, \
+        cols: {8}- {9}'.format(float(arguments["--threshold_rms"]),np.float(arguments["--threshold_mask"]),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
+      sys.exit()
+
     # print itemp, iend_emp
     if flat>5 and iend_emp-itemp < .6*(iend_emp-ibeg_emp):
         logger.warning('Image too short in comparison to master, set flat to 5')
@@ -3174,8 +3245,8 @@ def empirical_cor(l):
     los = as_strided(maps[:,:,l]).flatten()
     samp = 1
 
-    map_ramp, map_flata, map_topo, rms, map_noramps = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
-      y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l)
+    map_ramp, map_flata, map_topo, rmsi, map_noramps = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
+      y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
 
     if (lin_start is not None) and (lin_end is not None):
       try:
@@ -3221,7 +3292,7 @@ def empirical_cor(l):
   else:
     map_flata, map_noramps = np.copy(maps[:,:,l]),np.copy(maps[:,:,l])
     map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))
-    rms = 1
+    rmsi = 1
 
   # set ramp to NaN to have ramp of the size of the images
   kk = np.nonzero(np.isnan(map_flata))
@@ -3229,12 +3300,12 @@ def empirical_cor(l):
   ramp[kk] = float('NaN')
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
-
-  return map_ramp, map_flata, map_topo, rms, map_noramps 
+  
+  return map_ramp, map_flata, map_topo, rmsi, map_noramps 
 
 def temporal_decomp(pix):
-    j = pix  % (jend-jbeg)
-    i = int(pix/(jend-jbeg))
+    j = pix  % (new_cols)
+    i = int(pix/(new_cols))
 
     # Initialisation
     mdisp=np.ones((N))*float('NaN')
@@ -3299,12 +3370,12 @@ def temporal_decomp(pix):
 
 # initialization
 maps_flata = np.copy(maps)
-models = np.zeros((iend-ibeg,jend-jbeg,N))
+models = np.zeros((new_lines,new_cols,N))
 
 # prepare flatten maps
-maps_ramp = np.zeros((iend-ibeg,jend-jbeg,N))
-maps_topo = np.zeros((iend-ibeg,jend-jbeg,N))
-maps_noramps = np.zeros((iend-ibeg,jend-jbeg,N))
+maps_ramp = np.zeros((new_lines,new_cols,N))
+maps_topo = np.zeros((new_lines,new_cols,N))
+maps_noramps = np.zeros((new_lines,new_cols,N))
 rms = np.zeros((N))
 
 for ii in range(np.int(arguments["--niter"])):
@@ -3317,11 +3388,11 @@ for ii in range(np.int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
-    pix_az, pix_rg = np.indices((iend-ibeg,jend-jbeg))
+    pix_az, pix_rg = np.indices((new_lines,new_cols))
     # if radar file just initialise figure
     if arguments["--topofile"] is not None:
       nfigure +=1
-      fig = plt.figure(nfigure,figsize=(14,10))
+      fig_dphi = plt.figure(nfigure,figsize=(14,10))
     
     # if iteration = 0 or spatialiter==yes, then spatial estimation
     if (ii==0) or (arguments["--spatialiter"]=='yes') :
@@ -3334,24 +3405,22 @@ for ii in range(np.int(arguments["--niter"])):
       #########################################
       print()
     
-      # # Loop over the dates
-      # for l in range((N)):
-      #   maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
+      for l in range((N)):
+        maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
 
-      output = []
-      with TimeIt():
-          # for kk in range(Nifg):
-          work = range(N)
-          with poolcontext(processes=nproc) as pool:
-              results = pool.map(empirical_cor, work)
-              # maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = results[0][l]
-              # TypeError: cannot unpack non-iterable int object
-          output.append(results)
+      # output = []
+      # with TimeIt():
+      #     work = range(N)
+      #     with poolcontext(processes=nproc) as pool:
+      #         results = pool.map(empirical_cor, work)
+      #         # maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = results[0][l]
+      #         # TypeError: cannot unpack non-iterable int object
+      #     output.append(results)
 
-          # fetch results
-          for l in range(N):
-              maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = output[0][l]
-          del output
+      #     # fetch results
+      #     for l in range(N):
+      #         maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = output[0][l]
+      #     del output
 
       # plot corrected ts
       nfigure +=1
@@ -3445,23 +3514,23 @@ for ii in range(np.int(arguments["--niter"])):
     logger.debug('Input uncertainties: {}'.format(inaps))
 
     # reiinitialize maps models
-    models = np.zeros((iend-ibeg,jend-jbeg,N))
-    models_trends = np.zeros((iend-ibeg,jend-jbeg,N))
-    models_seas = np.zeros((iend-ibeg,jend-jbeg,N))
-    models_lin = np.zeros((iend-ibeg,jend-jbeg,N))
-    models_vect = np.zeros((iend-ibeg,jend-jbeg,N))
+    models = np.zeros((new_lines,new_cols,N))
+    models_trends = np.zeros((new_lines,new_cols,N))
+    models_seas = np.zeros((new_lines,new_cols,N))
+    models_lin = np.zeros((new_lines,new_cols,N))
+    models_vect = np.zeros((new_lines,new_cols,N))
 
     output = []
     with TimeIt():
-        work = range(0,(iend-ibeg)*(jend-jbeg),int(arguments["--sampling"]))
+        work = range(0,(new_lines)*(new_cols),int(arguments["--sampling"]))
         with poolcontext(processes=nproc) as pool:
             results = pool.map(temporal_decomp, work)
         output.append(results)
 
         # fetch results
-        for pix in range(0,(iend-ibeg)*(jend-jbeg),int(arguments["--sampling"])):
-            j = pix  % (jend-jbeg)
-            i = int(pix/(jend-jbeg))
+        for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
+            j = pix  % (new_cols)
+            i = int(pix/(new_cols))
             
             # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
             # aps_pix, naps_pix = temporal_decomp(pix)
@@ -3650,28 +3719,28 @@ for l in range((N)):
 
         if arguments["--geotiff"] is not None:
 
-            ds = driver.Create(outdir+'{}_flat.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+            ds = driver.Create(outdir+'{}_flat.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(data_flat)
             ds.SetGeoTransform(gt)
             ds.plt.setprojection(proj)
             band.FlushCache()
 
-            ds = driver.Create(outdir+'{}_ramp_tropo.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+            ds = driver.Create(outdir+'{}_ramp_tropo.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(ramp+tropo)
             ds.SetGeoTransform(gt)
             ds.plt.setprojection(proj)
             band.FlushCache()
 
-            ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+            ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(model)
             ds.SetGeoTransform(gt)
             ds.plt.setprojection(proj)
             band.FlushCache()
 
-            # ds = driver.Create(outdir+'{}_res.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+            # ds = driver.Create(outdir+'{}_res.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             # band = ds.GetRasterBand(1)
             # band.WriteArray(res)
             # ds.SetGeoTransform(gt)
@@ -3725,7 +3794,7 @@ if arguments["--geotiff"] is not None:
     for l in range((Mbasis)):
         outname = '{}_coeff.tif'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].m)
         ds.SetGeoTransform(gt)
@@ -3735,7 +3804,7 @@ if arguments["--geotiff"] is not None:
 
         outname = '{}_sigcoeff.tif'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].sigmam)
         ds.SetGeoTransform(gt)
@@ -3746,7 +3815,7 @@ if arguments["--geotiff"] is not None:
     for l in range((Mker)):
         outname = '{}_coeff.tif'.format(kernels[l].reduction)
         logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].m)
         ds.SetGeoTransform(gt)
@@ -3756,7 +3825,7 @@ if arguments["--geotiff"] is not None:
 
         outname = '{}_sigcoeff.tif'.format(kernels[l].reduction)
         logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].sigmam)
         ds.SetGeoTransform(gt)
@@ -3806,7 +3875,7 @@ if arguments["--seasonal"]  == 'yes':
 
     if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format(outname))
-        ds = driver.Create('ampwt_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('ampwt_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
@@ -3815,7 +3884,7 @@ if arguments["--seasonal"]  == 'yes':
         del ds
 
         logger.info('Save: {}'.format('ampwt_sigcoeff.tif'))
-        ds = driver.Create('ampwt_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('ampwt_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
@@ -3836,7 +3905,7 @@ if arguments["--seasonal"]  == 'yes':
 
     if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format('phiwt_coeff.tif'))
-        ds = driver.Create('phiwt_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('phiwt_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
@@ -3845,7 +3914,7 @@ if arguments["--seasonal"]  == 'yes':
         del ds
 
         logger.info('Save: {}'.format('phiwt_sigcoeff.tif'))
-        ds = driver.Create('phiwt_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('phiwt_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
@@ -3877,7 +3946,7 @@ if arguments["--semianual"] == 'yes':
 
     if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format('ampw2t_coeff.tif'))
-        ds = driver.Create('ampw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('ampw2t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
@@ -3886,7 +3955,7 @@ if arguments["--semianual"] == 'yes':
         del ds
 
         logger.info('Save: {}'.format('ampw2t_sigcoeff.tif'))
-        ds = driver.Create('ampw2t_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('ampw2t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
@@ -3907,7 +3976,7 @@ if arguments["--semianual"] == 'yes':
 
     if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format('phiw2t_coeff.tif'))
-        ds = driver.Create('phiw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('phiw2t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
         ds.plt.setprojection(proj)
@@ -3915,7 +3984,7 @@ if arguments["--semianual"] == 'yes':
         del ds
 
         logger.info('Save: {}'.format('phiw2t_sigcoeff.tif'))
-        ds = driver.Create('phiw2t_sigcoeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
+        ds = driver.Create('phiw2t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
         ds.plt.setprojection(proj)
