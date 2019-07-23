@@ -2026,7 +2026,7 @@ else:
 ibeg,iend,jbeg,jend = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
 
 if arguments["--ref_zone"] == None:
-    lin_start, lin_jend, col_start, col_end = 0,mlines,0,mcols
+    lin_start, lin_end, col_start, col_end = 0,mlines,0,mcols
 else:
     ref = list(map(int,arguments["--ref_zone"].replace(',',' ').split()))
     try:
