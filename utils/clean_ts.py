@@ -14,16 +14,16 @@ clean_ts.py
 -------------
 Clean a time series file (cube in binary format) given an other real4 file (mask) and a threshold on this mask
 
-Usage: clean_ts.py --infile=<path> --mask=<path> --threshold=<value> --outfile=<path> \
+Usage: clean_ts.py [--infile=<path> ] [--outfile=<path>]  [--mask=<path>] [--threshold=<value>]  \
 [--perc=<value>] [--vmin=<value>] [--vmax=<value>] [--rampmask=<yes/no>] \
 [--flatten_mask=<path>] [--lectfile=<path>] [--scale=<value>] [--imref=<value>] \
 [--images=<path>] [--clean=<values>]  [--crop=<values>] [--clean_demerr=<path>] 
 
 Options:
 -h --help           Show this screen.
---infile PATH       path to time series (depl_cumule)
---outfile PATH      output file
---mask PATH         r4 file used as mask
+--infile PATH       path to time series [default: depl_cumule]
+--outfile PATH      output file [default: depl_cumule_clean]
+--mask PATH         r4 file used as mask [default: None]
 --flatten_mask PATH output r4 flatten mask [default: None]
 --rampmask VALUE    flatten mask [default: yes]
 --threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
@@ -32,7 +32,7 @@ Options:
 --imref VALUE       Reference image number [default: 1]
 --images PATH       Path to image_retuenues file [default: images_retenues]
 --clean VALUE       Clean option [default: 0,0,0,0]
---crop VALUE        Crop option [default: 0,nlign,0,ncol]
+--crop VALUE        Crop option [default: 0,nlines,0,ncol]
 --vmax              Max colorscale [default: 98th percentile]
 --vmin              Min colorscale [default: 2th percentile]
 --perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
@@ -48,7 +48,7 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from pylab import *
-
+import gdal, shutil
 # scipy
 import scipy
 import scipy.optimize as opt
@@ -56,10 +56,19 @@ import scipy.linalg as lst
 
 import docopt
 arguments = docopt.docopt(__doc__)
-infile = arguments["--infile"]
-outfile = arguments["--outfile"]
+if arguments["--infile"] ==  None:
+    infile = 'depl_cumule'
+else:
+    infile = arguments["--infile"]
+if arguments["--outfile"] ==  None:
+    outfile = 'depl_cumule_clean'
+else:
+    outfile = arguments["--outfile"]    
 maskf = arguments["--mask"]
-seuil = float(arguments["--threshold"])
+if arguments["--threshold"] == None:
+    seuil = 1
+else:
+    seuil = float(arguments["--threshold"])
 if arguments["--rampmask"] ==  None:
    rampmask = "no"
 else:
@@ -79,9 +88,15 @@ elif arguments["--imref"] < 1:
 else:
     imref = int(arguments["--imref"]) - 1
 
-# read lect.in 
-ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
-
+# lect cube
+ds = gdal.Open(infile)
+if not ds:
+  print '.hdr file time series cube {0}, not found, open {1}'.format(infile,lecfile)
+  ncol, nlines = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
+else:
+  ncol, nlines = ds.RasterXSize, ds.RasterYSize
+  driver =  ds.GetDriver()
+  
 if arguments["--clean"] ==  None:
     mask = [0,0,0,0]
 else:
@@ -90,7 +105,7 @@ else:
 mibeg,miend,mjbeg,mjend = int(mask[0]),int(mask[1]),int(mask[2]),int(mask[3])
 
 if arguments["--crop"] ==  None:
-    crop = [0,nlign,0,ncol]
+    crop = [0,nlines,0,ncol]
 else:
     crop = map(float,arguments["--crop"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
@@ -102,7 +117,7 @@ else:
 
 if arguments["--clean_demerr"] ==  None:
     demf = 'no'
-    dem = np.zeros((nlign,ncol))
+    dem = np.zeros((iend-ibeg,jend-jbeg))
 else:
     demf = arguments["--clean_demerr"]
     extension = os.path.splitext(demf)[1]
@@ -110,7 +125,7 @@ else:
         ds = gdal.Open(demf, gdal.GA_ReadOnly)
         dem = ds.GetRasterBand(1).ReadAsArray()
     else:
-        dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
+        dem = np.fromfile(demf,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
 
 # load images_retenues file
 fimages='images_retenues'
@@ -120,14 +135,13 @@ N=len(dates)
 print 'Number images: ', N
 
 # open mask file
-mask = np.zeros((nlign,ncol))
-fid2 = open(maskf, 'r')
-mask = np.fromfile(fid2,dtype=np.float32).reshape((nlign,ncol))
-mask =  mask*scale
-
-kk = np.nonzero(np.logical_or(mask==0.0, mask>999.))
-mask[kk] = float('NaN')
-
+mask = np.zeros((iend-ibeg,jend-jbeg))
+if maskf is not None:
+    fid2 = open(maskf, 'r')
+    mask = np.fromfile(fid2,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+    mask =  mask*scale
+    kk = np.nonzero(np.logical_or(mask==0.0, mask>999.))
+    mask[kk] = float('NaN')
 
 if rampmask=='yes':
 
@@ -155,46 +169,47 @@ if rampmask=='yes':
     print 'Remove ramp mask %f x**2 %f x  + %f y**2 + %f y + %f for : %s'%(a,b,c,d,e,maskf)
 
     G=np.zeros((len(mask.flatten()),5))
-    for i in xrange(nlign):
+    for i in xrange(iend-ibeg):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,2] = i**2
         G[i*ncol:(i+1)*ncol,3] = i
     G[:,4] = 1
     temp = (mask.flatten() - np.dot(G,pars))
-    maskflat=temp.reshape(nlign,ncol)
-    # maskflat = (temp - np.nanmin(temp)).reshape(nlign,ncol)
+    maskflat=temp.reshape(iend-ibeg,jend-jbeg)
+    # maskflat = (temp - np.nanmin(temp)).reshape(nlines,ncol)
 
 else:
     # pass
     maskflat = np.copy(mask)
 
-vmax = np.nanpercentile(maskflat,99)
-vmax=1
+if maskf is not None:
+    vmax = np.nanpercentile(maskflat,99)
+    vmax=1
 
-kk = np.nonzero(maskflat>seuil)
-spacial_mask = np.copy(maskflat)
-spacial_mask[kk] = float('NaN')
-nfigure=0
-fig = plt.figure(0,figsize=(9,4))
-ax = fig.add_subplot(1,3,1)
-cax = ax.imshow(mask,cmap=cm.jet,vmax=vmax,vmin=0)
-ax.set_title('RMSpixel')
-setp( ax.get_xticklabels(), visible=False)
-fig.colorbar(cax, orientation='vertical',aspect=10)
-ax = fig.add_subplot(1,3,2)
-cax = ax.imshow(maskflat,cmap=cm.jet,vmax=vmax,vmin=0)
-ax.set_title('flat RMSpixel')
-setp( ax.get_xticklabels(), visible=False)
-fig.colorbar(cax, orientation='vertical',aspect=10)
-ax = fig.add_subplot(1,2,2)
-cax = ax.imshow(spacial_mask,cmap=cm.jet,vmax=vmax,vmin=0)
-ax.set_title('Mask')
-setp( ax.get_xticklabels(), visible=False)
-fig.colorbar(cax, orientation='vertical',aspect=10)
-del spacial_mask, mask
-# plt.show()
-# sys.exit()
+    kk = np.nonzero(maskflat>seuil)
+    spacial_mask = np.copy(maskflat)
+    spacial_mask[kk] = float('NaN')
+    nfigure=0
+    fig = plt.figure(0,figsize=(9,4))
+    ax = fig.add_subplot(1,3,1)
+    cax = ax.imshow(mask,cmap=cm.jet,vmax=vmax,vmin=0)
+    ax.set_title('RMSpixel')
+    setp( ax.get_xticklabels(), visible=False)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
+    ax = fig.add_subplot(1,3,2)
+    cax = ax.imshow(maskflat,cmap=cm.jet,vmax=vmax,vmin=0)
+    ax.set_title('flat RMSpixel')
+    setp( ax.get_xticklabels(), visible=False)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
+    ax = fig.add_subplot(1,2,2)
+    cax = ax.imshow(spacial_mask,cmap=cm.jet,vmax=vmax,vmin=0)
+    ax.set_title('Mask')
+    setp( ax.get_xticklabels(), visible=False)
+    fig.colorbar(cax, orientation='vertical',aspect=10)
+    del spacial_mask, mask
+    # plt.show()
+    # sys.exit()
 
 if arguments["--flatten_mask"] != None:
     # save clean ts
@@ -202,20 +217,18 @@ if arguments["--flatten_mask"] != None:
     maskflat.flatten().astype('float32').tofile(fid)
     fid.close()
 
-# lect cube
 cubei = np.fromfile(infile,dtype=np.float32)
-cube = as_strided(cubei[:nlign*ncol*N])
+cube = as_strided(cubei[:nlines*ncol*N])
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
 
 _cube=np.copy(cube)
 _cube[cube==0] = np.float('NaN')
 maxlos,minlos=np.nanpercentile(_cube,perc),np.nanpercentile(_cube,(100-perc))
-print maxlos,minlos
-# sys.exit()
-
+print 'Min, Max LOS:', minlos, maxlos
 print 'Number of line in the cube: ', cube.shape
-maps = cube.reshape((nlign,ncol,N))
+
+maps = cube.reshape((nlines,ncol,N))[ibeg:iend,jbeg:jend,:N]
 print 'Reshape cube: ', maps.shape
 # set at NaN zero values for all dates
 kk = np.nonzero(
@@ -238,11 +251,20 @@ for l in xrange((N)):
         d[index] = np.float('NaN')
     maps[mibeg:miend,mjbeg:mjend,l] = np.float('NaN')
 
-
 # save clean ts
+# if not ds:
 fid = open(outfile, 'wb')
-maps[ibeg:iend,jbeg:jend,:].flatten().astype('float32').tofile(fid)
+maps.flatten().astype('float32').tofile(fid)
 fid.close()
+wf = open("lect_clean.in", "w")
+wf.write("%i %i %i\n" % (jend-jbeg, iend-ibeg, N))
+wf.close()
+# else:
+#     dst_ds = driver.Create(outfile, iend-ibeg, jend-jbeg, N, gdal.GDT_Float32)
+#     for i in range(N):
+#         dst_band = dst_ds.GetRasterBand(i)
+#         dst_band.WriteArray(maps[:,:,i],0,0)
+#         dst_band.FlushCache()
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(14,10))
@@ -258,12 +280,9 @@ if arguments["--vmin"] ==  None:
 else:
     vmin = np.float(arguments["--vmin"])
 
-
 for l in xrange((N)):
-    d = as_strided(maps[ibeg:iend,jbeg:jend,l])
-    #ax = fig.add_subplot(1,N,l+1)
+    d = as_strided(maps[:,:,l])
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    #cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
     cmap = cm.jet
     cmap.set_bad('white')
     cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
@@ -277,7 +296,5 @@ fig.tight_layout()
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
 fig.savefig('maps_clean.eps', format='EPS',dpi=150)
-
-
 plt.show()
 

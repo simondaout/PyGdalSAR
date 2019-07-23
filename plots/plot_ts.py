@@ -23,7 +23,7 @@ Options:
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --imref VALUE       Reference image number [default: 1]
 --list_images PATH  Path to image_retuenues file [default: images_retenues]
---crop VALUE        Crop option [default: 0,nlign,0,ncol]
+--crop VALUE        Crop option [default: 0,nlines,0,ncol]
 --vmax              Max colorscale [default: 98th percentile]
 --vmin              Min colorscale [default: 2th percentile]
 """
@@ -42,6 +42,7 @@ from pylab import *
 import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
+import gdal
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -57,11 +58,17 @@ if arguments["--imref"] !=  None:
     else:
         imref = int(arguments["--imref"]) - 1
 
-# read lect.in 
-ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
+# lect cube
+ds = gdal.Open(infile)
+if not ds:
+  print '.hdr file time series cube {0}, not found, open {1}'.format(infile,lecfile)
+  # read lect.in 
+  ncol, nlines = map(int, open(lecfile).readline().split(None, 2)[0:2])
+else:
+  ncol, nlines = ds.RasterXSize, ds.RasterYSize
 
 if arguments["--crop"] ==  None:
-    crop = [0,nlign,0,ncol]
+    crop = [0,nlines,0,ncol]
 else:
     crop = map(float,arguments["--crop"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
@@ -77,14 +84,14 @@ print 'Number images: ', N
 
 # lect cube
 cubei = np.fromfile(infile,dtype=np.float32)
-cube = as_strided(cubei[:nlign*ncol*N])
+cube = as_strided(cubei[:nlines*ncol*N])
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
 
 _cube=np.copy(cube)
 _cube[cube==0] = np.float('NaN')
 print 'Number of line in the cube: ', cube.shape
-maps = cube.reshape((nlign,ncol,N))
+maps = cube.reshape((nlines,ncol,N))
 print 'Reshape cube: ', maps.shape
 if arguments["--imref"] !=  None:
     cst = np.copy(maps[:,:,imref])
