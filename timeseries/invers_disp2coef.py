@@ -12,69 +12,70 @@
 """\
 invers_disp2coef.py
 -------------
-Spatial and temporal inversions of the time series delay maps (used depl_cumule (BIP format) and images_retenues, output of invers_pixel), based on an iteration procedure.
-At each iteration, (1) estimation of spatial ramps, (2) linear decomposition in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal),
-(3) estimation of RMS that will be then used as weight for the next iteration. Possibility to also to correct for a term proportional to the topography.
+Spatial and temporal inversions of the cumulative time series delay maps based on an iteration procedure. 
+Requieres depl_cumule (BIP format) and images_retenues, output of invers_pixel.
+At each iteration, (1) estimation of spatial ramps and/or phase/topography relationship, (2) linear decomposition
+in time based on a library of temporal functions (linear, heaviside, logarithm, seasonal, slow-slip...) 
+or given in as vector text file with the vector argument, (3) estimation of the misfit that will be then used as 
+weight for the next iteration. 
 
-Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--ref=<jstart,jend,istart,iend> ] [--refstart=<value>] [--refend=<value>] [--linear=<yes/no>]  \
-[--coseismic=<values>] [--postseismic=<values>]  [--seasonal=<yes/no>] [--slowslip=<values>] [--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
-[--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] [--niter=<value>]  [--spatialiter=<yes/no>]  [--sampling=<value>] [--imref=<value>] [--mask=<path>] \
-[--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
-[--tempmask=<yes/no>] [--cond=<value>] [--ineq=<value>] [--rmspixel=<path>] [--threshold_rms=<path>] \
-[--crop=<values>] [--crop_emp=<values>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
-[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] \
-[<ibeg>] [<iend>] [<jbeg>] [<jend>] 
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
+[--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
+[--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--slowslip=<value,value>] \
+[--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
+[--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
+[--sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
+[--mask=<path>] [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--tempmask=<yes/no>]\
+[--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
+[--crop=<value,value,value,value>] [--crop_emp=<value,value,value,value>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
+[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] 
 
-invers_disp2coef.py -h | --help
-
-Options:
 -h --help               Show this screen
---cube PATH             Path to displacement file [default: depl_cumul]
---lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
---list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
---aps PATH              Path to the APS file giving an input error to each dates [default: No weigthing if no spatial estimation or misfit spatial estimation used as input uncertianties]
---rmspixel PATH         Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None]
---threshold_rms VALUE   Threshold on rmsmap for spatial estimations [default: 1.]
---linear YES/NO         Add a linear function in the inversion [default:yes]
---coseismic PATH        Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
---postseismic PATH      Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.)
---slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5), [default: None]
---vector PATH           Path to the vector text files containing a value for each dates
---seasonal YES/NO       If yes, add seasonal terms in the inversion
---semianual YES/NO      If yes, add semianual terms in the inversion
---dem Yes/No            If yes, add term proportional to the perpendicular baseline in the inversion
---ivar VALUE            Define phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation
---nfit VALUE            Fit degree in azimuth or in elevation [0:linear (default), 1: quadratic]
---flat PATH             Remove a spatial ramp at each iteration.
-0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
-4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e,
-8: ay**2+by+cx**3+dx**2+ex+f, 9: ax+by+cxy**2+dxy+e
---niter VALUE           Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, while for the next itarations, uncertainties are equals to the global RMS of the previous iteration for each map [default: 1]
---spatialiter  YES/NO   If yes iterate the spatial estimations at each iterations (defined by niter) on the maps minus the temporal terms (ie. linear, coseismic...) [default: no]
---sampling VALUE        Downsampling factor [default: 1]
---imref VALUE           Reference image number [default: 1]
---mask PATH             Path to mask file in r4 or tif format for the spatial estimations (Keep only values > threshold_mask for ramp estimation).
---rampmask YES/NO       Remove a quadratic ramp in range a linear in azimuth on the mask before computing threshold [default: no]
---threshold_mask VALUE  Threshold on mask: take only > values (use scale factor for convenience) [default: 0]
---scale_mask  VALUE     Scale factor to apply on mask
---tempmask YES/NO       If yes, also use the spatial mask for the temporal inversion [default: no]
---topofile PATH         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation.
---aspect PATH           Path to aspect file in r4 or tif format: take into account the slope orientation in the phase/topo relationship [default: None].
---perc_los VALUE        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:98.]
---perc_topo VALUE       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:90.]
---cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
---ineq VALUE            If yes, add ineguality constraints in the inversion: use least square result without post-seismic functions as a first guess to iterate the inversion. Force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
---fulloutput YES/NO     If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
---geotiff PATH          Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files [default: .r4]
---plot YES/NO           Display plots [default: yes]
---refstart VALUE        Depricate - Stating line number of the area where phase is set to zero [default: None] 
---refend VALUE          Depricate - Ending line number of the area where phase is set to zero [default: None]
---ref=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero - Overwrite refstart/refend [default: None] 
---dateslim              Datemin,Datemax time series  
---crop VALUE            Define a region of interest for the temporal decomposition [default: 0,nlines,0,ncol]
---crop_emp VALUE    Define a region of interest for the spatial estimatiom (ramp+phase/topo) [default: 0,nlines,0,ncol]
---nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
+--cube=<path>           Path to time series displacements cube file [default: no]
+--lectfile=<path>       Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
+--list_images=<path>    Path to list images file. text file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues].
+--aps=<path>            Path to the APS file. Text file with a single columns giving an input error to each dates. By default, mo weigthing if no empirical estimation or misfit spatial estimation used as input uncertianties [default: None].
+--rmspixel=<path>       Path to the RMS map. Map in r4 or tiff format that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None].
+--threshold_rms=<value> Threshold on rmspixel argument for empitical spatial estimations [default: 1.]
+--ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None]  
+--niter=<value>         Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, while for the next itarations, uncertainties are equals to the global RMS previous temporal decomposition [default: 0].
+--linear=<yes/no>       Add a linear function in the inversion [default:yes]
+--coseismic=<value,value>     Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.) [default: None]
+--postseismic=<value,value>   Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) [default: None].
+--slowslip=<value,value>      Add slow-slip function in the inversion . As defined by Larson et al., 2004. Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None].
+--vector=<path>         Path to the vector text files containing a value for each dates [default: None]
+--seasonal=<yes/no>       If yes, add seasonal terms in the inversion [default: no]
+--semianual=<yes/no>      If yes, add semianual terms in the inversion [default: no]
+--dem=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
+--ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
+--nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
+--flat=<0/1/2/3/4/5/6/7/8/9>             Remove a spatial ramp at each iteration [default: 0].
+--spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, coseismic...) [default: no]
+--sampling=<value>      Downsampling factor temporal decomposition [default: 1]
+--imref=<value>         Reference image number [default: 1]
+--mask=<path>           Path to mask file in r4 or tif format for the empirical spatial estimations. Keep only values > threshold_mask for ramp estimation [default: no].
+--rampmask=<yes/no>     Remove a quadratic ramp in range and linear ramp in azimuth on the mask [default: no].
+--threshold_mask=<value> Threshold on mask: take only > values (use scale factor for convenience) [default: 0].
+--scale_mask=<value>     Scale factor to apply on mask [default: 1]
+--tempmask=<yes/no>       If yes, also use the mask for the temporal decomposition [default: no]
+--topofile=<path>         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation [default: None].
+--aspect=<path>            Path to aspect file in r4 or tif format: take into account the slope orientation in  the phase/topo relationship .
+--perc_los=<value>        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:99.]
+--perc_topo=<value>       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:99.]
+--cond=<value>            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
+--ineq=<yes/no>           If yes, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
+--fulloutput=<yes/no>      If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
+--geotiff=<path>           Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files 
+--plot=<yes/no>         Display plots [default: no]
+--dateslim=<value,value>     Datemin,Datemax time series 
+--crop=<value,value,value,value>            Define a region of interest for the temporal decomposition 
+--crop_emp=<value,value,value,value>    Define a region of interest for the spatial estimatiom (ramp+phase/topo) 
+--nproc=<nb_cores>        Use <nb_cores> local cores to create delay maps [Default: 4]
 """
+
+# 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
+# 4: ax+by+cxy+d 5: ax**2+bx+cy+d, 6: ay**2+by+cx+d, 7: ay**2+by+cx**2+dx+e,
+# 8: ay**2+by+cx**3+dx**2+ex+f, 9: ax+by+cxy**2+dxy+e
 
 print()
 print('# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #')
@@ -319,96 +320,30 @@ def poolcontext(*arg, **kargs):
 # Initialization
 ################################
 
-
 # read arguments
 arguments = docopt.docopt(__doc__)
 if arguments["--lectfile"] ==  None:
-    infile = "lect.in"
-else:
-    infile = arguments["--lectfile"]
+    arguments["--lectfile"] = "lect.in"
 if arguments["--list_images"] ==  None:
-    listim = "images_retenues"
-else:
-    listim = arguments["--list_images"]
+    arguments["--list_images"] = "images_retenues"
+if arguments["--cube"] ==  None:
+    arguments["--cube"] = "depl_cumule"
 if arguments["--aps"] ==  None:
     apsf = 'no'
 else:
     apsf = arguments["--aps"]
 if arguments["--linear"] ==  None:
-    inter = 'yes'
-else:
-    inter = arguments["--linear"]
+    arguments["--linear"] = 'yes'
 if arguments["--seasonal"] ==  None:
-    seasonal = 'no'
-else:
-    seasonal = arguments["--seasonal"]
+    arguments["--seasonal"] = 'no'
 if arguments["--semianual"] ==  None:
-    semianual = 'no'
-else:
-    semianual = arguments["--semianual"]
+    arguments["--semianual"] = 'no'
 if arguments["--dem"] ==  None:
-    dem = 'no'
-else:
-    dem = arguments["--dem"]
-if arguments["--coseismic"] ==  None:
-    cos = []
-else:
-    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
-
-if arguments["--postseismic"] ==  None:
-    pos = []
-else:
-    pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
-
-if len(pos)>0 and len(cos) != len(pos):
-    raise Exception("coseimic and postseismic lists are not the same size")
-
-if arguments["--slowslip"] == None:
-    sse, sse_time, sse_car = [], [], []
-else:
-    try:
-        sse = list(map(float,arguments["--slowslip"].replace(',',' ').split()))
-        sse_time = sse[::2]
-        sse_car = sse[1::2]
-    except:
-        sse_time, sse_car = [], []
-
-if arguments["--vector"] != None:
-    vectf = arguments["--vector"].replace(',',' ').split()
-else:
-    vectf = []
-    vect = None
-
-# read lect.in
-ncol, nlines = list(map(int, open(infile).readline().split(None, 2)[0:2]))
-
-if arguments["--refstart"] == None:
-    lin_start = None
-else:
-    lin_start = int(arguments["--refstart"])
-if arguments["--refend"] == None:
-    lin_end = None
-else:
-    lin_end = int(arguments["--refend"])
-
-if arguments["--ref"] == None:
-    lin_start, lin_jend, col_start, col_end = None,None,None,None
-else:
-    ref = list(map(int,arguments["--ref"].replace(',',' ').split()))
-    try:
-        lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
-    except:
-        lin_start,lin_end = ref[0], ref[1]
-        col_start, col_end = 0, ncol
-
+    arguments["--dem"] = 'no'
 if arguments["--niter"] ==  None:
-    niter = 1
-else:
-    niter = int(arguments["--niter"])
+    arguments["--niter"] = 1
 if arguments["--spatialiter"] ==  None:
-    spatialiter = 'no'
-else:
-    spatialiter = arguments["--spatialiter"]
+    arguments["--spatialiter"] = 'no'
 if arguments["--flat"] == None:
     flat = 0
 elif int(arguments["--flat"]) <  10:
@@ -416,113 +351,66 @@ elif int(arguments["--flat"]) <  10:
 else:
     flat = 0
 if arguments["--sampling"] ==  None:
-    sampling = 1
-else:
-    sampling = int(arguments["--sampling"])
+    arguments["--sampling"] = 1
 if arguments["--mask"] ==  None:
-    maskfile = None
-else:
-    maskfile = arguments["--mask"]
+    arguments["--mask"] = None
 if arguments["--rampmask"] ==  None:
-    rampmask = 'no'
-else:
-    rampmask = arguments["--rampmask"]
+    arguments["--rampmask"] = 'no'
 if arguments["--threshold_mask"] ==  None:
-    seuil = 0.
-else:
-    seuil = float(arguments["--threshold_mask"])
+    arguments["--threshold_mask"] = 0.
 if arguments["--threshold_rms"] ==  None:
-    threshold_rms = 1.
-else:
-    threshold_rms = float(arguments["--threshold_rms"])
+    arguments["--threshold_rms"]  = 1.
 if arguments["--tempmask"] ==  None:
-    tempmask = 'no'
-else:
-    tempmask = arguments["--tempmask"]
+    arguments["--tempmask"] = 'no'
 if arguments["--scale_mask"] ==  None:
-    scale = 1
-else:
-    scale = float(arguments["--scale_mask"])
+    arguments["--scale_mask"] = 1
 if arguments["--topofile"] ==  None:
-   radar = None
-else:
-   radar = arguments["--topofile"]
-
-if arguments["--aspect"] ==  None:
-   aspect = None
-else:
-   aspect = arguments["--aspect"]
-
-if arguments["--imref"] ==  None:
-    imref = 0
-elif arguments["--imref"] < 1:
-    logger.warning('--imref must be between 1 and Nimages')
-else:
-    imref = int(arguments["--imref"]) - 1
-
+   arguments["--topofile"] = None
 if arguments["--cond"] ==  None:
-    rcond = 1e-3
-else:
-    rcond = float(arguments["--cond"])
+    arguments["--cond"] = 1e-3
 if arguments["--rmspixel"] ==  None:
-    rmsf = None
-else:
-    rmsf = arguments["--rmspixel"]
+    arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
-    ineq = 'no'
-else:
-    ineq = arguments["--ineq"]
-
+    arguments["--ineq"] = 'no'
 if arguments["--fulloutput"] ==  None:
-    fulloutput = 'no'
-else:
-    fulloutput = arguments["--fulloutput"]
-
-if arguments["--cube"] ==  None:
-    cubef = "depl_cumule"
-else:
-    cubef = arguments["--cube"]
-
-if arguments["--geotiff"] ==  None:
-    geotiff = None
-else:
-    geotiff = arguments["--geotiff"]
+    arguments["--fulloutput"] = 'no'
+if arguments["--geotiff"] is not None:
+    logger.warning('Load geotiff: {}'.format(geotiff))
     georef = gdal.Open(geotiff)
     gt = georef.GetGeoTransform()
     proj = georef.GetProjection()
     driver = gdal.GetDriverByName('GTiff')
-
+    logger.warning('Set geotiff projection: {}'.format(proj))
 if arguments["--ivar"] == None:
     ivar = 0
 elif int(arguments["--ivar"]) <  2:
     ivar = int(arguments["--ivar"])
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
 else:
     logger.warning('Error: ivar > 1, set ivar to 0')
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
     ivar = 0
-
 if arguments["--nfit"] == None:
     nfit = 0
 elif int(arguments["--nfit"]) <  2:
     nfit = int(arguments["--nfit"])
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
 else:
     logger.warning('Error: nfit > 1, set nfit to 0')
     nfit = 0
-
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
 if arguments["--perc_topo"] ==  None:
-    perc_topo = 90.
-else:
-    perc_topo = float(arguments["--perc_topo"])
-
+    arguments["--perc_topo"] = 90.
 if arguments["--perc_los"] ==  None:
-    perc_los = 98.
-else:
-    perc_los = float(arguments["--perc_los"])
-
+    arguments["--perc_los"] = 98.
 if arguments["--nproc"] ==  None:
     nproc = 4
 else:
     nproc = int(arguments["--nproc"])
-
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
     logger.warning('plot is yes. Set nproc to 1')
@@ -534,20 +422,12 @@ else:
     plot = 'no'
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
-
-if arguments["--crop"] ==  None:
-    crop = [0,nlines,0,ncol]
+if arguments["--imref"] ==  None:
+    imref = 0
+elif arguments["--imref"] < 1:
+    logger.warning('--imref must be between 1 and Nimages')
 else:
-    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
-    logger.warning('Crop time series data between lines {}-{} and cols:{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
-ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-
-if arguments["--crop_emp"] ==  None:
-    crop_emp = [0,iend-ibeg,0,jend-jbeg]
-else:
-    crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
-    logger.warning('Crop empirical estimation between lines {}-{} and cols:{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
-ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
+    imref = int(arguments["--imref"]) - 1
 
 #####################################################################################
 # INITIALISATION
@@ -557,12 +437,10 @@ ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop
 cmap = cm.jet
 cmap.set_bad('white')
 
-# load images_retenues file
-checkinfile(listim)
-nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-N = len(dates)
+logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
+checkinfile(arguments["--list_images"])
+nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 baseref = base[imref]
-
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
     datemin = date2dec(dmin)
@@ -577,11 +455,48 @@ indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
 nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
-checkinfile(cubef)
-cubei = np.fromfile(cubef,dtype=np.float32)
-# extract
+checkinfile(arguments["--cube"])
+ds = gdal.Open(arguments["--cube"])
+if not ds:
+  logger.info('.hdr file time series cube {0}, not found, open {1}'.format(arguments["--cube"],arguments["--lectfile"]))
+  ncol, nlines = list(map(int, open(arguments["--lectfile"]).readline().split(None, 2)[0:2]))
+  N = len(dates)
+else:
+  ncol, nlines = ds.RasterXSize, ds.RasterYSize
+  N = ds.RasterCount
+
+logger.debug('Read reference zones: {}'.format(arguments["--ref_zone"]))
+if arguments["--ref_zone"] == None:
+    lin_start, lin_jend, col_start, col_end = None,None,None,None
+else:
+    ref = list(map(int,arguments["--ref_zone"].replace(',',' ').split()))
+    try:
+        lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
+    except:
+        lin_start,lin_end = ref[0], ref[1]
+        col_start, col_end = 0, ncol
+
+logger.debug('Read crop zones time decomposition: {}, and empirical estimations'.\
+  format(arguments["--crop"],arguments["--crop_emp"]))
+if arguments["--crop"] ==  None:
+    crop = [0,nlines,0,ncol]
+else:
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
+    logger.warning('Crop time series data between lines {}-{} and cols:{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
+ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+
+if arguments["--crop_emp"] ==  None:
+    crop_emp = [0,iend-ibeg,0,jend-jbeg]
+else:
+    crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
+    logger.warning('Crop empirical estimation between lines {}-{} and cols:{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
+ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
+
+
+# extract time series
+cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
-logger.info('Load time series cube: {0}, with length: {1}'.format(cubef, len(cube)))
+logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
 maps_temp = cube.reshape((nlines,ncol,N))
@@ -613,17 +528,17 @@ fig = plt.figure(12)
 nfigure=0
 
 # open mask file
-if maskfile is not None:
-    extension = os.path.splitext(maskfile)[1]
-    checkinfile(maskfile)
+if arguments["--mask"] is not None:
+    extension = os.path.splitext(arguments["--mask"])[1]
+    checkinfile(arguments["--mask"])
     if extension == ".tif":
-      ds = gdal.Open(maskfile, gdal.GA_ReadOnly)
+      ds = gdal.Open(arguments["--mask"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      maski = band.ReadAsArray().flatten()*scale
+      maski = band.ReadAsArray().flatten()*np.float(arguments["--scale_mask"])
       del ds
     else:
-      fid = open(maskfile,'r')
-      maski = np.fromfile(fid,dtype=np.float32)*scale
+      fid = open(arguments["--mask"],'r')
+      maski = np.fromfile(fid,dtype=np.float32)*np.float(arguments["--scale_mask"])
       fid.close()
     mask = maski.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     maski = mask.flatten()
@@ -633,20 +548,20 @@ else:
     maski = mask.flatten()
 
 # open elevation map
-if radar is not None:
-    extension = os.path.splitext(radar)[1]
-    checkinfile(radar)
+if arguments["--topofile"] is not None:
+    extension = os.path.splitext(arguments["--topofile"])[1]
+    checkinfile(arguments["--topofile"])
     if extension == ".tif":
-      ds = gdal.Open(radar, gdal.GA_ReadOnly)
+      ds = gdal.Open(arguments["--topofile"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
       elevi = band.ReadAsArray().flatten()
       del ds
     else:
-      fid = open(radar,'r')
+      fid = open(arguments["--topofile"],'r')
       elevi = np.fromfile(fid,dtype=np.float32)
       fid.close()
 
-    elevi = elevi[:nlines*ncols]
+    elevi = elevi[:nlines*ncol]
     # fig = plt.figure(10)
     # plt.imshow(elevi.reshape(iend-ibeg,jend-jbeg)[ibeg:iend,jbeg:jend])
     elev = elevi.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
@@ -658,23 +573,29 @@ if radar is not None:
     # plt.imshow(elev[ibeg:iend,jbeg:jend])
     # plt.show()
     # sys.exit()
+
+    # define max min topo for empirical relationship
+    maxtopo,mintopo = np.nanpercentile(elev,float(arguments["--perc_topo"])),np.nanpercentile(elev,100-float(arguments["--perc_topo"]))
+    logger.info('Max-Min topography for empirical estimation: {0}-{1}'.format(maxtopo,mintopo))
+
 else:
    elev = np.ones((iend-ibeg,jend-jbeg))
    elevi = elev.flatten()
+   maxtopo,mintopo = 2, 0 
 
-if aspect is not None:
-    extension = os.path.splitext(aspect)[1]
-    checkinfile(aspect)
+if arguments["--aspect"] is not None:
+    extension = os.path.splitext(arguments["--aspect"])[1]
+    checkinfile(arguments["--aspect"])
     if extension == ".tif":
-      ds = gdal.Open(aspect, gdal.GA_ReadOnly)
+      ds = gdal.Open(arguments["--aspect"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
       aspecti = band.ReadAsArray().flatten()
       del ds
     else:
-      fid = open(aspect,'r')
+      fid = open(arguments["--aspect"],'r')
       aspecti = np.fromfile(fid,dtype=np.float32)
       fid.close()
-    aspecti = aspecti[:nlines*ncols]
+    aspecti = aspecti[:nlines*ncol]
     slope = aspecti.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     slope[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(slope>9999.))
@@ -689,12 +610,12 @@ else:
     slope = np.ones((iend-ibeg,jend-jbeg))
     aspecti = slope.flatten()
 
-if rmsf is not None:
-    checkinfile(rmsf)
-    rmsmap = np.fromfile(rmsf,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+if arguments["--rmspixel"] is not None:
+    checkinfile(arguments["--rmspixel"])
+    rmsmap = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap>999.))
     rmsmap[kk] = float('NaN')
-    kk = np.nonzero(rmsmap>threshold_rms)
+    kk = np.nonzero(rmsmap>float(arguments["--threshold_rms"]))
     spacial_mask = np.copy(rmsmap)
     spacial_mask[kk] = float('NaN')
     fig = plt.figure(nfigure,figsize=(9,4))
@@ -736,14 +657,14 @@ plt.legend(loc='best')
 fig.savefig('baseline.eps', format='EPS',dpi=150)
 np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
 
-if maskfile is not None:
+if arguments["--mask"] is not None:
     los_temp = as_strided(mask[ibeg_emp:iend_emp,jbeg_emp:jend_emp]).flatten()
 
-    if rampmask=='yes':
+    if arguments["--rampmask"]=='yes':
         logger.info('Flatten mask...')
         temp = [(i,j) for i in range(iend_emp-ibeg_emp) for j in range(jend_emp-jbeg_emp) \
         if np.logical_and((math.isnan(los_temp[i*(jend_emp-jbeg_emp)+j]) is False), \
-            (los_temp[i*(jend_emp-jbeg_emp)+j]>seuil))]
+            (los_temp[i*(jend_emp-jbeg_emp)+j]>np.float(arguments["--threshold_mask"])))]
 
         temp2 = np.array(temp)
         x = temp2[:,0]; y = temp2[:,1]
@@ -753,7 +674,7 @@ if maskfile is not None:
         # ramp inversion
         pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),los_clean)
         a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-        logger.info('Remove ramp mask %f x**2 %f x  + %f y + %f for : %s'%(a,b,c,d,maskfile))
+        logger.info('Remove ramp mask %f x**2 %f x  + %f y + %f for : %s'%(a,b,c,d,arguments["--mask"]))
 
         # remove 0 values
         kk = np.flatnonzero(np.logical_or(maski==0, maski==9999))
@@ -780,14 +701,14 @@ if maskfile is not None:
     del maski
 
     # check seuil
-    kk = np.flatnonzero(mask_flat<seuil)
+    kk = np.flatnonzero(mask_flat<np.float(arguments["--threshold_mask"]))
     mask_flat_clean=np.copy(mask_flat.flatten())
     mask_flat_clean[kk]=float('NaN')
     mask_flat_clean = mask_flat_clean.reshape(iend-ibeg,jend-jbeg)
 
     # mask maps if necessary for temporal inversion
-    if tempmask=='yes':
-        kk = np.nonzero(mask_flat[ibeg_emp:iend_emp,jbeg_emp:jend_emp]<seuil)
+    if arguments["--tempmask"]=='yes':
+        kk = np.nonzero(mask_flat[ibeg_emp:iend_emp,jbeg_emp:jend_emp]<np.float(arguments["--threshold_mask"]))
         for l in range((N)):
             # clean only selected area
             d = as_strided(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,l])
@@ -863,6 +784,35 @@ fid.close()
 # Create functions of decomposition
 ######################################################
 
+if arguments["--coseismic"] ==  None:
+    cos = []
+else:
+    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
+
+if arguments["--postseismic"] ==  None:
+    pos = []
+else:
+    pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
+
+if len(pos)>0 and len(cos) != len(pos):
+    raise Exception("coseimic and postseismic lists are not the same size")
+
+if arguments["--slowslip"] == None:
+    sse, sse_time, sse_car = [], [], []
+else:
+    try:
+        sse = list(map(float,arguments["--slowslip"].replace(',',' ').split()))
+        sse_time = sse[::2]
+        sse_car = sse[1::2]
+    except:
+        sse_time, sse_car = [], []
+
+if arguments["--vector"] != None:
+    vectf = arguments["--vector"].replace(',',' ').split()
+else:
+    vectf = []
+    vect = None
+
 basis=[
     reference(name='reference',date=datemin,reduction='ref'),
     ]
@@ -871,18 +821,18 @@ index = len(basis)
 # initialise iteration with interseismic alone
 iteration=False
 
-if inter=='yes':
+if arguments["--linear"]=='yes':
     indexinter=index
     basis.append(interseismic(name='interseismic',reduction='lin',date=datemin))
     index = index + 1
 
-if seasonal=='yes':
+if arguments["--seasonal"] =='yes':
     indexseas = index
     basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
     basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
     index = index + 2
 
-if semianual=='yes':
+if arguments["--semianual"]=='yes':
      indexsemi = index
      basis.append(cos2var(name='semi-anual var (cos)',reduction='cosw2t',date=datemin))
      basis.append(sin2var(name='semi-anual var (sin)',reduction='sinw2t',date=datemin))
@@ -918,7 +868,7 @@ for i in range(len(sse_time)):
 
 kernels=[]
 
-if dem=='yes':
+if arguments["--dem"]=='yes':
    kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=baseref,bp=base))
    indexdem = index
    index = index + 1
@@ -1073,7 +1023,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
       data = np.copy(los_clean)
 
       # y: range, x: azimuth
-      if radar is None:
+      if arguments["--topofile"] is None:
           topobins = topo_clean
           rgbins, azbins = y, x
 
@@ -1107,7 +1057,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
     
       if order==0:
 
-        if radar is None:
+        if arguments["--topofile"] is None:
 
             a = 0.
             ramp = np.zeros((iend-ibeg,jend-jbeg))
@@ -1259,7 +1209,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
       elif order==1: # Remove a range ramp ay+b for each maps (y = col)
 
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),2))
             G[:,0] = rgbins
             G[:,1] = 1
@@ -1446,7 +1396,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
 
       elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),2))
             G[:,0] = azbins
             G[:,1] = 1
@@ -1634,7 +1584,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==3: # Remove a ramp ay+bx+c for each maps
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),3))
             G[:,0] = rgbins
             G[:,1] = azbins
@@ -1836,7 +1786,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==4:
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),4))
             G[:,0] = rgbins
             G[:,1] = azbins
@@ -2048,7 +1998,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
       elif order==5:
 
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),4))
             G[:,0] = rgbins**2
             G[:,1] = rgbins
@@ -2264,7 +2214,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 pass
 
       elif order==6:
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),4))
             G[:,0] = azbins**2
             G[:,1] = azbins
@@ -2476,7 +2426,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
 
 
       elif order==7:
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),5))
             G[:,0] = azbins**2
             G[:,1] = azbins
@@ -2694,7 +2644,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==8:
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),6))
             G[:,0] = azbins**3
             G[:,1] = azbins**2
@@ -2926,7 +2876,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l):
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(iend-ibeg,jend-jbeg)
 
       elif order==9:
-        if radar is None:
+        if arguments["--topofile"] is None:
             G=np.zeros((len(data),5))
             G[:,0] = rgbins
             G[:,1] = azbins
@@ -3154,11 +3104,6 @@ def empirical_cor(l):
   """
   Function that preapare and run empirical estimaton for each interferogram kk
   """
-  
-  # global maps, models, elev, perc_topo, maxtopo, mintopo
-  # global mask_flat, seuil, rmsmap, threshold_rms, slope, radar
-  # global flat, iend_emp, ibeg_emp, ivar, nfit
-  # global lin_start, lin_end, col_start,col_end
 
   # first clean los
   maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
@@ -3166,7 +3111,8 @@ def empirical_cor(l):
   # no estimation on the ref image set to zero 
   if np.nansum(maps[:,:,l]) != 0:
 
-    maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],perc_los),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-perc_los)
+    maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
+    logger.debug('Set Max-Min LOS for empirical estimation: {0}-{1}'.format(maxlos,minlos))
     kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
     maps_temp[kk] = np.float('NaN')
 
@@ -3178,23 +3124,19 @@ def empirical_cor(l):
             break
     logger.debug('Begining of the image: {}'.format(itemp))
 
-    if radar is not None:
-        maxtopo,mintopo = np.nanpercentile(elev,perc_topo),np.nanpercentile(elev,100-perc_topo)
+    if arguments["--topofile"] is not None:
         ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    else:
-        maxtopo,mintopo = 2, 0
-    logger.debug('Max-Min topo: {0}-{1}'.format(maxtopo,mintopo))
 
-    logger.debug('Threshold RMS: {}'.format(threshold_rms))
+    logger.debug('Threshold RMS: {}'.format(float(arguments["--threshold_rms"])))
 
     # selection pixels
     index = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
-            np.logical_and(mask_flat>seuil,
+            np.logical_and(mask_flat>np.float(arguments["--threshold_mask"]),
             np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<threshold_rms,
+                np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(pix_az>ibeg,
@@ -3239,11 +3181,11 @@ def empirical_cor(l):
       try:
         indexref = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
-            np.logical_and(mask_flat>seuil,
+            np.logical_and(mask_flat>np.float(arguments["--threshold_mask"]),
             np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<threshold_rms,
+                np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(pix_az>lin_start,
@@ -3311,7 +3253,7 @@ def temporal_decomp(pix):
     aps_tmp = np.zeros((N))
 
     # Inisilize m to zero
-    m = np.zeros((M))
+    m = np.ones((M))*float('NaN')
     sigmam = np.ones((M))*float('NaN')
 
     if kk > N/6:
@@ -3331,7 +3273,7 @@ def temporal_decomp(pix):
             G[:,Mbasis+l]=kernels[l].g(k)
 
         # inversion
-        m,sigmam = consInvert(G,taby,inaps[k],cond=rcond,ineq=ineq)
+        m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"])
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
@@ -3341,17 +3283,13 @@ def temporal_decomp(pix):
         # dont weight by inaps to be consistent from one iteration to the other
         aps_tmp[k] = abs((disp[k]-mdisp[k]))
 
-        # # # remove NaN value for next iterations (but normally no NaN?)
-        # index = np.flatnonzero(np.logical_or(np.isnan(aps_tmp),aps_tmp==0))
-        # aps_tmp[index] = 1.0 # 1 is a bad misfit
-
         # count number of pixels per dates
         naps_tmp[k] = naps_tmp[k] + 1.0
 
         # Build seasonal and linear models
-        if inter=='yes':
+        if arguments["--linear"]=='yes':
             mlin[k] = np.dot(G[:,indexinter],m[indexinter])
-        if seasonal=='yes':
+        if arguments["--seasonal"] =='yes':
             mseas[k] = np.dot(G[:,indexseas:indexseas+2],m[indexseas:indexseas+2])
         if arguments["--vector"] != None:
             mvect[k] = np.dot(G[:,indexvect],m[indexvect])
@@ -3369,7 +3307,7 @@ maps_topo = np.zeros((iend-ibeg,jend-jbeg,N))
 maps_noramps = np.zeros((iend-ibeg,jend-jbeg,N))
 rms = np.zeros((N))
 
-for ii in range(niter):
+for ii in range(np.int(arguments["--niter"])):
     print()
     print('---------------')
     print('iteration: {}'.format(ii))
@@ -3381,12 +3319,12 @@ for ii in range(niter):
 
     pix_az, pix_rg = np.indices((iend-ibeg,jend-jbeg))
     # if radar file just initialise figure
-    if radar is not None:
+    if arguments["--topofile"] is not None:
       nfigure +=1
       fig = plt.figure(nfigure,figsize=(14,10))
     
     # if iteration = 0 or spatialiter==yes, then spatial estimation
-    if (ii==0) or (spatialiter=='yes') :
+    if (ii==0) or (arguments["--spatialiter"]=='yes') :
 
       print() 
       #########################################
@@ -3432,7 +3370,7 @@ for ii in range(niter):
       fig.tight_layout()
       figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
-      if radar is not None:
+      if arguments["--topofile"] is not None:
           fig.savefig('phase-topo.eps', format='EPS',dpi=150)
           nfigure +=1
           figtopo = plt.figure(nfigure,figsize=(14,10))
@@ -3515,18 +3453,20 @@ for ii in range(niter):
 
     output = []
     with TimeIt():
-        work = range(0,(iend-ibeg)*(jend-jbeg),sampling)
+        work = range(0,(iend-ibeg)*(jend-jbeg),int(arguments["--sampling"]))
         with poolcontext(processes=nproc) as pool:
             results = pool.map(temporal_decomp, work)
         output.append(results)
 
         # fetch results
-        for pix in range(0,(iend-ibeg)*(jend-jbeg),sampling):
+        for pix in range(0,(iend-ibeg)*(jend-jbeg),int(arguments["--sampling"])):
             j = pix  % (jend-jbeg)
             i = int(pix/(jend-jbeg))
             
-            # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, aps_pix, naps_pix = temporal_decomp(pix)
-            m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, aps_pix, naps_pix = output[0][pix]
+            # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
+            # aps_pix, naps_pix = temporal_decomp(pix)
+            m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
+            aps_pix, naps_pix = output[0][pix]
           
             aps = aps + aps_pix
             n_aps = n_aps + naps_pix
@@ -3573,14 +3513,14 @@ fid = open('depl_cumule_flat', 'wb')
 cube_flata.flatten().astype('float32').tofile(fid)
 fid.close()
 
-if fulloutput=='yes':
-    if (seasonal=='yes'):
+if arguments["--fulloutput"]=='yes':
+    if (arguments["--seasonal"] =='yes'):
         logger.info('Save time series cube without seasonality: {}'.format('depl_cumule_dseas'))
         fid = open('depl_cumule_dseas', 'wb')
         (maps_flata - models_seas).flatten().astype('float32').tofile(fid)
         fid.close()
 
-    if inter=='yes':
+    if arguments["--linear"]=='yes':
         fid = open('depl_cumule_dtrend', 'wb')
         logger.info('Save de-trended time series cube: {}'.format('depl_cumule_dtrend'))
         (maps_flata - models_lin).flatten().astype('float32').tofile(fid)
@@ -3605,7 +3545,7 @@ except:
   pass
 
 # create MAPS directory to save .r4
-if fulloutput=='yes':
+if arguments["--fulloutput"]=='yes':
     outdir = './MAPS/'
     logger.info('Save time series maps in: {}'.format(outdir))
     if not os.path.exists(outdir):
@@ -3706,9 +3646,9 @@ for l in range((N)):
     # ############
 
     # save flatten maps
-    if fulloutput=='yes':
+    if arguments["--fulloutput"]=='yes':
 
-        if geotiff is not None:
+        if arguments["--geotiff"] is not None:
 
             ds = driver.Create(outdir+'{}_flat.tif'.format(idates[l]), jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
@@ -3781,7 +3721,7 @@ except:
 # Save functions in binary file
 #######################################################
 
-if geotiff is not None:
+if arguments["--geotiff"] is not None:
     for l in range((Mbasis)):
         outname = '{}_coeff.tif'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
@@ -3853,7 +3793,7 @@ else:
 # Compute Amplitude and phase seasonal
 #######################################################
 
-if seasonal == 'yes':
+if arguments["--seasonal"]  == 'yes':
     cosine = as_strided(basis[indexseas].m)
     sine = as_strided(basis[indexseas+1].m)
     amp = np.sqrt(cosine**2+sine**2)
@@ -3864,7 +3804,7 @@ if seasonal == 'yes':
     sigamp = np.sqrt(sigcosine**2+sigsine**2)
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 
-    if geotiff is not None:
+    if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format(outname))
         ds = driver.Create('ampwt_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
@@ -3894,7 +3834,7 @@ if seasonal == 'yes':
         sigamp.flatten().astype('float32').tofile(fid)
         fid.close()
 
-    if geotiff is not None:
+    if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format('phiwt_coeff.tif'))
         ds = driver.Create('phiwt_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
@@ -3924,7 +3864,7 @@ if seasonal == 'yes':
         sigphi.flatten().astype('float32').tofile(fid)
         fid.close()
 
-if semianual == 'yes':
+if arguments["--semianual"] == 'yes':
     cosine = as_strided(basis[indexsemi].m)
     sine = as_strided(basis[indexsemi+1].m)
     amp = np.sqrt(cosine**2+sine**2)
@@ -3935,7 +3875,7 @@ if semianual == 'yes':
     sigamp = np.sqrt(sigcosine**2+sigsine**2)
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 
-    if geotiff is not None:
+    if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format('ampw2t_coeff.tif'))
         ds = driver.Create('ampw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
@@ -3965,7 +3905,7 @@ if semianual == 'yes':
         sigamp.flatten().astype('float32').tofile(fid)
         fid.close()
 
-    if geotiff is not None:
+    if arguments["--geotiff"] is not None:
         logger.info('Save: {}'.format('phiw2t_coeff.tif'))
         ds = driver.Create('phiw2t_coeff.tif', jend-jbeg, iend-ibeg, 1, gdal.GDT_Float32)
         band.WriteArray(phi)

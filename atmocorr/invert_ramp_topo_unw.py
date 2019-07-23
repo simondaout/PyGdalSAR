@@ -13,7 +13,7 @@ Estimates atmospheric phase/elevation correlations or/and azimuthal and range ra
 on unwrapped interferograms (ROI_PAC/GAMMA/GTIFF). Temporal inversion of all coeffient with a strong weight for
 small temporal baselines and lage cover interferograms. Reconstruction of the empirical phase correction.
 
-usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--ref_zone=<jstart,jend,istart,iend> ] [--refend=<value>] [--int_path=<path>] [--out_path=<path>] \
+usage: invert_ramp_topo_unw.py --int_list=<path> [--ref_zone=<jstart,jend,istart,iend> ] [--int_path=<path>] [--out_path=<path>] \
 [--prefix=<value>] [--suffix=<value>] [--rlook=<value>]  [--ref=<path>] [--format=<value>] \
 [--flat=<0/1/2/3/4/5/6>] [--topofile=<path>] [--ivar=<0/1>] [--nfit=<0/1>] [--tsinv=<yes/no>]\
 [--estim=yes/no] [--mask=<path>] [--threshold_mask=<value>]  \
@@ -25,9 +25,7 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--refstart=<value>] [--ref_zon
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
 --int_path PATh       Relative path to output interferograms directory
---refstart VALUE      Stating line number of the area where phase is set to zero [default: 0]
---refend VALUE        Ending line number of the area where phase is set to zero [default: 200]
---ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero - Overwrite refstart/refend [default: None] 
+--ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None] 
 --prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --rlook value         look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
@@ -1743,17 +1741,29 @@ if arguments["--ivar"] == None:
     ivar = 0
 elif int(arguments["--ivar"]) <  2:
     ivar = int(arguments["--ivar"])
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
+
 else:
     logger.warning('ivar > 1, set ivar to 0')
     ivar = 0
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
+
 
 if arguments["--nfit"] == None:
     nfit = 0
 elif int(arguments["--nfit"]) <  2:
     nfit = int(arguments["--nfit"])
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
+
 else:
     logger.warning('nfit > 1, set nfit to 0')
     nfit = 0
+    if arguments["--topofile"] is None:
+        logger.critical('No topographic file is given. Empirical phase/topo will not be performed')
+
 
 if arguments["--mask"] ==  None or not os.path.exists(arguments["--mask"]):
     maskfile = None
@@ -1808,11 +1818,11 @@ if arguments["--iend_mask"] ==  None:
 else:
     iend_mask = int(arguments["--iend_mask"])
 if arguments["--perc_topo"] ==  None:
-    perc_topo = 98.
+    perc_topo = 99.
 else:
     perc_topo = float(arguments["--perc_topo"])
 if arguments["--perc"] ==  None:
-    perc = 98.
+    perc = 99.
 else:
     perc = float(arguments["--perc"])
 if arguments["--perc_slope"] ==  None:
@@ -1821,7 +1831,7 @@ else:
     perc_slope = float(arguments["--perc_slope"])
 
 if arguments["--nproc"] ==  None:
-    nproc = 2
+    nproc = 4
 else:
     nproc = int(arguments["--nproc"])
 
@@ -1953,12 +1963,14 @@ if radar is not None:
             minelev = float(arguments["--min_topo"])
         else:
             minelev = np.nanpercentile(elev_map,100-perc_topo)
+        logger.info('Max-Min topography for empirical estimation: {0}-{1}'.format(maxelev,minelev))
 
     # compute slope
     toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,3.)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
     minslope = np.nanpercentile(slope_map,100-perc_slope)
+    logger.info('Min relief for empirical estimation: {0}-{1}'.format(minslope))
     
     fig = plt.figure(0,figsize=(12,8))
 
@@ -2012,17 +2024,6 @@ else:
     crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
     logger.warning('Crop empirical estimation between lines {}-{} and cols:{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
 ibeg,iend,jbeg,jend = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
-
-if arguments["--refstart"] == None:
-    lin_start = 0
-    col_start = 0
-else:
-    lin_start = int(arguments["--refstart"])
-if arguments["--refend"] == None:
-    lin_end = mlines
-    col_end = 0
-else:
-    lin_end = int(arguments["--refend"])
 
 if arguments["--ref_zone"] == None:
     lin_start, lin_jend, col_start, col_end = 0,mlines,0,mcols
