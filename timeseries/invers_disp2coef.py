@@ -55,7 +55,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --imref=<value>         Reference image number [default: 1]
 --mask=<path>           Path to mask file in r4 or tif format for the empirical spatial estimations. Keep only values > threshold_mask for ramp estimation [default: no].
 --rampmask=<yes/no>     Remove a quadratic ramp in range and linear ramp in azimuth on the mask [default: no].
---threshold_mask=<value> Threshold on mask: take only > values (use scale factor for convenience) [default: 0].
+--threshold_mask=<value> Threshold on mask: take only > values (use scale factor for convenience) [default: 1].
 --scale_mask=<value>     Scale factor to apply on mask [default: 1]
 --tempmask=<yes/no>       If yes, also use the mask for the temporal decomposition [default: no]
 --topofile=<path>         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation [default: None].
@@ -485,8 +485,9 @@ else:
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # extract time series
+cube = np.zeros((nlines,ncol,N)).flatten()
 cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
-cube = as_strided(cubei[:nlines*ncol*N])
+cube[:] = as_strided(cubei[:nlines*ncol*N])
 logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
@@ -631,7 +632,7 @@ if arguments["--rmspixel"] is not None:
 else:
     rmsmap = np.ones((new_lines,new_cols))
     spacial_mask = np.ones((new_lines,new_cols))
-    threshold_rms = 2.
+    arguments["--threshold_rms"] = 2.
 
 # plot bperp vs time
 fig = plt.figure(nfigure,figsize=(10,4))
@@ -766,7 +767,7 @@ for l in range((N)):
 
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
-fig.tight_layout()
+# fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
 
 # plt.show()
@@ -777,7 +778,7 @@ fig.savefig('maps.eps', format='EPS',dpi=150)
 #######################################################
 
 fid = open('lect_ts.in','w')
-np.savetxt(fid, (new_cols,new_lines),fmt='%6i',newline='\t')
+np.savetxt(fid, (new_cols,new_lines,N),fmt='%6i',newline='\t')
 fid.close()
 
 #######################################################
@@ -3186,6 +3187,8 @@ def empirical_cor(l):
 
     if arguments["--topofile"] is not None:
         ax_dphi = fig_dphi.add_subplot(4,int(N/4)+1,l+1)
+    else:
+        ax_dphi = None
 
     logger.debug('Threshold RMS: {}'.format(float(arguments["--threshold_rms"])))
 
@@ -3406,7 +3409,7 @@ for ii in range(np.int(arguments["--niter"])):
       print()
     
       for l in range((N)):
-        maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
+          maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
 
       # output = []
       # with TimeIt():
@@ -3436,7 +3439,7 @@ for ii in range(np.int(arguments["--niter"])):
       plt.setp(axd.get_yticklabels(), visible=False)
       figd.colorbar(caxd, orientation='vertical',aspect=10)
       figd.suptitle('Corrected time series maps')
-      fig.tight_layout()
+      # fig.tight_layout()
       figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
       if arguments["--topofile"] is not None:
@@ -3454,7 +3457,7 @@ for ii in range(np.int(arguments["--niter"])):
               plt.setp(axtopo.get_yticklabels(), visible=False)
           figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
           figtopo.suptitle('Time series RAMPS+TOPO')
-          fig.tight_layout()
+          # fig.tight_layout()
           figtopo.savefig('tropo.eps', format='EPS',dpi=150)
           
 
@@ -3473,7 +3476,7 @@ for ii in range(np.int(arguments["--niter"])):
           plt.setp(axref.get_yticklabels(), visible=False)
           figref.suptitle('Time series RAMPS')
           figref.colorbar(caxref, orientation='vertical',aspect=10)
-          fig.tight_layout()
+          # fig.tight_layout()
           figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
           
 
@@ -3522,34 +3525,38 @@ for ii in range(np.int(arguments["--niter"])):
 
     output = []
     with TimeIt():
-        work = range(0,(new_lines)*(new_cols),int(arguments["--sampling"]))
-        with poolcontext(processes=nproc) as pool:
-            results = pool.map(temporal_decomp, work)
-        output.append(results)
+    
+    #     work = range(0,(new_lines)*(new_cols),int(arguments["--sampling"]))
+    #     with poolcontext(processes=nproc) as pool:
+    #         results = pool.map(temporal_decomp, work)
+    #     output.append(results)
 
-        # fetch results
-        for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
-            j = pix  % (new_cols)
-            i = int(pix/(new_cols))
+    #     # fetch results
+          for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
+              j = pix  % (new_cols)
+              i = int(pix/(new_cols))
+              
+              m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
+              aps_pix, naps_pix = temporal_decomp(pix)
+              # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
+              # aps_pix, naps_pix = output[0][pix]
             
-            # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
-            # aps_pix, naps_pix = temporal_decomp(pix)
-            m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
-            aps_pix, naps_pix = output[0][pix]
-          
-            aps = aps + aps_pix
-            n_aps = n_aps + naps_pix
+              aps = aps + aps_pix
+              n_aps = n_aps + naps_pix
 
-            # save m
-            for l in range((Mbasis)):
-                basis[l].m[i,j] = m[l]
-                basis[l].sigmam[i,j] = sigmam[l]
+              # save m
+              for l in range((Mbasis)):
+                  basis[l].m[i,j] = m[l]
+                  basis[l].sigmam[i,j] = sigmam[l]
 
-            for l in range((Mker)):
-                kernels[l].m[i,j] = m[Mbasis+l]
-                kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
+              for l in range((Mker)):
+                  kernels[l].m[i,j] = m[Mbasis+l]
+                  kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
 
-        del output
+          try:
+              del output
+          except:
+              pass
 
     # convert aps in rad
     aps = aps/n_aps
@@ -3708,7 +3715,7 @@ for l in range((N)):
     plt.setp(axres.get_xticklabels(), visible=False)
     plt.setp(axres.get_yticklabels(), visible=False)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
     # ############
     # # SAVE .R4 #
