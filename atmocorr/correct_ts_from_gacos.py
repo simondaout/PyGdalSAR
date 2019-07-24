@@ -12,9 +12,9 @@ Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to
 3) correct data
 
 Usage: 
-    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--plot=<yes|no>] [--load=<path>] [--rmspixel=<path>] [--threshold_rms=<value>] [--refstart=<values>] [--refend=<values>]  
-    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--plot=<yes|no>] [--load=<path>] [--rmspixel=<path>] [--threshold_rms=<value>] [--refstart=<values>] [--refend=<values>]  [--ramp=<cst|lin>] [--zone=<values>] [--topofile=<path>] 
-    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--plot=<yes|no>] [--load=<path>] [--rmspixel=<path>] [--threshold_rms=<value>] [--refstart=<values>] [--refend=<values>]  [--fitmodel=<yes|no>] [--zone=<values>] [--topofile=<path>] 
+    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--plot=<yes|no>] [--load=<path>] [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<values>]  
+    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--plot=<yes|no>] [--load=<path>] [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<values>]  [--ramp=<cst|lin>] [--crop_emp=<values>] [--topofile=<path>] 
+    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--proj=<value>] [--plot=<yes|no>] [--load=<path>] [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<values>]  [--fitmodel=<yes|no>] [--crop_emp=<values/value/value/value>] [--topofile=<path>] 
 
 correct_ts_from_gacos.py -h | --help
 
@@ -26,12 +26,11 @@ Options:
 --imref=<value>       Reference image number [default: 1]
 --proj=<value>        EPSG for projection GACOS map [default: 4326]
 --crop=<values>       Crop GACOS data to data extent in the output projection, eg. --crop=xmin,ymin,xmax,ymax 
---refstart=<value>    Stating line number of the area where phase is set to zero [default: 0] 
---refend=<value>      Ending line number of the area where phase is set to zero [default: length]
+--ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None]
 --ramp=<cst|lin|quad> Estimate a constant, linear or quadratic ramp in x and y in addition to the los/gacos relationship [default: cst].
---zone=<value>        Crop option for empirical estimation (eg: 0,ncol,0,nlign)
+--crop_emp=<value>        Crop option for empirical estimation (eg: 0,ncol,0,nlign)
 --topo=<file>         Use DEM file to mask very low or high altitude values in the empirical estimation 
---gacos2data=<value>  Scaling value between zenithal gacos data (m) and desired output (e.g data in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504) [default: -920.504]
+--gacos2data=<value>  Scaling value between zenithal gacos data (m) and desired output (e.g data in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504) [default: 1]
 --rmspixel=<file>     Path to the RMS map that gives an error for each pixel (e.g RMSpixel, output of invers_pixel)
 --threshold_rms=<value>  Thresold on rmspixel for ramp estimation [default: 2.]   
 --plot=<yes|no>      Display results [default: yes]
@@ -87,7 +86,7 @@ else:
     proj = True
     EPSG = int(arguments["--proj"])
 if arguments["--gacos2data"] ==  None:
-    gacos2data = -920.504 
+    gacos2data = 1 
 else:
     gacos2data = float(arguments["--gacos2data"])
 if arguments["--ramp"] ==  None:
@@ -106,21 +105,18 @@ else:
    radar = arguments["--topofile"]
 # read lect.in: size maps
 ncol, nlign = list(map(int, open('lect.in').readline().split(None, 2)[0:2]))
-if arguments["--zone"] ==  None:
+
+if arguments["--crop_emp"] ==  None:
     refzone = [0,ncol,0,nlign]
     col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlign
 else:
     refzone = list(map(float,arguments["--clean"].replace(',',' ').split()))
 
-if arguments["--refstart"] == None:
-    refstart = 0
+if arguments["--ref_zone"] == None:
+    refline_beg, refline_end, refcol_beg, refcol_end = None,None,None,None
 else:
-    refstart = int(arguments["--refstart"])
-if arguments["--refend"] == None:
-    refend = nlign
-else:
-    refend = int(arguments["--refend"])
-    col_beg,col_end,line_beg,line_end = refzone[0],refzone[1],refzone[2],refzone[3]
+    ref = list(map(int,arguments["--ref_zone"].replace(',',' ').split()))
+    refline_beg,refline_end, refcol_beg, refcol_end = ref[0], ref[1], ref[2], ref[3]
 
 if arguments["--rmspixel"] ==  None:
     rms = np.ones((nlign,ncol))
@@ -304,7 +300,9 @@ for l in xrange((N)):
   
   if l == imref:
     # check if data and model are set to zeros
-    print "REF DATE:", np.nanmean(data-model)
+    data_flat[np.isnan(data)] = np.float('NaN')
+    data_flat[data_flat>999.]= np.float('NaN')
+    # print "REF DATE:", np.nanstd(data_flat)
   
   else:
 
@@ -345,10 +343,11 @@ for l in xrange((N)):
         np.logical_and(pix_col>col_beg, pix_col<col_end
         )))))))))))))))
 
-    indexref = np.nonzero(
+    if refline_beg is not None:
+        indexref = np.nonzero(
         np.logical_and(~np.isnan(data),
-        np.logical_and(pix_lin>refstart,
-        np.logical_and(pix_lin<refend,
+        np.logical_and(pix_lin>refline_beg,
+        np.logical_and(pix_lin<refline_end,
         np.logical_and(data<losmax,
         np.logical_and(data>losmin,
         np.logical_and(rms<threshold_rms,
@@ -359,7 +358,7 @@ for l in xrange((N)):
         np.logical_and(elev>mintopo,
         np.logical_and(data!=0.0,
         np.logical_and(model!=0.0,
-        np.logical_and(pix_col>col_beg, pix_col<col_end
+        np.logical_and(pix_col>refcol_beg, pix_col<refcol_end
         )))))))))))))))
 
     temp = np.array(index).T
@@ -367,17 +366,16 @@ for l in xrange((N)):
     los_clean = data[index].flatten()
     model_clean = model[index].flatten()
    
-    # compute average phase in the ref area 
-    # we want los ref area to be zero
-    los_ref = data[indexref].flatten() - model[indexref].flatten()
-    rms_ref = rms[indexref].flatten()
-    amp_ref = 1./rms_ref
-    amp_ref = amp_ref/np.nanpercentile(amp_ref,99)
-    # weigth average of the phase
-    rg_ref, az_ref,model_ref = np.nanmean(pix_col[indexref]),np.nanmean(pix_lin[indexref]),np.nanmean(model[indexref])
-    cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
-    # print 'Average phase within ref area:', cst
-    # logger.info('Average rg: {0}, az:{1}, topo:{2}, within ref area'.format(np.int(rg_ref), np.int(az_ref), np.int(model_ref)))
+    if refline_beg is not None:
+        # compute average phase in the ref area 
+        # we want los ref area to be zero
+        los_ref = data[indexref].flatten() - model[indexref].flatten()
+        rms_ref = rms[indexref].flatten()
+        amp_ref = 1./rms_ref
+        amp_ref = amp_ref/np.nanpercentile(amp_ref,99)
+        # weigth average of the phase
+        rg_ref, az_ref,model_ref = np.nanmean(pix_col[indexref]),np.nanmean(pix_lin[indexref]),np.nanmean(model[indexref])
+        cst = np.nansum(los_ref*amp_ref) / np.nansum(amp_ref)
 
     # digitize data in bins, compute median and std
     bins = np.arange(gacosmin,gacosmax,abs(gacosmax-gacosmin)/500.)
@@ -518,86 +516,87 @@ for l in xrange((N)):
         remove_ramp[np.isnan(data)] = np.float('NaN')
     
     # correction
-    # data_flat = data - (gacos + ramp)
     data_flat[:,:] = data - remove
-    # data_flat[np.isnan(data)] = np.float('NaN')
-    # data_flat[data_flat>999.]= np.float('NaN')
-    
+    data_flat[np.isnan(data)] = np.float('NaN')
+    data_flat[data_flat>999.]= np.float('NaN')
     # model = gacos + ramp
     model_flat[:,:,l] = gacos[:,:,l] + remove_ramp
  
-    # Refer data again (just to check)
-    rms_ref = rms[indexref].flatten()
-    amp_ref = 1./rms_ref
-    amp_ref = amp_ref/np.nanmax(amp_ref)
-    cst = np.nansum(data_flat[indexref]*amp_ref) / np.nansum(amp_ref)
-    print 'Ref area set to zero:', refstart,refend
-    print 'Average phase within ref area:', cst 
-    data_flat = data_flat - cst
-    data_flat[np.isnan(data)] = np.float('NaN')
-    data_flat[data_flat>999.]= np.float('NaN')
-
+    if refline_beg is not None:
+        # Refer data again (just to check)
+        rms_ref = rms[indexref].flatten()
+        amp_ref = 1./rms_ref
+        amp_ref = amp_ref/np.nanmax(amp_ref)
+        cst = np.nansum(data_flat[indexref]*amp_ref) / np.nansum(amp_ref)
+        print 'Ref area set to zero: lines: {}-{}, cols: {}-{}'.format(refline_beg,refline_end,refcol_beg,refcol_end) 
+        print 'Average phase within ref area:', cst 
+        data_flat = data_flat - cst
+        data_flat[np.isnan(data)] = np.float('NaN')
+        data_flat[data_flat>999.]= np.float('NaN')
+    
     # compute variance flatten data
-    var[l] = np.sqrt(np.nanmean(data_flat**2))
+    # var[l] = np.sqrt(np.nanmean(data_flat**2))
+    var[l] = np.nanstd(data_flat)
     print 'Var: ', var[l]
+    
+    # initiate figure depl
+    fig = plt.figure(nfigure,figsize=(14,7))
+    nfigure += 1
+    ax = fig.add_subplot(3,2,1)
+    im = ax.imshow(data,cmap=cmap,vmax=losmax,vmin=losmin)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Data {}'.format(idates[l]),fontsize=6)
+
+    # initiate figure depl
+    ax = fig.add_subplot(3,2,2)
+    im = ax.imshow(model,cmap=cmap)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Model {}'.format(idates[l]),fontsize=6)
+    
+    # initiate figure depl
+    ax = fig.add_subplot(3,2,3)
+    im = ax.imshow(model_flat[:,:,l],vmax=losmax,vmin=losmin,cmap=cmap)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Flatten Model {}'.format(idates[l]),fontsize=6)
+
+    # initiate figure depl
+    ax = fig.add_subplot(3,2,4)
+    im = ax.imshow(data_flat,cmap=cmap,vmax=losmax,vmin=losmin)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('Correct Data {}'.format(idates[l]),fontsize=6)
+
+    ax = fig.add_subplot(3,2,5)
+    g = np.linspace(np.nanmax(model_clean),np.nanmin(model_clean),100)
+    ax.scatter(model_clean,los_clean - funct, s=0.005, alpha=0.1, rasterized=True)
+    ax.plot(modelbins,losbins - functbins,'-r', lw =.5)
+    ax.plot(g,f*g,'-r', lw =4.)
+    ax.set_ylim([(los_clean-funct).min(),(los_clean-funct).max()])
+    ax.set_xlim([model_clean.min(),model_clean.max()])
+    ax.set_xlabel('GACOS ZTD')
+    ax.set_ylabel('LOS delay')
+    ax.set_title('Data/Model')
+
+    fig.tight_layout()
+    fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
 
     if plot == 'yes':
-        # initiate figure depl
-        fig = plt.figure(nfigure,figsize=(14,7))
-        nfigure += 1
-        ax = fig.add_subplot(3,2,1)
-        im = ax.imshow(data,cmap=cmap,vmax=losmax,vmin=losmin)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Data {}'.format(idates[l]),fontsize=6)
-
-        # initiate figure depl
-        ax = fig.add_subplot(3,2,2)
-        im = ax.imshow(model,cmap=cmap,vmax=losmax,vmin=losmin)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Model {}'.format(idates[l]),fontsize=6)
-        
-        # initiate figure depl
-        ax = fig.add_subplot(3,2,3)
-        im = ax.imshow(model_flat[:,:,l],cmap=cmap)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Flatten Model {}'.format(idates[l]),fontsize=6)
-
-        # initiate figure depl
-        ax = fig.add_subplot(3,2,4)
-        im = ax.imshow(data_flat,cmap=cmap,vmax=losmax,vmin=losmin)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        ax.set_title('Correct Data {}'.format(idates[l]),fontsize=6)
-
-        ax = fig.add_subplot(3,2,5)
-        g = np.linspace(np.nanmax(model_clean),np.nanmin(model_clean),100)
-        ax.scatter(model_clean,los_clean - funct, s=0.005, alpha=0.1, rasterized=True)
-        ax.plot(modelbins,losbins - functbins,'-r', lw =.5)
-        ax.plot(g,f*g,'-r', lw =4.)
-        ax.set_ylim([(los_clean-funct).min(),(los_clean-funct).max()])
-        ax.set_xlim([model_clean.min(),model_clean.max()])
-        ax.set_xlabel('GACOS ZTD')
-        ax.set_ylabel('LOS delay')
-        ax.set_title('Data/Model')
-
-        fig.tight_layout()
-        fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
         plt.show()
         # sys.exit()
 
 # save new cube
-fid = open('depl_cumule_gacos', 'wb')
+fid = open('depl_cumule-gacos', 'wb')
 maps_flat.flatten().astype('float32').tofile(fid)
 fid.close()
 # save gacos ref spatialy
-fid = open('gacos_ref', 'wb')
+fid = open('cube_gacos_flat', 'wb')
 model_flat.flatten().astype('float32').tofile(fid)
 fid.close()
 
