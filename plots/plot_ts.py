@@ -36,7 +36,8 @@ import os
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
-from pylab import *
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 # scipy
 import scipy
@@ -130,14 +131,15 @@ for l in xrange((N)):
     cmap.set_bad('white')
     cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
     ax.set_title(idates[l],fontsize=6)
-    setp( ax.get_xticklabels(), visible=False)
-    setp( ax.get_yticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_yticklabels(), visible=False)
 
-setp(ax.get_xticklabels(), visible=False)
-setp(ax.get_yticklabels(), visible=False)
-fig.tight_layout()
+plt.setp(ax.get_xticklabels(), visible=False)
+plt.setp(ax.get_yticklabels(), visible=False)
 plt.suptitle('Time series maps')
-fig.colorbar(cax, orientation='vertical',aspect=10)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 fig.savefig('maps_clean.eps', format='EPS',dpi=150)
 
 

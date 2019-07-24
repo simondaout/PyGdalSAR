@@ -238,6 +238,7 @@ except:
     pass
 
 # Display the data
+fig.tight_layout()
 ax.set_rasterized(True)
 fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
 plt.show()
