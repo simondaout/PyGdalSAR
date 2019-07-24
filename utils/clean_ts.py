@@ -47,12 +47,17 @@ import os
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
-from pylab import *
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import gdal, shutil
+
 # scipy
 import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -94,6 +99,8 @@ if not ds:
   print '.hdr file time series cube {0}, not found, open {1}'.format(infile,lecfile)
   ncol, nlines = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
 else:
+  hdr = infile + '.hdr'
+  print 'Read ', hdr
   ncol, nlines = ds.RasterXSize, ds.RasterYSize
   driver =  ds.GetDriver()
   
@@ -125,7 +132,7 @@ else:
         ds = gdal.Open(demf, gdal.GA_ReadOnly)
         dem = ds.GetRasterBand(1).ReadAsArray()
     else:
-        dem = np.fromfile(demf,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+        dem = np.fromfile(demf,dtype=np.float32)[:nlines*ncol].reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
 
 # load images_retenues file
 fimages='images_retenues'
@@ -138,7 +145,7 @@ print 'Number images: ', N
 mask = np.zeros((iend-ibeg,jend-jbeg))
 if maskf is not None:
     fid2 = open(maskf, 'r')
-    mask = np.fromfile(fid2,dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+    mask = np.fromfile(fid2,dtype=np.float32)[:nlines*ncol].reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     mask =  mask*scale
     kk = np.nonzero(np.logical_or(mask==0.0, mask>999.))
     mask[kk] = float('NaN')
@@ -150,8 +157,6 @@ if rampmask=='yes':
     maski = mask[index].flatten()
 
     az = temp[:,0]; rg = temp[:,1]
-
-
     G=np.zeros((len(maski),5))
     G[:,0] = rg**2
     G[:,1] = rg
@@ -191,22 +196,30 @@ if maskf is not None:
     spacial_mask = np.copy(maskflat)
     spacial_mask[kk] = float('NaN')
     nfigure=0
-    fig = plt.figure(0,figsize=(9,4))
+    fig = plt.figure(0,figsize=(11,4))
     ax = fig.add_subplot(1,3,1)
     cax = ax.imshow(mask,cmap=cm.jet,vmax=vmax,vmin=0)
     ax.set_title('RMSpixel')
-    setp( ax.get_xticklabels(), visible=False)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_xticklabels(), visible=False)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
     ax = fig.add_subplot(1,3,2)
     cax = ax.imshow(maskflat,cmap=cm.jet,vmax=vmax,vmin=0)
     ax.set_title('flat RMSpixel')
-    setp( ax.get_xticklabels(), visible=False)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
-    ax = fig.add_subplot(1,2,2)
+    plt.setp( ax.get_xticklabels(), visible=False)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+    ax = fig.add_subplot(1,3,3)
     cax = ax.imshow(spacial_mask,cmap=cm.jet,vmax=vmax,vmin=0)
     ax.set_title('Mask')
-    setp( ax.get_xticklabels(), visible=False)
-    fig.colorbar(cax, orientation='vertical',aspect=10)
+    plt.setp( ax.get_xticklabels(), visible=False)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
     del spacial_mask, mask
     # plt.show()
     # sys.exit()
@@ -252,19 +265,19 @@ for l in xrange((N)):
     maps[mibeg:miend,mjbeg:mjend,l] = np.float('NaN')
 
 # save clean ts
-# if not ds:
-fid = open(outfile, 'wb')
-maps.flatten().astype('float32').tofile(fid)
-fid.close()
-wf = open("lect_clean.in", "w")
-wf.write("%i %i %i\n" % (jend-jbeg, iend-ibeg, N))
-wf.close()
-# else:
-#     dst_ds = driver.Create(outfile, iend-ibeg, jend-jbeg, N, gdal.GDT_Float32)
-#     for i in range(N):
-#         dst_band = dst_ds.GetRasterBand(i)
-#         dst_band.WriteArray(maps[:,:,i],0,0)
-#         dst_band.FlushCache()
+if not ds:
+    fid = open(outfile, 'wb')
+    maps.flatten().astype('float32').tofile(fid)
+    fid.close()
+    wf = open("lect_clean.in", "w")
+    wf.write("%i %i %i\n" % (jend-jbeg, iend-ibeg, N))
+    wf.close()
+else:
+    dst_ds = driver.Create(outfile, jend-jbeg, iend-ibeg, N, gdal.GDT_Float32)
+    for i in range(N):
+        dst_band = dst_ds.GetRasterBand(i+1)
+        dst_band.WriteArray(maps[:,:,i],0,0)
+        dst_band.FlushCache()
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(14,10))
@@ -287,14 +300,15 @@ for l in xrange((N)):
     cmap.set_bad('white')
     cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
     ax.set_title(idates[l],fontsize=6)
-    setp( ax.get_xticklabels(), visible=False)
-    setp( ax.get_yticklabels(), visible=False)
+    plt.setp( ax.get_xticklabels(), visible=False)
+    plt.setp( ax.get_yticklabels(), visible=False)
 
-setp(ax.get_xticklabels(), visible=False)
-setp(ax.get_yticklabels(), visible=False)
-fig.tight_layout()
+plt.setp(ax.get_xticklabels(), visible=False)
+plt.setp(ax.get_yticklabels(), visible=False)
+# fig.tight_layout()
 plt.suptitle('Time series maps')
-fig.colorbar(cax, orientation='vertical',aspect=10)
-fig.savefig('maps_clean.eps', format='EPS',dpi=150)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 plt.show()
 
