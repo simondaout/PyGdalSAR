@@ -43,6 +43,9 @@ from pylab import *
 import matplotlib.ticker as ticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib import colors
+from matplotlib.ticker import PercentFormatter
+
 np.warnings.filterwarnings('ignore')
 try:
     from nsbas import docopt
@@ -123,7 +126,7 @@ phi_map[amp_map<threshold_amp] = np.float('NaN')
 lin_map[amp_map<threshold_amp] = np.float('NaN')
 
 # convert phi between 0 and 2pi
-phi[phi<0] = phi[phi<0] + 2*np.pi
+phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi
 
 # plot
 fig_ampphi = plt.figure(0,figsize=(12,6))
@@ -152,10 +155,10 @@ plt.colorbar(im, cax=cax)
 ax.set_title('Amplitude (mm)',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,2)
-cmap = cm.tab20b
+cmap_phi = cm.tab20b
 if dem is not False:
     cax = ax.imshow(dem,cmap=cm.Greys,zorder=1)
-im = ax.imshow(np.ma.array(phi_map, mask=np.isnan(phi_map)),cmap=cmap,vmin=0,vmax=2*np.pi,alpha=0.8,zorder=2)
+im = ax.imshow(np.ma.array(phi_map, mask=np.isnan(phi_map)),cmap=cmap_phi,vmin=0,vmax=2*np.pi,alpha=0.8,zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -174,4 +177,35 @@ plt.colorbar(im, cax=cax)
 ax.set_title('Velocity (mm/yr)',fontsize=12)
 
 fig_ampphi.tight_layout()
+
+# figure histo phi
+fig_histo = plt.figure(1,figsize=(6,4))
+ax = fig_histo.add_subplot(1,1,1)
+
+# remove Nan for histo
+kk = np.nonzero(~np.isnan(phi_map))
+phi = phi_map[kk] 
+# N is the count in each bin, bins is the lower-limit of the bin
+N, bins, patches = ax.hist(phi,bins=100, alpha=.8, color='blue',density=True)
+
+# color scale based on the x axis
+fracs = bins / bins.max()
+# we need to normalize the data to 0..1 for the full range of the colormap
+# print(fracs.min(), fracs.max())
+norm = colors.Normalize(vmin=fracs.min(), vmax=fracs.max())
+# Now, we'll loop through our objects and set the color of each accordingly
+for thisfrac, thispatch in zip(fracs, patches):
+    color = cmap_phi(norm(thisfrac))
+    thispatch.set_facecolor(color)
+
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+
+xmin,xmax = 0,2*np.pi
+ax.set_xlim([xmin,xmax])
+ax.set_xticks(np.arange(xmin,xmax , (xmax-xmin)/12))
+ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
+ax.set_title('Histo timing',fontsize=6)
+ax.legend(loc='best')
+fig_histo.tight_layout()
+
 plt.show()
