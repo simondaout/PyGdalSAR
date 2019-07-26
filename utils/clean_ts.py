@@ -265,19 +265,19 @@ for l in xrange((N)):
     maps[mibeg:miend,mjbeg:mjend,l] = np.float('NaN')
 
 # save clean ts
-if not ds:
-    fid = open(outfile, 'wb')
-    maps.flatten().astype('float32').tofile(fid)
-    fid.close()
-    wf = open("lect_clean.in", "w")
-    wf.write("%i %i %i\n" % (jend-jbeg, iend-ibeg, N))
-    wf.close()
-else:
-    dst_ds = driver.Create(outfile, jend-jbeg, iend-ibeg, N, gdal.GDT_Float32)
-    for i in range(N):
-        dst_band = dst_ds.GetRasterBand(i+1)
-        dst_band.WriteArray(maps[:,:,i],0,0)
-        dst_band.FlushCache()
+#if not ds:
+fid = open(outfile, 'wb')
+maps.flatten().astype('float32').tofile(fid)
+fid.close()
+wf = open("lect_clean.in", "w")
+wf.write("%i %i %i\n" % (jend-jbeg, iend-ibeg, N))
+wf.close()
+#else:
+#    dst_ds = driver.Create(outfile, jend-jbeg, iend-ibeg, N, gdal.GDT_Float32)
+#    for i in range(N):
+#        dst_band = dst_ds.GetRasterBand(i+1)
+#        dst_band.WriteArray(maps[:,:,i],0,0)
+#        dst_band.FlushCache()
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(14,10))
