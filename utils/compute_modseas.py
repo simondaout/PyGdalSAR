@@ -108,7 +108,7 @@ if arguments["--crop"] ==  None:
 else:
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-print(ibeg,iend,jbeg,jend)
+# print(ibeg,iend,jbeg,jend)
 
 # Open maps
 amp_map=np.fromfile(arguments["--ampfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
@@ -189,7 +189,7 @@ im = ax.imshow(slope_map,cmap=cm.Greys,zorder=1)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
-ax.set_title('Amplitude (mm)',fontsize=12)
+ax.set_title('Slope in LOS',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,2)
 cmap = cm.rainbow
@@ -262,7 +262,7 @@ mean_pos,std_pos = np.array(mean_pos),np.array(std_pos)
 mean_neg,std_neg = np.array(mean_neg),np.array(std_neg)
 
 # plot slope postive
-fig=plt.figure(1,figsize=(12,6))
+fig=plt.figure(1,figsize=(14,5))
 ax=fig.add_subplot(1,2,1)
 ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(arguments["--minamp"])) 
 ax.errorbar(dmod,mean_pos,yerr=std_pos,fmt='none',ecolor='blue',alpha=0.1)
