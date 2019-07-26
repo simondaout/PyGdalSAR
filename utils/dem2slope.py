@@ -70,7 +70,7 @@ else:
     # in roipac incidence file, band 2 is the angle between north and horizontal LOS
     heading[:,:] = np.deg2rad(90 - ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize))[:nlines,:ncols]
 
-toposmooth = scipy.ndimage.filters.gaussian_filter(topo,5.)
+toposmooth = scipy.ndimage.filters.gaussian_filter(topo,1.)
 Py, Px = np.gradient(toposmooth,90,90*np.cos(lat))
 slope = np.sqrt(Px**2+Py**2)
 slopelos = (np.cos(heading)*Px+np.sin(heading)*Py)/np.sin(look)
