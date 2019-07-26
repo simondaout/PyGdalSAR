@@ -439,6 +439,8 @@ cmap.set_bad('white')
 logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
 checkinfile(arguments["--list_images"])
 nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+N = len(dates)
+
 baseref = base[imref]
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
@@ -459,10 +461,10 @@ ds = gdal.Open(arguments["--cube"])
 if not ds:
   logger.info('.hdr file time series cube {0}, not found, open {1}'.format(arguments["--cube"],arguments["--lectfile"]))
   ncol, nlines = list(map(int, open(arguments["--lectfile"]).readline().split(None, 2)[0:2]))
-  N = len(dates)
 else:
   ncol, nlines = ds.RasterXSize, ds.RasterYSize
   N = ds.RasterCount
+# print(nlines,ncol)
 
 logger.debug('Read reference zones: {}'.format(arguments["--ref_zone"]))
 if arguments["--ref_zone"] == None:
@@ -483,15 +485,17 @@ else:
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
     logger.warning('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+# print(ibeg,iend,jbeg,jend)
 
 # extract time series
-cube = np.zeros((nlines,ncol,N)).flatten()
+# cube = np.zeros((nlines,ncol,N)).flatten()
 cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
-cube[:] = as_strided(cubei[:nlines*ncol*N])
+cube = as_strided(cubei[:nlines*ncol*N])
 logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
 maps_temp = cube.reshape((nlines,ncol,N))
+
 # set at NaN zero values for all dates
 # kk = np.nonzero(maps_temp[:,:,-1]==0)
 cst = np.copy(maps_temp[:,:,imref])
@@ -515,19 +519,20 @@ else:
     crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
     logger.warning('Crop empirical estimation between lines {}-{} and cols {}-{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
 ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
+# print(ibeg_emp,iend_emp,jbeg_emp,jend_emp)
+# sys.exit(0)
 
 # clean
 del cube, cubei, maps_temp
 
 # fig = plt.figure(0)
-# plt.imshow(cst,vmax=1,vmin=-1)
+# plt.imshow(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,-1],vmax=1,vmin=-1)
 # fig = plt.figure(1)
-# plt.imshow(maps[ibeg:iend,jbeg:jend,imref],vmax=1,vmin=-1)
+# plt.imshow(maps[:,:,imref],vmax=1,vmin=-1)
 # plt.show()
 # sys.exit()
 
 nfigure=0
-
 # open mask file
 if arguments["--mask"] is not None:
     extension = os.path.splitext(arguments["--mask"])[1]
@@ -577,7 +582,7 @@ if arguments["--topofile"] is not None:
 
     # define max min topo for empirical relationship
     maxtopo,mintopo = np.nanpercentile(elev,float(arguments["--perc_topo"])),np.nanpercentile(elev,100-float(arguments["--perc_topo"]))
-    logger.info('Max-Min topography for empirical estimation: {0}-{1}'.format(maxtopo,mintopo))
+    logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxtopo,mintopo))
 
 else:
    elev = np.ones((new_lines,new_cols))
@@ -1016,7 +1021,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
 
     return fsoln,sigmam
 
-def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
+def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
       # global new_lines, new_cols
       # global ibeg_emp, iend_emp, jbeg_emp, jend_emp
@@ -1024,12 +1029,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       # initialize topo
       topo = np.zeros((new_lines,new_cols))
       ramp = np.zeros((new_lines,new_cols))      
-      data = np.copy(los_clean)
 
       # y: range, x: azimuth
       if arguments["--topofile"] is None:
           topobins = topo_clean
-          rgbins, azbins = y, x
+          rgbins, azbins = rg, az
+          data = np.copy(los_clean)
 
       else:
           # lets try to digitize to improve the fit
@@ -1040,6 +1045,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
           losbins = []
           losstd = []
           azbins, rgbins = [], []
+          los_clean2, topo_clean2, az_clean2, rg_clean2, rms_clean2 = [], [], [], [], []
           for j in range(len(bins)-1):
                   uu = np.flatnonzero(inds == j)
                   if len(uu)>20:
@@ -1047,17 +1053,36 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
                       # do a small clean within the bin
                       indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
-                          los_clean[uu],2.),los_clean[uu]<np.percentile(los_clean[uu],98.)))
+                          los_clean[uu],100-float(arguments["--perc_los"])),los_clean[uu]<np.percentile(los_clean[uu],float(arguments["--perc_los"]))))
 
-                      losstd.append(np.std(los_clean[uu][indice]))
-                      losbins.append(np.median(los_clean[uu][indice]))
-                      azbins.append(np.median(x[uu][indice]))
-                      rgbins.append(np.median(y[uu][indice]))
+                      losstd.append(np.nanstd(los_clean[uu][indice]))
+                      losbins.append(np.nanmedian(los_clean[uu][indice]))
+                      azbins.append(np.nanmedian(az[uu][indice]))
+                      rgbins.append(np.nanmedian(rg[uu][indice]))
 
-          data = np.array(losbins)
-          rms = np.array(losstd)
+                      # remove outliers from data
+                      los_clean2.append(los_clean[uu][indice])
+                      az_clean2.append(az[uu][indice])
+                      rg_clean2.append(rg[uu][indice])
+                      topo_clean2.append(topo_clean[uu][indice])
+                      rms_clean2.append(rms[uu][indice])
+
           topobins = np.array(topobins)
           rgbins, azbins = np.array(rgbins),np.array(azbins)
+
+          # data and model cleaned a second time by sliding median
+          los_clean = np.concatenate(los_clean2)
+          az, rg = np.concatenate(az_clean2), np.concatenate(rg_clean2)
+          topo_clean = np.concatenate(topo_clean2)
+          rms = np.concatenate(rms_clean2)
+          del los_clean2, topo_clean2, az_clean2, rg_clean2, rms_clean2 
+          
+          if order == 0 and ivar == 0:
+              data = np.array(losbins)
+              rms = np.array(losstd)
+
+          else:
+              data = np.array(los_clean)
 
           if len(data) < 10:
             logger.critical('Too small area for empirical phase/topo relationship. Re-defined crop values Exit!')
@@ -1147,8 +1172,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topobins
-                G[:,2] = azbins*topobins
+                G[:,1] = topo_clean
+                G[:,2] = az*topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1159,7 +1184,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
-                funct = a + c*topo_clean*x
+                funct = a + c*topo_clean*az
                 funcbins = a + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1184,9 +1209,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),4))
                 G[:,0] = 1
-                G[:,1] = azbins*topobins
-                G[:,2] = topobins
-                G[:,3] = topobins**2
+                G[:,1] = az*topo_clean
+                G[:,2] = topo_clean
+                G[:,3] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1197,7 +1222,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
-                funct = a + b*topo_clean*x
+                funct = a + b*topo_clean*az
                 funcbins = a + b*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1224,7 +1249,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),2))
-            G[:,0] = rgbins
+            G[:,0] = rg
             G[:,1] = 1
 
             # ramp inversion
@@ -1251,9 +1276,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),3))
-                G[:,0] = rgbins
+                G[:,0] = rg
                 G[:,1] = 1
-                G[:,2] = topobins
+                G[:,2] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1264,7 +1289,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
-                funct = a*y + b
+                funct = a*rg + b
                 funcbins = a*rgbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1289,10 +1314,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
-                G[:,0] = rgbins
+                G[:,0] = rg
                 G[:,1] = 1
-                G[:,2] = topobins
-                G[:,3] = topobins**2
+                G[:,2] = topo_clean
+                G[:,3] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1303,7 +1328,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b
+                funct = a*rg+ b
                 funcbins = a*rgbins+ b
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1329,10 +1354,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
-                G[:,0] = rgbins
+                G[:,0] = rg
                 G[:,1] = 1
-                G[:,2] = topobins
-                G[:,3] = topobins*azbins
+                G[:,2] = topo_clean
+                G[:,3] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1343,7 +1368,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b + d*topo_clean*x
+                funct = a*rg+ b + d*topo_clean*az
                 funcbins = a*rgbins+ b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1371,11 +1396,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
-                G[:,0] = rgbins
+                G[:,0] = rg
                 G[:,1] = 1
-                G[:,2] = topobins*azbins
-                G[:,3] = topobins
-                G[:,4] = topobins**2
+                G[:,2] = topo_clean*az
+                G[:,3] = topo_clean
+                G[:,4] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1386,7 +1411,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b + c*topo_clean*x
+                funct = a*rg+ b + c*topo_clean*az
                 funcbins = a*rgbins+ b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1416,7 +1441,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==2: # Remove a azimutal ramp ax+b for each maps (x is lign)
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),2))
-            G[:,0] = azbins
+            G[:,0] = az
             G[:,1] = 1
 
             # ramp inversion
@@ -1444,9 +1469,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),3))
-                G[:,0] = azbins
+                G[:,0] = az
                 G[:,1] = 1
-                G[:,2] = topobins
+                G[:,2] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1457,7 +1482,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
                 # plot phase/elev
-                funct = a*x + b
+                funct = a*az + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1483,10 +1508,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),4))
-                G[:,0] = azbins
+                G[:,0] = az
                 G[:,1] = 1
-                G[:,2] = topobins
-                G[:,3] = topobins**2
+                G[:,2] = topo_clean
+                G[:,3] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1497,7 +1522,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
-                funct = a*x + b
+                funct = a*az + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1523,10 +1548,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),4))
-                G[:,0] = azbins
+                G[:,0] = az
                 G[:,1] = 1
-                G[:,2] = topobins
-                G[:,3] = topobins*azbins
+                G[:,2] = topo_clean
+                G[:,3] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1537,7 +1562,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
-                funct = a*x + b + d*topo_clean*x
+                funct = a*az + b + d*topo_clean*az
                 funcbins = a*azbins + b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1565,11 +1590,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),5))
-                G[:,0] = azbins
+                G[:,0] = az
                 G[:,1] = 1
-                G[:,2] = topobins*azbins
-                G[:,3] = topobins
-                G[:,4] = topobins**2
+                G[:,2] = topo_clean*az
+                G[:,3] = topo_clean
+                G[:,4] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1580,7 +1605,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*x + b + c*topo_clean*x
+                funct = a*az + b + c*topo_clean*az
                 funcbins = a*azbins + b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1609,8 +1634,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==3: # Remove a ramp ay+bx+c for each maps
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),3))
-            G[:,0] = rgbins
-            G[:,1] = azbins
+            G[:,0] = rg
+            G[:,1] = az
             G[:,2] = 1
 
             # ramp inversion
@@ -1640,10 +1665,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),4))
-                G[:,0] = rgbins
-                G[:,1] = azbins
+                G[:,0] = rg
+                G[:,1] = az
                 G[:,2] = 1
-                G[:,3] = topobins
+                G[:,3] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1655,7 +1680,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c
+                funct = a*rg+ b*az + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1682,11 +1707,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),5))
-                G[:-1,0] = rgbins
-                G[:-1,1] = azbins
+                G[:-1,0] = rg
+                G[:-1,1] = az
                 G[:,2] = 1
-                G[:-1,3] = topobins
-                G[:-1,4] = topobins**2
+                G[:-1,3] = topo_clean
+                G[:-1,4] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1698,7 +1723,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c
+                funct = a*rg+ b*az + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1725,11 +1750,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),5))
-                G[:,0] = rgbins
-                G[:,1] = azbins
+                G[:,0] = rg
+                G[:,1] = az
                 G[:,2] = 1
-                G[:,3] = topobins
-                G[:,4] = topobins*azbins
+                G[:,3] = topo_clean
+                G[:,4] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1742,7 +1767,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c + e*topo_clean*x
+                funct = a*rg+ b*az + c + e*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1771,12 +1796,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins
-                G[:,1] = azbins
+                G[:,0] = rg
+                G[:,1] = az
                 G[:,2] = 1
-                G[:,3] = topobins*azbins
-                G[:,4] = topobins
-                G[:,5] = topobins**2
+                G[:,3] = topo_clean*az
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1787,7 +1812,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c + d*topo_clean*x
+                funct = a*rg+ b*az + c + d*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
@@ -1817,9 +1842,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==4:
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),4))
-            G[:,0] = rgbins
-            G[:,1] = azbins
-            G[:,2] = rgbins*azbins
+            G[:,0] = rg
+            G[:,1] = az
+            G[:,2] = rg*az
             G[:,3] = 1
 
             # ramp inversion
@@ -1848,11 +1873,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),5))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = rg*az
                 G[:,3] = 1
-                G[:,4] = topobins
+                G[:,4] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1864,7 +1889,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*x*y+ d
+                funct = a*rg+ b*az + c*az*rg+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1892,12 +1917,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = rg*az
                 G[:,3] = 1
-                G[:,4] = topobins
-                G[:,5] = topobins**2
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1909,7 +1934,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*x*y+ d
+                funct = a*rg+ b*az + c*az*rg+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1937,12 +1962,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = rg*az
                 G[:,3] = 1
-                G[:,4] = topobins
-                G[:,5] = topobins*azbins
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1954,7 +1979,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*x*y+ d + f*topo_clean*x
+                funct = a*rg+ b*az + c*az*rg+ d + f*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -1984,13 +2009,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = rg*az
                 G[:,3] = 1
-                G[:,4] = topobins*azbins
-                G[:,5] = topobins
-                G[:,6] = topobins**2
+                G[:,4] = topo_clean*az
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2002,7 +2027,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*x*y+ d + e*topo_clean*x
+                funct = a*rg+ b*az + c*az*rg+ d + e*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2034,9 +2059,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),4))
-            G[:,0] = rgbins**2
-            G[:,1] = rgbins
-            G[:,2] = azbins
+            G[:,0] = rg**2
+            G[:,1] = rg
+            G[:,2] = az
             G[:,3] = 1
 
             # ramp inversion
@@ -2068,11 +2093,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
             if (ivar==0 and nfit==0):
 
                 G=np.zeros((len(data),5))
-                G[:,0] = rgbins**2
-                G[:,1] = rgbins
-                G[:,2] = azbins
+                G[:,0] = rg**2
+                G[:,1] = rg
+                G[:,2] = az
                 G[:,3] = 1
-                G[:,4] = topobins
+                G[:,4] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2083,7 +2108,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r**2, %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*y**2 + b*y+ c*x + d
+                funct = a*rg**2 + b*rg+ c*az + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2111,12 +2136,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins**2
-                G[:,1] = rgbins
-                G[:,2] = azbins
+                G[:,0] = rg**2
+                G[:,1] = rg
+                G[:,2] = az
                 G[:,3] = 1
-                G[:,4] = topobins
-                G[:,5] = topobins**2
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2127,7 +2152,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*y**2 + b*y+ c*x + d
+                funct = a*rg**2 + b*rg+ c*az + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2157,12 +2182,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
             elif (ivar==1 and nfit==0):
 
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins**2
-                G[:,1] = rgbins
-                G[:,2] = azbins
+                G[:,0] = rg**2
+                G[:,1] = rg
+                G[:,2] = az
                 G[:,3] = 1
-                G[:,4] = topobins
-                G[:,5] = topobins*azbins
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2173,7 +2198,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*y**2 + b*y+ c*x + d + f*topo_clean*x
+                funct = a*rg**2 + b*rg+ c*az + d + f*topo_clean*az
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2204,13 +2229,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
             elif (ivar==1 and nfit==1):
 
                 G=np.zeros((len(data),7))
-                G[:,0] = rgbins**2
-                G[:,1] = rgbins
-                G[:,2] = azbins
+                G[:,0] = rg**2
+                G[:,1] = rg
+                G[:,2] = az
                 G[:,3] = 1
-                G[:,4] = topobins*azbins
-                G[:,5] = topobins
-                G[:,6] = topobins**2
+                G[:,4] = topo_clean*az
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2221,7 +2246,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r**2, %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*y**2 + b*y+ c*x + d + e*topo_clean*x
+                funct = a*rg**2 + b*rg+ c*az + d + e*topo_clean*az
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2255,9 +2280,9 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==6:
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),4))
-            G[:,0] = azbins**2
-            G[:,1] = azbins
-            G[:,2] = rgbins
+            G[:,0] = az**2
+            G[:,1] = az
+            G[:,2] = rg
             G[:,3] = 1
 
             # ramp inversion
@@ -2287,11 +2312,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0) :
                 G=np.zeros((len(data),5))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg
                 G[:,3] = 1
-                G[:,4] = topobins
+                G[:,4] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2302,7 +2327,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y+ d
+                funct = a*az**2 + b*az + c*rg+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2330,12 +2355,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),6))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg
                 G[:,3] = 1
-                G[:,4] = topobins
-                G[:,5] = topobins**2
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2346,7 +2371,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y+ d
+                funct = a*az**2 + b*az + c*rg+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2374,12 +2399,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg
                 G[:,3] = 1
-                G[:,4] = topobins
-                G[:,5] = topobins*azbins
+                G[:,4] = topo_clean
+                G[:,5] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2390,7 +2415,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y+ d + f*topo_clean*x
+                funct = a*az**2 + b*az + c*rg+ d + f*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2420,14 +2445,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg
                 G[:,3] = 1
-                G[:,4] = topobins*azbins
-                G[:,5] = topobins
-                G[:,6] = topobins**2
-                G[:,7] = (topobins*azbins)**2
+                G[:,4] = topo_clean*az
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean**2
+                G[:,7] = (topo_clean*az)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2438,7 +2463,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y+ d + e*topo_clean*x + h*(topo_clean*x)**2
+                funct = a*az**2 + b*az + c*rg+ d + e*topo_clean*az + h*(topo_clean*az)**2
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + e*topobins*azbins + h*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2472,10 +2497,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==7:
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),5))
-            G[:,0] = azbins**2
-            G[:,1] = azbins
-            G[:,2] = rgbins**2
-            G[:,3] = rgbins
+            G[:,0] = az**2
+            G[:,1] = az
+            G[:,2] = rg**2
+            G[:,3] = rg
             G[:,4] = 1
 
             # ramp inversion
@@ -2506,12 +2531,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit ==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins**2
-                G[:,3] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg**2
+                G[:,3] = rg
                 G[:,4] = 1
-                G[:,5] = topobins
+                G[:,5] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2522,7 +2547,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*x+ e
+                funct = a*az**2 + b*az + c*rg**2 + d*az+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2551,13 +2576,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             if (ivar==0 and nfit ==1):
                 G=np.zeros((len(data),7))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins**2
-                G[:,3] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg**2
+                G[:,3] = rg
                 G[:,4] = 1
-                G[:,5] = topobins
-                G[:,6] = topobins**2
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2568,7 +2593,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y+ e
+                funct = a*az**2 + b*az + c*rg**2 + d*rg+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2597,13 +2622,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit ==0):
                 G=np.zeros((len(data),7))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins**2
-                G[:,3] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg**2
+                G[:,3] = rg
                 G[:,4] = 1
-                G[:,5] = topobins
-                G[:,6] = topobins*azbins
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2614,7 +2639,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y+ e + g*topo_clean*x
+                funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + g*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2645,14 +2670,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = azbins**2
-                G[:,1] = azbins
-                G[:,2] = rgbins**2
-                G[:,3] = rgbins
+                G[:,0] = az**2
+                G[:,1] = az
+                G[:,2] = rg**2
+                G[:,3] = rg
                 G[:,4] = 1
-                G[:,5] = topobins*azbins
-                G[:,6] = topobins
-                G[:,7] = topobins**2
+                G[:,5] = topo_clean*az
+                G[:,6] = topo_clean
+                G[:,7] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2663,7 +2688,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**2 + b*x + c*y**2 + d*y+ e + f*topo_clean*x
+                funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + f*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2695,11 +2720,11 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==8:
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),6))
-            G[:,0] = azbins**3
-            G[:,1] = azbins**2
-            G[:,2] = azbins
-            G[:,3] = rgbins**2
-            G[:,4] = rgbins
+            G[:,0] = az**3
+            G[:,1] = az**2
+            G[:,2] = az
+            G[:,3] = rg**2
+            G[:,4] = rg
             G[:,5] = 1
 
             # ramp inversion
@@ -2731,13 +2756,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),7))
-                G[:,0] = azbins**3
-                G[:,1] = azbins**2
-                G[:,2] = azbins
-                G[:,3] = rgbins**2
-                G[:,4] = rgbins
+                G[:,0] = az**3
+                G[:,1] = az**2
+                G[:,2] = az
+                G[:,3] = rg**2
+                G[:,4] = rg
                 G[:,5] = 1
-                G[:,6] = topobins
+                G[:,6] = topo_clean
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2748,7 +2773,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
+                funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2778,14 +2803,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = azbins**3
-                G[:,1] = azbins**2
-                G[:,2] = azbins
-                G[:,3] = rgbins**2
-                G[:,4] = rgbins
+                G[:,0] = az**3
+                G[:,1] = az**2
+                G[:,2] = az
+                G[:,3] = rg**2
+                G[:,4] = rg
                 G[:,5] = 1
-                G[:,6] = topobins
-                G[:,7] = topobins**2
+                G[:,6] = topo_clean
+                G[:,7] = topo_clean**2
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2796,7 +2821,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f
+                funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2827,14 +2852,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),8))
-                G[:,0] = azbins**3
-                G[:,1] = azbins**2
-                G[:,2] = azbins
-                G[:,3] = rgbins**2
-                G[:,4] = rgbins
+                G[:,0] = az**3
+                G[:,1] = az**2
+                G[:,2] = az
+                G[:,3] = rg**2
+                G[:,4] = rg
                 G[:,5] = 1
-                G[:,6] = topobins
-                G[:,7] = topobins*azbins
+                G[:,6] = topo_clean
+                G[:,7] = topo_clean*az
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2845,7 +2870,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + h*topo_clean*x
+                funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + h*topo_clean*az
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + h*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2877,16 +2902,16 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),10))
-                G[:,0] = azbins**3
-                G[:,1] = azbins**2
-                G[:,2] = azbins
-                G[:,3] = rgbins**2
-                G[:,4] = rgbins
+                G[:,0] = az**3
+                G[:,1] = az**2
+                G[:,2] = az
+                G[:,3] = rg**2
+                G[:,4] = rg
                 G[:,5] = 1
-                G[:,6] = topobins*azbins
-                G[:,7] = topobins
-                G[:,8] = topobins**2
-                G[:,9] = (topobins*azbins)**2
+                G[:,6] = topo_clean*az
+                G[:,7] = topo_clean
+                G[:,8] = topo_clean**2
+                G[:,9] = (topo_clean*az)**2
 
                 # ramp inversion1
                 x0 = lst.lstsq(G,data)[0]
@@ -2897,7 +2922,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f az**3, %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l]))
 
                 # plot phase/elev
-                funct = a*x**3 + b*x**2 + c*x + d*y**2 + e*y+ f + g*topo_clean*x + k*(topo_clean*x)**2
+                funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + g*topo_clean*az + k*(topo_clean*az)**2
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + g*topobins*azbins + k*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -2932,10 +2957,10 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
       elif order==9:
         if arguments["--topofile"] is None:
             G=np.zeros((len(data),5))
-            G[:,0] = rgbins
-            G[:,1] = azbins
-            G[:,2] = (rgbins*azbins)**2
-            G[:,3] = rgbins*azbins
+            G[:,0] = rg
+            G[:,1] = az
+            G[:,2] = (rg*az)**2
+            G[:,3] = rg*az
             G[:,4] = 1
 
             # ramp inversion
@@ -2965,12 +2990,12 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
         else:
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),6))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = (rgbins*azbins)**2
-                G[:,3] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = (rg*az)**2
+                G[:,3] = rg*az
                 G[:,4] = 1
-                G[:,5] = topobins
+                G[:,5] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -2982,8 +3007,8 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev
-                funcbins = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
-                funct = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
+                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
+                funct = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
                 ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
@@ -3010,13 +3035,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             if (ivar==0 and nfit==1):
                 G=np.zeros((len(data),7))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = (rgbins*azbins)**2
-                G[:,3] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = (rg*az)**2
+                G[:,3] = rg*az
                 G[:,4] = 1
-                G[:,5] = topobins
-                G[:,6] = topobins**2
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -3028,7 +3053,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e
+                funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -3057,13 +3082,13 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==0):
                 G=np.zeros((len(data),7))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = (rgbins*azbins)**2
-                G[:,3] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = (rg*az)**2
+                G[:,3] = rg*az
                 G[:,4] = 1
-                G[:,5] = topobins
-                G[:,6] = topobins*azbins
+                G[:,5] = topo_clean
+                G[:,6] = topo_clean*az
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -3075,7 +3100,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + g*topo_clean*x
+                funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + g*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
@@ -3105,14 +3130,14 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
 
             elif (ivar==1 and nfit==1):
                 G=np.zeros((len(data),8))
-                G[:,0] = rgbins
-                G[:,1] = azbins
-                G[:,2] = (rgbins*azbins)**2
-                G[:,3] = rgbins*azbins
+                G[:,0] = rg
+                G[:,1] = az
+                G[:,2] = (rg*az)**2
+                G[:,3] = rg*az
                 G[:,4] = 1
-                G[:,5] = topobins*azbins
-                G[:,6] = topobins
-                G[:,7] = topobins**2
+                G[:,5] = topo_clean*az
+                G[:,6] = topo_clean
+                G[:,7] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -3124,7 +3149,7 @@ def estim_ramp(los,los_clean,topo_clean,x,y,order,rms,nfit,ivar,l,ax_dphi):
                 print ('Remove ramp %f r, %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
                 # plot phase/elev
-                funct = a*y+ b*x + c*(x*y)**2 + d*x*y+ e + f*topo_clean*x
+                funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + f*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
                 ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
