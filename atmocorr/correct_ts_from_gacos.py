@@ -267,8 +267,8 @@ gacos = gcube.reshape((nlign,ncol,N))*gacos2data
 # Plot
 fig = plt.figure(0,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
-vmax = np.nanpercentile(gacos[:,:,-1],99)
-vmin = np.nanpercentile(gacos[:,:,-1],1)
+vmax = np.nanpercentile(gacos,99)
+vmin = np.nanpercentile(gacos,1)
 for l in xrange((N)):
    d = as_strided(gacos[:,:,l])
    ax = fig.add_subplot(4,int(N/4)+1,l+1)
@@ -645,8 +645,11 @@ for l in xrange((N)):
     plt.legend(loc='best')
 
     fig.tight_layout()
-    fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
-
+    try:
+        fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
+    except:
+        pass
+        
     if plot == 'yes':
         plt.show()
         # sys.exit()
