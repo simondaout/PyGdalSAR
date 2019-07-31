@@ -128,8 +128,8 @@ for i in xrange(ds.RasterYSize):
             fit = seasonal(time,v,a,b,c)
             plot(dates,time,mode,t,fit,amp,dphi,nfigure,datemin,datemax)
             nfigure+=2
-            plt.show()
-            sys.exit()
+            # plt.show()
+            # sys.exit()
 
         # save data
         fid=open('temperatures_{}_{}.txt'.format(lat,lon),'wb')

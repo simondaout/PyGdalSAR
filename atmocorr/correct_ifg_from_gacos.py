@@ -9,16 +9,13 @@
 correct_ifg_from_gacos.py
 -------------
 Correct unwrapped IFGs from Gacos atmospheric models. 
-
 Usage: 
     correct_ifg_from_gacos.py --int_list=<path> [--int_path=<path>] [--gacos_path=<path>]  [--gacos2los=<value>] [--prefix=<value>] \
     [--suffix=<value>] [--rlook=<value>] [--plot=<yes|no>] [--cohpixel=<yes/no>] [--threshold_coh=<value>] \
     [--refstart=<values>] [--refend=<values>] [--format=<value>]  \
     [--ramp=<cst|lin>] [--crop=<values>] [--fitmodel=<yes|no>] [--perc=<value>]  \
     [--suffix_output=<value>] [--nproc=<nb_cores>]
-
 correct_ifg_from_gacos.py -h | --help
-
 Options:
 -h --help               Show this screen.
 --int_list=<path>       Text file containing list of interferograms dates in two colums, $los_map1 $date2
@@ -690,3 +687,18 @@ with TimeIt():
     work = range(Nifg)
     with poolcontext(processes=nproc) as pool:
         results = pool.map(empirical_cor, work)
+
+    © 2019 GitHub, Inc.
+    Terms
+    Privacy
+    Security
+    Status
+    Help
+
+    Contact GitHub
+    Pricing
+    API
+    Training
+    Blog
+    About
+
