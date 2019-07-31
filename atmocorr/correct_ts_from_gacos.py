@@ -692,7 +692,7 @@ for l in range((N)):
     plt.colorbar(im, cax=cax)
     ax.set_title('Correct Data {}'.format(idates[l]),fontsize=6)
     fig.tight_layout()
-    fig.savefig('maps-{}-data-model.eps'.format(idates[l]), format='EPS',dpi=150)
+    fig.savefig('{}-data-model-maps.png'.format(idates[l]), format='PNG',dpi=150)
 
     fig = plt.figure(2,figsize=(7,5))
     ax = fig.add_subplot(1,1,1)
@@ -709,7 +709,7 @@ for l in range((N)):
     fig.tight_layout()
 
     try:
-        fig.savefig('{}-data-model.eps'.format(idates[l]), format='EPS',dpi=150)
+        fig.savefig('{}-data-model.png'.format(idates[l]), format='PNG',dpi=150)
     except:
         pass
         
