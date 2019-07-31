@@ -73,8 +73,8 @@ index = np.nonzero(np.isnan(out))
 #out[index] = 0
 
 # plot maps
-vmax = np.nanmean(in11) +2* np.nanstd(in11)
-vmin = np.nanmean(in11) - 2*np.nanstd(in11)
+vmax = np.nanpercentile(in11,98)
+vmin = np.nanpercentile(in11,2)
 fig = plt.figure(10, figsize=(10,8))
 fig.subplots_adjust(hspace=0.5)
 ax1 = fig.add_subplot(1,3,1)
@@ -100,8 +100,8 @@ setp( ax2.get_xticklabels(), visible=False)
 ax2.set_title(infile2)
 cbar = fig.colorbar(cax, shrink = 0.2, aspect = 10)
 
-vmax = np.nanmean(out) + np.nanstd(out)
-vmin = np.nanmean(out) - np.nanstd(out)
+vmax = np.nanpercentile(out,98)
+vmin = np.nanpercentile(out,2)
 ax3 = fig.add_subplot(1,3,3)
 cax =ax3.imshow(out, cmap = cm.jet, vmax=vmax, vmin=0, extent=None)
 setp( ax3.get_xticklabels(), visible=False)

@@ -702,7 +702,7 @@ for jj in xrange((Npix)):
     # extract data
     wind = as_strided(maps[j-w:j+w+1,i-w:i+w+1,:])
     if infof is not None:
-      infm = np.nanmean(info[j-w:j+w+1,i-w:i+w+1])
+      infm = np.nanmedian(info[j-w:j+w+1,i-w:i+w+1])
     if iref is not None:
         windref = as_strided(maps[jref-wref:jref+wref+1,iref-wref:iref+wref+1,:])
         dispref = np.nanmedian(windref,axis=(0,1))

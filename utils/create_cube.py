@@ -30,7 +30,7 @@ print('Size expected time series cube: ({0} {1} {2}) '.format(nlign, ncol, N))
 
 imref = 0
 inlook = 2
-outlook = 8 
+outlook = 4
 rlook = int(outlook/inlook)
 
 maps = np.zeros((nlign,ncol,N))

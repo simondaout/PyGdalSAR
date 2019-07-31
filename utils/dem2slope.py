@@ -16,18 +16,20 @@ dem2slope.py
 Convert dem to slope file in the LOS geeometry knowing los heading and lattitude mean
 
 Usage: 
-    dem2slope.py --infile=<path> --outfile=<path> --los=<value> --heading=<value> --lat=<value>
-    dem2slope.py --infile=<path> --outfile=<path> --incidence=<path> --lat=<value>
+    dem2slope.py --infile=<path> --los=<value> --heading=<value>  [--out_slope=<path>] [--out_slopelos=<path>] [--lat=<value>] [--red=<value>]
+    dem2slope.py --infile=<path> --incidence=<path> [--out_slope=<path>] [--out_slopelos=<path>] [--lat=<value>] [--res=<value>]
 
 dem2slope.py -h | --help
 
 Options:
 -h --help           Show this screen
 --infile PATH       DEM file 
---outfile PATH      Output file 
+--out_slope FILE    Output slope file ['Slope.r4']
+--out_slopelos FILE Output slope in the LOS file ['LOSslope.r4']
 --los VALUE         Mean Los angle
 --heading VALUE.    Mean Heading angle
---lat VALUE.        Average latitude in deg.
+--lat VALUE.        Average latitude in deg.. if DEM is given in WGS84 [default: None]
+--res VALUE.        Resolutiom DEM (size pixel) [default: 30m]
 --incidence=<file>  Path to incidence file .unw 
 """
 
@@ -42,8 +44,19 @@ np.warnings.filterwarnings('ignore')
 # read arguments
 arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
-outfile = arguments["--outfile"]
-lat = np.deg2rad(float(arguments["--lat"]))
+if arguments["--out_slope"] == None:
+    arguments["--out_slope"] = 'Slope.r4'
+if arguments["--out_slopelos"] == None:
+    arguments["--out_slopelos"] = 'LOSslope.r4'
+
+if arguments["--lat"] == None:
+    lat = 0
+else:
+    lat = np.deg2rad(float(arguments["--lat"]))
+if arguments["--res"] == None:
+    res = 30
+else:
+    res = float(arguments["--res"])
 
 # read input
 ds_extension = os.path.splitext(infile)[1]
@@ -70,22 +83,30 @@ else:
     # in roipac incidence file, band 2 is the angle between north and horizontal LOS
     heading[:,:] = np.deg2rad(90 - ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize))[:nlines,:ncols]
 
-toposmooth = scipy.ndimage.filters.gaussian_filter(topo,1.)
-Py, Px = np.gradient(toposmooth,90,90*np.cos(lat))
+toposmooth = scipy.ndimage.filters.gaussian_filter(topo,2.)
+Py, Px = np.gradient(toposmooth,res,res*np.cos(lat))
 slope = np.sqrt(Px**2+Py**2)
 slopelos = (np.cos(heading)*Px+np.sin(heading)*Py)/np.sin(look)
 
 if (ds_extension == ".r4" or ds_extension == ""):
-    fid1 = open(outfile,'wb')
+    fid1 = open(arguments["--out_slopelos"],'wb')
     slopelos.flatten().astype('float32').tofile(fid1)
-    print(np.shape(slopelos))
+    fid1.close()
+    fid2 = open(arguments["--out_slope"],'wb')
+    slope.flatten().astype('float32').tofile(fid2)
+    fid2.close()
 else:
     # create output file
     drv = gdal.GetDriverByName('GTiff')
-    ds2 = drv.CreateCopy(outfile,ds)
+    ds2 = drv.CreateCopy(arguments["--out_slopelos"],ds)
     ds2_band = ds2.GetRasterBand(1)
     ds2_band.WriteArray(slopelos)
-    del ds2
+    del ds2. drv
+    drv = gdal.GetDriverByName('GTiff')
+    ds2 = drv.CreateCopy(arguments["--out_slope"],ds)
+    ds2_band = ds2.GetRasterBand(1)
+    ds2_band.WriteArray(slope)
+    del ds2, drv
 
 # ibeg,iend=600,900
 # jbeg,jend=900,1200
