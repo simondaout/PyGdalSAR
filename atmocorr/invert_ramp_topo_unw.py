@@ -197,6 +197,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
         losbins = los_clean
         topobins = topo_clean
         rgbins, azbins = rg, az
+        losstd = rms
 
     else:
         # lets try to digitize to improve the fit
@@ -1231,14 +1232,14 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
 
     corr = np.dot(G,pars).reshape(mlines,mcols)
     res = los - np.dot(G,pars)
-    rms = np.sqrt(np.nanmean(res**2))
+    var = np.nanstd(res)
 
     # plt.imshow(los.reshape(mlines,mcols))
     # plt.show()
     # plt.imshow(corr)
     # plt.show()
 
-    return sol, corr, rms, rgbins, azbins, topobins, losbins, losstd
+    return sol, corr, var, rgbins, azbins, topobins, losbins, losstd
 
 def empirical_cor(kk):
     """
@@ -1403,11 +1404,11 @@ def empirical_cor(kk):
       ivar_temp=ivar
 
     # try:
-    sol, corr, rms, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
+    sol, corr, var, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
     los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
     temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
 
-    logger.info('RMS: {0} '.format(rms))
+    logger.info('RMS: {0} '.format(var))
 
     # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
     func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
@@ -1517,7 +1518,7 @@ def empirical_cor(kk):
     except:
         pass
 
-    return iend-itemp, sol, rms
+    return iend-itemp, sol, var
 
 def apply_cor(kk, sp, sp_inv):
     """
