@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -13,7 +13,11 @@ Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to
 To skip 1) and 2), use the --load=gacos_cube argument, with gacos_cube the 3-D matrix containing the time series of the gacos models 
 
 Usage: 
-    correct_ts_from_gacos.py [--cube=<path>] [--path=<path>] [--crop=<values>] [--proj=<value>] [--load=<path>] [--list_images=<path>] [--imref=<value>] [--crop=<values>] [--gacos2data=<value>] [--plot=<yes|no>] [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<values>] [--ramp=<cst|lin>] [--crop_emp=<values>] [--topofile=<path>] [--fitmodel=<yes|no>] 
+    correct_ts_from_gacos.py [--cube=<file>] [--path=<path>] [--crop=<values>] [--proj=<value>] 
+    [--load=<file>] [--list_images=<file>] [--imref=<value>] [--gacos2data=<value>] \
+    [--plot=<yes|no>] [--rmspixel=<file>] [--threshold_rms=<value>] [--ref_zone=<values>] \
+    [--ramp=<cst|lin>] [--crop_emp=<values>] [--topofile=<path>] [--fitmodel=<yes|no>] \
+    [--output_cube=<file>] [--output_gacos=<file>]  [--lectfile=<path>]
 
 correct_ts_from_gacos.py -h | --help
 
@@ -24,17 +28,20 @@ Options:
 --list_images=<file>  Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: list_images.txt]
 --imref=<value>       Reference image number [default: 1]
 --proj=<value>        EPSG for projection GACOS map [default: 4326]
---crop=<values>       Crop GACOS data to data extent in the output projection, eg.--crop=xmin,ymin,xmax,ymax [default: None] 
+--crop                Crop GACOS data to data extent in the output projection, eg.--crop=xmin,ymin,xmax,ymax 
 --load=<file>        If a file is given, load directly GACOS cube 
 --ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero on the corrected data [default: None]
 --ramp=<cst|lin|quad> Estimate a constant, linear or quadratic ramp in x and y in addition to the optional los/gacos relationship [default: cst].
 --fitmodel=<yes|no>  If yes, then estimate the proportionlality between gacos and data in addition to the defined ramp
---crop_emp=<value>    Crop option for the empirical estimations (ie. ramp and fitmodel) (eg: 0,ncol,0,nlign)
+--crop_emp=<value>    Crop option for the empirical estimations (ie. ramp and fitmodel) (eg: 0,ncol,0,nlines)
 --topo=<file>         Use DEM file to mask very low or high altitude values in the empirical estimation 
 --gacos2data=<value>  Scaling value between zenithal gacos data (m) and desired output (e.g data in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504) [default: 1]
+--output_cube=<file> Name to the output cube corrected from GACOS [default: cube_gacos_flat]
+--output_gacos=<file> Name to the output GACOS flatten cube  [default: depl_cumule-gacos]
 --rmspixel=<file>     Path to the RMS map that gives an error for each pixels for the empirical estimations (e.g RMSpixel, output of invers_pixel)
 --threshold_rms=<value>  Thresold on rmspixel for ramp estimation [default: 2.]   
 --plot=<yes|no>      Display results [default: yes]
+--lectfile=<path>    Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
 """
 
 import gdal
@@ -54,60 +61,128 @@ try:
     from nsbas import docopt
 except:
     import docopt
+
+from contextlib import contextmanager
+from functools import wraps, partial
+import multiprocessing, warnings, logging
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
+
+logging.basicConfig(level=logging.INFO,\
+        format='line %(lineno)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('correct_ts_from_gacos.log')
+
+##################################################################################
+###  Extras functions and context maganers
+##################################################################################
+
+# Timer for all the functions
+class ContextDecorator(object):
+    def __call__(self, f):
+        @wraps(f)
+        def decorated(*args, **kwds):
+            with self:
+                try:
+                    return f(*args, **kwds)
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except:
+                    Exception('{0} Failed !'.format(f))
+                    raise
+        return decorated
+
+def checkinfile(file):
+    if os.path.exists(file) is False:
+        logger.critical("File: {0} not found, Exit !".format(file))
+        print("File: {0} not found in {1}, Exit !".format(file,os.getcwd()))
+
+# create generator for pool
+@contextmanager
+def poolcontext(*arg, **kargs):
+    pool = multiprocessing.Pool(*arg, **kargs)
+    yield pool
+    pool.terminate()
+    pool.join()
+
+#####################################################################################
+# FUNCTION
+#####################################################################################
+
+
+#####################################################################################
+# END FUNCTION
+#####################################################################################
     
 # read arguments
 arguments = docopt.docopt(__doc__)
 
 if arguments["--path"] ==  None:
-   path = "./GACOS/"
-else:
-   path = arguments["--path"]
+   arguments["--path"] = "./GACOS/"
 if arguments["--cube"] ==  None:
-    cubef = "depl_cumule"
-else:
-    cubef = arguments["--cube"]
+    arguments["--cube"] = "depl_cumule"
+if arguments["--output_cube"] ==  None:
+    arguments["--output_cube"] = "depl_cumule-gacos"
 if arguments["--list_images"] ==  None:
-    listim = "list_images.txt"
-else:
-    listim = arguments["--list_images"]
+    arguments["--list_images"] = "list_images.txt"
+if arguments["--lectfile"] ==  None:
+    arguments["--lectfile"] = "lect.in"
+if arguments["--output_gacos"] ==  None:
+    arguments["--output_gacos"] = "cube_gacos_flat"
 if arguments["--imref"] ==  None:
     imref = 0
 else:
     imref = int(arguments["--imref"]) - 1
 if arguments["--plot"] ==  None:
-    plot = 'yes'
-else:
-    plot = arguments["--plot"]
+    arguments["--plot"] = 'yes'
+
 if arguments["--proj"] ==  None:
     proj = False
     EPSG = 4326
 else:
     proj = True
     EPSG = int(arguments["--proj"])
+
 if arguments["--gacos2data"] ==  None:
     gacos2data = 1 
 else:
     gacos2data = float(arguments["--gacos2data"])
+
 if arguments["--ramp"] ==  None:
-    ramp = 'cst'
-else:
-    ramp = arguments["--ramp"]
+    arguments["--ramp"] = 'cst'
+
 if arguments["--load"] ==  None:
     load = 'yes'
-    loadf = 'cube_gacos'
+    arguments["--load"] = 'cube_gacos'
 else:
     load = 'no'
     loadf = arguments["--load"]
+
 if arguments["--topofile"] ==  None:
    radar = None
 else:
    radar = arguments["--topofile"]
 # read lect.in: size maps
-ncol, nlign = list(map(int, open('lect.in').readline().split(None, 2)[0:2]))
+
+if arguments["--crop"] ==  None:
+   crop = False
+else:
+   crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
+
+nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+checkinfile(arguments["--cube"])
+ds = gdal.Open(arguments["--cube"])
+if not ds:
+  logger.info('.hdr file time series cube {0}, not found, open {1}'.format(arguments["--cube"],arguments["--lectfile"]))
+  ncol, nlines = list(map(int, open(arguments["--lectfile"]).readline().split(None, 2)[0:2]))
+  N = len(dates)
+else:
+  ncol, nlines = ds.RasterXSize, ds.RasterYSize
+  N = ds.RasterCount
+logger.info('nlines:{0} ncols:{1} N:{2}'.format(nlines,ncol,N))
 
 if arguments["--crop_emp"] ==  None:
-    empzone = [0,ncol,0,nlign]
-    col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlign
+    empzone = [0,ncol,0,nlines]
+    col_beg,col_end,line_beg,line_end = 0 , ncol, 0., nlines
 else:
     empzone = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
     col_beg,col_end,line_beg,line_end = empzone[0], empzone[1], empzone[2], empzone[3]
@@ -119,10 +194,10 @@ else:
     refline_beg,refline_end, refcol_beg, refcol_end = ref[0], ref[1], ref[2], ref[3]
 
 if arguments["--rmspixel"] ==  None:
-    rms = np.ones((nlign,ncol))
+    rms = np.ones((nlines,ncol))
 else:
     rmsf = arguments["--rmspixel"]
-    rms = np.fromfile(rmsf,dtype=np.float32).reshape((nlign,ncol))
+    rms = np.fromfile(rmsf,dtype=np.float32).reshape((nlines,ncol))
     #plt.imshow(rms)
     #plt.show()
 
@@ -132,22 +207,10 @@ else:
     threshold_rms = float(arguments["--threshold_rms"])
 
 if arguments["--fitmodel"] ==  None:
-    fitmodel = 'no'
-else:
-    fitmodel = arguments["--fitmodel"]
-
-#print arguments["--crop"]
-#if arguments["--crop"] ==  None:
-#    crop = False
-#else:
-#    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
-
-nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-N = len(dates)
+    arguments["--fitmodel"]  = 'no'
 
 # Choose plot option
 cmap = cm.gist_rainbow_r
-# cmap = cm.jet
 cmap.set_bad('white')
 
 if radar is not None:
@@ -156,46 +219,49 @@ if radar is not None:
       ds = gdal.Open(radar, gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
       elev = band.ReadAsArray()
-      del ds
+      del ds, band
     else:
       fid = open(radar,'r')
       elevi = np.fromfile(fid,dtype=np.float32)
-      elevi = elevi[:nlign*ncol]
-      elev = elevi.reshape((nlign,ncol))
+      elevi = elevi[:nlines*ncol]
+      elev = elevi.reshape((nlines,ncol))
       fid.close()
+      del elevi
 else:
-    elev = np.ones((nlign,ncol))
+    elev = np.ones((nlines,ncol))
+
 
 # load cube of displacements
-cubei = np.fromfile(cubef,dtype=np.float32)
-cube = as_strided(cubei[:nlign*ncol*N])
-print 'Number of line in the cube: ', cube.shape
-maps = cube.reshape((nlign,ncol,N))
+cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
+cube = as_strided(cubei[:nlines*ncol*N])
+logger.info('Number of line in the cube: {0} '.format(cube.shape))
+maps = cube.reshape((nlines,ncol,N))
+del cube, cubei
 
 if load == 'yes':
-    gacos = np.zeros((nlign,ncol,N))
-    for i in xrange((N)):
+    gacos = np.zeros((nlines,ncol,N))
+    for i in range((N)):
 
-        print 'Read ',idates[i], i
-        infile = path+'{}.ztd'.format(int(idates[i]))
-        rsc = path+'{}.ztd.rsc'.format(int(idates[i]))
-        temp1 = path+'{}_temp1.tif'.format(int(idates[i]))
-        outtif = path+'{}_gacos.tif'.format(int(idates[i]))
+        logger.info('Read {0}-{1}'.format(idates[i], i))
+        infile = arguments["--path"]+'{}.ztd'.format(int(idates[i]))
+        rsc = arguments["--path"]+'{}.ztd.rsc'.format(int(idates[i]))
+        temp1 = arguments["--path"]+'{}_temp1.tif'.format(int(idates[i]))
+        outtif = arguments["--path"]+'{}_gacos.tif'.format(int(idates[i]))
 
         # read .rsc
         nncol = np.int(open(rsc).readlines()[0].split(None, 2)[1])
-        nnlign = np.int(open(rsc).readlines()[1].split(None, 2)[1])
+        nnlines = np.int(open(rsc).readlines()[1].split(None, 2)[1])
         xfirst = np.float(open(rsc).readlines()[6].split(None, 2)[1])
         yfirst = np.float(open(rsc).readlines()[7].split(None, 2)[1])
         xstep = np.float(open(rsc).readlines()[8].split(None, 2)[1])
         ystep = np.float(open(rsc).readlines()[9].split(None, 2)[1])
         geotransform = (xfirst, xstep, 0, yfirst, 0, ystep)
-        print 'Read .rsc and set Geotransform', geotransform
-        ztd_ = np.fromfile(infile, dtype='float32').reshape(nnlign,nncol)
+        logger.info('Read .rsc and set Geotransform: {}'.format(geotransform))
+        ztd_ = np.fromfile(infile, dtype='float32').reshape(nnlines,nncol)
 
         # transform gacos format to samething humanily readeable
         driver = gdal.GetDriverByName('GTiff')
-        ds = driver.Create(temp1, nncol, nnlign, 1, gdal.GDT_Float32)
+        ds = driver.Create(temp1, nncol, nnlines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(ztd_)
         ds.SetGeoTransform(geotransform)
@@ -207,32 +273,32 @@ if load == 'yes':
 
         # crop, re-preoject and resample
         if proj and crop is not False:
-            print "gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+\
-            " -ts "+str(ncol)+" "+str(nlign)+" -r average -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "\
-            +temp1+" "+outtif+" -of GTiff"
+            print("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+\
+            " -ts "+str(ncol)+" "+str(nlines)+" -r average -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "\
+            +temp1+" "+outtif+" -of GTiff")
             r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+\
                 " -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "\
-                +" -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
+                +" -ts "+str(ncol)+" "+str(nlines)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
             if r != 0:
                 raise Exception("gdalwarp failed")
 
         elif crop is not False and proj is False:
-            print "gdalwarp -overwrite -s_srs EPSG:4326-ts "+str(ncol)+" "+str(nlign)+" -r average \
-            -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "+temp1+" "+outtif+" -of GTiff"
-            r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -ts "+str(ncol)+" "+str(nlign)+" -r average \
+            print("gdalwarp -overwrite -s_srs EPSG:4326-ts "+str(ncol)+" "+str(nlines)+" -r average \
+            -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "+temp1+" "+outtif+" -of GTiff")
+            r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -ts "+str(ncol)+" "+str(nlines)+" -r average \
                 -te "+str(crop[0])+" "+str(crop[1])+" "+str(crop[2])+" "+str(crop[3])+" "+temp1+" "+outtif+" -of GTiff", shell=True)
             if r != 0:
                 raise Exception("gdalwarp failed")
 
         elif proj and crop is False:
-            print "gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+" -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff"
-            r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+" -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
+            print("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+" -ts "+str(ncol)+" "+str(nlines)+" -r average "+temp1+" "+outtif+" -of GTiff")
+            r = subprocess.call("gdalwarp -overwrite -s_srs EPSG:4326 -t_srs EPSG:"+str(EPSG)+" -ts "+str(ncol)+" "+str(nlines)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
             if r != 0:
                 raise Exception("gdalwarp failed")
 
         else:
-            print "gdalwarp -overwrite -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff"
-            r = subprocess.call("gdalwarp -overwrite -ts "+str(ncol)+" "+str(nlign)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
+            print("gdalwarp -overwrite -ts "+str(ncol)+" "+str(nlines)+" -r average "+temp1+" "+outtif+" -of GTiff")
+            r = subprocess.call("gdalwarp -overwrite -ts "+str(ncol)+" "+str(nlines)+" -r average "+temp1+" "+outtif+" -of GTiff", shell=True)
             if r != 0:
                 raise Exception("gdalwarp failed")
 
@@ -241,35 +307,36 @@ if load == 'yes':
         os.system(cmd)
 
         # open gacos
-        ds = gdal.Open(path+'{}_gacos.tif'.format(int(idates[i])), gdal.GA_ReadOnly)
+        ds = gdal.Open(arguments["--path"]+'{}_gacos.tif'.format(int(idates[i])), gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
         gacos[:,:,i] = band.ReadAsArray()*gacos2data
         del ds,band
 
     # Ref atmo models to the reference image
     cst = np.copy(gacos[:,:,imref])
-    for l in xrange((N)):
+    for l in range((N)):
         d = as_strided(gacos[:,:,l])
         gacos[:,:,l] = gacos[:,:,l] - cst
 
-    loadf = 'cube_gacos'
     # save new cube
-    fid = open(loadf, 'wb')
+    fid = open(arguments["--load"], 'wb')
     gacos.flatten().astype('float32').tofile(fid)
     fid.close()
 
 # # load gacos cube
-gcubei = np.fromfile(loadf,dtype=np.float32)
-gcube = as_strided(gcubei[:nlign*ncol*N])
+checkinfile(arguments["--load"])
+gcubei = np.fromfile(arguments["--load"],dtype=np.float32)
+gcube = as_strided(gcubei[:nlines*ncol*N])
 # why did you mask gacos2data here? put gacos2data=1 if you already did the conversion before
-gacos = gcube.reshape((nlign,ncol,N))*gacos2data
+gacos = gcube.reshape((nlines,ncol,N))*gacos2data
+del gcubei, gcube
 
 # Plot
 fig = plt.figure(0,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
 vmax = np.nanpercentile(gacos,99)
 vmin = np.nanpercentile(gacos,1)
-for l in xrange((N)):
+for l in range((N)):
    d = as_strided(gacos[:,:,l])
    ax = fig.add_subplot(4,int(N/4)+1,l+1)
    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
@@ -280,17 +347,17 @@ for l in xrange((N)):
 plt.suptitle('GACOS models')
 fig.colorbar(cax, orientation='vertical',aspect=10)
 fig.savefig('gocos.eps', format='EPS',dpi=150)
-if plot == 'yes':
+if arguments["--plot"] == 'yes':
    plt.show()
+plt.close('all')
 
 # Apply correction
-maps_flat = np.zeros((nlign,ncol,N))
-model_flat = np.zeros((nlign,ncol,N))
-
+maps_flat = np.zeros((nlines,ncol,N))
+model_flat = np.zeros((nlines,ncol,N))
 # initialise variance
 var = np.zeros((N))
 
-for l in xrange((N)):
+for l in range((N)):
 
   data = as_strided(maps[:,:,l]) 
   data_flat = as_strided(maps_flat[:,:,l])
@@ -300,7 +367,6 @@ for l in xrange((N)):
     # check if data and model are set to zeros
     data_flat[np.isnan(data)] = np.float('NaN')
     data_flat[data_flat>999.]= np.float('NaN')
-    # print "REF DATE:", np.nanstd(data_flat)
   
   else:
 
@@ -308,6 +374,7 @@ for l in xrange((N)):
     _los_map[np.logical_or(data==0,data>=9990)] = np.float('NaN')
     losmin,losmax = np.nanpercentile(_los_map,2.),np.nanpercentile(_los_map,98.)
     gacosmin,gacosmax = np.nanpercentile(model,2),np.nanpercentile(model,98)
+    del _los_map
 
     if radar is not None:
         maxtopo,mintopo = np.nanpercentile(elev,98), np.nanpercentile(elev,2)
@@ -321,7 +388,7 @@ for l in xrange((N)):
     # sys.exit()
 
     funct = 0.
-    pix_lin, pix_col = np.indices((nlign,ncol))
+    pix_lin, pix_col = np.indices((nlines,ncol))
    
     # find proportionality between data and model
     index = np.nonzero(
@@ -364,6 +431,7 @@ for l in xrange((N)):
     los_clean = data[index].flatten()
     model_clean = model[index].flatten()
     rms_clean = rms[index].flatten()
+    del temp
    
     if refline_beg is not None:
         # compute average phase in the ref area 
@@ -422,15 +490,15 @@ for l in xrange((N)):
     x_clean, y_clean = np.concatenate(x_clean2), np.concatenate(y_clean2)
     model_clean = np.concatenate(model_clean2)
     rms_clean = np.concatenate(rms_clean2)
-    del los_clean2, x_clean2, y_clean2, model_clean2
+    del los_clean2, x_clean2, y_clean2, model_clean2, bins, inds
 
-    if fitmodel == "no":
-      if (ramp == 'cst'):
+    if arguments["--fitmodel"]  == "no":
+      if (arguments["--ramp"] == 'cst'):
         
         a = cst
-        print 'Remove cst: %f for date: %i'%(a,idates[l])
+        logger.info('Remove cst: %f for date: %i'%(a,idates[l]))
 
-        remove_ramp = np.ones((nlign,ncol))*cst
+        remove_ramp = np.ones((nlines,ncol))*cst
         remove_ramp[model==0.] = 0.
         remove_ramp[np.isnan(data)] = np.float('NaN')
         
@@ -443,7 +511,7 @@ for l in xrange((N)):
         # set coef gacos to 1
         coef_model = 1
 
-      elif (ramp == 'lin'):
+      elif (arguments["--ramp"] == 'lin'):
         # here we want to minimize data-gacos = ramp
         # invers both clean data and ref frame together
         d = los_clean - model_clean
@@ -455,12 +523,11 @@ for l in xrange((N)):
         G[:,2] = 1
 
         x0 = lst.lstsq(G,d)[0]
-        # print x0
         _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
-        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=500,full_output=True,iprint=0,acc=1.e-9)[0]
         a = pars[0]; b = pars[1]; c = pars[2]
-        print 'Remove ramp  %f az  + %f r + %f for date: %i'%(a,b,c,idates[l])
+        logger.info('Remove ramp  %f az  + %f r + %f for date: %i'%(a,b,c,idates[l]))
             
         # Compute ramp for data = f(model)
         functbins = a*xbins + b*ybins + c
@@ -470,22 +537,22 @@ for l in xrange((N)):
 
         # build total G matrix
         G=np.zeros((len(data.flatten()),3))
-        for i in xrange(nlign):
+        for i in range(nlines):
             G[i*ncol:(i+1)*ncol,0] = i - line_beg 
             G[i*ncol:(i+1)*ncol,1] = np.arange(ncol) - col_beg
         G[:,2] = 1
 
         # compute ramp
-        remove_ramp = np.dot(G,pars).reshape(nlign,ncol)
+        remove_ramp = np.dot(G,pars).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
         remove_ramp[np.isnan(data)] = np.float('NaN')
         
         # data = gacos + (a*rg + b*az + cst) 
         remove = model + remove_ramp
 
-    elif fitmodel=='yes':
+    elif arguments["--fitmodel"] =='yes':
       
-      if (ramp == 'cst'): 
+      if arguments["--ramp"] == 'cst': 
         # invers both digitized data and ref frame together
         # here we invert data = a*gacos + cst
         d = losbins
@@ -496,12 +563,11 @@ for l in xrange((N)):
         G[:,1] = modelbins
 
         x0 = lst.lstsq(G,d)[0]
-        # print x0
         _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
-        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=500,full_output=True,iprint=0,acc=1.e-9)[0]
         a = pars[0]; b = pars[1]
-        print 'Remove ramp %f + %f model for date: %i'%(a,b,idates[l])
+        logger.info('Remove ramp %f + %f model for date: %i'%(a,b,idates[l]))
 
         #Compute ramp for data = f(model)
         funct = a
@@ -514,17 +580,17 @@ for l in xrange((N)):
         G[:,1] = model.flatten()
 
         # data = a*gacos + ramp
-        remove = np.dot(G,pars).reshape(nlign,ncol)
+        remove = np.dot(G,pars).reshape(nlines,ncol)
         remove[model==0.] = 0.
         remove[np.isnan(data)] = np.float('NaN')
 
         # ramp only
-        remove_ramp = np.ones((nlign,ncol))*a
-        remove_ramp = np.dot(G,pars[:-1]).reshape(nlign,ncol)
+        remove_ramp = np.ones((nlines,ncol))*a
+        remove_ramp = np.dot(G,pars[:-1]).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
         remove_ramp[np.isnan(data)] = np.float('NaN')
    
-      elif ("ramp == lin"): 
+      elif arguments["--ramp"] == "lin": 
         # invers both clean data and ref frame together
         # here we invert data = a*gacos + ramp
         d = los_clean
@@ -539,12 +605,11 @@ for l in xrange((N)):
         G[:,5] = model_clean
 
         x0 = lst.lstsq(G,d)[0]
-        # print x0
         _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
-        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0)[0]
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=500,full_output=True,iprint=0)[0]
         a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-        print 'Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f model for date: %i'%(a,b,c,d,e,f,idates[l])
+        logger.info('Remove ramp %f az**2, %f az  + %f r**2 + %f r + %f + %f model for date: %i'%(a,b,c,d,e,f,idates[l]))
 
         #Compute ramp for data = f(model)
         funct = a*x_clean**2 + b*x_clean + c*y_clean**2 + d*y_clean + e
@@ -553,7 +618,7 @@ for l in xrange((N)):
 
         # build total G matrix
         G=np.zeros((len(data.flatten()),6))
-        for i in xrange(nlign):
+        for i in range(nlines):
                 G[i*ncol:(i+1)*ncol,0] = (i - line_beg)**2
                 G[i*ncol:(i+1)*ncol,1] = i - line_beg
                 G[i*ncol:(i+1)*ncol,2] = np.arange((ncol - col_beg))**2
@@ -562,12 +627,12 @@ for l in xrange((N)):
         G[:,5] = model.flatten()
 
         # data = a*gacos + ramp
-        remove = np.dot(G,pars).reshape(nlign,ncol)
+        remove = np.dot(G,pars).reshape(nlines,ncol)
         remove[model==0.] = 0.
         remove[np.isnan(data)] = np.float('NaN')
 
         # ramp only
-        remove_ramp = np.dot(G[:,:-1],pars[:-1]).reshape(nlign,ncol)
+        remove_ramp = np.dot(G[:,:-1],pars[:-1]).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
         remove_ramp[np.isnan(data)] = np.float('NaN')
    
@@ -587,8 +652,8 @@ for l in xrange((N)):
         amp_ref = 1./rms_ref
         amp_ref = amp_ref/np.nanmax(amp_ref)
         cst = np.nansum(data_flat[indexref]*amp_ref) / np.nansum(amp_ref)
-        print 'Ref area set to zero: lines: {}-{}, cols: {}-{}'.format(refline_beg,refline_end,refcol_beg,refcol_end) 
-        print 'Average phase within ref area:', cst 
+        logger.info('Ref area set to zero: lines: {0}-{1}, cols: {2}-{3}'.format(refline_beg,refline_end,refcol_beg,refcol_end))
+        logger.info('Average phase within ref area: {0}'.format(cst))
         data_flat = data_flat - cst
         data_flat[np.isnan(data)] = np.float('NaN')
         data_flat[data_flat>999.]= np.float('NaN')
@@ -596,7 +661,7 @@ for l in xrange((N)):
     # compute variance flatten data
     # var[l] = np.sqrt(np.nanmean(data_flat**2))
     var[l] = np.nanstd(data_flat)
-    print 'Var: ', var[l]
+    logger.info('Var: {0} '.format(var[l]))
     
     fig = plt.figure(1,figsize=(12,6))
     ax = fig.add_subplot(2,2,1)
@@ -627,7 +692,7 @@ for l in xrange((N)):
     plt.colorbar(im, cax=cax)
     ax.set_title('Correct Data {}'.format(idates[l]),fontsize=6)
     fig.tight_layout()
-    fig.savefig('maps-{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
+    fig.savefig('maps-{}-data-model.eps'.format(idates[l]), format='EPS',dpi=150)
 
     fig = plt.figure(2,figsize=(7,5))
     ax = fig.add_subplot(1,1,1)
@@ -637,35 +702,43 @@ for l in xrange((N)):
     ax.plot(g,coef_model*g,'-r', lw =4.,label='flatten data = {0:.4f}*model'.format(coef_model))
     ax.set_ylim([(los_clean-funct).min(),(los_clean-funct).max()])
     ax.set_xlim([model_clean.min(),model_clean.max()])
-    # axis equal and auto-adjusted data limits
-    #ax.axis('equal')
     ax.set_xlabel('GACOS ZTD')
     ax.set_ylabel('LOS delay - RAMP')
     ax.set_title('Data/Model')
     plt.legend(loc='best')
-
     fig.tight_layout()
+
     try:
-        fig.savefig('{}-gacos-cor.eps'.format(idates[l]), format='EPS',dpi=150)
+        fig.savefig('{}-data-model.eps'.format(idates[l]), format='EPS',dpi=150)
     except:
         pass
         
-    if plot == 'yes':
+    if arguments["--plot"] == 'yes':
         plt.show()
         # sys.exit()
 
+    plt.close('all')
+
 # save new cube
-fid = open('depl_cumule-gacos', 'wb')
+logger.info('Create flatten time series cube: {}'.format(arguments["--output_cube"]))
+fid = open(arguments["--output_cube"], 'wb')
 maps_flat.flatten().astype('float32').tofile(fid)
 fid.close()
+
 # save gacos ref spatialy
-fid = open('cube_gacos_flat', 'wb')
+logger.info('Create flatten time series model: {}'.format(arguments["--output_gacos"]))
+fid = open(arguments["--output_gacos"], 'wb')
 model_flat.flatten().astype('float32').tofile(fid)
 fid.close()
 
 # save rms
-np.savetxt('rms_gacos.txt', var, header='# date   |   RMS', fmt=('%.8f'))
+logger.info('Save variance for each dates in rms_gacos.txt')
+np.savetxt('rms.txt', var, header='# date   |   RMS', fmt=('%.8f'))
+logger.info('Plot variance in rms.eps')
 fig_rms = plt.figure(4,figsize=(14,7))
 plt.plot(dates, var)
 fig_rms.savefig('rms.eps', format='EPS',dpi=150)
+
+if arguments["--plot"] == 'yes':
+    plt.show()
 
