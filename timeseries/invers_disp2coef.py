@@ -112,7 +112,7 @@ except:
 
 from contextlib import contextmanager
 from functools import wraps, partial
-import multiprocessing
+# import multiprocessing
 import logging
 
 import warnings
@@ -122,7 +122,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO,\
         format='line %(lineno)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('invers_disp2coef.log')
-
 
 ################################
 # Create lib of wavelet functions
@@ -407,7 +406,7 @@ if arguments["--perc_topo"] ==  None:
 if arguments["--perc_los"] ==  None:
     arguments["--perc_los"] = 98.
 if arguments["--nproc"] ==  None:
-    nproc = 4
+    nproc = 1
 else:
     nproc = int(arguments["--nproc"])
 if arguments["--plot"] ==  'yes':
@@ -3180,9 +3179,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
       # flata = (los - np.dot(G,pars)).reshape(new_lines,new_cols)
       flata = los.reshape(new_lines,new_cols) - ramp - topo
-      noramps = los.reshape(new_lines,new_cols) - ramp
 
-      return ramp, flata, topo, rms, noramps
+      return ramp, flata, topo, rms
  
 def empirical_cor(l):
   """
@@ -3273,7 +3271,7 @@ def empirical_cor(l):
     los = as_strided(maps[:,:,l]).flatten()
     samp = 1
 
-    map_ramp, map_flata, map_topo, rmsi, map_noramps = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
+    map_ramp, map_flata, map_topo, rmsi = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
       y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
 
     if (lin_start is not None) and (lin_end is not None):
@@ -3307,18 +3305,15 @@ def empirical_cor(l):
         logger.info('Average phase within ref area: {0}:'.format(cst))
         if np.isnan(cst):
           cst = 0.
-        map_ramp, map_flata, map_noramps = map_ramp + cst, map_flata - cst, maps_noramps - cst 
+        map_ramp, map_flata = map_ramp + cst, map_flata - cst
         del zone
       except:
         pass
 
-      del los_clean
-      del rms_clean
-      del topo_clean
-      del maps_temp
+      del los_clean, rms_clean, topo_clean, maps_temp
   
   else:
-    map_flata, map_noramps = np.copy(maps[:,:,l]),np.copy(maps[:,:,l])
+    map_flata = np.copy(maps[:,:,l])
     map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))
     rmsi = 1
 
@@ -3329,7 +3324,7 @@ def empirical_cor(l):
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
   
-  return map_ramp, map_flata, map_topo, rmsi, map_noramps 
+  return map_ramp, map_flata, map_topo, rmsi 
 
 def temporal_decomp(pix):
     j = pix  % (new_cols)
@@ -3385,16 +3380,17 @@ def temporal_decomp(pix):
         # count number of pixels per dates
         naps_tmp[k] = naps_tmp[k] + 1.0
 
-        # Build seasonal and linear models
-        if arguments["--linear"]=='yes':
-            mlin[k] = np.dot(G[:,indexinter],m[indexinter])
-        if arguments["--seasonal"] =='yes':
-            mseas[k] = np.dot(G[:,indexseas:indexseas+2],m[indexseas:indexseas+2])
-        if arguments["--vector"] != None:
-            mvect[k] = np.dot(G[:,indexvect],m[indexvect])
-
-    return m, sigmam, mdisp, mlin, mseas, mvect, aps_tmp, naps_tmp
-
+        # Build seasonal and vect models
+        if arguments["--fulloutput"]=='yes':
+          if arguments["--seasonal"] =='yes':
+              mseas[k] = np.dot(G[:,indexseas:indexseas+2],m[indexseas:indexseas+2])
+          if arguments["--vector"] != None:
+              mvect[k] = np.dot(G[:,indexvect],m[indexvect])
+    if arguments["--fulloutput"]=='yes':
+      return m, sigmam, mdisp, mseas, mvect, aps_tmp, naps_tmp
+    else:
+      return m, sigmam, mdisp, aps_tmp, naps_tmp
+    
 
 # initialization
 maps_flata = np.copy(maps)
@@ -3403,13 +3399,12 @@ models = np.zeros((new_lines,new_cols,N))
 # prepare flatten maps
 maps_ramp = np.zeros((new_lines,new_cols,N))
 maps_topo = np.zeros((new_lines,new_cols,N))
-maps_noramps = np.zeros((new_lines,new_cols,N))
 rms = np.zeros((N))
 
 for ii in range(np.int(arguments["--niter"])):
     print()
     print('---------------')
-    print('iteration: {}'.format(ii))
+    print('iteration: {}'.format(ii+1))
     print('---------------')
 
     #############################
@@ -3434,20 +3429,20 @@ for ii in range(np.int(arguments["--niter"])):
       print()
     
       for l in range((N)):
-          maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = empirical_cor(l)
+          maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
 
       # output = []
       # with TimeIt():
       #     work = range(N)
       #     with poolcontext(processes=nproc) as pool:
       #         results = pool.map(empirical_cor, work)
-      #         # maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = results[0][l]
+      #         # maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = results[0][l]
       #         # TypeError: cannot unpack non-iterable int object
       #     output.append(results)
 
       #     # fetch results
       #     for l in range(N):
-      #         maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l], maps_noramps[:,:,l] = output[0][l]
+      #         maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = output[0][l]
       #     del output
 
       # plot corrected ts
@@ -3485,7 +3480,6 @@ for ii in range(np.int(arguments["--niter"])):
           # fig.tight_layout()
           figtopo.savefig('tropo.eps', format='EPS',dpi=150)
           
-
       else:
           # plot corrected ts
           nfigure +=1
@@ -3503,7 +3497,6 @@ for ii in range(np.int(arguments["--niter"])):
           figref.colorbar(caxref, orientation='vertical',aspect=10)
           # fig.tight_layout()
           figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
-          
 
     if plot=='yes':
         plt.show()
@@ -3543,28 +3536,22 @@ for ii in range(np.int(arguments["--niter"])):
 
     # reiinitialize maps models
     models = np.zeros((new_lines,new_cols,N))
-    models_trends = np.zeros((new_lines,new_cols,N))
-    models_seas = np.zeros((new_lines,new_cols,N))
-    models_lin = np.zeros((new_lines,new_cols,N))
-    models_vect = np.zeros((new_lines,new_cols,N))
+    if arguments["--fulloutput"]=='yes':
+      models_seas = np.zeros((new_lines,new_cols,N))
+      models_vect = np.zeros((new_lines,new_cols,N))
 
-    output = []
     with TimeIt():
-    
-    #     work = range(0,(new_lines)*(new_cols),int(arguments["--sampling"]))
-    #     with poolcontext(processes=nproc) as pool:
-    #         results = pool.map(temporal_decomp, work)
-    #     output.append(results)
-
-    #     # fetch results
           for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
               j = pix  % (new_cols)
               i = int(pix/(new_cols))
+
+              if ((i % 50) == 0) and (j==0):
+                logger.info('Processing line: {}'.format(i))
               
-              m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
-              aps_pix, naps_pix = temporal_decomp(pix)
-              # m, sigmam, models[i,j,:], models_lin[i,j,:], models_seas[i,j,:], models_vect, \
-              # aps_pix, naps_pix = output[0][pix]
+              if arguments["--fulloutput"]=='yes':
+                m, sigmam, models[i,j,:], models_seas[i,j,:], models_vect[i,j,:], aps_pix, naps_pix = temporal_decomp(pix)
+              else:
+                m, sigmam, models[i,j,:], aps_pix, naps_pix = temporal_decomp(pix)
             
               aps = aps + aps_pix
               n_aps = n_aps + naps_pix
@@ -3578,10 +3565,7 @@ for ii in range(np.int(arguments["--niter"])):
                   kernels[l].m[i,j] = m[Mbasis+l]
                   kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
 
-          try:
-              del output
-          except:
-              pass
+              del m, sigmam
 
     # convert aps in rad
     aps = aps/n_aps
@@ -3607,11 +3591,8 @@ for ii in range(np.int(arguments["--niter"])):
 
 # create new cube
 logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-cube_flata = maps_flata[:,:,:].flatten()
-cube_noramps = maps_noramps[:,:,:].flatten()
-
 fid = open('depl_cumule_flat', 'wb')
-cube_flata.flatten().astype('float32').tofile(fid)
+maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
 fid.close()
 
 if arguments["--fulloutput"]=='yes':
@@ -3621,29 +3602,13 @@ if arguments["--fulloutput"]=='yes':
         (maps_flata - models_seas).flatten().astype('float32').tofile(fid)
         fid.close()
 
-    if arguments["--linear"]=='yes':
-        fid = open('depl_cumule_dtrend', 'wb')
-        logger.info('Save de-trended time series cube: {}'.format('depl_cumule_dtrend'))
-        (maps_flata - models_lin).flatten().astype('float32').tofile(fid)
-        fid.close()
-
     if arguments["--vector"] != None:
         fid = open('depl_cumule_dvect', 'wb')
         logger.info('Save time series cube without vector component: {}'.format('depl_cumule_dvect'))
         (maps_flata - models_vect).flatten().astype('float32').tofile(fid)
         fid.close()
 
-    if flat>0:
-        fid = open('depl_cumule_noramps', 'wb')
-        logger.info('Save time series cube without ramps only: {}'.format('depl_cumule_noramps'))
-        cube_noramps.flatten().astype('float32').tofile(fid)
-        fid.close()
-
-# clean memory
-try:
-  del cube_flata, cube_noramps
-except:
-  pass
+    del models_vect, models_seas
 
 # create MAPS directory to save .r4
 if arguments["--fulloutput"]=='yes':
@@ -3812,11 +3777,7 @@ if plot=='yes':
 plt.close('all')
 
 # clean memory
-del maps_ramp, maps_flata, maps_topo, maps_noramps
-try:
-  del models_trends, model_seas
-except:
-  pass 
+del maps_ramp, maps_flata, maps_topo
 
 #######################################################
 # Save functions in binary file
@@ -4033,7 +3994,6 @@ if arguments["--semianual"] == 'yes':
         fid = open('phiw2t_sigcoeff.r4', 'wb')
         sigphi.flatten().astype('float32').tofile(fid)
         fid.close()
-
 
 #######################################################
 # Plot
