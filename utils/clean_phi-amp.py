@@ -18,7 +18,8 @@ and wrapped phase between 0 to 2pi
 
 Usage: clean_phi-amp.py [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--topofile=<path>] \
 [--sigampfile=<path>] [--sigphifile=<path>] [--lectfile=<path>] [--threshold_amp=<value>] [--perc_sig=<value>] \
-[--outampfile=<path>] [--outphifile=<path>] [--slopefile=<path>] [--slopelosfile=<path>]  [--plotcorr=<yes/no>] [--maxamp=<value>] [--rad2mm=<value>]
+[--outampfile=<path>] [--outphifile=<path>] [--outlinfile=<path>] [--slopefile=<path>] [--slopelosfile=<path>]  [--plotcorr=<yes/no>] \
+[--maxamp=<value>] [--minelev=<value>] [--rad2mm=<value>]
 
 
 Options:
@@ -35,7 +36,8 @@ Options:
 --slopelosfile=<file>   SLope in the LOS file [default: None]
 --slopefile=<file>      SLope file [default: None]
 --plotcorr=<yes/no>     Plot correlation plots [default: no]
---maxamp=<value>     Maximum Amplitude limit [default: 3.]
+--maxamp=<value>        Maximum Amplitude limit [default: 3.]
+--minelev=<value>       Minimum Elevation limit [default: 3500.]
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
 """
 
@@ -93,6 +95,10 @@ if arguments["--outphifile"] ==  None:
     phioutf = 'phiwt_coeff_clean.r4'
 else:
     phioutf = arguments["--outphifile"]
+if arguments["--outlinfile"] ==  None:
+    linoutf = 'lin_coeff_clean.r4'
+else:
+    linoutf = arguments["--outlinfile"]
 if arguments["--topofile"] == None:
     demf = None
 else:
@@ -105,6 +111,10 @@ if arguments["--maxamp"] ==  None:
     maxamp = 3
 else:
     maxamp = np.float(arguments["--maxamp"])
+if arguments["--minelev"] ==  None:
+    minelev = 3500
+else:
+    minelev = np.float(arguments["--minelev"])
 if arguments["--rad2mm"] ==  None:
     rad2mm = -4.4563
 else:
@@ -121,11 +131,6 @@ sigamp,sigphi=np.fromfile(ampsigf,dtype=np.float32)[:nlines*ncols],np.fromfile(p
 amp_map, phi_map, lin_map = amp.reshape(nlines,ncols),phi.reshape(nlines,ncols),lin.reshape(nlines,ncols)
 sigamp_map, sigphi_map = sigamp.reshape(nlines,ncols),sigphi.reshape(nlines,ncols)
 del amp,phi,lin
-
-# conversion
-amp_map,sigamp_map,sigphi_map = amp_map*abs(rad2mm),sigamp_map*abs(rad2mm),sigphi_map*abs(rad2mm)
-lin_map = lin_map*rad2mm
-threshold_amp,maxamp = threshold_amp*abs(rad2mm),maxamp*abs(rad2mm)
 
 if demf ==  None:
     try:
@@ -161,6 +166,10 @@ phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 
+# clean based on elev
+phi_map[dem_map<minelev] = np.float('NaN')
+amp_map[dem_map<minelev] = np.float('NaN')
+lin_map[dem_map<minelev] = np.float('NaN')
 
 phi_map[amp_map<threshold_amp] = np.float('NaN')
 lin_map[amp_map<threshold_amp] = np.float('NaN')
@@ -175,6 +184,14 @@ fid1.close()
 fid2 = open(phioutf,'wb')
 phi_map.flatten().astype('float32').tofile(fid2)
 fid2.close()
+fid3 = open(linoutf,'wb')
+lin_map.flatten().astype('float32').tofile(fid3)
+fid3.close()
+
+# conversion
+amp_map,sigamp_map,sigphi_map = amp_map*abs(rad2mm),sigamp_map*abs(rad2mm),sigphi_map*abs(rad2mm)
+lin_map = lin_map*rad2mm
+threshold_amp,maxamp = threshold_amp*abs(rad2mm),maxamp*abs(rad2mm)
 
 # initiate figure amp and phase
 fig_ampphi = plt.figure(0,figsize=(12,6))
@@ -242,15 +259,13 @@ if plotcorr == 'yes':
 
     # some cleaning for correlations
     kk = np.nonzero(
-        np.logical_and(lin>np.nanpercentile(lin,2),
-        np.logical_and(lin<np.nanpercentile(lin,98),
-        np.logical_and(dem>np.nanpercentile(dem,2),
-        np.logical_and(dem<np.nanpercentile(dem,98),
-        np.logical_and(phi>np.nanpercentile(phi,10),
+        np.logical_and(lin>np.nanpercentile(lin,1),
+        np.logical_and(lin<np.nanpercentile(lin,99),
+        np.logical_and(phi>3.,
         np.logical_and(slope<np.nanpercentile(slope,80),
         np.logical_and(slopelos>np.nanpercentile(slopelos,20), 
         np.logical_and(slopelos<np.nanpercentile(slopelos,80), amp <  maxamp
-        )))))))))
+        )))))))
     phi,amp,lin,dem,slopelos,slope = phi[kk], amp[kk], lin[kk], dem[kk], slopelos[kk],slope[kk]
 
     # compute correlations
@@ -270,7 +285,7 @@ if plotcorr == 'yes':
     fig.savefig('cov_phiall.eps', format='EPS')
 
     import plot2Ddist
-    scatterstyle={'color':'black', 'alpha':0.1, 's':2.}
+    scatterstyle={'color':'black', 'alpha':0.1, 's':3.}
     styleargs = {'color':'k', 'scatterstyle':scatterstyle}
 
     plot2Ddist.plot2DdistsPairs(amp,[slopelos,dem,slope], mainlabel='Amp. (mm)', labels = [ 'Slope in Los (%)','DEM (m)','Slope (%)'], \

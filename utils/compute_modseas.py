@@ -13,7 +13,7 @@
 """\
 compute_modseas.py
 -------------
-Compute the mod of the seasonality 
+Compute the mod of the seasonality. Read output files from invers_dips2coef.py. 
 
 Usage: clean_phi-amp.py [--cube=<path> ] [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--demerrfile=<path>] \
 [--ref_file=<path>] [--slopefile=<path>] [--outampfile=<path>] [--outphifile=<path>] [--crop=<values>] [--lectfile=<path>] \
@@ -34,7 +34,7 @@ Options:
 --sigampfile=<file>   Uncertainty amplitude map file [default: ampwt_sigcoeff.r4]
 --sigphifile=<file>   Uncertainty phi map file [default: phiwt_sigcoeff.r4]
 --minamp=<value>      Mask on minimum Amplitude [default: 1.]
-[--maxamp=<value>]     Maximum Amplitude limit [default: 2.]
+[--maxamp=<value>]     Maximum Amplitude limit [default: 3.]
 --perc_sig=<value>    Percentile uncertainty for map cleaning [default: 99.]
 --name=<value>        Output file name
 """
@@ -83,13 +83,17 @@ if arguments["--sigphifile"] ==  None:
 if arguments["--cube"] ==  None:
     arguments["--cube"] = 'depl_cumule_flat'
 if arguments["--minamp"] ==  None:
-    arguments["--minamp"] = 1.5
+    minamp = 1.5
+else:
+    minamp = np.float(arguments["--minamp"])
 if arguments["--maxamp"] ==  None:
-    arguments["--maxamp"] = 3
+    maxamp = 3
+else:
+    maxamp = np.float(arguments["--maxamp"])
 
 fimages='images_retenues'
 imref = 0
-rad2mm = 1
+rad2mm = -4.4563
 
 ##################################
 
@@ -136,9 +140,13 @@ phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 
+phi_map[amp_map<np.float(minamp)] = np.float('NaN')
+lin_map[amp_map<np.float(minamp)] = np.float('NaN')
 
-phi_map[amp_map<np.float(arguments["--minamp"])] = np.float('NaN')
-lin_map[amp_map<np.float(arguments["--minamp"])] = np.float('NaN')
+# conversion
+amp_map,sigamp_map,sigphi_map = amp_map*abs(rad2mm),sigamp_map*abs(rad2mm),sigphi_map*abs(rad2mm)
+lin_map, ref_map = lin_map*rad2mm, ref_map*rad2mm
+minamp, maxamp = minamp*abs(rad2mm), maxamp*abs(rad2mm)
 
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi
@@ -185,7 +193,7 @@ def seasonal(time,a,b,c):
 fig_ampphi = plt.figure(0,figsize=(14,4))
 
 ax = fig_ampphi.add_subplot(1,3,1)
-im = ax.imshow(slope_map,cmap=cm.Greys,zorder=1)
+im = ax.imshow(slope_map,cmap=cm.Greys,vmax=np.nanpercentile(slope_map,92),vmin=np.nanpercentile(slope_map,8),zorder=1)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -193,10 +201,10 @@ ax.set_title('Slope in LOS',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,2)
 cmap = cm.rainbow
-cax = ax.imshow(slope_map,cmap=cm.Greys,zorder=1)
+cax = ax.imshow(slope_map,cmap=cm.Greys,vmax=np.nanpercentile(slope_map,92),vmin=np.nanpercentile(slope_map,8),zorder=1)
 # no point to take negatif amplitude
-im = ax.imshow(np.ma.array(amp_map, mask=np.isnan(amp_map)),cmap=cmap,vmin=arguments["--minamp"],\
-    vmax=np.nanpercentile(amp_map,98), alpha=0.2, zorder=2)
+im = ax.imshow(np.ma.array(amp_map, mask=np.isnan(amp_map)),cmap=cmap,vmin=minamp,\
+    vmax=np.nanpercentile(amp_map,98), alpha=0.5, zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -204,7 +212,7 @@ ax.set_title('Amplitude (mm)',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,3)
 cmap_phi = cm.tab20b
-cax = ax.imshow(slope_map,cmap=cm.Greys,zorder=1)
+cax = ax.imshow(slope_map,cmap=cm.Greys,zorder=1,vmax=np.nanpercentile(slope_map,92),vmin=np.nanpercentile(slope_map,8))
 im = ax.imshow(np.ma.array(phi_map, mask=np.isnan(phi_map)),cmap=cmap_phi,vmin=0,vmax=2*np.pi,alpha=0.8,zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -215,7 +223,7 @@ fig_ampphi.tight_layout()
 # sys.exit(0)
 
 # Open cube
-cube = np.fromfile(arguments["--cube"],dtype=np.float32)[:nlines*ncols*N]
+cube = np.fromfile(arguments["--cube"],dtype=np.float32)[:nlines*ncols*N]*rad2mm
 maps = cube.reshape((nlines,ncols,N))[ibeg:iend,jbeg:jend]
 
 dmodt = np.fmod(dates,1)
@@ -224,14 +232,14 @@ for t in range((N)):
 
 for i in range(iend-ibeg):
     for j in range(jend-jbeg):
-        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(arguments["--maxamp"])):
+        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(maxamp)):
             temp_pos = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
                 flat_disp_pos.append(temp_pos[t])
                 time_pos.append(dmodt[t])
                 amp_pos.append(amp_map[i,j])
-        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]<np.float(arguments["--maxamp"])):
+        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]<np.float(maxamp)):
             temp_neg = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
@@ -264,7 +272,7 @@ mean_neg,std_neg = np.array(mean_neg),np.array(std_neg)
 # plot slope postive
 fig=plt.figure(1,figsize=(14,5))
 ax=fig.add_subplot(1,2,1)
-ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(arguments["--minamp"])) 
+ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(np.int(minamp))) 
 ax.errorbar(dmod,mean_pos,yerr=std_pos,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -281,11 +289,11 @@ ax.set_xlim([0,1])
 ax.set_xticks(np.arange(0,1, 1./12))
 ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax.set_title('Amplitudes > {}'.format(arguments["--maxamp"]))
+ax.set_title('Amplitudes > {}'.format(np.int(maxamp)))
 
 # plot slope negative
 ax2=fig.add_subplot(1,2,2)
-ax2.plot(dmod,mean_neg,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(arguments["--minamp"])) 
+ax2.plot(dmod,mean_neg,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(np.int(minamp)))
 ax2.errorbar(dmod,mean_neg,yerr=std_neg,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -302,7 +310,7 @@ ax2.set_xlim([0,1])
 ax2.set_xticks(np.arange(0,1, 1./12))
 ax2.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax2.set_title(' {} < Amplitudes < {}'.format(arguments["--minamp"],arguments["--maxamp"]))
+ax2.set_title(' {} < Amplitudes < {}'.format(np.int(minamp),np.int(maxamp)))
 
 fig.tight_layout()
 fig.savefig('{}-modseas.pdf'.format(arguments["--name"]), format='PDF',dpi=80)
