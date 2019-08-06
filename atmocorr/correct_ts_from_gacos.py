@@ -13,11 +13,11 @@ Correct Time Series data from Gacos atmospheric models. 1) convert .ztd files to
 To skip 1) and 2), use the --load=gacos_cube argument, with gacos_cube the 3-D matrix containing the time series of the gacos models 
 
 Usage: 
-    correct_ts_from_gacos.py [--cube=<file>] [--path=<path>] [--crop=<values>] [--proj=<value>] 
-    [--load=<file>] [--list_images=<file>] [--imref=<value>] [--gacos2data=<value>] \
-    [--plot=<yes|no>] [--rmspixel=<file>] [--threshold_rms=<value>] [--ref_zone=<values>] \
-    [--ramp=<cst|lin>] [--crop_emp=<values>] [--topofile=<path>] [--fitmodel=<yes|no>] \
-    [--output_cube=<file>] [--output_gacos=<file>]  [--lectfile=<path>]
+    correct_ts_from_gacos.py [--cube=<file>] [--path=<path>] [--crop=<values>] [--proj=<value>] \
+    [--load=<file>] [--list_images=<file>] [--imref=<value>] [--gacos2data=<value>] [--los=<file>] \
+    [--plot=<yes|no>] [--rmspixel=<file>] [--threshold_rms=<value>] [--ref_zone=<values>] [--ramp=<cst|lin>] \
+    [--crop_emp=<values>] [--topofile=<path>] [--fitmodel=<yes|no>] [--output_cube=<file>] [--output_gacos=<file>]\
+      [--lectfile=<path>] [--meanlos=<value>]
 
 correct_ts_from_gacos.py -h | --help
 
@@ -35,7 +35,9 @@ Options:
 --fitmodel=<yes|no>  If yes, then estimate the proportionlality between gacos and data in addition to the defined ramp
 --crop_emp=<value>    Crop option for the empirical estimations (ie. ramp and fitmodel) (eg: 0,ncol,0,nlines)
 --topo=<file>         Use DEM file to mask very low or high altitude values in the empirical estimation 
---gacos2data=<value>  Scaling value between zenithal gacos data (m) and desired output (e.g data in mm positive toward the sat. and LOS angle 23°: -1000*cos(23)=-920.504) [default: 1]
+--gacos2data=<value>  Scaling value between zenithal gacos data (m) and desired output (e.g data in mm positive toward the sat.: -1000) [default: 1]
+--los=<file>          LOS angle between the vertical and the Look Direction use to convert zenital delays to LOS delays [default: None]
+--meanlos=<value>     Mean LOS angle between the vertical and the Look Direction. Taken into account if los argument is None [default: 0]
 --output_cube=<file> Name to the output cube corrected from GACOS [default: cube_gacos_flat]
 --output_gacos=<file> Name to the output GACOS flatten cube  [default: depl_cumule-gacos]
 --rmspixel=<file>     Path to the RMS map that gives an error for each pixels for the empirical estimations (e.g RMSpixel, output of invers_pixel)
@@ -149,13 +151,14 @@ else:
 
 if arguments["--ramp"] ==  None:
     arguments["--ramp"] = 'cst'
+if (arguments["--ramp"] != 'cst') and (arguments["--ramp"] != 'lin'):
+    arguments["--ramp"] = 'cst'
 
-if arguments["--load"] ==  None:
-    load = 'yes'
+if arguments["--load"] ==  None or arguments["--load"] ==  'no':
+    load = 'no'
     arguments["--load"] = 'cube_gacos'
 else:
-    load = 'no'
-    loadf = arguments["--load"]
+    load = 'yes'
 
 if arguments["--topofile"] ==  None:
    radar = None
@@ -179,6 +182,25 @@ else:
   ncol, nlines = ds.RasterXSize, ds.RasterYSize
   N = ds.RasterCount
 logger.info('nlines:{0} ncols:{1} N:{2}'.format(nlines,ncol,N))
+
+if arguments["--los"] ==  None:
+    if arguments["--meanlos"] ==  None:
+        look = 0
+    else:
+        look = np.ones((nlines,ncol))*np.float(arguments["--meanlos"])
+else:
+    losf = arguments["--los"]
+    extension = os.path.splitext(losf)[1]
+    checkinfile(losf)
+    if extension == ".tif":
+        ds = gdal.Open(losf, gdal.GA_ReadOnly)
+        band = ds.GetRasterBand(1)
+        look = band.ReadAsArray()
+        del ds
+    else:
+        fid = open(losf,'r')
+        look = np.fromfile(fid,dtype=np.float32)[:nlines*ncol].reshape(nlines,ncol)
+        fid.close()
 
 if arguments["--crop_emp"] ==  None:
     empzone = [0,ncol,0,nlines]
@@ -238,7 +260,7 @@ logger.info('Number of line in the cube: {0} '.format(cube.shape))
 maps = cube.reshape((nlines,ncol,N))
 del cube, cubei
 
-if load == 'yes':
+if load == 'no':
     gacos = np.zeros((nlines,ncol,N))
     for i in range((N)):
 
@@ -309,7 +331,7 @@ if load == 'yes':
         # open gacos
         ds = gdal.Open(arguments["--path"]+'{}_gacos.tif'.format(int(idates[i])), gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
-        gacos[:,:,i] = band.ReadAsArray()*gacos2data
+        gacos[:,:,i] = band.ReadAsArray()
         del ds,band
 
     # Ref atmo models to the reference image
@@ -327,8 +349,9 @@ if load == 'yes':
 checkinfile(arguments["--load"])
 gcubei = np.fromfile(arguments["--load"],dtype=np.float32)
 gcube = as_strided(gcubei[:nlines*ncol*N])
-# why did you mask gacos2data here? put gacos2data=1 if you already did the conversion before
 gacos = gcube.reshape((nlines,ncol,N))*gacos2data
+for l in range((N)):
+    gacos[:,:,l] = gacos[:,:,l]/np.cos(np.deg2rad(look))
 del gcubei, gcube
 
 # Plot
@@ -493,6 +516,7 @@ for l in range((N)):
     del los_clean2, x_clean2, y_clean2, model_clean2, bins, inds
 
     if arguments["--fitmodel"]  == "no":
+      
       if (arguments["--ramp"] == 'cst'):
         
         a = cst
@@ -586,7 +610,7 @@ for l in range((N)):
 
         # ramp only
         remove_ramp = np.ones((nlines,ncol))*a
-        remove_ramp = np.dot(G,pars[:-1]).reshape(nlines,ncol)
+        remove_ramp = np.dot(G[:,:-1],pars[:-1]).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
         remove_ramp[np.isnan(data)] = np.float('NaN')
    
