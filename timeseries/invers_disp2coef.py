@@ -373,8 +373,8 @@ if arguments["--ineq"] ==  None:
 if arguments["--fulloutput"] ==  None:
     arguments["--fulloutput"] = 'no'
 if arguments["--geotiff"] is not None:
-    logger.warning('Load geotiff: {}'.format(geotiff))
-    georef = gdal.Open(geotiff)
+    logger.warning('Load geotiff: {}'.format(arguments["--geotiff"]))
+    georef = gdal.Open(arguments["--geotiff"])
     gt = georef.GetGeoTransform()
     proj = georef.GetProjection()
     driver = gdal.GetDriverByName('GTiff')
