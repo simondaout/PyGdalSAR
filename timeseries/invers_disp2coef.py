@@ -22,7 +22,7 @@ weight for the next iteration.
 Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
 [--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--slowslip=<value,value>] \
-[--semianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
+[--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
 [--sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
 [--mask=<path>] [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--tempmask=<yes/no>]\
@@ -44,8 +44,9 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --postseismic=<value,value>   Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) [default: None].
 --slowslip=<value,value>      Add slow-slip function in the inversion . As defined by Larson et al., 2004. Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None].
 --vector=<path>         Path to the vector text files containing a value for each dates [default: None]
---seasonal=<yes/no>       If yes, add seasonal terms in the inversion [default: no]
---semianual=<yes/no>      If yes, add semianual terms in the inversion [default: no]
+--seasonal=<yes/no>       If yes, add seasonal terms in the decomposition [default: no]
+--semianual=<yes/no>      If yes, add semianual terms in the decomposition [default: no]
+--bianual=<yes/no>       If yes, add bianual terms in the decomposition [default: no]
 --dem=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
 --ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
 --nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
@@ -203,6 +204,28 @@ class cos2var(pattern):
              func[i]=math.cos(4*math.pi*(t[i]-self.to))
          return func
 
+class sin5var(pattern):
+     def __init__(self,name,reduction,date):
+         pattern.__init__(self,name,reduction,date)
+         self.to=date
+
+     def g(self,t):
+         func=np.zeros(t.size)
+         for i in range(t.size):
+             func[i]=math.sin(math.pi*(t[i]-self.to))
+         return func
+
+class cos5var(pattern):
+     def __init__(self,name,reduction,date):
+         pattern.__init__(self,name,reduction,date)
+         self.to=date
+
+     def g(self,t):
+         func=np.zeros(t.size)
+         for i in range(t.size):
+             func[i]=math.cos(math.pi*(t[i]-self.to))
+         return func
+
 class sinvar(pattern):
     def __init__(self,name,reduction,date):
         pattern.__init__(self,name,reduction,date)
@@ -336,6 +359,8 @@ if arguments["--seasonal"] ==  None:
     arguments["--seasonal"] = 'no'
 if arguments["--semianual"] ==  None:
     arguments["--semianual"] = 'no'
+if arguments["--bianual"] ==  None:
+    arguments["--bianual"] = 'no'
 if arguments["--dem"] ==  None:
     arguments["--dem"] = 'no'
 if arguments["--niter"] ==  None:
@@ -841,6 +866,12 @@ if arguments["--semianual"]=='yes':
      indexsemi = index
      basis.append(cos2var(name='semi-anual var (cos)',reduction='cosw2t',date=datemin))
      basis.append(sin2var(name='semi-anual var (sin)',reduction='sinw2t',date=datemin))
+     index = index + 2
+
+if arguments["--bianual"]=='yes':
+     indexbi = index
+     basis.append(cos5var(name='bi-anual var (cos)',reduction='cos5wt',date=datemin))
+     basis.append(sin5var(name='bi-anual var (sin)',reduction='sin5wt',date=datemin))
      index = index + 2
 
 indexco = np.zeros(len(cos))
@@ -3938,8 +3969,8 @@ if arguments["--semianual"] == 'yes':
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 
     if arguments["--geotiff"] is not None:
-        logger.info('Save: {}'.format('ampw2t_coeff.tif'))
-        ds = driver.Create('ampw2t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        logger.info('Save: {}'.format('amp_simiwt_coeff.tif'))
+        ds = driver.Create('amp_simiwt_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
@@ -3947,8 +3978,8 @@ if arguments["--semianual"] == 'yes':
         band.FlushCache()
         del ds
 
-        logger.info('Save: {}'.format('ampw2t_sigcoeff.tif'))
-        ds = driver.Create('ampw2t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        logger.info('Save: {}'.format('amp_simiwt_sigcoeff.tif'))
+        ds = driver.Create('amp_simiwt_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
@@ -3957,27 +3988,27 @@ if arguments["--semianual"] == 'yes':
         del ds
 
     else:
-        logger.info('Save: {}'.format('ampw2t_coeff.r4'))
-        fid = open('ampw2t_coeff.r4', 'wb')
+        logger.info('Save: {}'.format('amp_simiwt_coeff.r4'))
+        fid = open('amp_simiwt_coeff.r4', 'wb')
         amp.flatten().astype('float32').tofile(fid)
         fid.close()
 
-        logger.info('Save: {}'.format('ampw2t_sigcoeff.r4'))
-        fid = open('ampw2t_sigcoeff.r4', 'wb')
+        logger.info('Save: {}'.format('amp_simiwt_sigcoeff.r4'))
+        fid = open('amp_simiwt_sigcoeff.r4', 'wb')
         sigamp.flatten().astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
-        logger.info('Save: {}'.format('phiw2t_coeff.tif'))
-        ds = driver.Create('phiw2t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        logger.info('Save: {}'.format('phi_simiwt_coeff.tif'))
+        ds = driver.Create('phi_simiwt_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
         ds.plt.setprojection(proj)
         band.FlushCache()
         del ds
 
-        logger.info('Save: {}'.format('phiw2t_sigcoeff.tif'))
-        ds = driver.Create('phiw2t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        logger.info('Save: {}'.format('phi_simiwt_sigcoeff.tif'))
+        ds = driver.Create('phi_simiwt_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
         ds.plt.setprojection(proj)
@@ -3985,13 +4016,82 @@ if arguments["--semianual"] == 'yes':
         del ds
 
     else:
-        logger.info('Save: {}'.format('phiw2t_coeff.r4'))
-        fid = open('phiw2t_coeff.r4', 'wb')
+        logger.info('Save: {}'.format('phi_simiwt_coeff.r4'))
+        fid = open('phi_simiwt_coeff.r4', 'wb')
         phi.flatten().astype('float32').tofile(fid)
         fid.close()
 
-        logger.info('Save: {}'.format('phiw2t_sigcoeff.r4'))
-        fid = open('phiw2t_sigcoeff.r4', 'wb')
+        logger.info('Save: {}'.format('phi_simiwt_sigcoeff.r4'))
+        fid = open('phi_simiwt_sigcoeff.r4', 'wb')
+        sigphi.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+if arguments["--bianual"] == 'yes':
+    cosine = as_strided(basis[indexbi].m)
+    sine = as_strided(basis[indexbi+1].m)
+    amp = np.sqrt(cosine**2+sine**2)
+    phi = np.arctan2(sine,cosine)
+
+    sigcosine = as_strided(basis[indexbi].sigmam)
+    sigsine = as_strided(basis[indexbi+1].sigmam)
+    sigamp = np.sqrt(sigcosine**2+sigsine**2)
+    sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
+
+    if arguments["--geotiff"] is not None:
+        logger.info('Save: {}'.format('amp_biwt_coeff.tif'))
+        ds = driver.Create('ampw.5t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(amp)
+        ds.SetGeoTransform(gt)
+        ds.plt.setprojection(proj)
+        band.FlushCache()
+        del ds
+
+        logger.info('Save: {}'.format('amp_biwt_sigcoeff.tif'))
+        ds = driver.Create('ampw.5t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(sigamp)
+        ds.SetGeoTransform(gt)
+        ds.plt.setprojection(proj)
+        band.FlushCache()
+        del ds
+
+    else:
+        logger.info('Save: {}'.format('amp_biwt_coeff.r4'))
+        fid = open('ampw.5t_coeff.r4', 'wb')
+        amp.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+        logger.info('Save: {}'.format('amp_biwt_sigcoeff.r4'))
+        fid = open('ampw.5t_sigcoeff.r4', 'wb')
+        sigamp.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+    if arguments["--geotiff"] is not None:
+        logger.info('Save: {}'.format('phi_biwt_coeff.tif'))
+        ds = driver.Create('phiw.5t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band.WriteArray(phi)
+        ds.SetGeoTransform(gt)
+        ds.plt.setprojection(proj)
+        band.FlushCache()
+        del ds
+
+        logger.info('Save: {}'.format('phi_biwt_sigcoeff.tif'))
+        ds = driver.Create('phiw.5t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band.WriteArray(sigphi)
+        ds.SetGeoTransform(gt)
+        ds.plt.setprojection(proj)
+        band.FlushCache()
+        del ds
+
+    else:
+        logger.info('Save: {}'.format('phi_biwt_coeff.r4'))
+        fid = open('phiw.5t_coeff.r4', 'wb')
+        phi.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+        logger.info('Save: {}'.format('phi_biwt_sigcoeff.r4'))
+        fid = open('phiw.5t_sigcoeff.r4', 'wb')
         sigphi.flatten().astype('float32').tofile(fid)
         fid.close()
 

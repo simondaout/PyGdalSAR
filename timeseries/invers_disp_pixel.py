@@ -12,7 +12,7 @@ Temporal decomposition of the time series delays of selected pixels (used depl_c
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--linear=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
-[--semianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
+[--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
 
 invers_disp_pixel.py -h | --help
@@ -35,6 +35,7 @@ basis functions (Depricate) [default: 1.]
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
 --seasonal PATH         If yes, add seasonal terms in the inversion
 --semianual PATH        If yes, add semianual  terms in the inversion
+--bianual PATH          If yes, add bianual  terms in the inversion
 --vector PATH           Path to the vector text files containing a value for each dates [default: None]
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
@@ -181,6 +182,28 @@ class cos2var(pattern):
             func[i]=math.cos(4*math.pi*(t[i]-self.to))
         return func
 
+class sin5var(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in xrange(t.size):
+            func[i]=math.sin(math.pi*(t[i]-self.to))
+        return func
+
+class cos5var(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in xrange(t.size):
+            func[i]=math.cos(math.pi*(t[i]-self.to))
+        return func
+
 class slowslip(pattern):
       def __init__(self,name,reduction,date,tcar=1):
           pattern.__init__(self,name,reduction,date)
@@ -287,6 +310,10 @@ if arguments["--semianual"] ==  None:
     semianual = 'no'
 else:
     semianual = arguments["--semianual"]
+if arguments["--bianual"] ==  None:
+    bianual = 'no'
+else:
+    bianual = arguments["--bianual"]
 if arguments["--dem"] ==  None:
     dem = 'no'
 else:
@@ -500,6 +527,13 @@ if semianual=='yes':
    basis.append(sin2var(name='semi. annual var (sin)',reduction='sin2wt',date=datemin))
    index = index + 2
 
+if bianual=='yes':
+   # 4
+   indexbi = index 
+   basis.append(cos5var(name='bi-annual var (cos)',reduction='cos5wt',date=datemin))
+   basis.append(sin5var(name='bi-annual var (sin)',reduction='sin5wt',date=datemin))
+   index = index + 2
+
 indexco = np.zeros(len(cos))
 for i in xrange(len(cos)):
    # 6
@@ -667,7 +701,7 @@ if inter=='yes':
         fig3 = plt.figure(nfigure+3,figsize=(12,8))
     else:
         fig3 = plt.figure(nfigure+3,figsize=(10,4))
-if seasonal == 'yes' or semianual == 'yes':
+if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes':
     if Npix > 2:
         fig2 = plt.figure(nfigure+2,figsize=(12,8))
     else:
@@ -798,7 +832,7 @@ for jj in xrange((Npix)):
     if inter=='yes':
         ax3 = fig3.add_subplot(Npix,1,jj+1)
         ax3.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-    if seasonal == 'yes' or semianual == 'yes':
+    if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes':
         ax2 = fig2.add_subplot(Npix,1,jj+1)
         ax2.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
     
@@ -833,8 +867,14 @@ for jj in xrange((Npix)):
             for l in xrange((2)):
                 G[:,l]=basis[l+indexsemi].g(tabx)
             disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexsemi:indexsemi+2])
+
+    if bianual=='yes':
+            G=np.zeros((kk,2))
+            for l in xrange((2)):
+                G[:,l]=basis[l+indexbi].g(tabx)
+            disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexbi:indexbi+2])
             
-    if semianual=='yes' or seasonal=='yes':
+    if semianual=='yes' or seasonal=='yes' or bianual=='yes':
         ax2.plot(x,disp-disp_seas-demerr,'o',label='data -seasonal')
         # ax2.plot(x,mdisp-disp_seas-demerr,'o',color='red',alpha=0.5,label='model -seasonal')
         ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.3)
@@ -876,8 +916,14 @@ for jj in xrange((Npix)):
         for l in xrange((2)):
             G[:,l]=basis[l+indexsemi].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexsemi:indexsemi+2])
+
+    if bianual=='yes':
+        G=np.zeros((len(tdec),2))
+        for l in xrange((2)):
+            G[:,l]=basis[l+indexbi].g(tdec)
+        mseas = mseas + np.dot(G[:,:],m[indexbi:indexbi+2])
             
-    if seasonal=='yes' or semianual=='yes':
+    if seasonal=='yes' or semianual=='yes' or bianual=='yes':
         ax2.plot(t,model-mseas-model_dem,'-r')
         ax2.legend(loc='best',fontsize='x-small')
         ax2.set_xlim(xlim)
@@ -906,7 +952,7 @@ for jj in xrange((Npix)):
         ax3.set_ylabel('Displacements (mm)')
         fig3.savefig('Disp_{}_detrended.pdf'.format(output), format='PDF')
 
-    if seasonal == 'yes' or semianual =='yes':
+    if seasonal == 'yes' or semianual =='yes' or bianual =='yes':
         fig2.autofmt_xdate()
         ax2.set_xlabel('Time (Year/month/day)')
         ax2.set_ylabel('Displacements (mm)')
