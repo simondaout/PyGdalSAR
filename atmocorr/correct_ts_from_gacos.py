@@ -485,7 +485,7 @@ for l in range((N)):
     los_clean2, model_clean2, x_clean2, y_clean2, rms_clean2 = [], [], [], [], []
     for j in range(len(bins)-1):
             uu = np.flatnonzero(inds == j)
-            if len(uu)>20:
+            if len(uu)>500:
                 modelbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
 
                 # do a clean within the sliding median
@@ -502,7 +502,8 @@ for l in range((N)):
                 x_clean2.append(x_clean[uu][indice])
                 y_clean2.append(y_clean[uu][indice])
                 model_clean2.append(model_clean[uu][indice])
-                rms_clean2.append(rms_clean[uu][indice])
+                # new rms is clean rms time the standard deviation of the los within the bin
+                rms_clean2.append(rms_clean[uu][indice]*np.nanstd(los_clean[uu][indice]))
 
     losbins = np.array(losbins)
     losstd = np.array(losstd)
