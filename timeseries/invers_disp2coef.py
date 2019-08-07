@@ -1078,7 +1078,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
           los_clean2, topo_clean2, az_clean2, rg_clean2, rms_clean2 = [], [], [], [], []
           for j in range(len(bins)-1):
                   uu = np.flatnonzero(inds == j)
-                  if len(uu)>20:
+                  if len(uu)>200:
                       topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
 
                       # do a small clean within the bin
@@ -1095,7 +1095,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                       az_clean2.append(az[uu][indice])
                       rg_clean2.append(rg[uu][indice])
                       topo_clean2.append(topo_clean[uu][indice])
-                      rms_clean2.append(rms[uu][indice])
+                      # new rms is clean rms time the standard deviation of the los within the bin
+                      rms_clean2.append(rms[uu][indice]*np.nanstd(los_clean[uu][indice]))
 
           topobins = np.array(topobins)
           rgbins, azbins = np.array(rgbins),np.array(azbins)
