@@ -17,7 +17,7 @@ Convert dem to slope file in the LOS geeometry knowing los heading and lattitude
 
 Usage: 
     dem2slope.py --infile=<path> --los=<value> --heading=<value>  [--out_slope=<path>] [--out_slopelos=<path>] [--lat=<value>] [--red=<value>]
-    dem2slope.py --infile=<path> --incidence=<path> [--out_slope=<path>] [--out_slopelos=<path>] [--lat=<value>] [--res=<value>]
+    dem2slope.py --infile=<path> --incidence=<path> [--out_slope=<path>] [--out_slopelos=<path>] [--lat=<value>] [--az_res=<value>] [--rg_res=<value>]
 
 dem2slope.py -h | --help
 
@@ -28,8 +28,9 @@ Options:
 --out_slopelos FILE Output slope in the LOS file ['LOSslope.r4']
 --los VALUE         Mean Los angle
 --heading VALUE.    Mean Heading angle
---lat VALUE.        Average latitude in deg.. if DEM is given in WGS84 [default: None]
---res VALUE.        Resolutiom DEM (size pixel) [default: 30m]
+--lat VALUE.        Average latitude in deg.. if raster is given in WGS84 [default: None]
+--az_res VALUE.     Resolutiom azimuth pixel size (size pixel) [default: 30m]
+--rg_res VALUE.     Resolutiom range pixel size (size pixel) [default: 30m]
 --incidence=<file>  Path to incidence file .unw 
 """
 
@@ -53,10 +54,14 @@ if arguments["--lat"] == None:
     lat = 0
 else:
     lat = np.deg2rad(float(arguments["--lat"]))
-if arguments["--res"] == None:
-    res = 30
+if arguments["--az_res"] == None:
+    az_res = 30
 else:
-    res = float(arguments["--res"])
+    az_res = float(arguments["--az_res"])
+if arguments["--rg_res"] == None:
+    rg_res = 30
+else:
+    rg_res = float(arguments["--rg_res"])
 
 # read input
 ds_extension = os.path.splitext(infile)[1]
@@ -84,7 +89,7 @@ else:
     heading[:,:] = np.deg2rad(90 - ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize))[:nlines,:ncols]
 
 toposmooth = scipy.ndimage.filters.gaussian_filter(topo,2.)
-Py, Px = np.gradient(toposmooth,res,res*np.cos(lat))
+Py, Px = np.gradient(toposmooth,az_res,rg_res*np.cos(lat))
 slope = np.sqrt(Px**2+Py**2)
 slopelos = (np.cos(heading)*Px+np.sin(heading)*Py)/np.sin(look)
 

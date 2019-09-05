@@ -232,14 +232,15 @@ for t in range((N)):
 
 for i in range(iend-ibeg):
     for j in range(jend-jbeg):
-        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(maxamp)):
+        # if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(maxamp)):
+        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and slope_map[i,j]>0.03):
             temp_pos = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
                 flat_disp_pos.append(temp_pos[t])
                 time_pos.append(dmodt[t])
                 amp_pos.append(amp_map[i,j])
-        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]<np.float(maxamp)):
+        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and slope_map[i,j]<0.03):
             temp_neg = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
@@ -272,7 +273,7 @@ mean_neg,std_neg = np.array(mean_neg),np.array(std_neg)
 # plot slope postive
 fig=plt.figure(1,figsize=(14,5))
 ax=fig.add_subplot(1,2,1)
-ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(np.int(minamp))) 
+ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Thesh. Slope: {}'.format(0.03)) 
 ax.errorbar(dmod,mean_pos,yerr=std_pos,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -289,7 +290,7 @@ ax.set_xlim([0,1])
 ax.set_xticks(np.arange(0,1, 1./12))
 ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax.set_title('Amplitudes > {}'.format(np.int(maxamp)))
+ax.set_title('Slope > {}'.format(0.03))
 
 # plot slope negative
 ax2=fig.add_subplot(1,2,2)
@@ -304,13 +305,12 @@ try:
 except:
     pass
 
-
 ax2.set_ylim([-2,2])
 ax2.set_xlim([0,1])
 ax2.set_xticks(np.arange(0,1, 1./12))
 ax2.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax2.set_title(' {} < Amplitudes < {}'.format(np.int(minamp),np.int(maxamp)))
+ax2.set_title(' Slope < {}'.format(0.03)
 
 fig.tight_layout()
 fig.savefig('{}-modseas.pdf'.format(arguments["--name"]), format='PDF',dpi=80)

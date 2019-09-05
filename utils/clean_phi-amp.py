@@ -31,7 +31,7 @@ Options:
 --sigampfile=<file>     Uncertainty amplitude map file [default: ampwt_sigcoeff.r4]
 --sigphifile=<file>     Uncertainty phase map file [default: phiwt_sigcoeff.r4]
 --lectfile=<file>       Path of the lect.in file for r4 format [default: lect_ts.in]
---theshold_amp=<value>  Mask on minimum Amplitude for Phase [default: 1.5]
+--threshold_amp=<value>  Mask on minimum Amplitude for Phase [default: 1.5]
 --perc_sig=<value>      Percentile uncertainty for map cleaning [default: 99.]
 --slopelosfile=<file>   SLope in the LOS file [default: None]
 --slopefile=<file>      SLope file [default: None]
@@ -42,7 +42,6 @@ Options:
 """
 
 from __future__ import print_function
-
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import matplotlib as mpl
@@ -137,6 +136,7 @@ if demf ==  None:
         demf = 'dem'
         dem_map = np.fromfile('dem',dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
     except:
+        print('DEM file is not readible. Set elelvation to zeros.')
         dem_map = np.zeros((nlines,ncols))
 else:
     dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
@@ -176,6 +176,7 @@ lin_map[amp_map<threshold_amp] = np.float('NaN')
 
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi
+# phi_map = phi_map - np.pi
 
 #save output
 fid1 = open(ampoutf,'wb')
@@ -221,7 +222,8 @@ ax = fig_ampphi.add_subplot(1,3,3)
 if demf is not None:
     cax = ax.imshow(dem_map,cmap=cm.Greys,zorder=1)
 vmax = np.nanpercentile(lin_map,95)
-im = ax.imshow(np.ma.array(lin_map, mask=np.isnan(lin_map)),vmin=-vmax,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2)
+vmin = np.nanpercentile(lin_map,5)
+im = ax.imshow(np.ma.array(lin_map, mask=np.isnan(lin_map)),vmin=vmin,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -242,12 +244,13 @@ fracs = bins / bins.max()
 # we need to normalize the data to 0..1 for the full range of the colormap
 # print(fracs.min(), fracs.max())
 norm = colors.Normalize(vmin=fracs.min(), vmax=fracs.max())
+xmin,xmax = 0,2*np.pi
+# norm = colors.Normalize(vmin=0, vmax=1)
 # Now, we'll loop through our objects and set the color of each accordingly
 for thisfrac, thispatch in zip(fracs, patches):
     color = cmap_phi(norm(thisfrac))
     thispatch.set_facecolor(color)
 ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
-xmin,xmax = 0,2*np.pi
 ax.set_xlim([xmin,xmax])
 ax.set_xticks(np.arange(xmin,xmax , (xmax-xmin)/12))
 ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
