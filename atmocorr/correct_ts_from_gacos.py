@@ -257,7 +257,12 @@ else:
 cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
 logger.info('Number of line in the cube: {0} '.format(cube.shape))
+kk = np.flatnonzero(cube>9990)
+cube[kk] = float('NaN')
 maps = cube.reshape((nlines,ncol,N))
+cst = np.copy(maps[:,:,imref])
+for l in range((N)):
+    maps[:,:,l] = maps[:,:,l]-cst
 del cube, cubei
 
 if load == 'no':
@@ -350,8 +355,10 @@ checkinfile(arguments["--load"])
 gcubei = np.fromfile(arguments["--load"],dtype=np.float32)
 gcube = as_strided(gcubei[:nlines*ncol*N])
 gacos = gcube.reshape((nlines,ncol,N))*gacos2data
+
+cst = np.copy(gacos[:,:,imref])
 for l in range((N)):
-    gacos[:,:,l] = gacos[:,:,l]/np.cos(np.deg2rad(look))
+    gacos[:,:,l] = (gacos[:,:,l]-cst)/np.cos(np.deg2rad(look))
 del gcubei, gcube
 
 # Plot
@@ -386,6 +393,7 @@ for l in range((N)):
   data_flat = as_strided(maps_flat[:,:,l])
   model = as_strided(gacos[:,:,l])
   
+  # print(l, imref)
   if l == imref:
     # check if data and model are set to zeros
     data_flat[np.isnan(data)] = np.float('NaN')
@@ -448,6 +456,10 @@ for l in range((N)):
         np.logical_and(model!=0.0,
         np.logical_and(pix_col>refcol_beg, pix_col<refcol_end
         )))))))))))))))
+
+        if len(indexref[0]) < 2:
+            print('No data in the reference zone for date: %i. Exit!'%(idates[l]))
+            sys.exit()
 
     temp = np.array(index).T
     x_clean = temp[:,0]; y_clean = temp[:,1]
