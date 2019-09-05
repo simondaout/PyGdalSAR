@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 from os import environ
@@ -29,9 +29,10 @@ N=len(dates)
 print('Size expected time series cube: ({0} {1} {2}) '.format(nlign, ncol, N))
 
 imref = 0
-inlook = 2
+inlook = 4
 outlook = 4
 rlook = int(outlook/inlook)
+ref = [1788, 1100]
 
 maps = np.zeros((nlign,ncol,N))
 i=0
@@ -51,9 +52,12 @@ for d in idates:
     i+=1
 
 # ref to imref
-cst = np.copy(maps[:,:,0])
+cst = np.copy(maps[:,:,imref])
 for l in range((N)):
-    maps[:,:,l] = maps[:,:,l] - cst
+	# ref in time     
+	maps[:,:,l] = maps[:,:,l] - cst
+	# ref in space
+	# maps[:,:,l] = maps[:,:,l] - maps[ref[0],ref[1],l]
 
 fid = open('cube_era5', 'wb')
 maps.flatten().astype('float32').tofile(fid)
