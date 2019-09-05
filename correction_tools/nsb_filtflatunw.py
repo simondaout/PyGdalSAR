@@ -20,7 +20,7 @@ options:
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
   --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list = check_look/replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
-Job list is: erai look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
+Job list is: ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
@@ -194,7 +194,7 @@ def run(cmd):
 
 class Job():
     """ Create a class of Jobs to be run: 
-    Job list is: erai look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
+    Job list is: ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -224,7 +224,7 @@ class Job():
 
     def info(self):
         print('List of possible Jobs:') 
-        print('erai look_int replace_amp filter flatr flat_atmo flat_model colin \
+        print('ecmwf look_int replace_amp filter flatr flat_atmo flat_model colin \
             unwrapping add_model_back add_atmo_back add_ramp_back')
         print('Choose them in the order that you want')
 
@@ -513,7 +513,7 @@ def computesize(config,file):
         logger.critical(error)
         print(computesize.__doc__)
 
-def erai(config,kk):
+def ecmwf(config,kk):
     '''ERA Atmospheric corrections applied before filtering and unwrapping
     Requiered proc parameter: EraDir '''
     
@@ -544,7 +544,7 @@ def erai(config,kk):
             except Exception as e:
                 logger.critical(e)
                 config.stack.updatesuccess(kk)
-                print(erai.__doc__)
+                print(ecmwf.__doc__)
 
     return config.getconfig(kk)
 
@@ -836,7 +836,7 @@ def flat_atmo(config, kk):
 
             index = np.nonzero(
             np.logical_and(coh>np.float(config.thresh_amp_atmo),
-            np.logical_and(deltaz>75.,
+            np.logical_and(deltaz>125.,
             np.logical_and(np.logical_or(i<int(config.ibeg_mask),j>int(config.iend_mask)),
             np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
             ))))
