@@ -1536,6 +1536,8 @@ def apply_cor(kk, sp, sp_inv):
         infile=int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  rlook + '.unw'
         outfile = int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout +  rlook + '.unw'  
         outrsc = int_path + folder + prefix + str(date1) + '-' + str(date2) + suffix +  suffout +  rlook + '.unw.rsc' 
+        # print(infile)
+        # print(outfile)
         
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         # Get the band that have the data we want
@@ -1628,6 +1630,7 @@ def apply_cor(kk, sp, sp_inv):
         shutil.copy(rscfile,outrsc)
         dst_band1.FlushCache()
         dst_band2.FlushCache()
+        del dst_ds, ds
 
     elif sformat == 'GTIFF':
         dst_ds = driver.Create(outfile, cols, lines, 1, gdal.GDT_Float32)
@@ -1636,10 +1639,12 @@ def apply_cor(kk, sp, sp_inv):
         dst_ds.SetGeoTransform(gt)
         dst_ds.plt.setprojection(proj)
         dst_band2.FlushCache()
+        del dst_ds, ds
 
     elif sformat == 'GAMMA':
         fid = open(outfile, 'wb')
         flatlos.flatten().astype('>f4').tofile(fid)
+        fid.close()
 
     fig = plt.figure(5,figsize=(9,4))
 
@@ -1697,11 +1702,6 @@ def apply_cor(kk, sp, sp_inv):
         plt.show()
 
     plt.close('all')
-
-    try:
-        del dst_ds, ds, drv
-    except:
-        pass
     del los_map, rms_map
 
 #####################################################################################
@@ -1723,9 +1723,9 @@ arguments = docopt.docopt(__doc__)
 int_list=arguments["--int_list"]
 
 if arguments["--int_path"] == None:
-    int_path='.'
+    int_path='./'
 else:
-    int_path=arguments["--int_path"] + '/'
+    int_path=arguments["--int_path"] 
 
 if arguments["--out_path"] == None:
     out_path=np.copy(int_path)
@@ -2235,5 +2235,7 @@ print()
 # go 
 with TimeIt():
     work = range(Nifg)
+    # for j in range(Nifg):
+    #     apply_cor(j, spint, spint_inv)
     with poolcontext(processes=nproc) as pool:
         pool.map(partial(apply_cor, sp=spint, sp_inv=spint_inv), work)
