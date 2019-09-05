@@ -149,6 +149,7 @@ if maskf is not None:
     mask =  mask*scale
     kk = np.nonzero(np.logical_or(mask==0.0, mask>999.))
     mask[kk] = float('NaN')
+    # mask[kk] = 999
 
 if rampmask=='yes':
 
@@ -190,7 +191,7 @@ else:
 
 if maskf is not None:
     vmax = np.nanpercentile(maskflat,99)
-    vmax=1
+    vmin= np.nanpercentile(maskflat,1)
 
     kk = np.nonzero(maskflat>seuil)
     spacial_mask = np.copy(maskflat)
@@ -234,28 +235,28 @@ cubei = np.fromfile(infile,dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
-
-_cube=np.copy(cube)
-_cube[cube==0] = np.float('NaN')
-maxlos,minlos=np.nanpercentile(_cube,perc),np.nanpercentile(_cube,(100-perc))
-print 'Min, Max LOS:', minlos, maxlos
 print 'Number of line in the cube: ', cube.shape
 
 maps = cube.reshape((nlines,ncol,N))[ibeg:iend,jbeg:jend,:N]
 print 'Reshape cube: ', maps.shape
-# set at NaN zero values for all dates
-kk = np.nonzero(
-    np.logical_or(maps[:,:,-1]<minlos,
-    np.logical_or(maps[:,:,-1]>maxlos,
-    # np.logical_or(maps[:,:,-1]==0,
-    maskflat>seuil
-		)))
-# )
 
 # clean 
 cst = np.copy(maps[:,:,imref])
 for l in xrange((N)):
     d = as_strided(maps[:,:,l])
+    
+    _d=np.copy(d)
+    _d[d==0] = np.float('NaN')
+    maxlos,minlos=np.nanpercentile(_d,perc),np.nanpercentile(_d,(100-perc))
+    # print 'Min, Max LOS:', minlos, maxlos
+    # set at NaN zero values for all dates
+    kk = np.nonzero(
+    np.logical_or(d<minlos,
+    np.logical_or(d>maxlos,
+    np.logical_or(maskflat>seuil,
+        np.isnan(maskflat), 
+        ))))
+    
     d[kk] = np.float('NaN')
     # carefull stupid unit 
     maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l]-base[imref])/100.
@@ -263,6 +264,11 @@ for l in xrange((N)):
         index = np.nonzero(d==0.0)
         d[index] = np.float('NaN')
     maps[mibeg:miend,mjbeg:mjend,l] = np.float('NaN')
+
+# _cube=np.copy(cube)
+# _cube[cube==0] = np.float('NaN')
+# maxlos,minlos=np.nanpercentile(_cube,perc),np.nanpercentile(_cube,(100-perc))
+# print 'Min, Max LOS:', minlos, maxlos
 
 # save clean ts
 #if not ds:
