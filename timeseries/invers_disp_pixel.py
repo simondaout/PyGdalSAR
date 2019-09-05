@@ -12,7 +12,7 @@ Temporal decomposition of the time series delays of selected pixels (used depl_c
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--linear=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
-[--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
+[--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
 
 invers_disp_pixel.py -h | --help
@@ -34,6 +34,7 @@ basis functions (Depricate) [default: 1.]
 --postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
 --seasonal PATH         If yes, add seasonal terms in the inversion
+--degreeday Values        Add degree-day model (Stefan model) in the inversion. Indicate thawing and freezing onsets (e.g. 0.36,0.7) [default: None] 
 --semianual PATH        If yes, add semianual  terms in the inversion
 --bianual PATH          If yes, add bianual  terms in the inversion
 --vector PATH           Path to the vector text files containing a value for each dates [default: None]
@@ -76,6 +77,8 @@ from pylab import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
+import matplotlib.ticker as ticker
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime as datetimes
 import datetime
 import time
@@ -215,6 +218,31 @@ class slowslip(pattern):
           funct = 0.5*(np.tanh(t)-1) + 1
           return funct
 
+class stefan(pattern):
+    def __init__(self,name,reduction,date,tcar1,tcar2):
+          pattern.__init__(self,name,reduction,date)
+          self.to = date
+          self.t1 = tcar1
+          self.t2 = tcar2
+
+    def g(self,t):
+        # t = np.arange(2014.,2015.,0.001)
+        day = np.mod(t-self.to,1)
+        # ddt: degree-day of thawing
+        ddt = day - self.t1; ddt[day<=self.t1] = self.t2 - self.t1; ddt[day>=self.t2] = self.t2 - self.t1
+        # ddf: degree-day of freezing
+        ddf = np.zeros(len(t))
+        ddf[day>self.t2] = day[day>self.t2] - self.t2
+        ddf[day<self.t1] = day[day<self.t1] + 1 - self.t2
+
+        # lets assune same coef. of freezing and thawing
+        alpha = np.sqrt((self.t2-self.t1) / (1 - self.t2 + self.t1))
+        func = np.sqrt(ddt) - alpha*np.sqrt(ddf) 
+        # plt.plot(t,func,'-b')
+        # plt.show()
+        # sys.exit()
+        return func
+
 ### KERNEL FUNCTIONS: not function of time
 class corrdem(pattern):
     def __init__(self,name,reduction,bp0,bp):
@@ -314,6 +342,7 @@ if arguments["--bianual"] ==  None:
     bianual = 'no'
 else:
     bianual = arguments["--bianual"]
+
 if arguments["--dem"] ==  None:
     dem = 'no'
 else:
@@ -333,6 +362,16 @@ else:
     sse = map(float,arguments["--slowslip"].replace(',',' ').split()) 
 sse_time = sse[::2]
 sse_car = sse[1::2]  
+
+if arguments["--degreeday"] ==  None:
+    degreeday = 'no'
+else:
+    degreeday = 'yes'
+    try:
+        ddt,ddf = map(float,arguments["--degreeday"].replace(',',' ').split()) 
+    except:
+        print('degreeday argument must contain two float values corresponding to the thawing and freezing onsets')
+        sys.exit(0)
 
 if arguments["--vector"] != None:
     vectf = arguments["--vector"].replace(',',' ').split()
@@ -482,7 +521,7 @@ else:
     vmin = np.nanpercentile(maps[:,:,-1],10)
 
 ax = fig.add_subplot(1,2,1)
-ax.imshow(maps[jstart:jend,istart:iend,-1], vmax=vmax, vmin=vmin, alpha=0.6)
+ax.imshow(maps[jstart:jend,istart:iend,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
 ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
 if iref is not None and jref is not None:
     ax.scatter(iref-istart,jref-jstart,marker='x',color='red',s=20.)
@@ -491,13 +530,18 @@ for i in xrange((Npix)):
 plt.suptitle('Black cross: pixels, red cross: reference point')
 
 ax = fig.add_subplot(1,2,2)
-ax.imshow(maps[:,:,-1], vmax=vmax, vmin=vmin, alpha=0.6)
+im = ax.imshow(maps[:,:,-1],cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
 ax.scatter(ipix,jpix,marker='x',color='black',s=15.)
 ax.scatter(iref,jref,marker='x',color='red',s=20.)
 for i in xrange((Npix)):
     ax.text(ipix[i],jpix[i],i)
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(im, cax=cax)
 plt.suptitle('Black cross: pixels, red cross: reference point')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
+
+# print(iref, jref)
 # plt.show()
 # sys.exit()
 
@@ -512,7 +556,13 @@ if inter=='yes':
       # 1
       indexinter=index
       index = index + 1
-      
+
+if degreeday=='yes':
+   indexdd = index
+   print(ddt, ddf, datemin)
+   basis.append(stefan(name='degree-day',reduction='ddt',date=datemin,tcar1=ddt,tcar2=ddf))
+   index = index + 1
+
 if seasonal=='yes':
    # 2
    indexseas = index
@@ -927,8 +977,8 @@ for jj in xrange((Npix)):
         ax2.plot(t,model-mseas-model_dem,'-r')
         ax2.legend(loc='best',fontsize='x-small')
         ax2.set_xlim(xlim)
-        if arguments["--bounds"] is not  None:
-            ax2.set_ylim(ylim)
+        # if arguments["--bounds"] is not  None:
+        #     ax2.set_ylim(ylim)
 
     ax.legend(loc='best',fontsize='x-small')
     ax.set_xlim(xlim)
@@ -938,8 +988,8 @@ for jj in xrange((Npix)):
     if inter=='yes':
         ax3.legend(loc='best',fontsize='x-small')
         ax3.set_xlim(xlim)
-        if arguments["--bounds"] is not  None:
-            ax3.set_ylim(ylim)
+    #     if arguments["--bounds"] is not  None:
+    #         ax3.set_ylim(ylim)
 
     fig.autofmt_xdate()
     ax.set_xlabel('Time (Year/month/day)')
