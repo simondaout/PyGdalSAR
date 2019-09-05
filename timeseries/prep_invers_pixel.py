@@ -131,7 +131,7 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
     weight = np.exp(-sigma/np.percentile(sigma,80))
-    do_sig = int(0)
+    do_sig = int(2) # user given weigth
     # print (sigma, weight)
     if len(sigma) != kmax:
       w2 = []
@@ -248,8 +248,8 @@ if os.path.exists(name) is False:
 0      #   mask pixels with large RMS misclosure  (y=0;n=1)
 1.7    #  threshold for the mask on RMS misclosure (in same unit as input files)
 1      #  range and azimuth downsampling (every n pixel)
-1      #  iterations to correct unwrapping errors (y:nb_of_iterations,n:0)
-1      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+3      #  iterations to correct unwrapping errors (y:nb_of_iterations,n:0)
+2      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 0.2    #  Scaling value for weighting residuals (1/(res**2+value**2)) (in same unit as input files) (Must be approximately equal to standard deviation on measurement noise)
 0      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 4.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
@@ -271,7 +271,10 @@ list_pair
 1      #  Weigthing by image quality (y:0,n:1) ? (then read quality in the list of input images)
 %d     #  Weigthing by interferogram variance (y:0,n:1) or user given weight (2)?
 1      #  use of covariance (y:0,n:1) ? (Obsolete)
-0      #  include a baseline term in inversion ? (y:1;n:0) Require to use smoothing option (smoothing coefficient) !
+0      #  Adjust functions to phase history ? (y:1;n:0) Require to use smoothing option (smoothing coefficient) !
+0      #  compute DEM error proportional to perpendicular baseline ? (y:1;n:0)
+0      #  include a step function ? (y:1;n:0)
+0      #  include a cosinus / sinus function ? (y:1;n:0)
 1      #  smoothing by Laplacian, computed with a scheme at 3pts (0) or 5pts (1) ?
 2      #  weigthed smoothing by the average time step (y :0 ; n : 1, int : 2) ?
 1      # put the first derivative to zero (y :0 ; n : 1)?
