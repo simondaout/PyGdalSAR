@@ -759,12 +759,12 @@ subroutine iter_px
   enddo
 
   ! ecriture du nb d image par pixel et du rang de la matrice
-  write(31,rec=ny)(anb_im_inv(i),i=1,nxx)
-  write(32,rec=ny)(anb_int_inv(i),i=1,nxx)
-   write(33,rec=ny)(rang_inv(i),i=1,nxx)
+  write(31,rec=ny)(real(anb_im_inv(i)),i=1,nxx)
+  write(32,rec=ny)(real(anb_int_inv(i)),i=1,nxx)
+  write(33,rec=ny)(rang_inv(i),i=1,nxx)
 
-   write(34,rec=ny)(varip(i),i=1,nxx)
-   write(35,rec=ny)(real(loc_rms(i)),i=1,nxx)
+  write(34,rec=ny)(varip(i),i=1,nxx)
+  write(35,rec=ny)(real(loc_rms(i)),i=1,nxx)
  enddo ! fin de boucle sur indice irect
 
  deallocate(phase,coh)
@@ -3231,7 +3231,7 @@ subroutine listing
       endif
       endif
    enddo
-   write(*,*)'image ',Im_ini(i),' seen ',Im_num_ini(i),' times'
+   write(*,*)'image ',Im_ini(i),' vue ',Im_num_ini(i),' fois'
    enddo
    if(irepIm.gt.1.and.niter.lt.10)then
    do i=1,Simage_ini
@@ -3254,7 +3254,7 @@ subroutine listing
 
    Simage=COUNT(Im_num_ini>=irepIm)
    Ninterf=COUNT(flag_Im1_Im2_ini)
-   write(*,*)' nb images ',Simage,' nb ifgs ',Ninterf
+   write(*,*)'nb d images ',Simage,' nb d interfero ',Ninterf
 
    allocate(Im(Simage),Im1_Im2(Ninterf,2),Im_s(Simage),flag_Im1_Im2_comb(Ninterf))
    allocate(baselr(Ninterf),Im_num(Simage),niveau_eau(Simage),base_im(Simage))
@@ -3969,6 +3969,7 @@ end subroutine ouv_lect_int_med
 
 
 subroutine write_ts_envihdr(path, xsize, ysize, cnt, dates)
+  use info_communes
   character(*),intent(in)::path
   integer,intent(in)::xsize,ysize,cnt
   character(8),dimension(:),intent(in)::dates
