@@ -20,7 +20,7 @@ options:
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
   --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list = check_look/replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
-Job list is: ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
+Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
@@ -194,7 +194,7 @@ def run(cmd):
 
 class Job():
     """ Create a class of Jobs to be run: 
-    Job list is: ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
+    Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -389,7 +389,7 @@ class PileInt:
 class FiltFlatUnw:
     """ Create a class FiltFlatUnw defining all the post-procesing functions 
     list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
-    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref,
+    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref, min_z, detla_z,
     seedx, seedy.threshold_unw, unw_method
     Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask (default: 0.)
     defining the boundary of the mask zone for emprical estimations
@@ -404,7 +404,7 @@ class FiltFlatUnw:
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
         self.FilterStrength,self.Filt_method,
-        self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref,
+        self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref, self.min_z, self.delta_z,
         self.seedx, self.seedy,self.threshold_unw,self.threshold_unfilt,self.unw_method,
         ) = map(str, params)
 
@@ -472,24 +472,26 @@ def check_look(config,kk):
         outfile =  config.stack.getname(kk) + '.int'
         outcor =  config.stack.getcor(kk)
 
+        look = int(int(config.Rlooks_int)/2)
+
         do = checkoutfile(config,outfile)
         if do:
             try:
-                run("look.pl "+str(infile)+" "+str(config.rlook)+" > log_look.txt")
+                run("look.pl "+str(infile)+" "+str(look)+" > log_look.txt")
             except Exception as e:
                 logger.critical(e)
-                logger.critical(' Can''t look file {0} in {1} look'.format(infile,config.rlook))
-                print(look_pre.__doc__)
+                logger.critical(' Can''t look file {0} in {1} look'.format(infile,look))
+                print(check_look.__doc__)
                 config.stack.updatesuccess(kk)
         
         do = checkoutfile(config,outcor)
         if do:
             try:
-                run("look.pl "+str(corfile)+" "+str(look_factor)+" >> log_look.txt")
+                run("look.pl "+str(corfile)+" "+str(look)+" >> log_look.txt")
             except Exception as e:
                 logger.critical(e)
-                logger.critical(' Can''t look file {0} in {1} look'.format(corfile,config.rlook))
-                print(look_pre.__doc__)
+                logger.critical(' Can''t look file {0} in {1} look'.format(corfile,look))
+                print(check_look.__doc__)
                 config.stack.updatesuccess(kk)
                 
         # update size
@@ -759,7 +761,7 @@ def flata(config,kk):
 
 def flat_atmo(config, kk):
     ''' Function flatten atmosphere on wrapped phase  (See Doin et al., 2015)
-    Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo
+    Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo, min_z, delta_z
     Estimation done on filterSW file
     Plot phase/topo in *_phase-topo.png file
     '''
@@ -799,6 +801,10 @@ def flat_atmo(config, kk):
         # update DEM
         config.dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
 
+    if (np.int(config.ivar) == 2) and int(config.nfit_atmo) < 1:
+        logger.warning("ivar = 2, nfit must be > 0. Set nfit to 1")
+        config.nfit_atmo = 1
+
     with Cd(config.stack.getpath(kk)):
 
         if force:
@@ -824,50 +830,119 @@ def flat_atmo(config, kk):
         copyrsc(inrsc,stratrsc)
 
         # select points
-        i, j, z, phi, coh, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,10), unpack=True,dtype='f,f,f,f,f,f')
-        z = z - float(config.z_ref)
-        phi = phi*0.00020944
+        i, j, z, dphi, coh, az, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,9,10), unpack=True,dtype='f,f,f,f,f,f,f')
+        dphi = dphi*0.00020944
+        # z = z - np.float(config.z_ref)
+        # config.min_z = np.float(config.min_z) - np.float(config.z_ref)
 
+        # open parameters for plot 
         b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
 
-        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask))) and int(config.ivar)<2 :
+        # I dont understand ivar=0
+        # ivar=2 needs to be implemented with mask
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0.)  and int(config.ivar)<2 :
+
+            w,l = computesize(config,infile)
+            if (int(config.iend_mask) - int(config.ibeg_mask) == 0) and (int(config.jend_mask) - int(config.jbeg_mask) != 0):
+                config.iend_mask = w
+                config.ibeg_mask = 0
+            if (int(config.iend_mask) - int(config.ibeg_mask) != 0) and (int(config.jend_mask) - int(config.jbeg_mask) == 0):
+                config.jend_mask = l
+                config.jbeg_mask = 0                
             
+            import scipy.optimize as opt
+            import scipy.linalg as lst
+
             b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
 
             index = np.nonzero(
             np.logical_and(coh>np.float(config.thresh_amp_atmo),
-            np.logical_and(deltaz>125.,
+            np.logical_and(z>np.float(config.min_z),
+            np.logical_and(deltaz>np.float(config.delta_z),
             np.logical_and(np.logical_or(i<int(config.ibeg_mask),j>int(config.iend_mask)),
             np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
-            ))))
+            )))
+            ))
 
-            phi_select = phi[index]
-            z_select = z[index]
+            dphi_select = dphi[index]; z_select = z[index]; az_select = az[index]
+            # dphi_select = dphi; z_select= z; az_select = az
+
+            # new top file
+            strattxt = path.splitext(infile)[0] + '_strat.top'
+            rm(strattxt)
 
             if config.nfit_atmo == str(-1):
-                b1 = np.nanmedian(phi_select)
-                fit = z_select*b1
+                b1 = np.nanmedian(dphi_select)
+
+                # save median phase/topo
+                wf = open(strattxt, "w")
+                wf.write("%.6E" % (b1))
+                wf.close()
+
             elif config.nfit_atmo == str(0):
-                b1 = np.nanmean(phi_select)
-                fit = z_select*b1
+                b1 = np.nanmean(dphi_select)
+
+                # save mean phase/topo
+                wf = open(strattxt, "w")
+                wf.write("%.6E" % (b1))
+                wf.close()
+
             elif config.nfit_atmo == str(1):
-                from sklearn.linear_model import LinearRegression
-                model = LinearRegression()
-                model.fit(z_select, phi_select)
-                fit = model.predict(z_select)
-            else:
-                from sklearn.preprocessing import PolynomialFeatures
-                polynomial_features= PolynomialFeatures(degree=config.nfit_atmo)
-                x_poly = polynomial_features.fit_transform(z_select)
-                model = LinearRegression()
-                model.fit(x_poly, phi_select)
-                fit = model.predict(x_poly)
-            
-            # save median phase/topo
-            strattxt = path.splitext(infile)[0] + '_strat.top'
-            wf = open(strattxt, "w")
-            wf.write("  %.8f  %.8f  %.8f  %.8f  %.8f  %.8f\n" % (b1, b2, b3, b4, 0, 0))
-            wf.close()
+                G=np.zeros((len(z_select),2))
+                G[:,0] = z_select 
+                G[:,1] = 1
+                x0 = lst.lstsq(G,dphi_select)[0]
+                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select))**2)
+                _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-dphi_select))
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                b2 = pars[0]; b1 = pars[1]
+                # print(pars)
+
+                # save mean phase/topo
+                wf = open(strattxt, "w")
+                wf.write("%.6E %.6E" % (b1, b2))
+                wf.close()
+
+            elif config.nfit_atmo == str(2):
+                G=np.zeros((len(z_select),3))
+                G[:,0] = z_select**2 
+                G[:,1] = z_select
+                G[:,2] = 1
+                x0 = lst.lstsq(G,dphi_select)[0]
+                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select))**2)
+                _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-dphi_select))
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                b3 = pars[0]; b2 = pars[1]; b1 = pars[2]
+                # print(pars)
+
+                # save mean phase/topo
+                wf = open(strattxt, "w")
+                wf.write("%.6E %.6E %.6E" % (b1, b2, b3))
+                wf.close()
+
+            elif config.nfit_atmo == str(3):
+                G=np.zeros((len(z_select),4))
+                G[:,0] = z_select**3 
+                G[:,1] = z_select**2 
+                G[:,2] = z_select
+                G[:,3] = 1
+                x0 = lst.lstsq(G,dphi_select)[0]
+                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select))**2)
+                _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-dphi_select))
+                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+                b4 = pars[0]; b3 = pars[1]; b2 = pars[2]; b1 = pars[3]
+
+                # save mean phase/topo
+                wf = open(strattxt, "w")
+                wf.write("%.6E %.6E %.6E %.6E" % (b1, b2, b3,b4))
+                wf.close()
+
+            # # save median phase/topo
+            # strattxt = path.splitext(infile)[0] + '_strat.top'
+            # rm(strattxt)
+            # wf = open(strattxt, "w")
+            # wf.write("  %.6E  %.6E  %.6E  %.6E  %.6E  %.6E \n" % (b1, b2, b3, b4, 0, 0))
+            # wf.close()
             
             # clean and prepare for write strat
             infileunw = path.splitext(infile)[0] + '.unw'
@@ -885,21 +960,21 @@ def flat_atmo(config, kk):
             outrsc = infileunw + '.rsc'
             copyrsc(inrsc,outrsc)
 
-            # remove strat file created by flatten_topo and write
+            # remove strat file created by flatten_topo and write the new one
             rm(stratfile)
             try:
                 run("write_strat_unw "+str(strattxt)+" "+str(infileunw)+" "+str(config.dem)+" "+str(stratfile)\
                     +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" >> log_flatatmo.txt")
-            except Exception as e:
-                logger.critical(e)
+            except:
                 logger.critical("Failed creating stratified file: {0}".format(stratfile))
                 print(flat_atmo.__doc__)
                 config.stack.updatesuccess(kk)
+                sys.exit()
 
             outrsc = stratfile + '.rsc'
             copyrsc(inrsc,outrsc)
 
-            # remove model created by flatten_topo and run
+            # remove corrected ifg created by flatten_topo and create new one
             rm(outfile)
             rm(filtout)
             try:
@@ -920,26 +995,45 @@ def flat_atmo(config, kk):
                 logger.critical("Failed filtering IFG {0}: ".format(outfile))
                 config.stack.updatesuccess(kk)
                 print(flat_atmo.__doc__)
+
+            # rm(infileunw)
                 
         else:
-            z_select = z; phi_select = phi
-            # I dont understand ivar=0
-            # ivar=2 needs to be implemented
-            fit = b1*z_select + (b2/2.)*z_select**2 + (b3/3.)*z_select**2 + (b4/4.)*z_select**2
+            z_select = z; dphi_select = dphi; az_select = az
 
-        # What about the cst??
-        cst = np.nanmean(fit-phi_select*z_select)
+        # lets not plot dphi but phi
+        index = z_select.argsort()
+        z_select = z_select[index]; dphi_select = dphi_select[index]; az_select = az_select[index]
+        phi_select = dphi_select*z_select
+        phi = dphi*z
+
+        if int(config.ivar)<2:
+            fit = b1*(z_select - np.float(config.z_ref)) + (b2/2.)*((z_select)**2 -np.float(config.z_ref)**2) + \
+            (b3/3.)*((z_select)**3-np.float(config.z_ref)**3) + (b4/4.)*((z_select)**4 - np.float(config.z_ref)**4)
+        else:
+            fit = b1*(z_select-np.float(config.z_ref)) + ((b2 + b3*az_select)/2.)*((z_select - np.float(config.z_ref))**2) + \
+            ((b4 + b5*az_select)/3.)*((z_select-np.float(config.z_ref))**3)
+
+        # compute crappy constant for the plot
+        cst = np.nanmean(fit-phi_select)
 
         # plot phase/topo
-        fig = plt.figure(0)
-        ax = fig.add_subplot(1,1,1)
-        # lets not plot dphi but phi
-        ax.plot(z,phi*z,'.',label='all points',alpha=.4)
-        ax.plot(z_select,phi_select*z_select,'.',label='selected points',alpha=.6)
-        ax.plot(z_select,fit-cst,'-r',lw=3,label='Fit: {0:.3f}z + {1:.3f}z**2 + {2:.3f}z**3 + {3:.3f}z**4'.format(b1,b2,b3,b4))
+        fig = plt.figure(0, figsize=(11,4))
+        ax = fig.add_subplot(1,2,1)
+        ax.plot(z,dphi*z,'.',label='all points',alpha=.2)
         ax.set_xlabel('Elevation (m)')
         ax.set_ylabel('Phase (rad)')
-        plt.legend(loc='best')
+        ax = fig.add_subplot(1,2,2)
+        ax.plot(z,dphi*z,'.',label='all points',alpha=.2)
+        ax.plot(z_select,phi_select,'.',label='selected points',alpha=.4)
+        if int(config.ivar)<2:
+            ax.plot(z_select,fit-cst,'-r',lw=4,label='Fit: {0:.2E}z + {1:.2E}z**2 + {2:.2E}z**3 + {3:.2E}z**4'.format(b1,b2,b3,b4))
+        else:
+            ax.plot(z_select,fit-cst,'-r',lw=4,label='Fit: {0:.2E}*z + ({1:.2E}+{2:.2E}az)/2.*z**2 + ({3:.2E}+{4:.2E}*az)/3.*z**3'.format(b1,b2,b3,b4,b5))
+
+        ax.set_xlabel('Elevation (m)')
+        ax.set_ylabel('Phase (rad)')
+        plt.legend(loc='best',fontsize = 'x-small')
         plotfile = path.splitext(infile)[0] + '_phase-topo.png'
         fig.savefig(plotfile, format='PNG')
         # plt.show()
@@ -1517,6 +1611,8 @@ proc_defaults = {
     "thresh_amp_topo": "0.2",
     "ivar": "1", # fct of topography only
     "z_ref": "8000.", # reference
+    "min_z": "0.", # min elevation
+    "delta_z": "75.", # min elevation
     "filterstyle": "SWc",
     "SWamplim": "0.05",
     "SWwindowsize": "8",
@@ -1554,15 +1650,15 @@ print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
     nfit_az: {8}, thresh_amp_az: {9}\n\
     filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
     FilterStrength : {13}, Filt_method : {14}\n\
-    nfit_topo: {15}, thresh_amp_topo: {16}, ivar: {17}, z_ref: {18}\n\
-    seedx: {19}, seedy: {20}, threshold_unw: {21}, threshold_unfilt: {22} unw_method: {23}'.\
+    nfit_topo: {15}, thresh_amp_topo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
+    seedx: {21}, seedy: {22}, threshold_unw: {23}, threshold_unfilt: {24} unw_method: {25}'.\
     format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
     proc["FilterStrength"],proc["Filt_method"],\
-    proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],\
+    proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
     proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"]\
     ))
 print()
@@ -1646,7 +1742,7 @@ for p in jobs:
         proc["nfit_az"], proc["thresh_amp_az"],
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
         proc["FilterStrength"], proc["Filt_method"], 
-        proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"],
+        proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, force=force, 
         ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask,
