@@ -75,8 +75,11 @@ else:
   nproc = int(arguments["--nproc"])
 
 outlook = str(int(rlook)+int(dlook))
-rlook = str('_' + str(rlook) + 'rlks')
-
+if int(rlook) > 1:
+	rlook = str('_' + str(rlook) + 'rlks')
+else:
+	rlook = ''
+	
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
 kmax=len(date_1)
 # cleanif 
