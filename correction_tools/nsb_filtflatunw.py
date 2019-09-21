@@ -876,7 +876,7 @@ def flat_atmo(config, kk):
 
                 # save median phase/topo
                 wf = open(strattxt, "w")
-                wf.write("%.6E" % (b1))
+                wf.write("%16.8E" % (b1))
                 wf.close()
 
             elif config.nfit_atmo == str(0):
@@ -884,7 +884,7 @@ def flat_atmo(config, kk):
 
                 # save mean phase/topo
                 wf = open(strattxt, "w")
-                wf.write("%.6E" % (b1))
+                wf.write("%16.8E" % (b1))
                 wf.close()
 
             elif config.nfit_atmo == str(1):
@@ -900,7 +900,7 @@ def flat_atmo(config, kk):
 
                 # save mean phase/topo
                 wf = open(strattxt, "w")
-                wf.write("%.6E %.6E" % (b1, b2))
+                wf.write("%15.8E %15.8E" % (b1, b2))
                 wf.close()
 
             elif config.nfit_atmo == str(2):
@@ -917,7 +917,7 @@ def flat_atmo(config, kk):
 
                 # save mean phase/topo
                 wf = open(strattxt, "w")
-                wf.write("%.6E %.6E %.6E" % (b1, b2, b3))
+                wf.write("%15.8E %15.8E %15.8E" % (b1, b2, b3))
                 wf.close()
 
             elif config.nfit_atmo == str(3):
@@ -934,7 +934,7 @@ def flat_atmo(config, kk):
 
                 # save mean phase/topo
                 wf = open(strattxt, "w")
-                wf.write("%.6E %.6E %.6E %.6E" % (b1, b2, b3,b4))
+                wf.write("%15.8E %15.8E %15.8E %15.8E" % (b1, b2, b3,b4))
                 wf.close()
 
             # # save median phase/topo
