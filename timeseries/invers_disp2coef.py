@@ -1042,6 +1042,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
     # sigma m **2 =  misfit**2 * diag([G.TG]-1)
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
+       # res2 = np.sum(pow((b-np.dot(A,fsoln))/sigmad,2))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
        scale = 1./(A.shape[0]-A.shape[1])
        # scale = 1./A.shape[0]
@@ -3752,28 +3753,28 @@ for l in range((N)):
             band = ds.GetRasterBand(1)
             band.WriteArray(data_flat)
             ds.SetGeoTransform(gt)
-            ds.plt.setprojection(proj)
+            ds.SetProjection(proj)
             band.FlushCache()
 
             ds = driver.Create(outdir+'{}_ramp_tropo.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(ramp+tropo)
             ds.SetGeoTransform(gt)
-            ds.plt.setprojection(proj)
+            ds.SetProjection(proj)
             band.FlushCache()
 
             ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(model)
             ds.SetGeoTransform(gt)
-            ds.plt.setprojection(proj)
+            ds.SetProjection(proj)
             band.FlushCache()
 
             # ds = driver.Create(outdir+'{}_res.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             # band = ds.GetRasterBand(1)
             # band.WriteArray(res)
             # ds.SetGeoTransform(gt)
-            # ds.plt.setprojection(proj)
+            # ds.SetProjection(proj)
             # band.FlushCache()
 
         else:
@@ -3823,7 +3824,7 @@ if arguments["--geotiff"] is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].m)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3833,7 +3834,7 @@ if arguments["--geotiff"] is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(basis[l].sigmam)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3844,7 +3845,7 @@ if arguments["--geotiff"] is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].m)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3854,7 +3855,7 @@ if arguments["--geotiff"] is not None:
         band = ds.GetRasterBand(1)
         band.WriteArray(kernels[l].sigmam)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3904,7 +3905,7 @@ if arguments["--seasonal"]  == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3913,7 +3914,7 @@ if arguments["--seasonal"]  == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3934,7 +3935,7 @@ if arguments["--seasonal"]  == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3943,7 +3944,7 @@ if arguments["--seasonal"]  == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3975,7 +3976,7 @@ if arguments["--semianual"] == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -3984,7 +3985,7 @@ if arguments["--semianual"] == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -4004,7 +4005,7 @@ if arguments["--semianual"] == 'yes':
         ds = driver.Create('phi_simiwt_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -4012,7 +4013,7 @@ if arguments["--semianual"] == 'yes':
         ds = driver.Create('phi_simiwt_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -4044,7 +4045,7 @@ if arguments["--bianual"] == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(amp)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -4053,7 +4054,7 @@ if arguments["--bianual"] == 'yes':
         band = ds.GetRasterBand(1)
         band.WriteArray(sigamp)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -4073,7 +4074,7 @@ if arguments["--bianual"] == 'yes':
         ds = driver.Create('phiw.5t_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(phi)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 
@@ -4081,7 +4082,7 @@ if arguments["--bianual"] == 'yes':
         ds = driver.Create('phiw.5t_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
         band.WriteArray(sigphi)
         ds.SetGeoTransform(gt)
-        ds.plt.setprojection(proj)
+        ds.SetProjection(proj)
         band.FlushCache()
         del ds
 

@@ -1637,7 +1637,7 @@ def apply_cor(kk, sp, sp_inv):
         dst_band2 = dst_ds.GetRasterBand(1)
         dst_band2.WriteArray(flatlos,0,0)
         dst_ds.SetGeoTransform(gt)
-        dst_ds.plt.setprojection(proj)
+        dst_ds.SetProjection(proj)
         dst_band2.FlushCache()
         del dst_ds, ds
 
