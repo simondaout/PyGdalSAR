@@ -172,7 +172,7 @@ amp_map[dem_map<minelev] = np.float('NaN')
 lin_map[dem_map<minelev] = np.float('NaN')
 
 phi_map[amp_map<threshold_amp] = np.float('NaN')
-lin_map[amp_map<threshold_amp] = np.float('NaN')
+# lin_map[amp_map<threshold_amp] = np.float('NaN')
 
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi

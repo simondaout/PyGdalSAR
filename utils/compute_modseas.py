@@ -273,7 +273,7 @@ mean_neg,std_neg = np.array(mean_neg),np.array(std_neg)
 # plot slope postive
 fig=plt.figure(1,figsize=(14,5))
 ax=fig.add_subplot(1,2,1)
-ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Thesh. Slope: {}'.format(0.03)) 
+ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Slope >: {}'.format(0.03)) 
 ax.errorbar(dmod,mean_pos,yerr=std_pos,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -294,7 +294,7 @@ ax.set_title('Slope > {}'.format(0.03))
 
 # plot slope negative
 ax2=fig.add_subplot(1,2,2)
-ax2.plot(dmod,mean_neg,'o',c='blue',ms=6.,label='Thesh. Amp: {}'.format(np.int(minamp)))
+ax2.plot(dmod,mean_neg,'o',c='blue',ms=6.,label='Slope <: {}'.format(0.03))
 ax2.errorbar(dmod,mean_neg,yerr=std_neg,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -310,7 +310,7 @@ ax2.set_xlim([0,1])
 ax2.set_xticks(np.arange(0,1, 1./12))
 ax2.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax2.set_title(' Slope < {}'.format(0.03)
+ax2.set_title(' Slope < {}'.format(0.03))
 
 fig.tight_layout()
 fig.savefig('{}-modseas.pdf'.format(arguments["--name"]), format='PDF',dpi=80)
