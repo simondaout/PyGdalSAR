@@ -267,31 +267,53 @@ class PileInt:
         return self._ifgs[kk].prefix, self._ifgs[kk].suffix
 
     def get_default_name(self,kk):
-        ''' Return interfergram file name at 2looks'''
-        return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_2rlks'
+        ''' Return interfergram file name'''
+        _f = str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) 
+        temp_rlook = 1 
+        if path.exists(_f) == False:
+            _f = str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_2rlks'
+            temp_rlook = 2
+        return _f, temp_rlook
 
     def get_default_cor(self,kk):
-        ''' Return cohrence file name at 2looks'''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_2rlks.cor'
+        ''' Return cohrence file name'''
+        _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.cor'
+        temp_rlook = 1 
+        if path.exists(_f) == False:
+            _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_2rlks.cor'
+        return  _f
 
     def getname(self,kk):
         ''' Return interfergram file name '''
-        return str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  \
-        self._ifgs[kk].look + 'rlks'
+        if int(self._ifgs[kk].look) > 1:
+          _f = str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' + self._ifgs[kk].look + 'rlks'
+        else:
+          _f = str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) 
+        return _f
 
     def getfiltSW(self,kk):
         ''' Return interfergram file name '''
-        return 'filt' + str(self.filterstyle) + '_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + \
-        str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks'
+        if int(self._ifgs[kk].look) > 1:
+          _f = 'filt' + str(self.filterstyle) + '_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks'
+        else:
+          _f = 'filt' + str(self.filterstyle) + '_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) 
+        return _f
 
     def getfiltROI(self,kk):
         ''' Return interfergram file name '''
-        return 'filt_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) \
-        + '_' +  self._ifgs[kk].look + 'rlks'
+        if int(self._ifgs[kk].look) > 1:
+          _f = 'filt_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_' +  self._ifgs[kk].look + 'rlks'
+        else:
+          _f = 'filt_' + str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) 
+        return _f
 
     def getcor(self,kk):
         ''' Return cohrence file name '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self._ifgs[kk].look + 'rlks.cor'
+        if int(self._ifgs[kk].look) > 1:
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self._ifgs[kk].look + 'rlks.cor'
+        else:
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.cor'
+        return _f
 
     def getsize(self,kk):
         ''' Return width and length IFG '''
@@ -303,32 +325,53 @@ class PileInt:
 
     def getstratfile(self,kk):
         ''' Return stratified file name '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks'
+        if int(self._ifgs[kk].look) > 1:
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat_' +  self._ifgs[kk].look + 'rlks'
+        else:
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_strat' 
+        return _f
 
     def getmodelfile(self,kk):
         ''' Return model file name 
         Assume model computed on the Rlooks_unw IFG...
         '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.strat'
+        if int(self.Rlooks_unw) > 1:
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.strat'
+        else:
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.strat'
+        return _f
 
     def geterafiles(self,kk):
         ''' Return ERA model file names '''
-        mdel1 = str(self.EraDir) + str(self._ifgs[kk].date1) + '_mdel' + '_' + self.Rlooks_unw + 'rlks' + '.unw'
-        mdel2 = str(self.EraDir) + str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_unw + 'rlks' + '.unw'
-        mdel12 = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_unw + 'rlks' + '.unw'
+        if int(self.Rlooks_unw) > 1:
+          mdel1 = str(self.EraDir) + '/'+ str(self._ifgs[kk].date1) + '_mdel' + '_' + self.Rlooks_int + 'rlks' + '.unw'
+          mdel2 = str(self.EraDir) + '/'+ str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_int + 'rlks' + '.unw'
+          mdel12 = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_int + 'rlks' + '.unw'
+        else:
+          mdel1 = str(self.EraDir) + '/'+ str(self._ifgs[kk].date1) + '_mdel' + '.unw'
+          mdel2 = str(self.EraDir) + '/'+ str(self._ifgs[kk].date2) + '_mdel' + '.unw'
+          mdel12 = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_mdel' + '.unw'
         return  mdel1, mdel2, mdel12
 
     def getflatrfile(self,kk):
         ''' Return stratified file name 
         Assume estimation computed on the Rlooks_int IFG...
         '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flatr'
+        if int(self.Rlooks_int) > 1:
+          _f=str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flatr'
+        else:
+          _f=str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.flatr'
+        return _f
 
     def getflatafile(self,kk):
         ''' Return stratified file name 
         Supposed estimation computed on the Rlooks_int IFG...
         '''
-        return  str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flata'
+        if int(self.Rlooks_int) > 1:
+          _f=str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_' +  self.Rlooks_int + 'rlks' + '.flata'
+        else:
+          _f=str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.flata'
+        return _f
 
     def updatelook(self,kk,newlook):
         self._ifgs[kk] = self._ifgs[kk]._replace(look=newlook)  
@@ -420,7 +463,10 @@ class FiltFlatUnw:
         self.strat = False
 
         # initilise radar file
-        self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_int + 'rlks.hgt'
+        if int(self.Rlooks_int) > 1:
+          self.dem =  self.SARMasterDir + '/'+  'radar_' + self.Rlooks_int + 'rlks.hgt'
+        else:
+          self.dem =  self.SARMasterDir + '/'+  'radar.hgt'
 
         # mask empirical estimations
         self.ibeg_mask, self.iend_mask, self.jbeg_mask, self.jend_mask = ibeg_mask, iend_mask, jbeg_mask, jend_mask
@@ -460,19 +506,20 @@ def look_file(config,file):
 def check_look(config,kk):
     ''' This function aims at multilooking all your IFGs and radar file to Rlooks_int. 
     To be used at a first stage of the processing if you want to corrrect your wrapped Ifgs to a higher look that the look they have been generated.
-    Attention: Default hardcoding factor of Rlooks_int-2. Igs are assumed to be generated at 2looks.. need to add a new argument to change that.
+    Attention: Default hardcoding factor of Rlooks_int/2. Igs are assumed to be generated at 2looks.. need to add a new argument to change that.
     Requiered parameters:  Rlooks_int
     '''
 
     with Cd(config.stack.getpath(kk)):
 
-        infile = config.stack.get_default_name(kk) + '.int'; checkinfile(infile)
+        infile, temp_rlook = config.stack.get_default_name(kk) 
+        infile= infile + '.int'; checkinfile(infile)
         corfile = config.stack.get_default_cor(kk); checkinfile(corfile)
 
         outfile =  config.stack.getname(kk) + '.int'
         outcor =  config.stack.getcor(kk)
 
-        look = int(int(config.Rlooks_int)/2)
+        look = int(int(config.Rlooks_int)/temp_rlook)
 
         do = checkoutfile(config,outfile)
         if do:
@@ -534,12 +581,12 @@ def ecmwf(config,kk):
         copyrsc(rscfile,outrsc)
 
         if force:
-            rm(outfile)
+            rm(outfile), rm(erafiles[2])
         # check if not done
         do = checkoutfile(config,outfile)
         if do:
             try:
-                run("add_rmg.pl "+str(erafiles[0])+" "+str(erafiles[1])+" "+str(erafiles[2])+" -1 0 > log_erai.txt" )
+                run("add_rmg.pl "+str(erafiles[1])+" "+str(erafiles[0])+" "+str(erafiles[2])+" -1 0 > log_erai.txt" )
                 checkinfile(erafiles[2])
                 run("removeModel.pl "+str(infile)+" "+str(erafiles[2])+" "+str(outfile)+" >> log_erai.txt")
 
@@ -799,7 +846,10 @@ def flat_atmo(config, kk):
         logger.warning('IFG:{0} and DEM file are not the same size: {0}'.format(infile))
         look_file(config,config.dem)
         # update DEM
-        config.dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
+        if int(config.Rlooks_unw) > 1:
+          config.dem = config.SARMasterDir + '/'+  'radar_' + config.Rlooks_unw + 'rlks.hgt'
+        else:
+          config.dem = config.SARMasterDir + '/'+  'radar.hgt'
 
     if (np.int(config.ivar) == 2) and int(config.nfit_atmo) < 1:
         logger.warning("ivar = 2, nfit must be > 0. Set nfit to 1")
@@ -812,7 +862,7 @@ def flat_atmo(config, kk):
         do = checkoutfile(config,outfile)
         if do:
             try:
-                run("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
+                 run("flatten_topo "+str(infile)+" "+str(filtfile)+" "+str(config.dem)+" "+str(outfile)+" "+str(filtout)\
                 +" "+str(config.nfit_atmo)+" "+str(config.ivar)+" "+str(config.z_ref)+" "+str(config.thresh_amp_atmo)+" "+\
                 str(stratfile)+" > log_flatatmo.txt")
             except Exception as e:
@@ -832,45 +882,63 @@ def flat_atmo(config, kk):
         # select points
         i, j, z, dphi, coh, az, deltaz = np.loadtxt('ncycle_topo',comments='#', usecols=(0,1,2,3,5,9,10), unpack=True,dtype='f,f,f,f,f,f,f')
         dphi = dphi*0.00020944
-        # z = z - np.float(config.z_ref)
-        # config.min_z = np.float(config.min_z) - np.float(config.z_ref)
 
         # open parameters for plot 
         b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
 
         # I dont understand ivar=0
         # ivar=2 needs to be implemented with mask
-        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0.)  and int(config.ivar)<2 :
+        if int(config.ivar)>1 :
+            logger.warning("ivar=2, no masking implemented !!!")
 
-            w,l = computesize(config,infile)
-            if (int(config.iend_mask) - int(config.ibeg_mask) == 0) and (int(config.jend_mask) - int(config.jbeg_mask) != 0):
-                config.iend_mask = w
-                config.ibeg_mask = 0
-            if (int(config.iend_mask) - int(config.ibeg_mask) != 0) and (int(config.jend_mask) - int(config.jbeg_mask) == 0):
-                config.jend_mask = l
-                config.jbeg_mask = 0                
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0. or config.delta_z != None)  and int(config.ivar)<2 :
+
+            # w,l = computesize(config,infile)
+            # if (int(config.iend_mask) - int(config.ibeg_mask) == 0) and (int(config.jend_mask) - int(config.jbeg_mask) != 0):
+            #     config.iend_mask = w
+            #     config.ibeg_mask = 0
+            # if (int(config.iend_mask) - int(config.ibeg_mask) != 0) and (int(config.jend_mask) - int(config.jbeg_mask) == 0):
+            #     config.jend_mask = l
+            #     config.jbeg_mask = 0                
             
             import scipy.optimize as opt
             import scipy.linalg as lst
 
             b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
+            
+            #print(config.thresh_amp_atmo, config.min_z, config.delta_z)
+            # print(config.ibeg_mask,config.iend_mask)
+            # print(config.jbeg_mask,config.jend_mask)
+            # print(config.thresh_amp_atmo,config.min_z,config.delta_z)
 
-            index = np.nonzero(
-            np.logical_and(coh>np.float(config.thresh_amp_atmo),
-            np.logical_and(z>np.float(config.min_z),
-            np.logical_and(deltaz>np.float(config.delta_z),
-            np.logical_and(np.logical_or(i<int(config.ibeg_mask),j>int(config.iend_mask)),
-            np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
-            )))
-            ))
 
+            if config.delta_z is None:
+                index = np.nonzero(
+                np.logical_and(coh>np.float(config.thresh_amp_atmo),
+                np.logical_and(z>np.float(config.min_z),
+                np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
+                np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
+                )))
+                )
+            else:
+                index = np.nonzero(
+                np.logical_and(coh>np.float(config.thresh_amp_atmo),
+                np.logical_and(z>np.float(config.min_z),
+                np.logical_and(deltaz>np.float(config.delta_z),
+                np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
+                np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
+                )))))
+                # )))
+
+            print(index)
+            print()
             dphi_select = dphi[index]; z_select = z[index]; az_select = az[index]
+            rms = 1./coh[index]
             # dphi_select = dphi; z_select= z; az_select = az
 
             # new top file
             strattxt = path.splitext(infile)[0] + '_strat.top'
             rm(strattxt)
-
             if config.nfit_atmo == str(-1):
                 b1 = np.nanmedian(dphi_select)
 
@@ -892,8 +960,8 @@ def flat_atmo(config, kk):
                 G[:,0] = z_select 
                 G[:,1] = 1
                 x0 = lst.lstsq(G,dphi_select)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select))**2)
-                _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-dphi_select))
+                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-dphi_select)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 b2 = pars[0]; b1 = pars[1]
                 # print(pars)
@@ -909,8 +977,8 @@ def flat_atmo(config, kk):
                 G[:,1] = z_select
                 G[:,2] = 1
                 x0 = lst.lstsq(G,dphi_select)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select))**2)
-                _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-dphi_select))
+                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-dphi_select)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 b3 = pars[0]; b2 = pars[1]; b1 = pars[2]
                 # print(pars)
@@ -927,14 +995,14 @@ def flat_atmo(config, kk):
                 G[:,2] = z_select
                 G[:,3] = 1
                 x0 = lst.lstsq(G,dphi_select)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select))**2)
-                _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-dphi_select))
+                _func = lambda x: np.sum(((np.dot(G,x)-dphi_select)/rms)**2)
+                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-dphi_select)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 b4 = pars[0]; b3 = pars[1]; b2 = pars[2]; b1 = pars[3]
 
                 # save mean phase/topo
                 wf = open(strattxt, "w")
-                wf.write("%15.8E %15.8E %15.8E %15.8E" % (b1, b2, b3,b4))
+                wf.write("%15.8E %15.8E %15.8E %15.8E" % (b1, b2, b3, b4))
                 wf.close()
 
             # # save median phase/topo
@@ -999,30 +1067,35 @@ def flat_atmo(config, kk):
             # rm(infileunw)
                 
         else:
-            z_select = z; dphi_select = dphi; az_select = az
+            z_select = np.copy(z); dphi_select = np.copy(dphi); az_select = np.copy(az)
 
         # lets not plot dphi but phi
+        phi = dphi*z
+        
         index = z_select.argsort()
         z_select = z_select[index]; dphi_select = dphi_select[index]; az_select = az_select[index]
         phi_select = dphi_select*z_select
-        phi = dphi*z
 
         if int(config.ivar)<2:
             fit = b1*(z_select - np.float(config.z_ref)) + (b2/2.)*((z_select)**2 -np.float(config.z_ref)**2) + \
             (b3/3.)*((z_select)**3-np.float(config.z_ref)**3) + (b4/4.)*((z_select)**4 - np.float(config.z_ref)**4)
+        elif (config.nfit_atmo) == 3 :
+            fit = (b1+b2*az_select)/2.*(z_select-np.float(config.z_ref))**2 + (b3+b4*az_select)/3.*(z_select-np.float(config.z_ref))**3
         else:
-            fit = b1*(z_select-np.float(config.z_ref)) + ((b2 + b3*az_select)/2.)*((z_select - np.float(config.z_ref))**2) + \
-            ((b4 + b5*az_select)/3.)*((z_select-np.float(config.z_ref))**3)
+            fit = b1*(z_select-np.float(config.z_ref)) +(b2+b3*az_select)/2.*(z_select-np.float(config.z_ref))**2 + (b4+b5*az_select)/3.*(z_select-np.float(config.z_ref))**3
 
         # compute crappy constant for the plot
-        cst = np.nanmean(fit-phi_select)
+        cst = np.nanmedian(fit-phi_select)
 
         # plot phase/topo
         fig = plt.figure(0, figsize=(11,4))
-        ax = fig.add_subplot(1,2,1)
-        ax.plot(z,dphi*z,'.',label='all points',alpha=.2)
-        ax.set_xlabel('Elevation (m)')
-        ax.set_ylabel('Phase (rad)')
+        ax1 = fig.add_subplot(1,2,1)
+        ax1.plot(z,dphi*z,'.',label='all points',alpha=.2)
+        ax1.set_xlabel('Elevation (m)')
+        ax1.set_ylabel('Phase (rad)')
+        ymin,ymax = ax1.get_ylim() 
+        # print(ymin,ymax)
+
         ax = fig.add_subplot(1,2,2)
         ax.plot(z,dphi*z,'.',label='all points',alpha=.2)
         ax.plot(z_select,phi_select,'.',label='selected points',alpha=.4)
@@ -1033,9 +1106,12 @@ def flat_atmo(config, kk):
 
         ax.set_xlabel('Elevation (m)')
         ax.set_ylabel('Phase (rad)')
+        ax.set_ylim(ymin,ymax)
         plt.legend(loc='best',fontsize = 'x-small')
         plotfile = path.splitext(infile)[0] + '_phase-topo.png'
         fig.savefig(plotfile, format='PNG')
+       
+
         # plt.show()
         plt.close()
         del fig, ax
@@ -1320,7 +1396,10 @@ def add_atmo_back(config,kk):
     with Cd(config.stack.getpath(kk)):
 
         # look strat file
-        stratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
+        if int(config.Rlooks_int) > 1:
+          stratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat_' + config.Rlooks_int + 'rlks.unw'
+        else:
+          stratfile = str(config.stack[kk].date1) + '-' + str(config.stack[kk].date2) + '_strat.unw'
         look_file(config,stratfile)
         
         # update look unw in case not done already
@@ -1377,8 +1456,6 @@ def add_flatr_back(config,kk):
         if "_flatr" in unwfile:
             param = config.stack.getflatrfile(kk)
             unwrsc = unwfile + '.rsc'
-
-            # look_factor = int(config.Rlooks_unw) - int(config.Rlooks_int)
 
             # update names
             prefix, suffix = config.stack.getfix(kk)
@@ -1612,7 +1689,7 @@ proc_defaults = {
     "ivar": "1", # fct of topography only
     "z_ref": "8000.", # reference
     "min_z": "0.", # min elevation
-    "delta_z": "75.", # min elevation
+    "delta_z": "None", 
     "filterstyle": "SWc",
     "SWamplim": "0.05",
     "SWwindowsize": "8",
