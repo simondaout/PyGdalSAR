@@ -19,7 +19,7 @@ and wrapped phase between 0 to 2pi
 Usage: clean_phi-amp.py [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--topofile=<path>] \
 [--sigampfile=<path>] [--sigphifile=<path>] [--lectfile=<path>] [--threshold_amp=<value>] [--perc_sig=<value>] \
 [--outampfile=<path>] [--outphifile=<path>] [--outlinfile=<path>] [--slopefile=<path>] [--slopelosfile=<path>]  [--plotcorr=<yes/no>] \
-[--maxamp=<value>] [--minelev=<value>] [--rad2mm=<value>]
+[--maxamp=<value>] [--minelev=<value>] [--rad2mm=<value>] [--outfig=<path>]
 
 
 Options:
@@ -39,6 +39,7 @@ Options:
 --maxamp=<value>        Maximum Amplitude limit [default: 3.]
 --minelev=<value>       Minimum Elevation limit [default: 3500.]
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
+--outfig                Name for the output figure [default: clean_phi-amp]
 """
 
 from __future__ import print_function
@@ -123,6 +124,11 @@ if arguments["--threshold_amp"] ==  None:
 else:
     threshold_amp = np.float(arguments["--threshold_amp"])
 
+if arguments["--outfig"] ==  None:
+    outfig = 'clean_phi-amp'
+else:
+    outfig = arguments["--outfig"]
+
 ncols, nlines = map(int, open(lectf).readline().split(None, 2)[0:2])
 
 amp,phi,lin=np.fromfile(ampf,dtype=np.float32)[:nlines*ncols],np.fromfile(phif,dtype=np.float32)[:nlines*ncols],np.fromfile(linf,dtype=np.float32)[:nlines*ncols]
@@ -158,6 +164,7 @@ if arguments["--perc_sig"] ==  None:
     perc_sig = 99.
 else:
     perc_sig = np.float(arguments["--perc_sig"])
+    
 phi_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
 amp_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
 lin_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
@@ -198,8 +205,8 @@ threshold_amp,maxamp = threshold_amp*abs(rad2mm),maxamp*abs(rad2mm)
 fig_ampphi = plt.figure(0,figsize=(12,6))
 ax = fig_ampphi.add_subplot(1,3,1)
 cmap = cm.rainbow
-if demf is not None:
-    cax = ax.imshow(dem_map,cmap=cm.Greys,zorder=1)
+# if arguments["--slopefile"] is not None:
+cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
 # no point to take negatif amplitude
 im = ax.imshow(np.ma.array(amp_map, mask=np.isnan(amp_map)),cmap=cmap,vmin=threshold_amp,\
     vmax=np.nanpercentile(amp_map,98), alpha=0.8, zorder=2)
@@ -209,9 +216,10 @@ plt.colorbar(im, cax=cax)
 ax.set_title('Amplitude (mm)',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,2)
-cmap_phi = cm.tab20b
-if demf is not None:
-    cax = ax.imshow(dem_map,cmap=cm.Greys,zorder=1)
+# cmap_phi = cm.tab20b
+cmap_phi = cm.PiYG_r
+# if arguments["--slopefile"] is not None:
+cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
 im = ax.imshow(np.ma.array(phi_map, mask=np.isnan(phi_map)),cmap=cmap_phi,vmin=0,vmax=2*np.pi,alpha=0.8,zorder=2)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -219,8 +227,8 @@ plt.colorbar(im, cax=cax)
 ax.set_title('Timing (rad)',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,3)
-if demf is not None:
-    cax = ax.imshow(dem_map,cmap=cm.Greys,zorder=1)
+# if arguments["--slopefile"] is not None:
+cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
 vmax = np.nanpercentile(lin_map,95)
 vmin = np.nanpercentile(lin_map,5)
 im = ax.imshow(np.ma.array(lin_map, mask=np.isnan(lin_map)),vmin=vmin,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2)
@@ -229,6 +237,8 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 ax.set_title('Velocity (mm/yr)',fontsize=12)
 fig_ampphi.tight_layout()
+
+fig_ampphi.savefig('{}.pdf'.format(outfig), format='PDF',dpi=150)
 
 # remove Nan 
 kk = np.nonzero(~np.isnan(phi_map))
@@ -257,6 +267,9 @@ ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
 ax.set_title('Histo timing',fontsize=6)
 ax.legend(loc='best')
 fig_histo.tight_layout()
+
+fig_histo.savefig('{}_histo.pdf'.format(outfig), format='PDF',dpi=150)
+
 
 if plotcorr == 'yes':
 
