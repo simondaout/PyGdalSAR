@@ -46,8 +46,8 @@ basis functions (Depricate) [default: 1.]
 --name Value            Name output figures [default: None] 
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
 --plot                  Display results [default: yes]            
---iref                  colum numbers of the reference pixel [default: None] 
---jref                  lign number of the reference pixel [default: None]
+iref                  colum numbers of the reference pixel [default: None] 
+jref                  lign number of the reference pixel [default: None]
 --bounds                yMin,yMax time series plots 
 --dateslim              Datemin,Datemax time series  
 """
@@ -418,6 +418,7 @@ else:
 if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
 
+markers = ['o','v','^','s','P','X','o','v','^','s','P','X']
 
 ipix = map(int,arguments["--cols"].replace(',',' ').split())
 jpix = map(int,arguments["--ligns"].replace(',',' ').split())
@@ -522,7 +523,8 @@ else:
 
 ax = fig.add_subplot(1,2,1)
 ax.imshow(maps[jstart:jend,istart:iend,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
-ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
+for i in range(len(ipix)):
+    ax.scatter(ipix[i]-istart,jpix[i]-jstart,marker=markers[i],color='black',s=10.)
 if iref is not None and jref is not None:
     ax.scatter(iref-istart,jref-jstart,marker='x',color='red',s=20.)
 for i in xrange((Npix)):
@@ -531,14 +533,15 @@ plt.suptitle('Black cross: pixels, red cross: reference point')
 
 ax = fig.add_subplot(1,2,2)
 im = ax.imshow(maps[:,:,-1],cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
-ax.scatter(ipix,jpix,marker='x',color='black',s=15.)
+for i in range(len(ipix)):
+    ax.scatter(ipix[i],jpix[i],marker=markers[i],color='black',s=10.)
 ax.scatter(iref,jref,marker='x',color='red',s=20.)
 for i in xrange((Npix)):
     ax.text(ipix[i],jpix[i],i)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
-plt.suptitle('Black cross: pixels, red cross: reference point')
+plt.suptitle('Black symbols: pixels, red cross: reference point')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
 
 # print(iref, jref)
@@ -895,14 +898,14 @@ for jj in xrange((Npix)):
     # plot data and model minus dem error
     if infof is not None:
       # print infof, infm
-      ax.plot(x,disp-demerr,'o',markersize=4,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
+      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
     else:
-      ax.plot(x,disp-demerr,'o',markersize=4,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
+      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
     ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
     
     # plot data and model minus dem error and linear term
     if inter=='yes':
-        ax3.plot(x,disp-demerr-lin,'o',markersize=4,label='detrended data')
+        ax3.plot(x,disp-demerr-lin,markers[jj],markersize=4,label='detrended data')
         ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
     
     # plot data and model minus dem error and seasonal terms
@@ -925,7 +928,7 @@ for jj in xrange((Npix)):
             disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexbi:indexbi+2])
             
     if semianual=='yes' or seasonal=='yes' or bianual=='yes':
-        ax2.plot(x,disp-disp_seas-demerr,'o',label='data -seasonal')
+        ax2.plot(x,disp-disp_seas-demerr,markers[jj],label='data -seasonal')
         # ax2.plot(x,mdisp-disp_seas-demerr,'o',color='red',alpha=0.5,label='model -seasonal')
         ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.3)
 
