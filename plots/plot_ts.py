@@ -15,7 +15,7 @@ plot_ts.py
 Plot a time series file (cube in binary format) 
 
 Usage: clean_ts.py --infile=<path> [--vmin=<value>] [--vmax=<value>] [--lectfile=<path>] [--imref=<value>] \
-[--list_images=<path>] [--crop=<values>] 
+[--list_images=<path>] [--crop=<values>] [--cpt=<values>] 
 
 Options:
 -h --help           Show this screen.
@@ -58,6 +58,19 @@ if arguments["--imref"] !=  None:
         print '--imref must be between 1 and Nimages'
     else:
         imref = int(arguments["--imref"]) - 1
+
+if arguments["--cpt"] is  None:
+    # cmap=cm.jet 
+    try:
+        from matplotlib.colors import LinearSegmentedColormap
+        cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
+        cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+        cmap = cmap.reversed()
+    except:
+        cmap=cm.rainbow
+else:
+    cmap=arguments["--cpt"]
+
 
 # lect cube
 ds = gdal.Open(infile)
@@ -102,7 +115,6 @@ if arguments["--imref"] !=  None:
             index = np.nonzero(maps[:,:,l]==0.0)
             maps[:,:,l][index] = np.float('NaN')
 
-
 if arguments["--vmax"] ==  None:
     vmax = np.nanpercentile(maps, 98)*4.4563
 else:
@@ -113,7 +125,6 @@ if arguments["--vmin"] ==  None:
 else:
     vmin = np.float(arguments["--vmin"])
 
-
 # plot diplacements maps
 fig = plt.figure(1,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
@@ -122,14 +133,17 @@ fig.subplots_adjust(wspace=0.001)
 #     np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
 # vmin = -vmax
 
-for l in xrange((N)):
+# for l in range((N)):
+# i = 1
+# listdate=[1,4,8,74]
+# for l in listdate:
+for l in range((N)): 
     d = as_strided(maps[ibeg:iend,jbeg:jend,l])*4.4563
-    #ax = fig.add_subplot(1,N,l+1)
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    #cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
-    cmap = cm.jet
+    # ax = fig.add_subplot(1,4,i)
+    # i = i+1
     cmap.set_bad('white')
-    cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(idates[l],fontsize=6)
     plt.setp( ax.get_xticklabels(), visible=False)
     plt.setp( ax.get_yticklabels(), visible=False)
