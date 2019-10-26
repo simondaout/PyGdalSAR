@@ -50,6 +50,11 @@ infile2 = wdir +"T004/T004_LOSVel_mmyr_nan_s90_cropV.tiff"
 lookf2 = wdir + "T004/T004_look_s90_cropV.tiff"
 headf2 = wdir +"T004/T004_head_s90_cropV.tiff"
 sigf2 = wdir + "T004/T004_LOS_sigmaVel_mmyr_nan_s90_cropV.tiff"
+# Descending T099
+infile3 = wdir +"T099/T099_LOSVel_mmyr_nan_s90_cropV.tiff"
+lookf3 = wdir + "T099/T099_look_s90_cropV.tiff"
+headf3 = wdir +"T099/T099_head_s90_cropV.tiff"
+sigf3 = wdir + "T099/T099_LOS_sigmaVel_mmyr_nan_s90_cropV.tiff"
 
 
 ################################
@@ -149,11 +154,129 @@ print()
 
 ################################
 
+print('Read ascending track: {}'.format(infile3))
+
+ds = gdal.Open(infile3,gdal.GA_ReadOnly)
+band = ds.GetRasterBand(1)
+los3 = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+band.FlushCache()
+nlines,ncols = ds.RasterYSize, ds.RasterXSize
+print('Number of pixel: {}'.format(len(los3.flatten())))
+print('Nlines: {}, Ncols: {}'.format(nlines,ncols))
+del ds, band
+
+
+ds = gdal.Open(lookf3,gdal.GA_ReadOnly)
+gt = ds.GetGeoTransform()
+proj = ds.GetProjectionRef()
+driver = gdal.GetDriverByName('GTiff')
+band = ds.GetRasterBand(1)
+look3 = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+band.FlushCache()
+del ds, band
+
+ds = gdal.Open(sigf3,gdal.GA_ReadOnly)
+band = ds.GetRasterBand(1)
+sig3 = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+sig3[np.isnan(los3)] = np.float('NaN') 
+band.FlushCache()
+del ds, band
+
+ds = gdal.Open(headf3,gdal.GA_ReadOnly)
+band = ds.GetRasterBand(1)
+head3 = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+del ds, band
+
+# convert head, look to angle phi, theta in rad
+# theta: vertical angle between LOS and vertical
+theta3 = np.deg2rad(90.-look3)
+# phi: horizontal angle between LOS and EAST
+phi3 = np.deg2rad(-90-head3)
+
+# compute proj
+proj3=[np.cos(theta3)*np.cos(phi3),
+                np.cos(theta3)*np.sin(phi3),
+                np.sin(theta3)
+                ]
+
+print('Average LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
+    format(np.nanmean(proj3[0]),np.nanmean(proj3[1]),np.nanmean(proj3[2])))
+print()
+
+################################
+# plot DATA
+
+cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
+cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+cmap_r = cmap.reversed()
+fig=plt.figure(0, figsize=(14,12))
+vmax=3
+vmin=-9
+
+# plot los1
+ax = fig.add_subplot(4,3,1)
+cax = ax.imshow(los1,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('LOS Asc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+# plot los2
+ax = fig.add_subplot(4,3,2)
+cax = ax.imshow(los2,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('LOS Desc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+# plot los2
+ax = fig.add_subplot(4,3,3)
+cax = ax.imshow(los3,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('LOS Desc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+vmax = 1
+vmin = 0
+
+# plot SIGMA los1
+ax = fig.add_subplot(4,3,4)
+cax = ax.imshow(sig1,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('Sigma LOS Asc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+# plot SIGMA los2
+ax = fig.add_subplot(4,3,5)
+cax = ax.imshow(sig2,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('sigma LOS Desc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+ax = fig.add_subplot(4,3,6)
+cax = ax.imshow(sig3,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('sigma LOS Desc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+vmax=10
+vmin=-10
+
+# plt.show()
+
+################################
+
 # prepare output matrix
 east, north, up = np.ones((nlines,ncols))*np.float('NaN'), np.ones((nlines,ncols))*np.float('NaN'), \
 np.ones((nlines,ncols))*np.float('NaN')
 seast, snorth, sup = np.ones((nlines,ncols))*np.float('NaN'), np.ones((nlines,ncols))*np.float('NaN'), \
 np.ones((nlines,ncols))*np.float('NaN')
+
+### optimisation 
 
 # loop over each line and cols
 # for i in range(nlines):
@@ -190,27 +313,82 @@ np.ones((nlines,ncols))*np.float('NaN')
 #             # print('east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
 #             # format(ve,vn,vup)) 
 
+
+## least-square 2 views 
+# # loop over each line and cols
+# for i in range(nlines):
+#     for j in range(ncols):
+
+#         if not np.isnan(los1[i,j]) and not np.isnan(los2[i,j]): 
+#             # build data matrix 
+#             data = np.zeros((2))
+#             data[0] = los1[i,j]
+#             data[1] = los2[i,j]
+
+#             # Build G matrix
+#             G = np.zeros((2,2))
+#             G[0,0] = proj1[0][i,j]
+#             G[0,1] = proj1[2][i,j]
+#             G[1,0] = proj2[0][i,j]
+#             G[1,1] = proj2[2][i,j]
+
+#             # build uncertainty matrix
+#             rms = np.zeros((2))
+#             rms[0] = sig1[i,j]
+#             rms[1] = sig1[i,j]
+
+#             # Inversion
+#             x0 = lst.lstsq(G,data)[0]
+#             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+#             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            
+#             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+#             east[i,j] = pars[0]; up[i,j] = pars[1]
+#             # print('east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
+#             # format(ve,vn,vup)) 
+
+#             Cd = np.diag(rms**2, k = 0)
+#             sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+#             seast[i,j], sup[i,j] = sigmam[0,0], sigmam[1,1]
+#             # A = (np.dot(G,G.T) + Cd)
+#             # A1 = np.linalg.inv(A)
+#             # sigmam = 1 - np.dot(G.T, A1)
+
+#             # print('sigma east: {0:.5f}, sigma up: {1:.5f}'.\
+#             # format(sigmam[0,0],sigmam[1,1])) 
+#             # sys.exit()
+
+## least-square 3 views 
 # loop over each line and cols
 for i in range(nlines):
     for j in range(ncols):
 
-        if not np.isnan(los1[i,j]) and not np.isnan(los2[i,j]): 
+        if (not np.isnan(los1[i,j]) or not np.isnan(los3[i,j])) and not np.isnan(los2[i,j]):  
             # build data matrix 
-            data = np.zeros((2))
+            data = np.zeros((3))
             data[0] = los1[i,j]
             data[1] = los2[i,j]
+            data[2] = los3[i,j]
 
             # Build G matrix
-            G = np.zeros((2,2))
+            G = np.zeros((3,2))
             G[0,0] = proj1[0][i,j]
             G[0,1] = proj1[2][i,j]
             G[1,0] = proj2[0][i,j]
             G[1,1] = proj2[2][i,j]
+            G[2,0] = proj3[0][i,j]
+            G[2,1] = proj3[2][i,j]
 
             # build uncertainty matrix
-            rms = np.zeros((2))
+            rms = np.zeros((3))
             rms[0] = sig1[i,j]
-            rms[1] = sig1[i,j]
+            rms[1] = sig2[i,j]
+            rms[2] = sig3[i,j]
+
+            if np.isnan(los3[i,j]) or np.isnan(sig3[i,j]):
+                data = np.delete(data,2,0); G = np.delete(G,2,0); rms = np.delete(rms,2,0)
+            if np.isnan(los1[i,j]) or np.isnan(sig1[i,j]):
+                data =np.delete(data,0,0); G = np.delete(G,0,0); rms = np.delete(rms,0,0)
 
             # Inversion
             x0 = lst.lstsq(G,data)[0]
@@ -234,13 +412,12 @@ for i in range(nlines):
             # sys.exit()
 
 
-
 ################################
 
 cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
 cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
 cmap_r = cmap.reversed()
-fig=plt.figure(figsize=(14,12))
+fig=plt.figure(1, figsize=(14,12))
 vmax=3
 vmin=-9
 
@@ -260,6 +437,13 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
+# plot los2
+ax = fig.add_subplot(4,3,3)
+cax = ax.imshow(los3,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('LOS Desc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 
 vmax = 1
 vmin = 0
@@ -275,6 +459,13 @@ plt.colorbar(cax, cax=c)
 # plot SIGMA los2
 ax = fig.add_subplot(4,3,5)
 cax = ax.imshow(sig2,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+ax.set_title('sigma LOS Desc.')
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+ax = fig.add_subplot(4,3,6)
+cax = ax.imshow(sig3,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
 ax.set_title('sigma LOS Desc.')
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
