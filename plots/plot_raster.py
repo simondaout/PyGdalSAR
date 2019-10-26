@@ -228,7 +228,7 @@ else:
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
 
-cax = ax.imshow(cutphi, cmap, interpolation=None,vmax=vmax,vmin=vmin,alpha=0.6)
+cax = ax.imshow(cutphi, cmap, interpolation='nearest',vmax=vmax,vmin=vmin,alpha=0.6)
 
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
@@ -245,6 +245,6 @@ except:
 
 # Display the data
 fig.tight_layout()
-ax.set_rasterized(True)
+# ax.set_rasterized(True)
 fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
 plt.show()
