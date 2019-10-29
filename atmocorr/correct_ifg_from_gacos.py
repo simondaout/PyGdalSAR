@@ -243,7 +243,7 @@ def correct_unw_gacos(kk):
     logger.info('lines:{0}, cols:{1}, IFG:{2}:'.format(lines, cols, idate))
     
     # Time differential of GACOS data
-    g_ztd_data = np.subtract(gacos1, gacos2) 
+    g_ztd_data = np.subtract(gacos2, gacos1) 
     # Convert GACOS ZTD to LOS
     g_los_data = np.divide(g_ztd_data, cos_los)
     # Convert GACOS LOS (in m) to radians
@@ -289,6 +289,7 @@ def correct_unw_gacos(kk):
         model!=0.0,
         )))))))))
 
+    # print(refline_beg,refline_end,refcol_beg,refcol_end)
     indexref = np.nonzero(
         np.logical_and(~np.isnan(los_map),
         np.logical_and(pix_lin>refline_beg,
@@ -367,9 +368,6 @@ def correct_unw_gacos(kk):
         logger.info('Remove cst: %f for date: %s'%(a,idate))
        
         remove_ramp = np.ones((lines,cols))*cst
-        remove_ramp[model==0.] = 0.
-        remove_ramp[np.isnan(los_map)] = np.float('NaN')
-        
         # Compute ramp for los_map = f(model) 
         functbins = a
         funct = a
@@ -378,7 +376,7 @@ def correct_unw_gacos(kk):
         # here we want to minimize los_map-gacos = ramp
         # invers both clean data and ref frame together
 
-        d = d = los_clean - model_clean
+        d = los_clean - model_clean
         sigmad = rms_clean
 
         G=np.zeros((len(d),3))
@@ -392,7 +390,7 @@ def correct_unw_gacos(kk):
         _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
         pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=500,full_output=True,iprint=0)[0]
         a = pars[0]; b = pars[1]; c = pars[2]
-        print ('Remove ramp  %f az  + %f r + %f for date: %i'%(a,b,c,idate))
+        print ('Remove ramp  %f az  + %f r + %f for date: %s'%(a,b,c,idate))
             
         # Compute ramp for los_map = f(model)
         functbins = a*xbins + b*ybins + c
@@ -400,9 +398,9 @@ def correct_unw_gacos(kk):
 
         # build total G matrix
         G=np.zeros((len(los_map.flatten()),3))
-        for i in xrange(nlign):
-            G[i*ncol:(i+1)*ncol,0] = i  
-            G[i*ncol:(i+1)*ncol,1] = np.arange(ncol) 
+        for i in range(lines):
+            G[i*cols:(i+1)*cols,0] = i  
+            G[i*cols:(i+1)*cols,1] = np.arange(cols) 
         G[:,2] = 1
 
         # compute ramp
@@ -411,9 +409,9 @@ def correct_unw_gacos(kk):
         remove_ramp[np.isnan(los_map)] = np.float('NaN')
 
     # Aply correction
-
+    remove = model + remove_ramp
     # los_map_flat = los_map - (gacos + ramp)
-    los_map_flat = los_map - remove_ramp
+    los_map_flat = los_map - remove
     los_map_flat[np.isnan(los_map)] = np.float('NaN')
     los_map_flat[los_map_flat>999.]= np.float('NaN')
     # model = gacos + ramp
@@ -518,8 +516,7 @@ if sformat == 'GAMMA':
     
     # Read incidence file
     inc = np.fromfile(inc_file, dtype='>f4').reshape(lines,cols)
-    inc_d = np.deg2rad(inc)
-    cos_los = np.cos(inc_d)
+    cos_los = np.cos(np.deg2rad(inc))
 else:
     logger.critical('Other formats not implemented yet... Exit!')
 
@@ -547,6 +544,8 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 ax.set_title('TOPS incidence (degrees)')
 fig.savefig(unw_gacos+'/TOPS_inc_DEM.png', format='PNG', bbox_inches='tight')
+# if plot == 'yes':
+#     plt.show()
 
 #####################################################################################
 # MAIN
@@ -555,6 +554,8 @@ fig.savefig(unw_gacos+'/TOPS_inc_DEM.png', format='PNG', bbox_inches='tight')
 with TimeIt():
     # for kk in range(Nifg):
     work = range(Nifg)
-    with poolcontext(processes=nproc) as pool:
-        results = pool.map(correct_unw_gacos, work)
+    # with poolcontext(processes=nproc) as pool:
+    for work in range(Nifg):
+        correct_unw_gacos(work)
+        # results = pool.map(correct_unw_gacos, work)
 
