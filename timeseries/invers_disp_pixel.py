@@ -11,7 +11,7 @@ invers_disp_pixel.py
 Temporal decomposition of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--linear=<value>] [--threshold_rmsd=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--vector=<path>] [--info=<path>]\
+[--linear=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
 
@@ -28,12 +28,11 @@ Options:
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
 --linear PATH     Add a linear function to the inversion
---threshold_rmsd VALUE  If linear = yes: first try inversion with ref/linear/dem only, if RMDS inversion > threshold_rmsd then add other 
-basis functions (Depricate) [default: 1.] 
 --coseismic PATH        Add heaviside functions to the inversion .Indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
 --seasonal PATH         If yes, add seasonal terms in the inversion
+--seasonal_increase PATH         If yes, add seasonal terms function of time in the inversion 
 --degreeday Values        Add degree-day model (Stefan model) in the inversion. Indicate thawing and freezing onsets (e.g. 0.36,0.7) [default: None] 
 --semianual PATH        If yes, add semianual  terms in the inversion
 --bianual PATH          If yes, add bianual  terms in the inversion
@@ -139,6 +138,28 @@ class interseismic(pattern):
 
     def g(self,t):
         func=(t-self.to)
+        return func
+
+class sint(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in xrange(t.size):
+            func[i]=(t[i]-self.to)*math.sin(2*math.pi*(t[i]-self.to))
+        return func
+
+class cost(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in xrange(t.size):
+            func[i]=(t[i]-self.to)*math.cos(2*math.pi*(t[i]-self.to))
         return func
 
 class sinvar(pattern):
@@ -334,6 +355,10 @@ if arguments["--seasonal"] ==  None:
     seasonal = 'no'
 else:
     seasonal = arguments["--seasonal"]
+if arguments["--seasonal_increase"] ==  None:
+    seasonalt = 'no'
+else:
+    seasonalt = arguments["--seasonal_increase"]
 if arguments["--semianual"] ==  None:
     semianual = 'no'
 else:
@@ -394,11 +419,6 @@ if arguments["--name"] ==  None:
     output = None
 else:
     output = arguments["--name"]
-
-if arguments["--threshold_rmsd"] ==  None:
-    maxrmsd = 1.
-else:
-    maxrmsd = float(arguments["--threshold_rmsd"]) 
 
 if arguments["--rad2mm"] ==  None:
     rad2mm = -4.4563
@@ -469,14 +489,6 @@ for l in xrange((N)):
 N = len(dates)
 maps = as_strided(maps[:,:,indexd])
 print 'Reshape cube: ', maps.shape
-
-
-# arbitrary set the max rms at pi/2
-if len(cos) > 0:
-    print
-    print 'Define a maximal RMSD for adding coseismic and postseismic basis functions in the inversion'
-    print 'Max RMSD:',  maxrmsd
-    print
 
 # perp baseline term
 base_moy = np.mean(base)
@@ -571,6 +583,13 @@ if seasonal=='yes':
    indexseas = index
    basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
    basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
+   index = index + 2
+
+if seasonalt=='yes':
+   # 2
+   indexseast = index
+   basis.append(cost(name='cost',reduction='cost',date=datemin))
+   basis.append(sint(name='sint',reduction='sint',date=datemin))
    index = index + 2
 
 if semianual=='yes':
@@ -679,6 +698,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
     else:
 
         print 'ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.'
+        # invert first without post-seismic
         Ain = np.delete(A,indexpo,1)
         try:
           U,eignv,V = lst.svd(Ain, full_matrices=False)
@@ -692,12 +712,9 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
           mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
         print 'SVD solution:', mtemp
           
-        # print mtemp
-        # print indexpo
         # rebuild full vector
         for z in xrange(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
-            # print mtemp
         minit = np.copy(mtemp)
         # print 'Prior model:', minit
         # # initialize bounds
@@ -714,7 +731,6 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-        
         # print mmin,mmax
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
@@ -754,7 +770,7 @@ if inter=='yes':
         fig3 = plt.figure(nfigure+3,figsize=(12,8))
     else:
         fig3 = plt.figure(nfigure+3,figsize=(10,4))
-if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes':
+if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes' or seasonalt == 'yes':
     if Npix > 2:
         fig2 = plt.figure(nfigure+2,figsize=(12,8))
     else:
@@ -812,42 +828,15 @@ for jj in xrange((Npix)):
     names = []
     # print 'data uncertainties', sigmad    
 
+    # Inisilize 
+    G=np.zeros((kk,M))
+    m,sigmam = np.zeros((M)),np.zeros((M))
     # do only this if more than N/2 points left
     if kk > N/6:
-        # Inisilize m
-        m,sigmam = np.zeros((M)),np.zeros((M))
-
         # inversion
         t = time.time()
 
-        rmsd = maxrmsd + 1
-        # if inter=='yes' and iteration is True:
-
-        #     Glin=np.zeros((kk,2+Mker))
-        #     for l in xrange((2)):
-        #         Glin[:,l]=basis[l].g(tabx)
-        #         names.append(basis[l].reduction)
-        #     for l in xrange((Mker)):
-        #         Glin[:,2+l]=kernels[l].g(k)
-        #         names.append(kernels[l].reduction)
-
-        #     # print k
-        #     # print sigmad
-        #     # print taby
-        #     print 'First inversion with linear term only. Complete inversion if rmsd>threshold_rmsd'
-        #     print 'basis functions:', names
-        #     mt,sigmamt = consInvert(Glin,taby,sigmad[k],cond=rcond)
-            
-        #     # compute rmsd
-        #     mdisp[k] = np.dot(Glin,mt)
-
-        #     # rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k])/inaps[k],2))/kk) 
-        #     rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk) 
-        #     print 'rmsd:', rmsd
-        #     print 
-
         names = []
-        G=np.zeros((kk,M))
         for l in xrange((Mbasis)):
             G[:,l]=basis[l].g(tabx)
             names.append(basis[l].reduction)
@@ -855,9 +844,8 @@ for jj in xrange((Npix)):
             G[:,Mbasis+l]=kernels[l].g(k)
             names.append(kernels[l].reduction)
 
-        if rmsd >= maxrmsd or inter!='yes': 
-            print 'basis functions:', names
-            mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq)
+        print 'basis functions:', names
+        mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq)
 
         # rebuild full vectors
         if Mker>0:
@@ -885,35 +873,76 @@ for jj in xrange((Npix)):
     if inter=='yes':
         ax3 = fig3.add_subplot(Npix,1,jj+1)
         ax3.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-    if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes':
+    if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes' or seasonalt == 'yes':
         ax2 = fig2.add_subplot(Npix,1,jj+1)
         ax2.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
     
     # initialize variables
     disp_seas = np.zeros((N))
+    disp_seast = np.zeros((N))
 
     if inter=='yes':
         lin[k] = np.dot(G[:,indexinter],m[indexinter])
 
-    # plot data and model minus dem error
-    if infof is not None:
-      # print infof, infm
-      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
-    else:
-      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
-    ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
-    
-    # plot data and model minus dem error and linear term
-    if inter=='yes':
-        ax3.plot(x,disp-demerr-lin,markers[jj],markersize=4,label='detrended data')
-        ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
-    
     # plot data and model minus dem error and seasonal terms
     if seasonal=='yes':
             G=np.zeros((kk,2))
             for l in xrange((2)):
                 G[:,l]=basis[l+indexseas].g(tabx)
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseas:indexseas+2])
+            amp,phi = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),np.arctan2(m[indexseas+1],m[indexseas])
+
+            if phi<0: 
+               phi = phi + 2*np.pi
+
+    if seasonalt=='yes':
+            G=np.zeros((kk,2))
+            for l in xrange((2)):
+                G[:,l]=basis[l+indexseast].g(tabx)
+            disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
+            disp_seast[k] = disp_seast[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
+
+            amp_min = 0
+            amp_max = np.sqrt(m[indexseast]**2+m[indexseast+1]**2)*(datemax-datemin)
+
+            phi = np.arctan2(m[indexseast+1],m[indexseast])
+            
+            # convert between 0 and 2pi
+            if phi<0: 
+                phi = phi + 2*np.pi
+
+            a_rate = (amp_max - amp_min)/(datemax-datemin)
+
+            if phi<0: 
+               phi = phi + 2*np.pi
+
+    if seasonalt=='yes' and seasonal=='yes':
+        a1_min, a2_min = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),0
+        a1_max, a2_max = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),np.sqrt(m[indexseast]**2+m[indexseast+1]**2)*(datemax-datemin)
+
+        phi1, phi2 = np.arctan2(m[indexseas+1],m[indexseas]), np.arctan2(m[indexseast+1],m[indexseast])
+        
+        if phi1<0: 
+            phi1 = phi1 + 2*np.pi
+
+        if phi2<0: 
+            phi2 = phi2 + 2*np.pi
+
+        amp_min = a1_min
+        phi_min = phi1
+        # convert between 0 and 2pi
+        if phi_min<0: 
+            phi_min = phi_min + 2*np.pi
+
+        amp_max = np.sqrt( (a1_max*np.cos(phi1) + a2_max*np.cos(phi2))**2 +
+            (a1_max*np.sin(phi1) + a2_max*np.sin(phi2))**2)
+
+        phi_max = np.arctan2(a1_max*np.sin(phi1)+a2_max*np.sin(phi2),a1_max*np.cos(phi1)+a2_max*np.cos(phi2)) 
+
+        if phi_max<0: 
+            phi_max = phi_max + 2*np.pi
+
+        a_rate = (amp_max - amp_min)/(datemax-datemin)
         
     if semianual=='yes':
             G=np.zeros((kk,2))
@@ -926,8 +955,22 @@ for jj in xrange((Npix)):
             for l in xrange((2)):
                 G[:,l]=basis[l+indexbi].g(tabx)
             disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexbi:indexbi+2])
+
+    # plot data and model minus dem error
+    if infof is not None:
+      # print infof, infm
+      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
+    else:
+      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
+    
+    ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
+    
+    # plot data and model minus dem error and linear term
+    if inter=='yes':
+        ax3.plot(x,disp-demerr-lin,markers[jj],markersize=4,label='detrended data')
+        ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
             
-    if semianual=='yes' or seasonal=='yes' or bianual=='yes':
+    if semianual=='yes' or seasonal=='yes' or bianual=='yes' or seasonalt == 'yes':
         ax2.plot(x,disp-disp_seas-demerr,markers[jj],label='data -seasonal')
         # ax2.plot(x,mdisp-disp_seas-demerr,'o',color='red',alpha=0.5,label='model -seasonal')
         ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.3)
@@ -936,6 +979,7 @@ for jj in xrange((Npix)):
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
     tdec = np.array([float(date.strftime('%Y')) + float(date.strftime('%j'))/365.1 for date in t])
     mseas = np.zeros(len(tdec))
+    mseast = np.zeros(len(tdec))
 
     G=np.zeros((len(tdec),M))
     for l in xrange((Mbasis)):
@@ -950,13 +994,6 @@ for jj in xrange((Npix)):
         model_dem = np.dot(G[:,indexdem],m[indexdem])
     else:
         model_dem = np.zeros(len(model))
-
-    # plot model
-    if inter=='yes':
-        ax.plot(t,model-model_dem,'-r',label='{:.2f} mm/yr'.format(m[indexinter]))
-        ax3.plot(t,model-model_lin-model_dem,'-r')
-    else:
-        ax.plot(t,model-model_dem,'-r')
         
     if seasonal=='yes':
         G=np.zeros((len(tdec),2))
@@ -970,14 +1007,39 @@ for jj in xrange((Npix)):
             G[:,l]=basis[l+indexsemi].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexsemi:indexsemi+2])
 
+    if seasonalt=='yes':
+        G=np.zeros((len(tdec),2))
+        for l in xrange((2)):
+            G[:,l]=basis[l+indexseast].g(tdec)
+        mseas = mseas + np.dot(G[:,:],m[indexseast:indexseast+2])
+        # mseast = mseast + np.dot(G[:,:],m[indexseast:indexseast+2])
+
     if bianual=='yes':
         G=np.zeros((len(tdec),2))
         for l in xrange((2)):
             G[:,l]=basis[l+indexbi].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexbi:indexbi+2])
+
+    # plot model
+    if inter=='yes':
+        if seasonal=='yes' and seasonalt=='no':
+            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],amp,phi))
+            ax3.plot(t,model-model_lin-model_dem,'-r')
+        elif seasonal=='yes' and seasonalt=='yes':
+            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp_beg: {:.2f}, Phi1: {:.2f}, Amp_end: {:.2f}, Phi2: {:.2f}, Rate_Amp: {:.2f}'.format(m[indexinter],amp_min,phi1,amp_max,phi2,a_rate))
+            ax3.plot(t,model-model_lin-model_dem,'-r')
+        elif seasonal=='no' and seasonalt=='yes':
+            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp_beg: {:.2f}, Amp_end: {:.2f}, Phi: {:.2f}, Rate_Amp: {:.2f}'.format(m[indexinter],amp_min,amp_max,phi,a_rate))
+            ax3.plot(t,model-model_lin-model_dem,'-r')
+        else:
+            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}'.format(m[indexinter]))
+            ax3.plot(t,model-model_lin-model_dem,'-r')
+    else:
+        ax.plot(t,model-model_dem,'-r')
             
-    if seasonal=='yes' or semianual=='yes' or bianual=='yes':
+    if seasonal=='yes' or semianual=='yes' or bianual=='yes' or seasonalt=='yes':
         ax2.plot(t,model-mseas-model_dem,'-r')
+        # ax2.plot(t,model-mseast-model_dem,'-r')
         ax2.legend(loc='best',fontsize='x-small')
         ax2.set_xlim(xlim)
         # if arguments["--bounds"] is not  None:
