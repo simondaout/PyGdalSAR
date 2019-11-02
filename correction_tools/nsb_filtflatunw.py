@@ -891,16 +891,9 @@ def flat_atmo(config, kk):
         if int(config.ivar)>1 :
             logger.warning("ivar=2, no masking implemented !!!")
 
-        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0. or config.delta_z != None)  and int(config.ivar)<2 :
+        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),np.float(config.min_z),config.delta_z)       
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0. or  np.float(config.delta_z) != 75.)  and int(config.ivar)<2 :
 
-            # w,l = computesize(config,infile)
-            # if (int(config.iend_mask) - int(config.ibeg_mask) == 0) and (int(config.jend_mask) - int(config.jbeg_mask) != 0):
-            #     config.iend_mask = w
-            #     config.ibeg_mask = 0
-            # if (int(config.iend_mask) - int(config.ibeg_mask) != 0) and (int(config.jend_mask) - int(config.jbeg_mask) == 0):
-            #     config.jend_mask = l
-            #     config.jbeg_mask = 0                
-            
             import scipy.optimize as opt
             import scipy.linalg as lst
 
@@ -911,30 +904,17 @@ def flat_atmo(config, kk):
             # print(config.jbeg_mask,config.jend_mask)
             # print(config.thresh_amp_atmo,config.min_z,config.delta_z)
 
+            index = np.nonzero(
+            np.logical_and(coh>np.float(config.thresh_amp_atmo),
+            np.logical_and(z>np.float(config.min_z),
+            np.logical_and(deltaz>np.float(config.delta_z),
+            np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
+            np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
+            )))))
+            # )))
 
-            if config.delta_z is None:
-                index = np.nonzero(
-                np.logical_and(coh>np.float(config.thresh_amp_atmo),
-                np.logical_and(z>np.float(config.min_z),
-                np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
-                np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
-                )))
-                )
-            else:
-                index = np.nonzero(
-                np.logical_and(coh>np.float(config.thresh_amp_atmo),
-                np.logical_and(z>np.float(config.min_z),
-                np.logical_and(deltaz>np.float(config.delta_z),
-                np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
-                np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
-                )))))
-                # )))
-
-            print(index)
-            print()
             dphi_select = dphi[index]; z_select = z[index]; az_select = az[index]
             rms = 1./coh[index]
-            # dphi_select = dphi; z_select= z; az_select = az
 
             # new top file
             strattxt = path.splitext(infile)[0] + '_strat.top'
@@ -1005,13 +985,6 @@ def flat_atmo(config, kk):
                 wf.write("%15.8E %15.8E %15.8E %15.8E" % (b1, b2, b3, b4))
                 wf.close()
 
-            # # save median phase/topo
-            # strattxt = path.splitext(infile)[0] + '_strat.top'
-            # rm(strattxt)
-            # wf = open(strattxt, "w")
-            # wf.write("  %.6E  %.6E  %.6E  %.6E  %.6E  %.6E \n" % (b1, b2, b3, b4, 0, 0))
-            # wf.close()
-            
             # clean and prepare for write strat
             infileunw = path.splitext(infile)[0] + '.unw'
             rm(infileunw)
@@ -1689,7 +1662,7 @@ proc_defaults = {
     "ivar": "1", # fct of topography only
     "z_ref": "8000.", # reference
     "min_z": "0.", # min elevation
-    "delta_z": "None", 
+    "delta_z": "75", 
     "filterstyle": "SWc",
     "SWamplim": "0.05",
     "SWwindowsize": "8",
