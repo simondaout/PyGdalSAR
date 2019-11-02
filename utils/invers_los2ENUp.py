@@ -276,43 +276,6 @@ np.ones((nlines,ncols))*np.float('NaN')
 seast, snorth, sup = np.ones((nlines,ncols))*np.float('NaN'), np.ones((nlines,ncols))*np.float('NaN'), \
 np.ones((nlines,ncols))*np.float('NaN')
 
-### optimisation 
-
-# loop over each line and cols
-# for i in range(nlines):
-#     for j in range(ncols):
-
-#         if not np.isnan(los1[i,j]) and not np.isnan(los2[i,j]): 
-#             # build data matrix 
-#             data = np.zeros((2))
-#             data[0] = los1[i,j]
-#             data[1] = los2[i,j]
-
-#             # Build G matrix
-#             G = np.zeros((2,3))
-#             G[0,0] = proj1[0][i,j]
-#             G[0,1] = proj1[1][i,j]
-#             G[0,2] = proj1[2][i,j]
-#             G[1,0] = proj2[0][i,j]
-#             G[1,1] = proj2[1][i,j]
-#             G[1,2] = proj2[2][i,j]
-
-#             # build uncertainty matrix
-#             rms = np.zeros((2))
-#             rms[0] = sig1[i,j]
-#             rms[1] = sig1[i,j]
-
-#             # Inversion
-#             x0 = lst.lstsq(G,data)[0]
-#             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-#             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            
-
-#             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
-#             east[i,j] = pars[0]; north[i,j] = pars[1]; up[i,j] = pars[2];
-#             # print('east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
-#             # format(ve,vn,vup)) 
-
 
 ## least-square 2 views 
 # # loop over each line and cols
