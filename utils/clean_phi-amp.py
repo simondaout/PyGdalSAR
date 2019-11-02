@@ -161,7 +161,7 @@ else:
 
 # # clean
 if arguments["--perc_sig"] ==  None:
-    perc_sig = 99.
+    perc_sig = 100.
 else:
     perc_sig = np.float(arguments["--perc_sig"])
     
