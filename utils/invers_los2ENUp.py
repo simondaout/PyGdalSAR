@@ -10,6 +10,7 @@
 ############################################
 
 import sys,os
+from os import environ
 import numpy as np
 import scipy.optimize as opt
 import scipy.linalg as lst
@@ -17,6 +18,9 @@ import gdal
 gdal.UseExceptions()
 
 # plot
+import matplotlib
+if environ["TERM"].startswith("screen"):
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -266,6 +270,7 @@ plt.colorbar(cax, cax=c)
 vmax=10
 vmin=-10
 
+fig.tight_layout()
 # plt.show()
 
 ################################
@@ -348,13 +353,20 @@ for i in range(nlines):
             rms[1] = sig2[i,j]
             rms[2] = sig3[i,j]
 
-            if np.isnan(los3[i,j]) or np.isnan(sig3[i,j]):
+            if np.isnan(los3[i,j]) or np.isnan(sig3[i,j]) or np.isnan(proj3[0][i,j]):
                 data = np.delete(data,2,0); G = np.delete(G,2,0); rms = np.delete(rms,2,0)
-            if np.isnan(los1[i,j]) or np.isnan(sig1[i,j]):
+            if np.isnan(los1[i,j]) or np.isnan(sig1[i,j]) or np.isnan(proj1[0][i,j]):
                 data =np.delete(data,0,0); G = np.delete(G,0,0); rms = np.delete(rms,0,0)
 
             # Inversion
-            x0 = lst.lstsq(G,data)[0]
+            try:
+                x0 = lst.lstsq(G,data)[0]
+            except:
+                print('data:',data)
+                print('G:'.G)
+                print('rms:',rms)
+                x0 = np.zeros((2))
+
             _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
             _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
             
@@ -364,7 +376,11 @@ for i in range(nlines):
             # format(ve,vn,vup)) 
 
             Cd = np.diag(rms**2, k = 0)
-            sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+            try:
+                sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+            except:
+                sigmam = np.ones((2,2))
+
             seast[i,j], sup[i,j] = sigmam[0,0], sigmam[1,1]
             # A = (np.dot(G,G.T) + Cd)
             # A1 = np.linalg.inv(A)
@@ -516,4 +532,4 @@ ds.SetGeoTransform(gt)
 ds.SetProjection(proj)
 band.FlushCache()
 
-plt.show()
+#plt.show()

@@ -1404,10 +1404,16 @@ def empirical_cor(kk):
       nfit_temp=nfit
       ivar_temp=ivar
 
-    # try:
-    sol, corr, var, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
-    los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
-    temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
+    try:
+        sol, corr, var, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
+        los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
+        temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
+    except:
+        sol = np.zeros((13))
+        corr = np.zeros((mlines,mcols))
+        var = 1
+        rgbins, azbins = az[::samp],rg[::samp]
+        topobins,losbins,losstd = elev_clean[::samp],los_clean[::samp],rms_clean[::samp]
 
     logger.info('RMS: {0} '.format(var))
 
@@ -1980,7 +1986,7 @@ if radar is not None:
             minelev = float(arguments["--min_topo"])
         else:
             minelev = np.nanpercentile(elev_map,100-perc_topo)
-        logger.info('Max-Min topography for empirical estimation: {0:.1f}-{0:.1f}'.format(maxelev,minelev))
+        logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxelev,minelev))
 
     # compute slope
     toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,3.)
@@ -2091,6 +2097,8 @@ if estim=='yes':
         with poolcontext(processes=nproc) as pool:
             results = pool.map(empirical_cor, work)
         output.append(results)
+        # for work in range(Nifg):
+        #     empirical_cor(work)
 
         for kk in range(Nifg):
             lenght, sol, rms = output[0][kk]

@@ -64,7 +64,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --perc_los=<value>        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:99.]
 --perc_topo=<value>       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:99.]
 --cond=<value>            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
---ineq=<yes/no>           If yes, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: no].
+--ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: yes].
 --fulloutput=<yes/no>      If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff=<path>           Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files 
 --plot=<yes/no>         Display plots [default: no]
@@ -394,7 +394,7 @@ if arguments["--cond"] ==  None:
 if arguments["--rmspixel"] ==  None:
     arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
-    arguments["--ineq"] = 'no'
+    arguments["--ineq"] = 'yes'
 if arguments["--fulloutput"] ==  None:
     arguments["--fulloutput"] = 'no'
 if arguments["--geotiff"] is not None:
@@ -738,7 +738,8 @@ if arguments["--mask"] is not None:
 
     # mask maps if necessary for temporal inversion
     if arguments["--tempmask"]=='yes':
-        kk = np.nonzero(mask_flat[ibeg_emp:iend_emp,jbeg_emp:jend_emp]<np.float(arguments["--threshold_mask"]))
+        kk = np.nonzero(np.logical_or(mask_flat<np.float(arguments["--threshold_mask"]),
+          np.isnan(mask_flat)))
         for l in range((N)):
             # clean only selected area
             d = as_strided(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,l])
@@ -770,10 +771,6 @@ if arguments["--mask"] is not None:
     fig.savefig('mask.eps', format='EPS',dpi=150)
     del mask_flat_clean
 
-    if plot=='yes':
-        plt.show()
-    # sys.exit()
-
 # plot diplacements maps
 nfigure+=1
 fig = plt.figure(nfigure,figsize=(14,10))
@@ -799,8 +796,10 @@ fig.colorbar(cax, orientation='vertical',aspect=10)
 # fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
 
-# plt.show()
-# sys.exit()
+
+if plot=='yes':
+        plt.show()
+
 
 #######################################################
 # Save new lect.in file
@@ -986,7 +985,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -1005,34 +1004,35 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
         fsoln = invSVD(A,b,cond)
         
     else:
-
-        # prior solution without postseismic 
-        Ain = np.delete(A,indexpo,1)
-        mtemp = invSVD(Ain,b,cond)
-       
-        # rebuild full vector
-        for z in range(len(indexpo)):
+        if len(indexpo>0):
+          # prior solution without postseismic 
+          Ain = np.delete(A,indexpo,1)
+          mtemp = invSVD(Ain,b,cond) 
+          # rebuild full vector
+          for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
-        minit = np.copy(mtemp)
+          minit = np.copy(mtemp)
+          # # initialize bounds
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf 
 
-        # # initialize bounds
-        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
-
-        # We here define bounds for postseismic to be the same sign than coseismic
-        # and coseismic inferior or egual to the coseimic initial 
-        for i in range(len(indexco)):
+          # We here define bounds for postseismic to be the same sign than coseismic
+          # and coseismic inferior or egual to the coseimic initial 
+          for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
+          bounds=zip(mmin,mmax)
+        
+        else:
+          minit=invSVD(A,b,cond)
+          bounds=None
         
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        
-        bounds=zip(mmin,mmax)
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
@@ -3308,7 +3308,7 @@ def empirical_cor(l):
       y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
 
     if (lin_start is not None) and (lin_end is not None):
-      try:
+      # try:
         indexref = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
             np.logical_and(mask_flat>np.float(arguments["--threshold_mask"]),
@@ -3327,7 +3327,7 @@ def empirical_cor(l):
                 ))
         
         ## Set data to zero in the ref area
-        zone = as_strided(map_flata[:,:,l])
+        zone = as_strided(map_flata[:,:])
         los_ref2 = zone[indexref].flatten()
         rms_ref = rmsmap[indexref].flatten()
         amp_ref = 1./rms_ref
@@ -3340,11 +3340,9 @@ def empirical_cor(l):
           cst = 0.
         map_ramp, map_flata = map_ramp + cst, map_flata - cst
         del zone
-      except:
-        pass
-
-      del los_clean, rms_clean, topo_clean, maps_temp
-  
+      # except:
+      #   pass
+      
   else:
     map_flata = np.copy(maps[:,:,l])
     map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))

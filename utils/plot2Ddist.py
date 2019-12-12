@@ -583,7 +583,7 @@ def plot2Ddist(variables, axeslist=None, truevalues=None, markvalues=None,
             import scipy.optimize as opt
             import scipy.linalg as lst
 
-            bins = np.arange(np.min(x),np.max(x),abs(np.max(x)-np.min(x))/500.)
+            bins = np.arange(np.min(x),np.max(x),abs(np.max(x)-np.min(x))/20.)
             inds = np.digitize(x,bins)
             xbins, ybins = [], []
             ystd = []
@@ -603,15 +603,20 @@ def plot2Ddist(variables, axeslist=None, truevalues=None, markvalues=None,
             G[:,0] = 1
             G[:,1] = xbins
 
-            x0 = lst.lstsq(G,ybins)[0]
+            try:
+                x0 = lst.lstsq(G,ybins)[0]
+            except:
+                x0 = np.zeros((2))
+            # print(x0)
             _func = lambda x: np.sum(((np.dot(G,x)-ybins)/ystd)**2)
             _fprime = lambda x: 2*np.dot(G.T/ystd, (np.dot(G,x)-ybins)/ystd)
             pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
-            
+            # print(pars)
+
             m = np.vstack([xbins,ybins])
             cov = (100*np.corrcoef(m)).astype(int)
 
-            # ax1.plot(xbins,ybins,'-r', lw =.5)
+            ax1.plot(xbins,ybins,'-r', lw =.5)
             ax1.plot(xbins,np.dot(G,pars),'-r', lw =2.,label='corr: {0} (%)'.format(cov[0,1]))
             ax1.legend(loc='best',fontsize='x-small')
         except:

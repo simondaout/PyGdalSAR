@@ -438,7 +438,8 @@ else:
 if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
 
-markers = ['o','v','^','s','P','X','o','v','^','s','P','X']
+# markers = ['o','v','^','s','P','X','o','v','^','s','P','X']
+markers = ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
 
 ipix = map(int,arguments["--cols"].replace(',',' ').split())
 jpix = map(int,arguments["--ligns"].replace(',',' ').split())
@@ -494,7 +495,7 @@ print 'Reshape cube: ', maps.shape
 base_moy = np.mean(base)
 
 if apsf is not None:
-    inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*rad2mm
+    inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*abs(rad2mm)
     print 'Input uncertainties:', inaps
     print 'Set very low values to the 2 percentile to avoid overweighting...'
     # maxinaps = np.nanmax(inaps) 
@@ -503,7 +504,10 @@ if apsf is not None:
     minaps= np.nanpercentile(inaps,2)
     index = flatnonzero(inaps<minaps)
     inaps[index] = minaps
-    inaps = inaps[indexd]
+    try:
+        inaps = inaps[indexd]
+    except:
+        pass
     print 'Output uncertainties for first iteration:', inaps
 
 if vectf is not None:
@@ -665,8 +669,23 @@ M = Mbasis + Mker
 for i in xrange((Mbasis)):
     basis[i].info()
 
+# SVD inversion with cut-off eigenvalues
+def invSVD(A,b,cond):
+    try:
+        U,eignv,V = lst.svd(A, full_matrices=False)
+        s = np.diag(eignv)
+        index = np.nonzero(s<cond)
+        inv = lst.inv(s)
+        inv[index] = 0.
+        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+    except:
+        fsoln = lst.lstsq(A,b)[0]
+        #fsoln = lst.lstsq(A,b,rcond=cond)[0]
+    
+    return fsoln
+
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -682,65 +701,56 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
 
     if ineq == 'no':
         print 'ineq=no: SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond)
-        try:
-          U,eignv,V = lst.svd(A, full_matrices=False)
-          s = np.diag(eignv) 
-          print 'Eigenvalues:', eignv
-          index = np.nonzero(s<cond)
-          inv = lst.inv(s)
-          inv[index] = 0.
-          fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-        except:
-          fsoln = lst.lstsq(A,b,rcond=cond)[0]
+        fsoln = invSVD(A,b,cond)
         print 'SVD solution:', fsoln
 
-
     else:
-
         print 'ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.'
-        # invert first without post-seismic
-        Ain = np.delete(A,indexpo,1)
-        try:
-          U,eignv,V = lst.svd(Ain, full_matrices=False)
-          s = np.diag(eignv) 
-          print 'Eigenvalues:', eignv
-          index = np.nonzero(s<cond)
-          inv = lst.inv(s)
-          inv[index] = 0.
-          mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-        except:
-          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
-        print 'SVD solution:', mtemp
-          
-        # rebuild full vector
-        for z in xrange(len(indexpo)):
-            mtemp = np.insert(mtemp,indexpo[z],0)
-        minit = np.copy(mtemp)
-        # print 'Prior model:', minit
-        # # initialize bounds
-        mmin,mmax = -np.ones(M)*np.inf, np.ones(M)*np.inf 
+        if len(indexpo>0):
+          # invert first without post-seismic
+          Ain = np.delete(A,indexpo,1)
+          try:
+              U,eignv,V = lst.svd(Ain, full_matrices=False)
+              s = np.diag(eignv) 
+              print 'Eigenvalues:', eignv
+              index = np.nonzero(s<cond)
+              inv = lst.inv(s)
+              inv[index] = 0.
+              mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+          except:
+              mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+          print 'SVD solution:', mtemp
 
-        # We here define bounds for postseismic to be the same sign than coseismic
-        # and coseisnic inferior or egal to the coseimic initial 
-        if len(indexco)>0:
+          # rebuild full vector
+          for z in range(len(indexpo)):
+            mtemp = np.insert(mtemp,indexpo[z],0)
+          minit = np.copy(mtemp)
+          # # initialize bounds
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf 
+
+          # We here define bounds for postseismic to be the same sign than coseismic
+          # and coseismic inferior or egual to the coseimic initial 
           print 'ineq=yes: Impose postseismic to be the same sign than coseismic'
-        for i in xrange(len(indexco)):
+          for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-        # print mmin,mmax
+          bounds=zip(mmin,mmax)
+        
+        else:
+          minit=invSVD(A,b,cond)
+          print 'SVD solution:', minit
+          bounds=None
+        
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        
-        bounds=zip(mmin,mmax)
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
-	
         print 'Optimization:', fsoln
 
     # tarantola:
@@ -748,16 +758,17 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-3, iter=2000,acc=1e-12):
     # sigma m **2 =  misfit**2 * diag([G.TG]-1)
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
+       # res2 = np.sum(pow((b-np.dot(A,fsoln))/sigmad,2))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
        scale = 1./(A.shape[0]-A.shape[1])
        # scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
-
     print 'model errors:', sigmam
 
     return fsoln,sigmam
+
 
 # plot diplacements maps
 nfigure = 10
@@ -798,6 +809,8 @@ for jj in xrange((Npix)):
     else:
         dmax = str(datemax) + '0101'
         dmin = str(datemin) + '0101'
+    # dmin,dmax = 20030101,20110101
+    # dmin,dmax = 20140101,20200101
     xmin = datetimes.strptime('{}'.format(dmin),'%Y%m%d')
     xmax = datetimes.strptime('{}'.format(dmax),'%Y%m%d')
     xlim=date2num(np.array([xmin,xmax]))
@@ -1047,6 +1060,7 @@ for jj in xrange((Npix)):
 
     ax.legend(loc='best',fontsize='x-small')
     ax.set_xlim(xlim)
+    # ax.set_xlim([2003,2011])
     if arguments["--bounds"] is not  None:
         ax.set_ylim(ylim)
     

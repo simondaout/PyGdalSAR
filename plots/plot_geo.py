@@ -49,7 +49,6 @@ import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.basemap import Basemap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.colors import LinearSegmentedColormap
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -64,6 +63,17 @@ else:
 
     except:
         cmap=arguments["--cpt"]
+
+if arguments["--cpt"] is  None:
+    try:
+        from matplotlib.colors import LinearSegmentedColormap
+        cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
+        cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+        cmap = cmap.reversed()
+    except:
+        cmap=cm.rainbow
+else:
+    cmap=arguments["--cpt"]
 
 if arguments["--coeff"] is  None:
   vel2disp=1
@@ -81,7 +91,7 @@ else:
     rad2mm = float(arguments["--rad2mm"])  
 
 ds_extension = os.path.splitext(infile)[1]
-print(ds_extension)  
+# print(ds_extension)  
 
 if ds_extension == ".unw":
   ds = gdal.Open(infile, gdal.GA_ReadOnly)
@@ -165,14 +175,14 @@ m = Basemap(
     urcrnrlat=latend, \
     resolution='i',
     ax=ax,
+    suppress_ticks = False,
     )
 
-m.drawparallels(np.arange(latbeg,latend,0.5),linewidth=0.25,zorder=1)
-m.drawmeridians(np.arange(lonbeg,lonend,0.5),linewidth=0.25,zorder=1)
-m.drawparallels(np.arange(latbeg,latend,.5),labels=[1,0,0,0],zorder=1)
-m.drawmeridians(np.arange(lonbeg,lonend,.5),labels=[0,0,0,1],zorder=1)
-# m.fillcontinents(color='white',lake_color='lightblue',zorder=2)
-
+# m.drawparallels(np.linspace(latbeg,latend,3),linewidth=0.25,zorder=1)
+# m.drawmeridians(np.linspace(lonbeg,lonend,3),linewidth=0.25,zorder=1)
+# m.drawparallels(np.linspace(latbeg,latend,3),labels=[1,0,0,0],dashes=[6,900],zorder=1)
+# m.drawmeridians(np.linspace(lonbeg,lonend,3),labels=[0,0,0,1],dashes=[6,900],zorder=1)
+m.fillcontinents(color='white',lake_color='lightblue',zorder=2)
 
 if arguments["--dem"] is not None:
    ds2 = gdal.Open(arguments["--dem"], gdal.GA_ReadOnly)
@@ -192,10 +202,11 @@ else:
    # hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
    #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
-
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
      vmax=vmax,vmin=vmin, zorder=4) 
 ax.set_title(basename,fontsize=6)
+ax.set_xticks(np.linspace(lonbeg,lonend,3))
+ax.set_yticks(np.linspace(latbeg,latend,3))
 
 outfile = basename+'.pdf'
 del ds, ds_band1

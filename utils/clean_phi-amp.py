@@ -18,8 +18,8 @@ and wrapped phase between 0 to 2pi
 
 Usage: clean_phi-amp.py [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--topofile=<path>] \
 [--sigampfile=<path>] [--sigphifile=<path>] [--lectfile=<path>] [--threshold_amp=<value>] [--perc_sig=<value>] \
-[--outampfile=<path>] [--outphifile=<path>] [--outlinfile=<path>] [--slopefile=<path>] [--slopelosfile=<path>]  [--plotcorr=<yes/no>] \
-[--maxamp=<value>] [--minelev=<value>] [--rad2mm=<value>] [--outfig=<path>]
+[--outampfile=<path>] [--outphifile=<path>] [--outlinfile=<path>] [--slopefile=<path>] [--slopelosfile=<path>] [--aspectfile=<path>]  [--plotcorr=<yes/no>] \
+[--maxamp=<value>] [--minelev=<value>] [--rad2mm=<value>] [--outfig=<path>] [--crop=<values>]
 
 
 Options:
@@ -32,14 +32,16 @@ Options:
 --sigphifile=<file>     Uncertainty phase map file [default: phiwt_sigcoeff.r4]
 --lectfile=<file>       Path of the lect.in file for r4 format [default: lect_ts.in]
 --threshold_amp=<value>  Mask on minimum Amplitude for Phase [default: 1.5]
---perc_sig=<value>      Percentile uncertainty for map cleaning [default: 99.]
+--perc_sig=<value>      Percentile uncertainty for map cleaning [default: 100]
 --slopelosfile=<file>   SLope in the LOS file [default: None]
 --slopefile=<file>      SLope file [default: None]
+--aspectfile=<file>     Aspect file [default: None]
 --plotcorr=<yes/no>     Plot correlation plots [default: no]
 --maxamp=<value>        Maximum Amplitude limit [default: 3.]
 --minelev=<value>       Minimum Elevation limit [default: 3500.]
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
 --outfig                Name for the output figure [default: clean_phi-amp]
+--crop=<values>       Crop data [default: 0,nlines,0,ncol]
 """
 
 from __future__ import print_function
@@ -130,38 +132,51 @@ else:
     outfig = arguments["--outfig"]
 
 ncols, nlines = map(int, open(lectf).readline().split(None, 2)[0:2])
+if arguments["--crop"] ==  None:
+    crop = [0,nlines,0,ncols]
+else:
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
+ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 amp,phi,lin=np.fromfile(ampf,dtype=np.float32)[:nlines*ncols],np.fromfile(phif,dtype=np.float32)[:nlines*ncols],np.fromfile(linf,dtype=np.float32)[:nlines*ncols]
 sigamp,sigphi=np.fromfile(ampsigf,dtype=np.float32)[:nlines*ncols],np.fromfile(phisigf,dtype=np.float32)[:nlines*ncols]
-amp_map, phi_map, lin_map = amp.reshape(nlines,ncols),phi.reshape(nlines,ncols),lin.reshape(nlines,ncols)
-sigamp_map, sigphi_map = sigamp.reshape(nlines,ncols),sigphi.reshape(nlines,ncols)
+amp_map, phi_map, lin_map = amp.reshape(nlines,ncols)[ibeg:iend,jbeg:jend],phi.reshape(nlines,ncols)[ibeg:iend,jbeg:jend],lin.reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
+sigamp_map, sigphi_map = sigamp.reshape(nlines,ncols)[ibeg:iend,jbeg:jend],sigphi.reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 del amp,phi,lin
 
 if demf ==  None:
     try:
         demf = 'dem'
-        dem_map = np.fromfile('dem',dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+        dem_map = np.fromfile('dem',dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
     except:
         print('DEM file is not readible. Set elelvation to zeros.')
-        dem_map = np.zeros((nlines,ncols))
+        dem_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 else:
     dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
 
 if arguments["--slopefile"] is not None:
-    slope_map = np.fromfile(arguments["--slopefile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+    slope_map = np.fromfile(arguments["--slopefile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
 else:
     toposmooth = scipy.ndimage.filters.gaussian_filter(dem_map,3.)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
 
 if arguments["--slopelosfile"] is not None:
-    slopelos_map = np.fromfile(arguments["--slopelosfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+    slopelos_map = np.fromfile(arguments["--slopelosfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
+    slopelos_map[slope_map<3.] = np.float('NaN') # mask aspect for small slope
 else:
-    slopelos_map = slope_map
+    slopelos_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
+
+if arguments["--aspectfile"] is not None:
+    aspect_map = np.fromfile(arguments["--aspectfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
+    aspect_map[slope_map<1] = np.float('NaN') # mask aspect for small slope
+    aspect_map[aspect_map<0] = aspect_map[aspect_map<0] + 360
+else:
+    aspect_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 
 # # clean
 if arguments["--perc_sig"] ==  None:
-    perc_sig = 100.
+    perc_sig = 100
 else:
     perc_sig = np.float(arguments["--perc_sig"])
     
@@ -203,7 +218,7 @@ threshold_amp,maxamp = threshold_amp*abs(rad2mm),maxamp*abs(rad2mm)
 
 # initiate figure amp and phase
 fig_ampphi = plt.figure(0,figsize=(12,6))
-ax = fig_ampphi.add_subplot(1,3,1)
+ax = fig_ampphi.add_subplot(2,3,1)
 cmap = cm.rainbow
 # if arguments["--slopefile"] is not None:
 cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
@@ -215,7 +230,7 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 ax.set_title('Amplitude (mm)',fontsize=12)
 
-ax = fig_ampphi.add_subplot(1,3,2)
+ax = fig_ampphi.add_subplot(2,3,2)
 # cmap_phi = cm.tab20b
 cmap_phi = cm.PiYG_r
 # if arguments["--slopefile"] is not None:
@@ -226,7 +241,7 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 ax.set_title('Timing (rad)',fontsize=12)
 
-ax = fig_ampphi.add_subplot(1,3,3)
+ax = fig_ampphi.add_subplot(2,3,3)
 # if arguments["--slopefile"] is not None:
 cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
 vmax = np.nanpercentile(lin_map,95)
@@ -238,17 +253,43 @@ plt.colorbar(im, cax=cax)
 ax.set_title('Velocity (mm/yr)',fontsize=12)
 fig_ampphi.tight_layout()
 
+ax = fig_ampphi.add_subplot(2,3,4)
+# if arguments["--slopefile"] is not None:
+im = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(im, cax=cax)
+ax.set_title('Slope',fontsize=12)
+
+ax = fig_ampphi.add_subplot(2,3,5)
+# if arguments["--slopefile"] is not None:
+im = ax.imshow(slopelos_map,vmax=np.nanpercentile(slopelos_map,90),vmin=np.nanpercentile(slopelos_map,10),cmap=cm.Greys,zorder=1)
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(im, cax=cax)
+ax.set_title('Slope LOS',fontsize=12)
+
+ax = fig_ampphi.add_subplot(2,3,6)
+# if arguments["--slopefile"] is not None:
+im = ax.imshow(aspect_map,vmax=np.nanpercentile(aspect_map,98),vmin=np.nanpercentile(aspect_map,2),cmap=cm.hsv,zorder=1)
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(im, cax=cax)
+ax.set_title('Aspect',fontsize=12)
+
+fig_ampphi.tight_layout()
 fig_ampphi.savefig('{}.pdf'.format(outfig), format='PDF',dpi=150)
+# 
 
 # remove Nan 
 kk = np.nonzero(~np.isnan(phi_map))
-phi,amp,lin,dem,slopelos,slope = phi_map[kk], amp_map[kk], lin_map[kk], dem_map[kk], slopelos_map[kk]*100, slope_map[kk]*100
+phi,amp,lin,dem,slopelos,slope, aspect = phi_map[kk], amp_map[kk], lin_map[kk], dem_map[kk], slopelos_map[kk], slope_map[kk], aspect_map[kk]
 
 # figure histo phi
 fig_histo = plt.figure(1,figsize=(6,4))
 ax = fig_histo.add_subplot(1,1,1)
 # N is the count in each bin, bins is the lower-limit of the bin
-N, bins, patches = ax.hist(phi,bins=100, alpha=.8, color='blue',density=True)
+N, bins, patches = ax.hist(phi,bins=100, alpha=.8, color='blue',density=False)
 # color scale based on the x axis
 fracs = bins / bins.max()
 # we need to normalize the data to 0..1 for the full range of the colormap
@@ -260,7 +301,8 @@ xmin,xmax = 0,2*np.pi
 for thisfrac, thispatch in zip(fracs, patches):
     color = cmap_phi(norm(thisfrac))
     thispatch.set_facecolor(color)
-ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+# ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+# ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.0%}'.format(y))) 
 ax.set_xlim([xmin,xmax])
 ax.set_xticks(np.arange(xmin,xmax , (xmax-xmin)/12))
 ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
@@ -277,12 +319,14 @@ if plotcorr == 'yes':
     kk = np.nonzero(
         np.logical_and(lin>np.nanpercentile(lin,1),
         np.logical_and(lin<np.nanpercentile(lin,99),
-        np.logical_and(phi>3.,
-        np.logical_and(slope<np.nanpercentile(slope,80),
-        np.logical_and(slopelos>np.nanpercentile(slopelos,20), 
-        np.logical_and(slopelos<np.nanpercentile(slopelos,80), amp <  maxamp
-        )))))))
-    phi,amp,lin,dem,slopelos,slope = phi[kk], amp[kk], lin[kk], dem[kk], slopelos[kk],slope[kk]
+        np.logical_and(phi>4.,
+        np.logical_and(slope<np.nanpercentile(slope,90),
+        np.logical_and(dem<np.nanpercentile(dem,95),
+        np.logical_and(slopelos>np.nanpercentile(slopelos,10), 
+        np.logical_and(slopelos<np.nanpercentile(slopelos,90), 
+        np.logical_and(amp>5, amp <  maxamp
+        )))))))))
+    phi,amp,lin,dem,slopelos,slope,aspect = phi[kk], amp[kk], lin[kk], dem[kk], slopelos[kk],slope[kk],aspect[kk]
 
     # compute correlations
     m = np.vstack([phi,amp,lin,dem,slopelos,slope])
@@ -301,16 +345,16 @@ if plotcorr == 'yes':
     fig.savefig('cov_phiall.eps', format='EPS')
 
     import plot2Ddist
-    scatterstyle={'color':'black', 'alpha':0.1, 's':3.}
+    scatterstyle={'color':'black', 'alpha':0.5, 's':3.}
     styleargs = {'color':'k', 'scatterstyle':scatterstyle}
 
-    plot2Ddist.plot2DdistsPairs(amp,[slopelos,dem,slope], mainlabel='Amp. (mm)', labels = [ 'Slope in Los (%)','DEM (m)','Slope (%)'], \
-        plotcontours=False,plotscatter=True,plotKDE=False,contourKDEthin=5000,thin=100,\
-        out='jointPDFcorrampall.pdf',corr='no',**styleargs)
-    plot2Ddist.plot2DdistsPairs(phi,[amp,slopelos,dem,slope], mainlabel='Phi. (rad)', labels = ['Amp. (mm)','Slope in Los (%)','DEM (m)','Slope (%)'], \
-        plotcontours=False,plotscatter=True,plotKDE=False,scaleview=True,contourKDEthin=5000,thin=100,\
-        out='jointPDFcorrphiall.pdf',corr='no',**styleargs)
-    plot2Ddist.plot2DdistsPairs(lin,[amp,phi,slopelos,dem,slope], mainlabel='Vel. (mm/yr)', labels = [ 'Amp. (mm)','Phi. (rad)','Slope in Los (%)','DEM (m)','Slope (%)'], \
+    # plot2Ddist.plot2DdistsPairs(amp,[slopelos,dem,slope,aspect], mainlabel='Amp. (mm)', labels = [ 'Slope in Los (%)','DEM (m)','Slope (%)','Aspect (deg)'], \
+    #     plotcontours=False,plotscatter=True,plotKDE=False,contourKDEthin=5000,thin=100,\
+    #     out='jointPDFcorrampall.pdf',corr='no',**styleargs)
+    # plot2Ddist.plot2DdistsPairs(phi,[amp,slopelos,dem,slope,aspect], mainlabel='Phi. (rad)', labels = ['Amp. (mm)','Slope in Los (%)','DEM (m)','Slope (%)','Aspect (deg)'], \
+    #     plotcontours=False,plotscatter=True,plotKDE=False,scaleview=True,contourKDEthin=5000,thin=100,\
+    #     out='jointPDFcorrphiall.pdf',corr='no',**styleargs)
+    plot2Ddist.plot2DdistsPairs(lin,[amp,phi,slopelos,dem,slope,aspect], mainlabel='Vel. (mm/yr)', labels = [ 'Amp. (mm)','Phi. (rad)','Slope in Los (%)','DEM (m)','Slope (%)','Aspect (deg)'], \
         plotcontours=False,plotscatter=True,plotKDE=False,contourKDEthin=5000,thin=100,\
         out='jointPDFcorrlinall.pdf',corr='no', **styleargs)
 

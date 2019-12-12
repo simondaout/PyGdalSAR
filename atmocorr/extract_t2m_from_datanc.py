@@ -26,6 +26,8 @@ for b in range(1, ds.RasterCount+1):
     
     # extract time
     netcdf_time = int(bandmd["NETCDF_DIM_time"])
+    print(bandmd)
+    sys.exit()
     # print netcdf_time
     # print netcdf_time/24, netcdf_time%24
     date = date_ref + datetime.timedelta(netcdf_time/24, netcdf_time%24)
