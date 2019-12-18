@@ -337,11 +337,12 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     G[i*mcols:(i+1)*mcols,2] *= i - ibeg
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(data),4))
+                G=np.zeros((len(data),5))
                 G[:,0] = 1
                 G[:,1] = topo_clean
-                G[:,2] = az*topo_clean
-                G[:,3] = (az*topo_clean)**2
+                G[:,2] = topo_clean**2
+                G[:,3] = az*topo_clean
+                G[:,4] = (az*topo_clean)**2
 
                 # ramp inversion 
                 x0 = lst.lstsq(G,data)[0]
@@ -351,18 +352,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
                 except:
                     pars = x0
-                sol[8] = pars[0]; sol[9] = pars[1]; sol[11] = pars[2];sol[12] = pars[3]
-                logger.info('Remove ref frame %f + %f z + %f az*z + %f (az*z)**2'%(pars[0],pars[1],pars[2],pars[3]))
+                sol[8] = pars[0]; sol[9] = pars[1]; sol[10] = pars[2]; sol[11] = pars[3]; sol[12] = pars[4]
+                logger.info('Remove ref frame %f + %f z + %f z**2 + %f az*z + %f (az*z)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4]))
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,0] = 1
                 G[:,1] = elev_map.flatten()
-                G[:,2] = elev_map.flatten()
-                G[:,3] = elev_map.flatten()**2
+                G[:,2] = elev_map.flatten()**2
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
                 for i in range(mlines):
-                    G[i*mcols:(i+1)*mcols,2] *= i - ibeg
-                    G[i*mcols:(i+1)*mcols,3] *= (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,3] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,4] *= (i-ibeg)**2
 
 
     elif order==1: # Remove a range ramp ay+b for each maps (y = col)
@@ -470,12 +472,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     G[i*mcols:(i+1)*mcols,3] *= i - ibeg
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(data),4))
+                G=np.zeros((len(data),6))
                 G[:,0] = rg
                 G[:,1] = 1
                 G[:,2] = topo_clean
-                G[:,3] = topo_clean*az
-                G[:,4] = (topo_clean*az)**2
+                G[:,3] = topo_clean**2
+                G[:,4] = topo_clean*az
+                G[:,5] = (topo_clean*az)**2
 
                 # ramp inversion
                 #y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 yz yz**2 
@@ -486,19 +489,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
                 except:
                     pars = x0
-                sol[2] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[11] = pars[3]; sol[12] = pars[4]
-                logger.info('Remove ramp %f r + %f + %f z + %f z*az'%(pars[0],pars[1],pars[2],pars[3],pars[4]))
+                sol[2] = pars[0]; sol[8] = pars[1]; sol[9] = pars[2]; sol[10] = pars[3]; sol[11] = pars[4]; sol[12] = pars[5]
+                logger.info('Remove ramp %f r + %f + %f z + %f z**2 + %f z*az'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5]))
 
                 # build total G matrix
-                G=np.zeros((len(los),5))
+                G=np.zeros((len(los),6))
                 G[:,1] = 1
                 G[:,2] = elev_map.flatten()
-                G[:,3] = elev_map.flatten()
-                G[:,4] = elev_map.flatten()**2
+                G[:,3] = elev_map.flatten()**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
-                    G[i*mcols:(i+1)*mcols,3] *= i - ibeg
-                    G[i*mcols:(i+1)*mcols,4] *= (i - ibeg)**2 
+                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,5] *= (i - ibeg)**2 
 
         
     elif order==2: # Remove an azimutal ramp ax+b for each maps (x is row)
@@ -718,7 +722,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
             
             elif ivar==1 and nfit==0:
                 # y**3 y**2 y x**3 x**2 x xy**2 xy cst z z**2 z*az az*z**2
-                G=np.zeros((len(data),5))
+                G=np.zeros((len(data),))
                 G[:,0] = rg
                 G[:,1] = az
                 G[:,2] = 1
@@ -747,13 +751,14 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     G[i*mcols:(i+1)*mcols,4] *= i - ibeg
             
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(data),6))
+                G=np.zeros((len(data),7))
                 G[:,0] = rg
                 G[:,1] = az
                 G[:,2] = 1
                 G[:,3] = topo_clean
-                G[:,4] = topo_clean*az
-                G[:,5] = (topo_clean*az)**2
+                G[:,4] = topo_clean**2
+                G[:,5] = topo_clean*az
+                G[:,6] = (topo_clean*az)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -764,20 +769,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                 except:
                     pars = x0
                 #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2    
-                sol[2] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]; sol[12] = pars[5]
-                logger.info('Remove ramp %f r  + %f az + %f + %f z + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5]))
+                sol[2] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[10] = pars[4]; sol[11] = pars[5]; sol[12] = pars[6]
+                logger.info('Remove ramp %f r  + %f az + %f + %f z + %f z**2 + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6]))
 
                 # build total G matrix
-                G=np.zeros((len(los),6))
+                G=np.zeros((len(los),7))
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
-                G[:,4] = elev_map.flatten()
-                G[:,5] = elev_map.flatten()**2
+                G[:,4] = elev_map.flatten()**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
                     G[i*mcols:(i+1)*mcols,1] = i - ibeg
-                    G[i*mcols:(i+1)*mcols,4] *= i - ibeg
-                    G[i*mcols:(i+1)*mcols,5] *= (i - ibeg)**2
+                    G[i*mcols:(i+1)*mcols,5] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,6] *= (i - ibeg)**2
 
 
     elif order==4:
@@ -900,14 +906,15 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     G[i*mcols:(i+1)*mcols,5] *= i
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(data),7))
+                G=np.zeros((len(data),8))
                 G[:,0] = rg
                 G[:,1] = az
                 G[:,2] = rg*az
                 G[:,3] = 1
                 G[:,4] = topo_clean
-                G[:,5] = topo_clean*az
-                G[:,6] = (topo_clean*az)**2
+                G[:,5] = topo_clean**2
+                G[:,6] = topo_clean*az
+                G[:,7] = (topo_clean*az)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -917,21 +924,22 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
                 except:
                     pars = x0
-                sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[11] = pars[5]; sol[12] = pars[6]
-                logger.info('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z*az+ %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6]))
+                sol[2] = pars[0]; sol[5] = pars[1]; sol[7] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[10] = pars[5]; sol[11] = pars[6]; sol[12] = pars[7]
+                logger.info('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6],pars[7]))
 
                 # build total G matrix
-                G=np.zeros((len(los),7))
+                G=np.zeros((len(los),8))
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
-                G[:,5] = elev_map.flatten()
-                G[:,6] = elev_map.flatten()**2
+                G[:,5] = elev_map.flatten()**2
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = np.arange((mcols)) - jbeg
                     G[i*mcols:(i+1)*mcols,1] = i - ibeg
                     G[i*mcols:(i+1)*mcols,2] = (i - ibeg) * (np.arange((mcols)) - jbeg)
-                    G[i*mcols:(i+1)*mcols,5] *= i - ibeg
-                    G[i*mcols:(i+1)*mcols,6] *= (i - ibeg)**2
+                    G[i*mcols:(i+1)*mcols,6] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,7] *= (i - ibeg)**2
 
     elif order==5:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1053,14 +1061,15 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     G[i*mcols:(i+1)*mcols,5] *= i - ibeg
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(data),7))
+                G=np.zeros((len(data),8))
                 G[:,0] = rg**2
                 G[:,1] = rg
                 G[:,2] = az
                 G[:,3] = 1
                 G[:,4] = topo_clean
-                G[:,5] = topo_clean*az
-                G[:,6] = (topo_clean*az)**2
+                G[:,5] = topo_clean**2
+                G[:,6] = topo_clean*az
+                G[:,7] = (topo_clean*az)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1070,21 +1079,22 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
                 except:
                     pars = x0
-                sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[11] = pars[5]; sol[12] = pars[6]
-                logger.info('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6]))
+                sol[1] = pars[0]; sol[2] = pars[1]; sol[5] = pars[2]; sol[8] = pars[3]; sol[9] = pars[4]; sol[10] = pars[5]; sol[11] = pars[6]; sol[12] = pars[7]
+                logger.info('Remove ramp %f r**2, %f r  + %f az + %f + %f z + %f z**2 + %f z*az + %f (z*az)**2'%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6],pars[7]))
 
                 # build total G matrix
-                G=np.zeros((len(los),7))
+                G=np.zeros((len(los),8))
                 G[:,3] = 1
                 G[:,4] = elev_map.flatten()
-                G[:,5] = elev_map.flatten()
-                G[:,6] = elev_map.flatten()**2
+                G[:,5] = elev_map.flatten()**2
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = (np.arange((mcols)) - jbeg)**2
                     G[i*mcols:(i+1)*mcols,1] = np.arange((mcols)) - jbeg
                     G[i*mcols:(i+1)*mcols,2] = i - ibeg
-                    G[i*mcols:(i+1)*mcols,5] *= i - ibeg
-                    G[i*mcols:(i+1)*mcols,6] *= (i-ibeg)**2
+                    G[i*mcols:(i+1)*mcols,6] *= i - ibeg
+                    G[i*mcols:(i+1)*mcols,7] *= (i-ibeg)**2
 
     elif order==6:
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
@@ -1198,13 +1208,14 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                     G[:,4] *= i 
 
             elif ivar==1 and nfit==1:
-                G=np.zeros((len(data),6))
+                G=np.zeros((len(data),7))
                 G[:,0] = az**2
                 G[:,1] = az
                 G[:,2] = 1
                 G[:,3] = topo_clean
-                G[:,4] = topo_clean*az
-                G[:,5] = (topo_clean*az)**2
+                G[:,4] = topo_clean**2
+                G[:,5] = topo_clean*az
+                G[:,6] = (topo_clean*az)**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1215,20 +1226,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
                 except:
                     pars = x0
                 #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
-                sol[4] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[11] = pars[4]; sol[12] = pars[5]
-                logger.info('Remove ramp %f az**2, %f az + %f + %f z + %f z*az + %f (z*az)**2 '%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5]))
+                sol[4] = pars[0]; sol[5] = pars[1]; sol[8] = pars[2]; sol[9] = pars[3]; sol[10] = pars[4]; sol[11] = pars[5]; sol[12] = pars[6]
+                logger.info('Remove ramp %f az**2, %f az + %f + %f z + %f z**2 + %f z*az + %f (z*az)**2 '%(pars[0],pars[1],pars[2],pars[3],pars[4],pars[5],pars[6]))
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,2] = 1
                 G[:,3] = elev_map.flatten()
-                G[:,4] = elev_map.flatten()
-                G[:,5] = elev_map.flatten()**2
+                G[:,4] = elev_map.flatten()**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
                 for i in range(mlines):
                     G[i*mcols:(i+1)*mcols,0] = (i-ibeg)**2
                     G[i*mcols:(i+1)*mcols,1] = i -ibeg
-                    G[:,4] *= i -ibeg
-                    G[:,5] *= (i-ibeg)**2 
+                    G[:,5] *= i -ibeg
+                    G[:,6] *= (i-ibeg)**2 
 
 
     corr = np.dot(G,pars).reshape(mlines,mcols)
