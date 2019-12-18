@@ -464,8 +464,8 @@ logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
 checkinfile(arguments["--list_images"])
 nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 N = len(dates)
-
 baseref = base[imref]
+
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
     datemin = date2dec(dmin)
@@ -793,7 +793,7 @@ for l in range((N)):
 
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
-# fig.tight_layout()
+fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
 
 

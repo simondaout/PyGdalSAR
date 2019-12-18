@@ -28,7 +28,7 @@ do
    read ligne
    if [ "$ligne" = "" ]; then break; fi
    set -- $ligne ; image1=$1 ; image2=$2 ;
-   cd $home/int/int_$1_$2/
+   cd $home/INTERFERO/int_$1_$2/
 
    length.pl ${prefix}$1-$2_${suffix}_${rlook}rlks.unw
    refer_interf "${prefix}$1-$2_${suffix}_${rlook}rlks.unw" "${prefix}$1-$2_${suffix}_refer_${rlook}rlks.unw" $left $top $widthr $lengthr

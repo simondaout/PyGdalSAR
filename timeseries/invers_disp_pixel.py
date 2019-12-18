@@ -316,7 +316,7 @@ else:
     listim = arguments["--list_images"]
 
 if arguments["--ineq"] ==  None:
-    ineq = 'no' 
+    ineq = 'yes' 
 else:
     ineq = arguments["--ineq"] 
 if arguments["--cond"] ==  None:
@@ -447,16 +447,27 @@ if len(jpix) != len(ipix):
    raise Exception("ncols and nligns lists are not the same size")
 # number of pixels
 Npix = len(ipix)
-# bounds plots
-istart,iend = np.min(ipix) - 100, np.max(ipix) + 100
-jstart,jend = np.min(jpix) - 100, np.max(jpix) + 100
 
 # read lect.in 
 ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
 
+# bounds plots
+istart,iend = np.min(ipix) - 100, np.max(ipix) + 100
+jstart,jend = np.min(jpix) - 100, np.max(jpix) + 100
+if istart < 0:
+    istart = 0
+if jstart < 0:
+    jstart = 0
+if iend > ncol:
+    iend = ncol
+if jend > nlign:
+    jend = nlign
+
 # load images_retenues file
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 N = len(dates)
+# save bp0 before time crop
+bp0=base[imref] 
 
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
@@ -531,11 +542,11 @@ if infof is not None:
 
 # plot pixels on map
 fig = plt.figure(1,figsize=(12,8))
-if arguments["--bounds"] is not  None:
-    vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
-else:
-    vmax = np.nanpercentile(maps[:,:,-1],80)
-    vmin = np.nanpercentile(maps[:,:,-1],10)
+# if arguments["--bounds"] is not  None:
+#     vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
+# else:
+vmax = np.nanpercentile(maps[:,:,-1],90)
+vmin = np.nanpercentile(maps[:,:,-1],10)
 
 ax = fig.add_subplot(1,2,1)
 ax.imshow(maps[jstart:jend,istart:iend,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
@@ -548,7 +559,7 @@ for i in xrange((Npix)):
 plt.suptitle('Black cross: pixels, red cross: reference point')
 
 ax = fig.add_subplot(1,2,2)
-im = ax.imshow(maps[:,:,-1],cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
+im = ax.imshow(maps[:,:,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
 for i in range(len(ipix)):
     ax.scatter(ipix[i],jpix[i],marker=markers[i],color='black',s=10.)
 ax.scatter(iref,jref,marker='x',color='red',s=20.)
@@ -559,7 +570,6 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 plt.suptitle('Black symbols: pixels, red cross: reference point')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
-
 # print(iref, jref)
 # plt.show()
 # sys.exit()
@@ -640,7 +650,7 @@ indexpofull = np.array(indexpofull)
 kernels=[]
 
 if dem=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=base[imref],bp=base))
+   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=bp0,bp=base))
    indexdem = index
    index = index + 1
 
@@ -657,7 +667,6 @@ if vectf != None:
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
-
 
 # define size G matrix
 print
@@ -768,7 +777,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
     print 'model errors:', sigmam
 
     return fsoln,sigmam
-
 
 # plot diplacements maps
 nfigure = 10
