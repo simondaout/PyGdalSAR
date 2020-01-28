@@ -15,7 +15,8 @@ analysis. In addition perform statistical analysis of corrections.
     26th January 2020
 
 Usage:
-    nsb_unw_ERAcorr_stats.py --int_dir=<path> --int_prefix=<string> --int_suffix=<string> --era_dir=<path> --int_list=<path> --rdr_rsc=<path> --rdr_dem=<path> --ref_zone=<xstart,xend,ystart,yend> [--int_looks=<value>] [--nproc=<nb_cores>] 
+    nsb_unw_ERAcorr_stats.py --int_dir=<path> --int_prefix=<string> --int_suffix=<string> --era_dir=<path> --int_list=<path> 
+    --rdr_rsc=<path> --rdr_dem=<path> --ref_zone=<xstart,xend,ystart,yend> [--int_looks=<value>] [--nproc=<nb_cores>] [--plot=<yes/no>]
 
 Options:
     -h --help                   Show this screen
@@ -29,14 +30,15 @@ Options:
     --ref_zone=VALUES           Area where phase is set to zero for double difference subtraction (X0,X1,Y0,Y1).
     --int_looks=VALUE           Looks on unwrapped IFG (default = 2rlks)
     --nproc=NB_CORES            Number of cores to use for parallelizing (default=1)
-    
+    --plot yes/no               If yes, plot figures for each ints [default: no]
+
 """
 
 import os, sys, logging, glob
 import docopt
 import numpy as np
 import matplotlib.pyplot as plt 
-from os import path
+from os import path, environ
 import seaborn as sns
 from copy import deepcopy
 
@@ -54,7 +56,7 @@ from multiprocessing import Process, Pool
 import subprocess
 
 import matplotlib as mpl
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -66,6 +68,12 @@ import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 
 import gdal
+gdal.UseExceptions()
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
+
 
 ### Load colormaps
 cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
@@ -179,12 +187,18 @@ def correct_int_era_ramp(m_date, s_date):
     c_data = int_data[:,:rdr_nx]
     
     # Read in ERA data for master and slave respectively
-    e_mdata_bands = np.fromfile(era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw', np.float32).reshape(rdr_ny,rdr_nx*2)
-    e_mdata = e_mdata_bands[:,rdr_nx:]
-    
-    e_sdata_bands = np.fromfile(era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw', np.float32).reshape(rdr_ny,rdr_nx*2)
-    e_sdata = e_sdata_bands[:,rdr_nx:]
-    
+    infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
+    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds_band2 = ds.GetRasterBand(2)
+    e_mdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    del ds
+
+    infile = era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw'
+    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds_band2 = ds.GetRasterBand(2)
+    e_sdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    del ds
+
     # Time difference ERA data (already in slant and radians)
     e_data = np.subtract(e_sdata, e_mdata)
     
@@ -198,23 +212,30 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     Compare ramp and reconstructed ramp, perform correction and save.
     '''
     print('Correcting IFG with IFG = ERA + RAMP: {}_{}'.format(m_date, s_date))
+
+    # Read in ERA data for master and slave respectively
+    infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
+    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds_band2 = ds.GetRasterBand(2)
+    e_mdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    del ds
     
+    infile = era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw'
+    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds_band2 = ds.GetRasterBand(2)
+    e_sdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    del ds
+
     # Reading in IFG data
     # Add in: prefix, suffix, looks
     int_fid = int_prefix+'_' + str(m_date) + '-' + str(s_date) +'_'+int_suffix+'_'+int_looks+'.unw'
     int_did = 'int_' + str(m_date)+'_' + str(s_date)
-    int_data = np.fromfile(int_dir + '/' + int_did + '/' + int_fid, np.float32).reshape(rdr_ny,rdr_nx*2)
-    
-    # split into bands...
-    i_data = int_data[:,rdr_nx:]
-    c_data = int_data[:,:rdr_nx]
-    
-    # Read in ERA data for master and slave respectively
-    e_mdata_bands = np.fromfile(era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw', np.float32).reshape(rdr_ny,rdr_nx*2)
-    e_mdata = e_mdata_bands[:,rdr_nx:]
-    
-    e_sdata_bands = np.fromfile(era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw', np.float32).reshape(rdr_ny,rdr_nx*2)
-    e_sdata = e_sdata_bands[:,rdr_nx:]
+
+    ds = gdal.Open(int_dir + '/' + int_did + '/' + int_fid, gdal.GA_ReadOnly)
+    ds_band1 = ds.GetRasterBand(1)
+    ds_band2 = ds.GetRasterBand(2)
+    c_data= ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    i_data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
     
     # Time difference ERA data (already in slant and radians)
     e_data = np.subtract(e_sdata, e_mdata)
@@ -270,14 +291,16 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     # Set areas outside = 0 using c_data (amplitude)
     ie_corr_recons[c_data==0] = 0
     
-    # Need to combine with c_data for nsbas format...
-    int_data_ecorr_recons = np.zeros((rdr_ny,rdr_nx*2))
-    int_data_ecorr_recons[:,rdr_nx:] = ie_corr_recons
-    int_data_ecorr_recons[:,:rdr_nx] = c_data
-    
-    # Now save in dir created above
     ie_corr_fid = int_edir+'/'+int_did+'/'+'eracorr_recons_'+int_fid
-    int_data_ecorr_recons.astype(np.float32).tofile(ie_corr_fid)
+
+    dst_ds = driver.Create(ie_corr_fid, ds.RasterXSize, ds.RasterYSize, 2, gdal.GDT_Float32)
+    dst_band1 = dst_ds.GetRasterBand(1)
+    dst_band2 = dst_ds.GetRasterBand(2)
+    dst_band1.WriteArray(c_data,0,0)
+    dst_band2.WriteArray(ie_corr_recons,0,0)
+    dst_band1.FlushCache()
+    dst_band2.FlushCache()
+    del dst_ds, ds
     
     # Copy across par files too...
     if not os.path.exists(ie_corr_fid+'.rsc'):
@@ -410,7 +433,11 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     plt.colorbar(cax3, cax=c)
     ax3.set_title('$\phi_{IFG} - \phi_{ERA} - \phi_{RAMPRECONS}$:: '+str(m_date)+'_'+str(s_date))
     
-    fig.savefig(int_gdir+'/'+int_did+'/'+'eracorr_recons_map_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', bbox_inches='tight')
+    fig.savefig(int_edir+'/'+int_did+'/'+'eracorr_recons_map_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', bbox_inches='tight')
+    if plot == 'yes':
+        print('Hello')
+        plt.show()
+    
     plt.clf()
     
 def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
@@ -554,10 +581,24 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
         
     ## Save figure
     fig.savefig(int_edir+'/'+int_did+'/'+'phase-era'+'_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', dpi=300, bbox_inches='tight')
+    if plot == 'yes':
+        print('Hello')
+        plt.show()
     plt.clf()
     
     # Note slope = gradient, rvalue = correlation coefficient
     return popt[0], rvalue
+
+
+#####################################################################################
+# INIT LOG
+#####################################################################################
+
+# logging.basicConfig(level=logging.INFO,\
+logging.basicConfig(level=logging.INFO,\
+        format='line %(lineno)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('nsb_unw_ERAcorr_stats.log')
+
 
 #####################################################################################
 # READ INPUT PARAM
@@ -600,6 +641,19 @@ if arguments["--nproc"] == None:
 else:
     nproc = int(arguments["--nproc"])
 
+if arguments["--plot"] ==  'yes':
+    plot = 'yes'
+    logger.warning('plot is yes. Set nproc to 1')
+    nproc = 1
+    if environ["TERM"].startswith("screen"):
+        matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
+else:
+    plot = 'no'
+    matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+    import matplotlib.pyplot as plt
+
+
 #####################################################################################
 # INITIALISE 
 #####################################################################################
@@ -641,7 +695,7 @@ if __name__ == '__main__':
     # Run this with a pool of agents (nproc)
     with Pool(processes=nproc) as pool:
         ramps_results = pool.starmap(correct_int_era_ramp, ifg_pairs)
-    
+
     # Create array for storing IFG ramp M_date, s_date, ax, + by, + c
     ramp_pars = np.zeros((N_ifgs, 3))
     # Need to reformat ramp results into arrays
@@ -681,7 +735,6 @@ if __name__ == '__main__':
 
     # Paralellize phase-era correction and estimation
     ifg_pairs_ramp_pars = list(zip(m_dates, s_dates, ramp_pars, ramp_pars_recons))
-
     print('Correcting reconstr unw IFGs with ERA:')
     
     # Run this with a pool of agents (nproc)
