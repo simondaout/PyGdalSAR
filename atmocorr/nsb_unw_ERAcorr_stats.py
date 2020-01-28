@@ -65,6 +65,8 @@ from matplotlib.colorbar import Colorbar
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 
+import gdal
+
 ### Load colormaps
 cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
 cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt")).reversed()
@@ -618,8 +620,13 @@ if __name__ == '__main__':
     rdr_rad2mm = (rdr_wl/(4*const.pi))*1000
 
     # Read in DEM (assume nsb format)
-    dem = np.fromfile(rdr_dem, np.float32).reshape(rdr_ny,rdr_nx*2)
-    dem_data = dem[:,rdr_nx:]
+    # dem = np.fromfile(rdr_dem, np.float32).reshape(rdr_ny,rdr_nx)
+    # dem_data = dem[:,rdr_nx:]
+    driver = gdal.GetDriverByName("roi_pac")
+    ds = gdal.Open(rdr_dem, gdal.GA_ReadOnly)
+    ds_band2 = ds.GetRasterBand(2)
+    rdr_ny, rdr_nx = ds.RasterYSize, ds.RasterXSize
+    dem_data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
 
     # Saving corrected IFGs in a new dir
     int_edir = 'INTERFERO_era'
