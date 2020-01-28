@@ -14,7 +14,7 @@ add_r4.py
 -------------
 Add, substract, compute the amplitude (infile1**2,infile2**2) ar the phase (arctan(infile1/infile2)) from two real4 files.
 
-Usage: add_r4.py --infile1=<path> --infile2=<path> --outfile=<path> --nlign=<value> --ncol=<value> --sign=<+/-/amp/dphi> 
+Usage: add_r4.py --infile1=<path> --infile2=<path> [--outfile=<path>] [--lectfile=<path>] --sign=<+/-/amp/dphi> 
 add_r4.py -h | --help
 
 Options:
@@ -22,8 +22,7 @@ Options:
 --infile1 PATH      
 --infile2 PATH
 --outfile PATH
---nlign VALUE       
---ncol VALUE        
+--lectfile PATH     Path of the lect.in file [default: lect.in]
 --sign VALUE        amp=sqrt(infile1**2,infile2**2), dphi=arctan(infile1/infile2)
 """
 
@@ -37,12 +36,22 @@ import docopt
 
 # read arguments
 arguments = docopt.docopt(__doc__)
-ncol = int(arguments["--ncol"])
-nlign = int(arguments["--nlign"])
 infile1 = arguments["--infile1"]
 infile2 = arguments["--infile2"]
-outfile = arguments["--outfile"]
 sign = arguments["--sign"]
+
+if arguments["--lectfile"] ==  None:
+    lecfile = "lect.in"
+else:
+    lecfile = arguments["--lectfile"]
+
+# read lect.in
+ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
+
+if arguments["--outfile"] ==  None:
+    outfile  = 'diff.r4'
+else:
+    outfile = arguments["--outfile"]
 
 # read r4
 in1 = np.fromfile(infile1,dtype=np.float32) 
@@ -76,7 +85,7 @@ index = np.nonzero(np.isnan(out))
 #out[index] = 0
 
 # plot maps
-vmax = np.max( [np.nanpercentile(in11,98),np.abs(np.nanpercentile(in11,2))] )
+vmax = np.max( [np.nanpercentile(in11,95),np.abs(np.nanpercentile(in11,5))] )
 
 try:
         from matplotlib.colors import LinearSegmentedColormap
@@ -104,6 +113,8 @@ divider = make_axes_locatable(ax2)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 #vmax = np.max( [np.nanpercentile(out,98),np.abs(np.nanpercentile(out,2))] )
+
+vmax = np.max( [np.nanpercentile(out,95),np.abs(np.nanpercentile(out,5))] )
 
 ax3 = fig.add_subplot(1,3,3)
 cax = ax3.imshow(out, cmap = cmap, vmax=vmax, vmin=-vmax, extent=None)

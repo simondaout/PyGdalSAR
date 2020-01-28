@@ -26,7 +26,7 @@ infile = arguments["<file>"]
 
 
 # there is probably a better way to do that re search... 
-# _re = re.compile(r"(.*) COL:(.*?) ROW:(.*?) (\d+) (.*)", re.IGNORECASE)
+# _re = re.compile(r"(.*) COL:(.*?) ROW:(.*) ", re.IGNORECASE)
 _re = re.compile(r"(.*) COL:(.*) ROW:(.*)", re.IGNORECASE)
 
 file = open('bridge.in', "w")

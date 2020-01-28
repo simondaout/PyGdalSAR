@@ -748,7 +748,6 @@ def flatr(config,kk):
                 logger.critical("Flatten range failed for IFG: {0} Failed!".format(infile))
                 print(flatr.__doc__) 
                 config.stack.updatesuccess(kk)
-
         force_link(param,newparam)
 
     return config.getconfig(kk)
@@ -1304,7 +1303,7 @@ def unwrapping(config,kk):
 
                 if path.exists(bridgefile) == False:
                     wf = open(bridgefile,"w")
-                    wf.write("1  1  1  1  0  0")
+                    wf.write("1  1  1  1  0 ")
                     wf.close()
 
                 # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)

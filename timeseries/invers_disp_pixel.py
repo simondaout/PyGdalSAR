@@ -483,12 +483,13 @@ indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
 nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
-# ATTENTION: here i convert rad to mm
-cubei = np.fromfile(cubef,dtype=np.float32)*rad2mm
+cubei = np.fromfile(cubef,dtype=np.float32)
 cube = as_strided(cubei[:nlign*ncol*N])
 print 'Number of line in the cube: ', cube.shape
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
+# ATTENTION: here i convert rad to mm
+cube = cube*rad2mm
 maps = cube.reshape((nlign,ncol,N))
 
 # set to NaN lakes and ocean, new image ref.
