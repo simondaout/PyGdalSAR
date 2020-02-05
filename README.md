@@ -66,9 +66,9 @@ Postdoctoral Research Fellow, Department of Earth Sciences, University of Oxford
 ```
 Collaborators:  
 Louise Maubant: louise.maubant@univ-grenoble-alpes.fr
-Benedetta Dini: benedetta.dini@erdw.ethz.ch
 Marie-Pierre Doin: marie-pierre.doin@univ-grenoble-alpes.fr
 Mathieu Volat: matthieu.volat@univ-lyon1.fr
+Nicholas Dodds: nicholas.dodds@st-annes.ox.ac.uk
 ```
  References
 ============
