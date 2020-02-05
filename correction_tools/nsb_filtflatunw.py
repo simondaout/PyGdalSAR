@@ -826,6 +826,12 @@ def flat_atmo(config, kk):
             filterSW(config,kk)
             checkinfile(filtfile)
 
+        width,length = computesize(config,filtfile)
+        if (int(width) == 0) or (int(length) == 0):
+            logger.info('{0} has zero size'.format(filtfile))
+            filterSW(config,kk)
+            checkinfile(filtfile)
+
         # update names
         prefix, suffix = config.stack.getfix(kk)
         newsuffix = suffix + '_flatz'
