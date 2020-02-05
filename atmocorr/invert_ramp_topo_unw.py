@@ -1699,6 +1699,7 @@ def apply_cor(kk, sp, sp_inv):
 
     _los_map = np.copy(flatlos)
     _los_map[los_map==0] = np.float('NaN')
+    flatlos[los_map==0] = np.float('NaN')
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
 
     ax = fig.add_subplot(1,4,4)
