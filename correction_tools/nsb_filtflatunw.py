@@ -270,7 +270,9 @@ class PileInt:
         ''' Return interfergram file name'''
         _f = str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) 
         temp_rlook = 1 
-        if path.exists(_f) == False:
+        print(_f+'.int')
+        print()
+        if path.exists(_f+'.int') == False:
             _f = str(self._ifgs[kk].prefix) + str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + str(self._ifgs[kk].suffix) + '_2rlks'
             temp_rlook = 2
         return _f, temp_rlook
