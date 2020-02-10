@@ -90,9 +90,9 @@ else:
 
 print('Heading:', np.nanmean(heading))
 toposmooth = scipy.ndimage.filters.gaussian_filter(topo,2.)
-Py, Px = np.gradient(toposmooth,az_res,rg_res*np.cos(lat))
+Py, Px = np.gradient(toposmooth,az_res,rg_res*np.cos(lat)) # cos0 = 1: do not take into account lat in radar geometry
 slope = np.sqrt(Py**2+Px**2)
-aspect = np.rad2deg(np.arctan2(-Px,Py)) - (heading  + 180) # convrt to angle with the north
+aspect = np.rad2deg(np.arctan2(-Px,Py)) - (heading  + 180) # convrt to angle with the north, does not make sense in radar geoemtry
 # aspect[aspect<0] = aspect[aspect<0] + 360
 # slopelos = (np.cos(heading)*Px+np.sin(heading)*Py)/np.sin(look)
 slopelos = Px # LOS is range direction.... 
