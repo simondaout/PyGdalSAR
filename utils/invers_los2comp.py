@@ -331,7 +331,7 @@ fig=plt.figure(0, figsize=(14,12))
 for i in range(M):
     d = insar[i]
     # plot LOS
-    ax = fig.add_subplot(2,M,1+(i*2))
+    ax = fig.add_subplot(2,M,i+1)
     cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('{}'.format(d.reduction))
     divider = make_axes_locatable(ax)
@@ -339,7 +339,7 @@ for i in range(M):
     plt.colorbar(cax, cax=c)
 
     # plot SIGMA LOS
-    ax = fig.add_subplot(2,M,2+(i*2))
+    ax = fig.add_subplot(2,M,i+1+M)
     cax = ax.imshow(d.sigma,cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
     ax.set_title('SIGMA {}'.format(d.reduction))
     divider = make_axes_locatable(ax)
@@ -357,7 +357,7 @@ fig.savefig('data_decomposition_{}.pdf'.format(output),format='PDF',dpi=150)
 
 # Initialise output matrix
 disp = np.ones((nlines,ncols,3))*np.float('NaN')
-sdisp = np.ones((nlines,ncols,3))
+sdisp = np.ones((nlines,ncols,3))*np.float('NaN')
 
 print()
 logger.info('Inversion pixel by pixel....')
@@ -377,34 +377,50 @@ for i in range(ibeg,iend):
 
         for m in range(M):
             d = insar[m]
-            if not np.isnan(d.los[i,j]): 
-                # build data matrix 
-                data[m] = d.los[i,j]
-                rms[m] = d.sigma[i,j]
+            # build data matrix 
+            data[m] = d.los[i,j]
+            rms[m] = d.sigma[i,j]
 
             for n in range(N):
-                if not np.isnan(d.proj[int(comp[n])][i,j]):
-                    G[m,n] = d.proj[int(comp[n])][i,j]
+                G[m,n] = d.proj[int(comp[n])][i,j]
 
-        if (not np.isnan(data.any())) and (not np.isnan(sdisp.any()) and (not np.isnan(G.any()))):
+        rms[np.isnan(rms)] = 1.
+        # remove los with NaN
+        # could be only one 
+        index = np.flatnonzero(~np.isnan(data))
+        data = data[index]
+        rms = rms[index]
+        G = G[index,:]
 
-                # Inversion
-                pars = lst.lstsq(G,data)[0]
-                if iter>1:
-                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                    pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
-                
-                for n in range((N)):        
-                    disp[i,j,int(comp[n])] = pars[n]
+        # Inversion
+        # try:
+        pars = lst.lstsq(G,data)[0]
+        # except:
+        #     print('data:',data)
+        #     print('G:',G)
+        #     print('rms:',rms)
+        #     print(np.isnan(data))
+        #     print()
+        if iter>1:
+            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+            pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
+        
+        for n in range((N)):        
+            disp[i,j,int(comp[n])] = pars[n]
 
-                Cd = np.diag(rms**2, k = 0)
-                try:
-                    sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
-                except:
-                    sigmam = np.ones((N,N))
-                for n in range((N)): 
-                    sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
+        Cd = np.diag(rms**2, k = 0)
+        try:
+            sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+            for n in range((N)): 
+                sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
+        except:
+            pass
+            # print('data:',data)
+            # print('G:',G)
+            # print('rms:',rms)
+            # print()
+
 
 ################################
 # PLOT RESULTS
@@ -428,10 +444,10 @@ for n in range(N):
 
     # plot SIGMA LOS
     sigdata = sdisp[:,:,int(comp[n])]
-    sigdata[sigdata==0] = np.float('NaN')
-    sigdata[sigdata==1] = np.float('NaN')
+    # sigdata[sigdata==0] = np.float('NaN')
+    # sigdata[sigdata==1] = np.float('NaN')
 
-    vmax=np.nanpercentile(sigdata,98)
+    vmax=np.nanpercentile(sigdata,95)
     ax = fig.add_subplot(2,N,n+1+N)
     cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
     ax.set_title('SIGMA {}'.format(comp_name[n]))
@@ -461,6 +477,5 @@ for n in range(N):
     ds.SetGeoTransform(gt)
     ds.SetProjection(projref)
     band.FlushCache()
-
 
 plt.show()
