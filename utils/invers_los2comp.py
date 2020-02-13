@@ -1,0 +1,466 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+############################################
+#
+# PyGdalSAR: An InSAR post-processing package 
+# written in Python-Gdal
+#
+############################################
+# Author        : Simon DAOUT (Oxford)
+############################################
+
+# import sys,os
+# from sys import argv,stdin,stdout
+# from os import environ,path
+# import logging
+# import getopt
+
+from sys import argv,exit,stdin,stdout
+import getopt
+import os, math
+from os import path
+import logging
+
+
+import numpy as np
+import scipy.optimize as opt
+import scipy.linalg as lst
+import gdal
+gdal.UseExceptions()
+
+# plot
+import matplotlib
+if os.environ["TERM"].startswith("screen"):
+    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+import matplotlib.dates as mdates
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+
+################################
+# CLASSES
+################################
+
+class network:
+    """
+    Load InSAR displacements and LOS angle maps
+    name: name of raster displacement map (convention positive towards satellite)
+    reduction: reducted name 
+    wdir: relative path input files
+    lookf: name incidence angle file (angle between vertical and LOS)
+    headf: name heading file (angle between North and LOS)
+    scale: scale LOS displacement map
+    format: format input files: GTiff, NetCDF, ROI_PAC (default: GTiff)
+    scale_sig: scale sigma file
+    bounds: optional bounds for plot [losmin,losmax]
+    """
+    
+    def __init__(self,name,wdir,reduction,lookf,headf,sigmaf=None,scale=1,scale_sig=1000,format='GTiff',bounds=None):
+        self.name = name
+        self.wdir = wdir
+        self.reduction = reduction
+        self.path = wdir + name
+        self.lookf = wdir + lookf
+        self.headf = wdir + headf
+        self.sigmaf = wdir + sigmaf
+        self.scale = scale
+        self.scale_sig = scale_sig
+        self.bounds = bounds
+
+    def load(self,rot):
+        logger.info('Read track: {}'.format(self.name))
+        ds = gdal.Open(self.path,gdal.GA_ReadOnly)
+        band = ds.GetRasterBand(1)
+        self.los = self.scale*band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        band.FlushCache()
+        self.nlines,self.ncols = ds.RasterYSize, ds.RasterXSize
+        logger.info('Number of pixel: {}'.format(len(self.los.flatten())))
+        logger.info('Nlines: {}, Ncols: {}'.format(self.nlines,self.ncols))
+        del ds, band
+
+        # compute losmax,losmin
+        if self.bounds == None:
+            self.losmax = np.nanpercentile(self.los,98)
+            self.losmin = np.nanpercentile(self.los,2)
+        else:
+            self.losmin = self.bounds[0]
+            self.losmax = self.bounds[1]
+        
+        ds = gdal.Open(self.lookf,gdal.GA_ReadOnly)
+        # param output files
+        self.gt = ds.GetGeoTransform()
+        self.projref = ds.GetProjectionRef()
+        self.driver = gdal.GetDriverByName('GTiff')
+
+        band = ds.GetRasterBand(1)
+        self.look = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        self.look[np.isnan(self.los)] = np.float('NaN') 
+        band.FlushCache()
+        del ds, band
+
+        if self.sigmaf is not None:
+            ds = gdal.Open(self.sigmaf,gdal.GA_ReadOnly)
+            band = ds.GetRasterBand(1)
+            self.sigma = self.scale_sig*band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+            # self.sigma[np.isnan(self.los)] = np.float('NaN') 
+            band.FlushCache()
+            del ds, band
+        else:
+            self.sigma = np.ones((self.nlines,self.ncols))
+
+        # compute siglosmax,siglosmin
+        self.sig_losmax = np.nanpercentile(self.sigma,98)
+        self.sig_losmin = np.nanpercentile(self.sigma,2)
+
+        ds = gdal.Open(self.headf,gdal.GA_ReadOnly)
+        band = ds.GetRasterBand(1)
+        self.head = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        self.head[np.isnan(self.los)] = np.float('NaN') 
+        band.FlushCache()
+        del ds, band
+
+        # convert head, look to angle phi, theta in rad
+        # theta: vertical angle between LOS and vertical
+        self.theta = np.deg2rad(90.-self.look)
+        # phi: horizontal angle between LOS and comp1
+        self.phi = np.deg2rad(-90-self.head)
+
+        logger.info('Average LOOK:{0:.5f}, THETA:{1:.5f} angles'.\
+            format(np.nanmean(self.look),np.nanmean(np.rad2deg(self.theta))))
+
+        logger.info('Average HEADING:{0:.5f}, PHI:{1:.5f} angles'.\
+            format(np.nanmean(self.head),np.nanmean(np.rad2deg(self.phi))))
+
+        # compute proj ENcomp3
+        self.proj=[np.cos(self.phi),
+               np.sin(self.phi),
+               np.sin(self.theta)
+              ]
+        logger.info('Average horizontal LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
+            format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
+
+        # compute proj Shortening
+        self.proj=[(np.cos(rot)*self.proj[0] + np.sin(rot)*self.proj[1])*np.cos(self.theta),
+               (-np.sin(rot)*self.proj[0] + np.cos(rot)*self.proj[1])*np.cos(self.theta),
+               self.proj[2]
+               ]
+
+        logger.info('Average LOS projection to comp1, comp2, comp3: {0:.5f} {1:.5f} {2:.5f}'.\
+            format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
+        print()
+
+
+################################
+#EXAMPLE INPUT FILE
+################################
+
+# # define output name
+# output = 'post09'
+
+# # define angle between north and new axis
+# # e.g if axis = [east, north, up], rotation = 0
+# # e.g if axis = [N20E, N70W, Up], rotation = 20
+# rotation = 22
+
+# # define desired invert components
+# # e.g [east, north, up], comp = [1,2,3]
+# # e.g [east, north, up], comp = [1,2,3]
+# # e.g [east, up], comp = [1,3]
+# comp = [1,3]
+
+# # parameters inversion
+# # iter: number of least-square iterations (default:2000)
+# # acc: desired accuracy results of the sequential least-square
+# #iter = 2000
+# acc=1.e-9
+# iter = 1
+
+# # optional crop data
+# # define [line_beg, line_end, col_beg_col_end]
+# # default: None
+# #crop=[200,400,100,300]
+# crop= None
+
+# insar = [
+# network('T172_inter/T172_inter_LOSVelocity_nan_s90.xy-los_flat_crop09.grd','/home/cometraid14/daouts/work/tibet/qinghai/data/insar/',\
+#     'T172','T172_inter/T172_look_s90_crop09.tiff','T172_inter/T172_head_s90_crop09.tiff',\
+#     sigmaf='T172_inter/T172_LOS_sigVelocity.los_crop09.tiff',\
+#     scale=1,scale_sig=1000,format='GTiff',bounds=[-2,3]),
+# network('T004_inter/T004_inter_LOSVelocity_nan_mmyr_s90_crop09.grd','/home/cometraid14/daouts/work/tibet/qinghai/data/insar/',\
+#     'T004','T004_inter/T004_look_s90_crop09.tiff','T004_inter/T004_head_s90_crop09.tiff',\
+#     sigmaf='T004_inter/T004_LOS_sigVelocity.los_crop09.tiff',\
+#     scale=1,scale_sig=1000,format='GTiff',bounds=[-2,3])
+# ]
+
+
+################################
+# MAIN
+################################
+
+def usage():
+  print('plotPro.py infile.py [-v] [-h]')
+  print('-v Verbose mode. Show more information about the processing')
+  print('-h Show this screen')
+
+try:
+    opts,args = getopt.getopt(argv[1:], "h", ["help"])
+except:
+    print(str(err))
+    print("for help use --help")
+    exit()
+
+level = 'basic'
+for o in argv:
+    if o in ("-h","--help"):
+       usage()
+       exit()
+    if o in ("-v","--verbose"):
+      level = 'debug'
+
+# init logger 
+if level == 'debug':
+    logging.basicConfig(level=logging.DEBUG,\
+        format='%(lineno)s -- %(levelname)s -- %(message)s')
+    logger = logging.getLogger('plotPro.log')
+    logger.info('Initialise log file {0} in DEBUG mode'.format('invers_los2comp.log'))
+
+else:
+    logging.basicConfig(level=logging.INFO,\
+        format='%(lineno)s -- %(levelname)s -- %(message)s')
+    logger = logging.getLogger('invers_los2comp.log')
+    logger.info('Initialise log file {0} in INFO mode. Use option -v for a DEBUG mode'.format('invers_los2comp.log'))
+
+if 1==len(argv):
+  usage()
+  assert False, "no input file"
+  logger.critical('No input file')
+  exit()
+
+if len(argv)>1:
+  try:
+    fname=argv[1]
+    logger.info('Read input file {0}'.format(fname))
+    try:
+      sys.path.append(path.dirname(path.abspath(fname)))
+      exec ("from "+path.basename(fname)+" import *")
+    except:
+      exec(open(path.abspath(fname)).read())
+  
+  except Exception as e: 
+    logger.critical('Problem in input file')
+    logger.critical(e)
+    print(network.__doc__)
+    exit()
+
+# rotation angle: angle between comp1 and shortening
+rot = np.deg2rad(90-rotation)
+
+# Load data
+M = len(insar)
+vmax=0; vmin=0; sigmax=0; sigmin=0
+for i in range(M):
+    insar[i].load(rot)
+    if insar[i].losmax > vmax:
+        vmax = insar[i].losmax
+    if insar[i].losmin < vmin:
+        vmin = insar[i].losmin
+    if insar[i].sig_losmax > sigmax:
+        sigmax = insar[i].sig_losmax
+    if insar[i].sig_losmin < sigmin:
+        sigmin = insar[i].sig_losmin
+
+    # should be able to crop within same area in the future
+    nlines, ncols = insar[0].nlines, insar[0].ncols
+    # check size maps identical
+    if (insar[i].nlines != nlines) or (insar[i].ncols != ncols):
+        logger.critical('Size input maps are not idenical. Exit!')
+        exit()
+    # get param output files
+    gt = insar[0].gt
+    projref = insar[0].projref
+    driver = insar[0].driver
+
+# define invert components
+comp = np.array(comp) - 1 
+N = len(comp)
+comp_name = []
+for n in range(N):
+    if int(comp[n]) == 0:
+        name = 'East + {} deg'.format(np.rad2deg(rot))
+    elif int(comp[n]) == 1:
+        name = 'North + {} deg'.format(np.rad2deg(rot))
+    elif int(comp[n]) == 2:
+        name = 'Up '
+    else:
+        logger.critical('Error defined inverted component. Exit!')
+        logger.critical('[east, north, up], comp = [1,2,3]')
+        logger.critical('[east, north, up], comp = [1,2,3]')
+        logger.critical('[east, up], comp = [1,3]')
+        exit()
+    logger.info('Invert components: {}'.format(name))
+    comp_name.append(name)
+
+# crop options
+if 'crop' in locals():
+    if crop is not None:
+        logger.info('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
+        ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+    else:
+        ibeg,iend,jbeg,jend = 0,nlines,0,ncols
+else:
+    ibeg,iend,jbeg,jend = 0,nlines,0,ncols
+
+################################
+# plot DATA
+################################
+
+print()
+logger.info('Plot DATA ....') 
+try:
+    from matplotlib.colors import LinearSegmentedColormap
+    cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
+    cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+    cmap_r = cmap.reversed()
+except:
+    cmap=cm.rainbow
+
+fig=plt.figure(0, figsize=(14,12))
+
+for i in range(M):
+    d = insar[i]
+    # plot LOS
+    ax = fig.add_subplot(2,M,1+(i*2))
+    cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+    ax.set_title('{}'.format(d.reduction))
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+    # plot SIGMA LOS
+    ax = fig.add_subplot(2,M,2+(i*2))
+    cax = ax.imshow(d.sigma,cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
+    ax.set_title('SIGMA {}'.format(d.reduction))
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+# fig.tight_layout()
+fig.savefig('data_decomposition_{}.pdf'.format(output),format='PDF',dpi=150)
+# plt.show()
+# exit()
+
+################################
+# INVERSION
+################################
+
+# Initialise output matrix
+disp = np.ones((nlines,ncols,3))*np.float('NaN')
+sdisp = np.ones((nlines,ncols,3))
+
+print()
+logger.info('Inversion pixel by pixel....')
+logger.info('Size invers matrix: {}x{}'.format(M,N))
+
+# lcomp1-square 2 views 
+# loop over each line and cols
+for i in range(ibeg,iend):
+    if i % 50 == 0:
+        print('Processing line: {}'.format(i)) 
+    for j in range(jbeg,jend):
+
+        # initialise matrix for each pixels
+        data = np.zeros((M))
+        G = np.zeros((M,N))
+        rms = np.zeros((M))
+
+        for m in range(M):
+            d = insar[m]
+            if not np.isnan(d.los[i,j]): 
+                # build data matrix 
+                data[m] = d.los[i,j]
+                rms[m] = d.sigma[i,j]
+
+            for n in range(N):
+                if not np.isnan(d.proj[int(comp[n])][i,j]):
+                    G[m,n] = d.proj[int(comp[n])][i,j]
+
+        if (not np.isnan(data.any())) and (not np.isnan(sdisp.any()) and (not np.isnan(G.any()))):
+
+                # Inversion
+                pars = lst.lstsq(G,data)[0]
+                if iter>1:
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                    pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
+                
+                for n in range((N)):        
+                    disp[i,j,int(comp[n])] = pars[n]
+
+                Cd = np.diag(rms**2, k = 0)
+                try:
+                    sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+                except:
+                    sigmam = np.ones((N,N))
+                for n in range((N)): 
+                    sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
+
+################################
+# PLOT RESULTS
+################################
+
+fig=plt.figure(1, figsize=(14,12))
+
+for n in range(N):
+
+    data = disp[:,:,int(comp[n])]
+    data[data==0] = np.float('NaN')
+
+    # plot comps
+    vmax =  np.nanpercentile(data,98)
+    ax = fig.add_subplot(2,N,n+1)
+    cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=-vmax,interpolation=None)
+    ax.set_title('{}'.format(comp_name[n]))
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+    # plot SIGMA LOS
+    sigdata = sdisp[:,:,int(comp[n])]
+    sigdata[sigdata==0] = np.float('NaN')
+    sigdata[sigdata==1] = np.float('NaN')
+
+    vmax=np.nanpercentile(sigdata,98)
+    ax = fig.add_subplot(2,N,n+1+N)
+    cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
+    ax.set_title('SIGMA {}'.format(comp_name[n]))
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+
+# fig.tight_layout()
+fig.savefig('decomposition_{}.pdf'.format(output), format='PDF',dpi=150)
+
+################################
+# SAVE RESULTS
+################################
+
+# Save output files
+for n in range(N):
+    ds = driver.Create('U{}_{}.tif'.format(n,output), ncols, nlines, 1, gdal.GDT_Float32)
+    band = ds.GetRasterBand(1)
+    band.WriteArray(disp[:,:,int(comp[n])])
+    ds.SetGeoTransform(gt)
+    ds.SetProjection(projref)
+    band.FlushCache()
+
+    ds = driver.Create('sig_U{}_{}.tif'.format(n,output), ncols, nlines, 1, gdal.GDT_Float32)
+    band = ds.GetRasterBand(1)
+    band.WriteArray(sdisp[:,:,int(comp[n])])
+    ds.SetGeoTransform(gt)
+    ds.SetProjection(projref)
+    band.FlushCache()
+
+
+plt.show()
