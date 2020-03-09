@@ -130,7 +130,8 @@ if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None):
 elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
-    weight = np.exp(-sigma/np.percentile(sigma,80))
+    # weight = np.exp(-sigma/np.percentile(sigma,80))
+    weight = np.exp(-sigma)
     do_sig = int(2) # user given weigth
     # print (sigma, weight)
     if len(sigma) != kmax:
@@ -149,7 +150,7 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     wf.close()
 elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      print('Weigth interferograms based on their baselines with Btc:{} and Bpc:{}'.format(btc,bpc))
-     do_sig = int(0)
+     do_sig = int(2)
      weight=np.zeros((kmax))
      for i in xrange((kmax)):
      	deltat = (abs(bt[im==date_1[i]] - bt[im==date_2[i]]))/btc
