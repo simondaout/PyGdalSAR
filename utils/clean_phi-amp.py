@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 ############################################
@@ -33,7 +33,7 @@ Options:
 --lectfile=<file>       Path of the lect.in file for r4 format [default: lect_ts.in]
 --threshold_amp=<value>  Mask on minimum Amplitude for Phase [default: 1.5]
 --perc_sig=<value>      Percentile uncertainty for map cleaning [default: 100]
---slopelosfile=<file>   SLope in the LOS file [default: None]
+--slopelosfile=<file>   SLope in the LOS direction [default: None]
 --slopefile=<file>      SLope file [default: None]
 --aspectfile=<file>     Aspect file [default: None]
 --plotcorr=<yes/no>     Plot correlation plots [default: no]
@@ -169,7 +169,7 @@ else:
 
 if arguments["--aspectfile"] is not None:
     aspect_map = np.fromfile(arguments["--aspectfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
-    aspect_map[slope_map<1] = np.float('NaN') # mask aspect for small slope
+    aspect_map[slope_map<3] = np.float('NaN') # mask aspect for small slope
     aspect_map[aspect_map<0] = aspect_map[aspect_map<0] + 360
 else:
     aspect_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
@@ -198,7 +198,6 @@ phi_map[amp_map<threshold_amp] = np.float('NaN')
 
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi
-# phi_map = phi_map - np.pi
 
 #save output
 fid1 = open(ampoutf,'wb')
