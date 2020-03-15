@@ -96,7 +96,7 @@ class network:
 
         band = ds.GetRasterBand(1)
         self.look = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        self.look[np.isnan(self.los)] = np.float('NaN') 
+        # self.look[np.isnan(self.los)] = np.float('NaN') 
         band.FlushCache()
         del ds, band
 
@@ -117,7 +117,7 @@ class network:
         ds = gdal.Open(self.headf,gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
         self.head = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        self.head[np.isnan(self.los)] = np.float('NaN') 
+        # self.head[np.isnan(self.los)] = np.float('NaN') 
         band.FlushCache()
         del ds, band
 
@@ -159,14 +159,14 @@ class network:
 # # define output name
 # output = 'post09'
 
-# # define angle between north and new axis
+# # define angle between north and new axis 
 # # e.g if axis = [east, north, up], rotation = 0
-# # e.g if axis = [N20E, N70W, Up], rotation = 20
+# # e.g if axis = [N70W, N20E, Up], rotation = 20
 # rotation = 22
 
 # # define desired invert components
 # # e.g [east, north, up], comp = [1,2,3]
-# # e.g [east, north, up], comp = [1,2,3]
+# # e.g [north, up], comp = [2,3]
 # # e.g [east, up], comp = [1,3]
 # comp = [1,3]
 
@@ -178,9 +178,8 @@ class network:
 # iter = 1
 
 # # optional crop data
-# # define [line_beg, line_end, col_beg_col_end]
-# # default: None
-# #crop=[200,400,100,300]
+# # define [line_beg, line_end, col_beg_col_end] (default: None)
+# # crop=[200,400,100,300]
 # crop= None
 
 # insar = [
@@ -254,8 +253,8 @@ if len(argv)>1:
     print(network.__doc__)
     exit()
 
-# rotation angle: angle between comp1 and shortening
-rot = np.deg2rad(90-rotation)
+# rotation angle: angle between comp1 and East
+rot = np.deg2rad(-rotation)
 
 # Load data
 M = len(insar)
@@ -288,9 +287,9 @@ N = len(comp)
 comp_name = []
 for n in range(N):
     if int(comp[n]) == 0:
-        name = 'East + {} deg'.format(np.rad2deg(rot))
+        name = 'East + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
     elif int(comp[n]) == 1:
-        name = 'North + {} deg'.format(np.rad2deg(rot))
+        name = 'North + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
     elif int(comp[n]) == 2:
         name = 'Up '
     else:
@@ -348,7 +347,7 @@ for i in range(M):
 
 # fig.tight_layout()
 fig.savefig('data_decomposition_{}.pdf'.format(output),format='PDF',dpi=150)
-# plt.show()
+plt.show()
 # exit()
 
 ################################
@@ -393,33 +392,36 @@ for i in range(ibeg,iend):
         G = G[index,:]
 
         # Inversion
-        # try:
-        pars = lst.lstsq(G,data)[0]
-        # except:
-        #     print('data:',data)
-        #     print('G:',G)
-        #     print('rms:',rms)
-        #     print(np.isnan(data))
-        #     print()
-        if iter>1:
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
-        
-        for n in range((N)):        
-            disp[i,j,int(comp[n])] = pars[n]
+        if len(data)>1:
+            try:
+                pars = lst.lstsq(G,data)[0]
 
-        Cd = np.diag(rms**2, k = 0)
-        try:
-            sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
-            for n in range((N)): 
-                sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
-        except:
-            pass
-            # print('data:',data)
-            # print('G:',G)
-            # print('rms:',rms)
-            # print()
+                if iter>1:
+                    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+                    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+                    pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
+                
+                for n in range((N)):        
+                    disp[i,j,int(comp[n])] = pars[n]
+
+                Cd = np.diag(rms**2, k = 0)
+                try:
+                    sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+                    for n in range((N)): 
+                        sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
+                except:
+                    pass
+                    # print('data:',data)
+                    # print('G:',G)
+                    # print('rms:',rms)
+                    # print()
+
+            except:
+                pars = np.zeros((N))
+                print(i,j)
+                print('data:',data)
+                print('G:',G)
+                print()
 
 
 ################################
@@ -464,14 +466,14 @@ fig.savefig('decomposition_{}.pdf'.format(output), format='PDF',dpi=150)
 
 # Save output files
 for n in range(N):
-    ds = driver.Create('U{}_{}.tif'.format(n,output), ncols, nlines, 1, gdal.GDT_Float32)
+    ds = driver.Create('U{}_{}.tif'.format(comp[n],output), ncols, nlines, 1, gdal.GDT_Float32)
     band = ds.GetRasterBand(1)
     band.WriteArray(disp[:,:,int(comp[n])])
     ds.SetGeoTransform(gt)
     ds.SetProjection(projref)
     band.FlushCache()
 
-    ds = driver.Create('sig_U{}_{}.tif'.format(n,output), ncols, nlines, 1, gdal.GDT_Float32)
+    ds = driver.Create('sig_U{}_{}.tif'.format(comp[n],output), ncols, nlines, 1, gdal.GDT_Float32)
     band = ds.GetRasterBand(1)
     band.WriteArray(sdisp[:,:,int(comp[n])])
     ds.SetGeoTransform(gt)
