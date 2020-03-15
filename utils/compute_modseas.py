@@ -17,7 +17,7 @@ Compute the mod of the seasonality. Read output files from invers_dips2coef.py.
 
 Usage: clean_phi-amp.py [--cube=<path> ] [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--demerrfile=<path>] \
 [--ref_file=<path>] [--slopefile=<path>] [--outampfile=<path>] [--outphifile=<path>] [--crop=<values>] [--lectfile=<path>] \
-[--sigampfile=<path>] [--sigphifile=<path>] [--minamp=<value>] [--maxamp=<value>] [--perc_sig=<value>] [--name=<value>]
+[--sigampfile=<path>] [--sigphifile=<path>] [--minamp=<value>] [--maxamp=<value>] [--maxslope=<value>] [--perc_sig=<value>] [--name=<value>] [--topofile=<path>] [--threshold=<amp/slope>]
 
 
 Options:
@@ -27,16 +27,19 @@ Options:
 --phifile=<file>      phi map file [default: phiwt_coeff.r4]
 --linfile=<file>      Linear map file [default: lin_coeff.r4]
 --demerrfile=<file>   Path to the dem error file [default: corrdem_coeff.r4]
---ref_file=<file>      Path to the reference file [default: ref_coeff.r4]
---slopefile=<file>     Linear map file [default: LOSslope.r4]
+--ref_file=<file>     Path to the reference file [default: ref_coeff.r4]
+--slopefile=<file>    Elevation slope [default: Slope.r4]
 --lectfile=<file>     Path of the lect.in file for r4 format [default: lect_ts.in]
 --crop=<values>       Crop data [default: 0,nlines,0,ncol]
 --sigampfile=<file>   Uncertainty amplitude map file [default: ampwt_sigcoeff.r4]
 --sigphifile=<file>   Uncertainty phi map file [default: phiwt_sigcoeff.r4]
---minamp=<value>      Mask on minimum Amplitude [default: 1.]
-[--maxamp=<value>]     Maximum Amplitude limit [default: 3.]
+--minamp=<value>      Mask on minimum Amplitude in mm [default: 3.5]
+--maxamp=<value>      Threshold Amplitude limit in mm [default: 10.]
+--maxslope=<value>    Threshold on Slope in % [default: 3.]
 --perc_sig=<value>    Percentile uncertainty for map cleaning [default: 99.]
 --name=<value>        Output file name
+--topofile=<file>     Topographic file [default: dem]
+--threshold=<amp/slope> Choose if you want to apply the threshold on the amplitude (ampmax) or the slope (ampslope) [default: amp]
 """
 
 import numpy as np
@@ -75,7 +78,7 @@ if arguments["--linfile"] ==  None:
 if arguments["--lectfile"] ==  None:
     arguments["--lectfile"] = "lect_ts.in"
 if arguments["--slopefile"] ==  None:
-    arguments["--slopefile"] = "LOSslope.r4"
+    arguments["--slopefile"] = "Slope.r4"
 if arguments["--sigampfile"] ==  None:
     arguments["--sigampfile"] = 'ampwt_sigcoeff.r4'
 if arguments["--sigphifile"] ==  None:
@@ -83,17 +86,38 @@ if arguments["--sigphifile"] ==  None:
 if arguments["--cube"] ==  None:
     arguments["--cube"] = 'depl_cumule_flat'
 if arguments["--minamp"] ==  None:
-    minamp = 1.5
+    minamp = 2.5
 else:
     minamp = np.float(arguments["--minamp"])
 if arguments["--maxamp"] ==  None:
-    maxamp = 3
+    maxamp = 10
 else:
     maxamp = np.float(arguments["--maxamp"])
+if arguments["--maxslope"] ==  None:
+    maxslope = 3
+else:
+    maxslope = np.float(arguments["--maxslope"])
+if arguments["--topofile"] == None:
+    demf = None
+else:
+    demf = arguments["--topofile"]
+if arguments["--threshold"] == None:
+    threshold = "Amp"
+    maxthreshold = maxamp
+elif arguments["--threshold"] == "amp":
+    threshold = "Amp"
+    maxthreshold = maxamp
+elif arguments["--threshold"] == "slope":
+    threshold = "Slope"
+    maxthreshold = maxslope
+else:
+    "threshold argument not recognise. Exit!"
+    sys.exit()
 
 fimages='images_retenues'
 imref = 0
 rad2mm = -4.4563
+minelev = 3500 
 
 ##################################
 
@@ -127,11 +151,24 @@ if arguments["--demerrfile"] is not None:
 else:
     bperp_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 
+if demf ==  None:
+    try:
+        demf = 'dem'
+        dem_map = np.fromfile('dem',dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
+    except:
+        print('DEM file is not readible. Set elelvation to zeros.')
+        dem_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
+else:
+    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+print('Min Elev: {}, Max Elve: {}'.format(np.nanmin(dem_map), np.nanmax(dem_map)))
+
 # # clean
 if arguments["--perc_sig"] ==  None:
-    perc_sig = 99.
+    perc_sig = 100.
 else:
     perc_sig = np.float(arguments["--perc_sig"])
+
+# cleaning 
 phi_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
 amp_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
 lin_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
@@ -140,16 +177,23 @@ phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
 
-phi_map[amp_map<np.float(minamp)] = np.float('NaN')
-lin_map[amp_map<np.float(minamp)] = np.float('NaN')
-
 # conversion
 amp_map,sigamp_map,sigphi_map = amp_map*abs(rad2mm),sigamp_map*abs(rad2mm),sigphi_map*abs(rad2mm)
 lin_map, ref_map = lin_map*rad2mm, ref_map*rad2mm
-minamp, maxamp = minamp*abs(rad2mm), maxamp*abs(rad2mm)
+
+phi_map[amp_map<np.float(minamp)] = np.float('NaN')
+lin_map[amp_map<np.float(minamp)] = np.float('NaN')
+
+phi_map[dem_map<minelev] = np.float('NaN')
+amp_map[dem_map<minelev] = np.float('NaN')
+lin_map[dem_map<minelev] = np.float('NaN')
+
 
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi
+
+# slope in %
+slope_map = slope_map*100
 
 # Initialisation
 dmod=[]
@@ -193,11 +237,11 @@ def seasonal(time,a,b,c):
 fig_ampphi = plt.figure(0,figsize=(14,4))
 
 ax = fig_ampphi.add_subplot(1,3,1)
-im = ax.imshow(slope_map,cmap=cm.Greys,vmax=np.nanpercentile(slope_map,92),vmin=np.nanpercentile(slope_map,8),zorder=1)
+im = ax.imshow(slope_map,cmap=cm.Greys,vmax=np.nanpercentile(slope_map,90),vmin=np.nanpercentile(slope_map,10),zorder=1)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
-ax.set_title('Slope in LOS',fontsize=12)
+ax.set_title('Slope',fontsize=12)
 
 ax = fig_ampphi.add_subplot(1,3,2)
 cmap = cm.rainbow
@@ -219,7 +263,9 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 ax.set_title('Timing (rad)',fontsize=12)
 fig_ampphi.tight_layout()
-# plt.show()
+fig_ampphi.savefig('{}-modmaps.pdf'.format(arguments["--name"]), format='PDF',dpi=80)
+
+plt.show()
 # sys.exit(0)
 
 # Open cube
@@ -232,15 +278,32 @@ for t in range((N)):
 
 for i in range(iend-ibeg):
     for j in range(jend-jbeg):
-        # if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(maxamp)):
-        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and slope_map[i,j]>0.03):
+
+      if threshold == "Amp":  
+        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(maxamp)):
             temp_pos = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
                 flat_disp_pos.append(temp_pos[t])
                 time_pos.append(dmodt[t])
                 amp_pos.append(amp_map[i,j])
-        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and slope_map[i,j]<0.03):
+        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]<np.float(maxamp)):
+            temp_neg = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
+                - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
+            for t in range((N)):
+                flat_disp_neg.append(temp_neg[t])
+                time_neg.append(dmodt[t])
+                amp_neg.append(amp_map[i,j])
+      
+      elif threshold == "Slope":  
+        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and slope_map[i,j]>maxslope):
+            temp_pos = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
+                - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
+            for t in range((N)):
+                flat_disp_pos.append(temp_pos[t])
+                time_pos.append(dmodt[t])
+                amp_pos.append(amp_map[i,j])
+        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and slope_map[i,j]<maxslope):
             temp_neg = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
@@ -256,6 +319,11 @@ amp_neg = np.array(amp_neg).flatten()
 flat_disp_pos = np.array(flat_disp_pos).flatten()
 flat_disp_neg = np.array(flat_disp_neg).flatten()
 dmod=np.unique(np.array(dmod).flatten())
+
+# check
+#print(len(amp_pos), amp_pos)
+#print(len(amp_neg), amp_neg)
+#sys.exit()
 
 mean_pos,std_pos=[],[]
 mean_neg,std_neg=[],[]
@@ -273,7 +341,7 @@ mean_neg,std_neg = np.array(mean_neg),np.array(std_neg)
 # plot slope postive
 fig=plt.figure(1,figsize=(14,5))
 ax=fig.add_subplot(1,2,1)
-ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='Slope >: {}'.format(0.03)) 
+ax.plot(dmod,mean_pos,'o',c='blue',ms=6.,label='{} > {}'.format(threshold,maxthreshold)) 
 ax.errorbar(dmod,mean_pos,yerr=std_pos,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -290,11 +358,10 @@ ax.set_xlim([0,1])
 ax.set_xticks(np.arange(0,1, 1./12))
 ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax.set_title('Slope > {}'.format(0.03))
 
 # plot slope negative
 ax2=fig.add_subplot(1,2,2)
-ax2.plot(dmod,mean_neg,'o',c='blue',ms=6.,label='Slope <: {}'.format(0.03))
+ax2.plot(dmod,mean_neg,'o',c='blue',ms=6.,label='{} < {}'.format(threshold,maxthreshold))
 ax2.errorbar(dmod,mean_neg,yerr=std_neg,fmt='none',ecolor='blue',alpha=0.1)
 
 try:
@@ -310,7 +377,6 @@ ax2.set_xlim([0,1])
 ax2.set_xticks(np.arange(0,1, 1./12))
 ax2.xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.2f'))
 plt.legend(loc='best')
-ax2.set_title(' Slope < {}'.format(0.03))
 
 fig.tight_layout()
 fig.savefig('{}-modseas.pdf'.format(arguments["--name"]), format='PDF',dpi=80)
