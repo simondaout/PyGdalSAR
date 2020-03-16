@@ -15,8 +15,8 @@ clean_r4.py
 Clean a r4 file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
-[--perc=<value>] [--clean=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] \
-[--ramp=<yes/no>] [--ref=<jstart,jend>]
+[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] \
+[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend>]
 
 Options:
 -h --help           Show this screen.
@@ -26,10 +26,10 @@ Options:
 --threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
 --scale VALUE       scale the mask [default:1]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
---clean VALUE       Crop option with smoothing of boundaries [default: 0,ncol,0,nlign]
+--crop VALUE       Crop option with smoothing of boundaries [default: 0,ncol,0,nlign]
 --buff VALUE        Number of pixels for crop smothing  (default: 50)
 --perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
---ramp<yes/no>      If yes estimate a quadratic ramp in range
+--ramp<lin/quad/cub/no>      Correct the map from ramp in range and azimuth
 --ref=<jstart,jend> Set to zero displacements from jstart to jend
 """
 
@@ -72,8 +72,18 @@ else:
 
 if arguments["--ramp"] == None:
     ramp = 'no'
+elif arguments["--ramp"] == 'lin':
+    ramp = 'lin'
+elif arguments["--ramp"] == 'quad':
+    ramp = 'quad'
+elif arguments["--ramp"] == 'cub':
+    ramp = 'cub'
+elif arguments["--ramp"] == 'yes':
+    print('ramp==yes is depricated. Use lin/quad/cub/no. Set ramp to lin')
+    ramp = 'lin'
 else:
-    ramp = arguments["--ramp"]
+    print('ramp argument not recognized. Exit!')
+    sys.exit()
 
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
@@ -100,6 +110,14 @@ kk = np.nonzero(
 m[kk] = np.float('NaN')
 mf = np.copy(m)
 
+# clean for ramp
+maxlos,minlos=np.nanpercentile(m,90),np.nanpercentile(m,10)
+print 'Clean outliers for ramp estimation outside:', maxlos,minlos
+kk = np.nonzero(
+    np.logical_or(m<minlos,m>maxlos))
+m_ramp = np.copy(m)
+m_ramp[kk] = np.float('NaN')
+
 # mask
 if maskf is not 'no':
     fid2 = open(maskf, 'r')
@@ -110,17 +128,16 @@ if maskf is not 'no':
 else:
     mask = np.zeros((nlign,ncol))
 
-if ramp=='yes':
-    index = np.nonzero(~np.isnan(mf))
+if ramp=='lin':
+    index = np.nonzero(~np.isnan(m_ramp))
     temp = np.array(index).T
     mi = m[index].flatten()
     az = temp[:,0]; rg = temp[:,1]
 
-    G=np.zeros((len(mi),4))
-    G[:,0] = rg**2
-    G[:,1] = rg
-    G[:,2] = az
-    G[:,3] = 1
+    G=np.zeros((len(mi),3))
+    G[:,0] = rg
+    G[:,1] = az
+    G[:,2] = 1
 
     x0 = lst.lstsq(G,mi)[0]
     _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
@@ -128,27 +145,98 @@ if ramp=='yes':
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
 
     pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
-    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
-    print 'Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d)
+    a = pars[0]; b = pars[1]; c = pars[2]
+    print 'Remove ramp %f x  + %f y + %f'%(a,b,c)
 
-    G=np.zeros((len(mask.flatten()),4))
+    G=np.zeros((len(mask.flatten()),3))
+    for i in xrange(nlign):
+        G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
+        G[i*ncol:(i+1)*ncol,1] = i
+    G[:,2] = 1
+    temp = (mf.flatten() - np.dot(G,pars))
+    mf=temp.reshape(nlign,ncol)
+    mf_ramp=temp.reshape(nlign,ncol)
+
+if ramp=='quad':
+    index = np.nonzero(~np.isnan(m_ramp))
+    temp = np.array(index).T
+    mi = m[index].flatten()
+    az = temp[:,0]; rg = temp[:,1]
+
+    G=np.zeros((len(mi),5))
+    G[:,0] = rg**2
+    G[:,1] = rg
+    G[:,2] = az
+    G[:,3] = az**2
+    G[:,4] = 1
+
+    x0 = lst.lstsq(G,mi)[0]
+    _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+    _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
+
+    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
+    print 'Remove ramp %f x**2 %f x  + %f y**2 + %f y + %f'%(a,b,c,d,e)
+
+    G=np.zeros((len(mask.flatten()),5))
     for i in xrange(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
-        G[i*ncol:(i+1)*ncol,2] = i
-    G[:,3] = 1
+        G[i*ncol:(i+1)*ncol,2] = i**2
+        G[i*ncol:(i+1)*ncol,3] = i
+    G[:,4] = 1
     temp = (mf.flatten() - np.dot(G,pars))
     mf=temp.reshape(nlign,ncol)
+    mf_ramp=temp.reshape(nlign,ncol)
+
+elif ramp=='cub':
+    index = np.nonzero(~np.isnan(m_ramp))
+    temp = np.array(index).T
+    mi = m[index].flatten()
+    az = temp[:,0]; rg = temp[:,1]
+
+    G=np.zeros((len(mi),6))
+    G[:,0] = rg**2
+    G[:,1] = rg
+    G[:,2] = az**3
+    G[:,3] = az**2
+    G[:,4] = az
+    G[:,5] = 1
+
+    x0 = lst.lstsq(G,mi)[0]
+    _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+    _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
+
+    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
+    print 'Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f)
+
+    G=np.zeros((len(mask.flatten()),6))
+    for i in xrange(nlign):
+        G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
+        G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
+        G[i*ncol:(i+1)*ncol,2] = i**3
+        G[i*ncol:(i+1)*ncol,3] = i**2
+        G[i*ncol:(i+1)*ncol,4] = i
+    G[:,5] = 1
+    temp = (mf.flatten() - np.dot(G,pars))
+    mf=temp.reshape(nlign,ncol)
+    mf_ramp=temp.reshape(nlign,ncol)
+
+else:
+    mf_ramp= np.copy(mf)
 
 if (arguments["--ref"] is not None) :
     cst = np.nanmean(mf[lin_start:lin_end,col_start:col_end])
     mf = mf - cst
 
 # crop
-if arguments["--clean"] ==  None:
+if arguments["--crop"] ==  None:
     crop = [0,ncol,0,nlign]
 else:
-    crop = map(float,arguments["--clean"].replace(',',' ').split())
+    crop = map(float,arguments["--crop"].replace(',',' ').split())
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 if iend>ncol:
     iend=ncol
@@ -208,38 +296,43 @@ mf.flatten().astype('float32').tofile(fid3)
 # Plot
 vmax = np.nanpercentile(mf,98) 
 # vmax= 2.
-vmin = -vmax
+vmin = np.nanpercentile(mf,2)
 
 fig = plt.figure(0,figsize=(12,8))
 ax = fig.add_subplot(1,4,1)
-# hax = ax.imshow(mask, cm.Greys, vmin=0, vmax=seuil)
 cax = ax.imshow(m, cm.RdBu,vmin=vmin, vmax=vmax)
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
 cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
 
 ax = fig.add_subplot(1,4,2)
+cax = ax.imshow(mf_ramp, cm.RdBu, vmin=vmin, vmax=vmax)
+ax.set_title('DATA - RAMP')
+setp( ax.get_xticklabels(), visible=False)
+cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+
+ax = fig.add_subplot(1,4,3)
 cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=seuil)
 ax.set_title('MASK')
 setp( ax.get_xticklabels(), visible=False)
 cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
 
 if iend-ibeg<ncol and jend-jbeg<nlign:
-    ax = fig.add_subplot(1,4,3)
+    ax = fig.add_subplot(1,4,4)
     cax = ax.imshow(mf[jbeg-buf:jend+buf,ibeg-buf:iend+buf], cm.RdBu, vmin=vmin, vmax=vmax)
     setp( ax.get_xticklabels(), visible=False)
     setp( ax.get_xticklabels(), visible=False)
     cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
     ax.set_title(outfile)
 
-    ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(mf[jbeg-buf:jend+buf,ibeg-buf:iend+buf]-m[jbeg-buf:jend+buf,ibeg-buf:iend+buf], cm.RdBu, vmin=vmin, vmax=vmax)
-    setp( ax.get_xticklabels(), visible=False)
-    setp( ax.get_xticklabels(), visible=False)
-    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
-    ax.set_title('Check diff')
+#    ax = fig.add_subplot(1,4,4)
+#    cax = ax.imshow(mf[jbeg-buf:jend+buf,ibeg-buf:iend+buf]-m[jbeg-buf:jend+buf,ibeg-buf:iend+buf], cm.RdBu, vmin=vmin, vmax=vmax)
+#    setp( ax.get_xticklabels(), visible=False)
+#    setp( ax.get_xticklabels(), visible=False)
+#    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+#    ax.set_title('Check diff')
 else:
-    ax = fig.add_subplot(1,4,3)
+    ax = fig.add_subplot(1,4,4)
     cax = ax.imshow(mf, cm.RdBu, vmin=vmin, vmax=vmax)
     setp( ax.get_xticklabels(), visible=False)
     setp( ax.get_xticklabels(), visible=False)
