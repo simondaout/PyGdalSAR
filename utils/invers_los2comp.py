@@ -21,7 +21,6 @@ import os, math
 from os import path
 import logging
 
-
 import numpy as np
 import scipy.optimize as opt
 import scipy.linalg as lst
@@ -37,7 +36,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+import matplotlib.patches as patches
 
 ################################
 # CLASSES
@@ -57,7 +56,7 @@ class network:
     bounds: optional bounds for plot [losmin,losmax]
     """
     
-    def __init__(self,name,wdir,reduction,lookf,headf,sigmaf=None,scale=1,scale_sig=1000,format='GTiff',bounds=None):
+    def __init__(self,name,wdir,reduction,lookf,headf,sigmaf=None,scale=1,scale_sig=1000,format='GTiff',bounds=None, ref_zone=None):
         self.name = name
         self.wdir = wdir
         self.reduction = reduction
@@ -68,6 +67,7 @@ class network:
         self.scale = scale
         self.scale_sig = scale_sig
         self.bounds = bounds
+        self.ref_zone = ref_zone
 
     def load(self,rot):
         logger.info('Read track: {}'.format(self.name))
@@ -182,6 +182,9 @@ class network:
 # # crop=[200,400,100,300]
 # crop= None
 
+# ref_zone=[y0,y1,x0,x1]
+# reference shift to zero for both LOS, figure pops up before inversion to check!
+
 # insar = [
 # network('T172_inter/T172_inter_LOSVelocity_nan_s90.xy-los_flat_crop09.grd','/home/cometraid14/daouts/work/tibet/qinghai/data/insar/',\
 #     'T172','T172_inter/T172_look_s90_crop09.tiff','T172_inter/T172_head_s90_crop09.tiff',\
@@ -281,6 +284,22 @@ for i in range(M):
     projref = insar[0].projref
     driver = insar[0].driver
 
+# Apply reference zone shift...
+if ref_zone is not None:
+    if ref_zone[1]<=insar[i].los.shape[0] and ref_zone[3]<=insar[i].los.shape[1]:
+        for i in range(M):
+            ref_z = insar[i].los[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
+            if np.isnan(np.nanmean(ref_z)) is True:
+                logger.critical('Reference zone given contains only NaN values. Re-choose [y0, y1, x0, x1]. Exit!')
+                exit()
+            insar[i].los = insar[i].los - np.nanmean(ref_z)
+    else:
+        logger.critical('Reference zone given is outside image. Re-choose [y0, y1, x0, x1]. Exit!')
+        exit()
+else:
+    logger.critical('No reference zone given. Need [y0, y1, x0, x1]. Exit!')
+    exit()
+
 # define invert components
 comp = np.array(comp) - 1 
 N = len(comp)
@@ -333,6 +352,10 @@ for i in range(M):
     ax = fig.add_subplot(2,M,i+1)
     cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('{}'.format(d.reduction))
+    # Add the patch to the Axes
+    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
+    ax.add_patch(rect)
+    # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
@@ -341,14 +364,17 @@ for i in range(M):
     ax = fig.add_subplot(2,M,i+1+M)
     cax = ax.imshow(d.sigma,cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
     ax.set_title('SIGMA {}'.format(d.reduction))
+    # Add the patch to the Axes
+    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
+    ax.add_patch(rect)
+    # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
 
 # fig.tight_layout()
-fig.savefig('data_decomposition_{}.pdf'.format(output),format='PDF',dpi=150)
+fig.savefig('data_decomposition_{}.png'.format(output),format='PNG',dpi=300)
 plt.show()
-# exit()
 
 ################################
 # INVERSION
@@ -440,6 +466,10 @@ for n in range(N):
     ax = fig.add_subplot(2,N,n+1)
     cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=-vmax,interpolation=None)
     ax.set_title('{}'.format(comp_name[n]))
+    # Add the patch to the Axes
+    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
+    ax.add_patch(rect)
+    # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
@@ -453,12 +483,16 @@ for n in range(N):
     ax = fig.add_subplot(2,N,n+1+N)
     cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
     ax.set_title('SIGMA {}'.format(comp_name[n]))
+    # Add the patch to the Axes
+    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
+    ax.add_patch(rect)
+    # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
 
 # fig.tight_layout()
-fig.savefig('decomposition_{}.pdf'.format(output), format='PDF',dpi=150)
+fig.savefig('decomposition_{}.png'.format(output), format='PNG',dpi=300)
 
 ################################
 # SAVE RESULTS
