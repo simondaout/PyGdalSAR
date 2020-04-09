@@ -27,7 +27,7 @@ Options:
     --int_list=PATH             List of IFGs for TS processing/correction.
     --rdr_rsc=PATH              Path to radar param file
     --rdr_dem=PATH              Path to DEM in radar geometry.
-    --ref_zone=VALUES           Area where phase is set to zero for double difference subtraction (X0,X1,Y0,Y1).
+    --ref_zone=VALUES           Area where phase is set to zero for double difference subtraction (Y0,Y1,X0,X1).
     --int_looks=VALUE           Looks on unwrapped IFG (default = 2rlks)
     --nproc=NB_CORES            Number of cores to use for parallelizing (default=1)
     --plot yes/no               If yes, plot figures for each ints [default: no]
