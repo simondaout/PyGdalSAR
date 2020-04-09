@@ -139,7 +139,7 @@ class network:
                np.sin(self.theta)
               ]
         logger.info('Average horizontal LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
-            format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
+            format(np.nanmean(self.proj[0]*np.cos(self.theta)),np.nanmean(self.proj[1]*np.cos(self.theta)),np.nanmean(self.proj[2])))
 
         # compute proj Shortening
         self.proj=[(np.cos(rot)*self.proj[0] + np.sin(rot)*self.proj[1])*np.cos(self.theta),
