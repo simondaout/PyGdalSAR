@@ -25,7 +25,7 @@ Options:
   --suffix=<vaue>     Suffix name $prefix$date1-$date2$suffix.unw [default: '']
   --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
   --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
-  --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 2,100) 
+  --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 0.5,100). Downweight small temporal baselines and large perpendicular baselines 
   -h --help           Show this screen
 """
 
@@ -153,9 +153,9 @@ elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      do_sig = int(2)
      weight=np.zeros((kmax))
      for i in xrange((kmax)):
-     	deltat = (abs(bt[im==date_1[i]] - bt[im==date_2[i]]))/btc
+     	deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
      	deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
-        weight[i] = np.float(np.exp(-(deltap+deltat)))
+        weight[i] = (np.float(np.exp(-deltap)) + np.float(np.exp(-deltat)))/2
      wf = open(os.path.join(tsdir, "list_pair"), "w")
      for i in xrange((kmax)):
           wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
