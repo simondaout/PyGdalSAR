@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 """
-nsb_unw_ERAcorr_stats.py
+nsb_unw_GACOScorr_stats.py
 -------------------
-Reads in ERA corrections in radar slant geometry. Following this apply
-correction to IFGs, using IFG=ERA+RAMP. Enforce closure in the
+Reads in GACOS corrections in radar geometry (gacos2nsbrdr.py),
+and converts ZTD to LOS using incidence. Following this apply
+correction to IFGs, using IFG=GACOS+RAMP. Enforce closure in the
 ramp corrections, and save these resulting IFGs for timeseries 
 analysis. In addition perform statistical analysis of corrections.
 
@@ -12,34 +13,33 @@ analysis. In addition perform statistical analysis of corrections.
 .. Author:
     Nicholas Dodds, University of Oxford; November, 2019.
 .. Last Modified:
-    26th January 2020
+    21st November 2019 (created)
 
 Usage:
-    nsb_unw_ERAcorr_stats.py --int_dir=<path> --int_prefix=<string> --int_suffix=<string> --era_dir=<path> --int_list=<path> 
-    --rdr_rsc=<path> --rdr_dem=<path> --ref_zone=<xstart,xend,ystart,yend> [--int_looks=<value>] [--nproc=<nb_cores>] [--plot=<yes/no>] [estim=<yes/no>]
+    nsb_unw_GACOScorr_stats.py --int_dir=<path> --int_prefix=<string> --int_suffix=<string> --gacos_dir=<path> --int_list=<path> --rdr_rsc=<path> --rdr_dem=<path> --ref_zone=<xstart,xend,ystart,yend> [--int_looks=<value>] [--nproc=<nb_cores>] [--plot=<yes/no>] [--estim=<yes/no>]
 
 Options:
-    -h --help                   Show this screen
-    --int_dir=PATH              Folder containing unw IFGs in radar.
-    --int_prefix=STRING         Prefix string on unw IFGs.
-    --int_suffix=STRING         Suffix string on unw IFGs.
-    --era_dir=PATH              Folder containing era corrections in radar.
-    --int_list=PATH             List of IFGs for TS processing/correction.
-    --rdr_rsc=PATH              Path to radar param file
-    --rdr_dem=PATH              Path to DEM in radar geometry.
-    --ref_zone=VALUES           Area where phase is set to zero for double difference subtraction (Y0,Y1,X0,X1).
-    --int_looks=VALUE           Looks on unwrapped IFG (default = 2rlks)
-    --nproc=NB_CORES            Number of cores to use for parallelizing (default=1)
-    --plot=YES/NO               If yes, plot figures for each ints [default: no]
-    --estim=YES/NO              Estimate IFG = ATMOS + RAMP, must run first time (default=yes)
-
+    -h --help               Show this screen
+    --int_dir=PATH          Folder containing unw IFGs in radar.
+    --int_prefix=STRING     Prefix string on unw IFGs.
+    --int_suffix=STRING     Suffix string on unw IFGs.
+    --gacos_dir=PATH        Folder containing gacos corrections in radar.
+    --int_list=PATH         List of IFGs for TS processing/correction.
+    --rdr_rsc=PATH          Path to radar param file
+    --rdr_dem=PATH          Path to DEM in radar geometry.
+    --ref_zone=VALUES       Area where phase is set to zero for double difference subtraction (Y0,Y1,X0,X1).
+    --int_looks=VALUE       Looks on unwrapped IFG (default = 2rlks)
+    --nproc=NB_CORES        Number of cores to use for parallelizing (default=1)
+    --plot=YES/NO           If yes, plot figures for each ints [default: no]
+    --estim=YES/NO          Estimate IFG = ATMOS + RAMP, must run first time (default=yes)
+    
 """
 
 import os, sys, logging, glob
 import docopt
 import numpy as np
 import matplotlib.pyplot as plt 
-from os import path, environ
+from os import path
 import seaborn as sns
 from copy import deepcopy
 
@@ -57,7 +57,7 @@ from multiprocessing import Process, Pool
 import subprocess
 
 import matplotlib as mpl
-# from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -68,12 +68,9 @@ from matplotlib.colorbar import Colorbar
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 
-import gdal
-gdal.UseExceptions()
-
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=RuntimeWarning) 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 ### Load colormaps
 cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
@@ -116,16 +113,16 @@ def rdr_rsc(inname, full=False, verbose=False):
         else:
                 return nx,ny
 
-def ramp_fit_int_era(rms_map, i_data, e_data):
+def ramp_fit_int_gacos(rms_map, i_data, g_data):
     '''
-    Returns ramp fit that ties IFG data to ERA:
-    IFG - ERA = ax + by + c
+    Returns ramp fit that ties IFG data to GACOS:
+    IFG - GACOS = ax + by + c
     a = pars[0]; b = pars[1]; c = pars[2]
     '''
     # Clean NaNs from data, and pixels with ~0 colinearity
     index = np.nonzero(
         np.logical_and(~np.isnan(i_data),
-        np.logical_and(~np.isnan(e_data), rms_map>1.e-6)
+        np.logical_and(~np.isnan(g_data), rms_map>1.e-6)
         ))
     
     temp = np.array(index).T
@@ -133,7 +130,7 @@ def ramp_fit_int_era(rms_map, i_data, e_data):
     y_clean = temp[:,1]
     del temp
     
-    d = i_data[index] - e_data[index]
+    d = i_data[index] - g_data[index]
     
     # Clean the rms_map too
     rms_clean = rms_map[index].flatten()
@@ -148,7 +145,7 @@ def ramp_fit_int_era(rms_map, i_data, e_data):
     # calculate lsq as a prior to gradient optimisation below
     x0 = lst.lstsq(G, d)[0]
     
-    # gradient optimization method, find ramp that best fits data (ifg - era)
+    # gradient optimization method, find ramp that best fits data (ifg - gacos)
     _func = lambda x: np.sum(((np.dot(G,x)-d)/sigmad)**2)
     _fprime = lambda x: 2*np.dot(G.T/sigmad, (np.dot(G,x)-d)/sigmad)
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=500,full_output=True,iprint=0)[0]
@@ -173,8 +170,8 @@ def sliding_median(x_data, y_data):
     # return bin centres, median, and std
     return binned_xdata, running_median, running_std
 
-def correct_int_era_ramp(m_date, s_date):
-    print('Estimating IFG - ERA = RAMP for: {}_{}'.format(m_date, s_date))
+def correct_int_gacos_ramp(m_date, s_date):
+    print('Estimating IFG - GACOS = RAMP for: {}_{}'.format(m_date, s_date))
     
     # Reading in IFG data
     # Add in: prefix, suffix, looks
@@ -186,59 +183,40 @@ def correct_int_era_ramp(m_date, s_date):
     i_data = int_data[:,rdr_nx:]
     c_data = int_data[:,:rdr_nx]
     
-    # Read in ERA data for master and slave respectively
-    infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
-    ds_band2 = ds.GetRasterBand(2)
-    e_mdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    del ds
-
-    infile = era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
-    ds_band2 = ds.GetRasterBand(2)
-    e_sdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    del ds
-
-    # Time difference ERA data (already in slant and radians)
-    e_data = np.subtract(e_sdata, e_mdata)
+    # Read in GACOS data for master and slave respectively
+    g_mdata = np.fromfile(gacos_dir+'/'+str(m_date)+'.rdr', np.float32).reshape(rdr_ny,rdr_nx)
+    g_sdata = np.fromfile(gacos_dir+'/'+str(s_date)+'.rdr', np.float32).reshape(rdr_ny,rdr_nx)
     
-    # Now minimise IFG = ERA + RAMP, use the coh/colinearity for weighting inversion
-    ramp_pars = ramp_fit_int_era(c_data, i_data, e_data)
+    # Time difference GACOS data
+    g_data = np.subtract(g_sdata, g_mdata)
+    
+    # Now minimise IFG = GACOS + RAMP, use the coh/colinearity for weighting inversion
+    ramp_pars = ramp_fit_int_gacos(c_data, i_data, g_data)
     
     return ramp_pars
 
-def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='yes', phase_era='yes'):
+def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='yes', phase_gacos='yes'):
     '''
     Compare ramp and reconstructed ramp, perform correction and save.
     '''
-    print('Correcting IFG with IFG = ERA + RAMP: {}_{}'.format(m_date, s_date))
-
-    # Read in ERA data for master and slave respectively
-    infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
-    ds_band2 = ds.GetRasterBand(2)
-    e_mdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    del ds
+    print('Correcting IFG with IFG = GACOS + RAMP: {}_{}'.format(m_date, s_date))
     
-    infile = era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
-    ds_band2 = ds.GetRasterBand(2)
-    e_sdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    del ds
-
     # Reading in IFG data
     # Add in: prefix, suffix, looks
     int_fid = int_prefix+'_' + str(m_date) + '-' + str(s_date) +'_'+int_suffix+'_'+int_looks+'.unw'
     int_did = 'int_' + str(m_date)+'_' + str(s_date)
-
-    ds = gdal.Open(int_dir + '/' + int_did + '/' + int_fid, gdal.GA_ReadOnly)
-    ds_band1 = ds.GetRasterBand(1)
-    ds_band2 = ds.GetRasterBand(2)
-    c_data= ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    i_data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    int_data = np.fromfile(int_dir + '/' + int_did + '/' + int_fid, np.float32).reshape(rdr_ny,rdr_nx*2)
     
-    # Time difference ERA data (already in slant and radians)
-    e_data = np.subtract(e_sdata, e_mdata)
+    # split into bands...
+    i_data = int_data[:,rdr_nx:]
+    c_data = int_data[:,:rdr_nx]
+    
+    # Read in GACOS data for master and slave respectively
+    g_mdata = np.fromfile(gacos_dir+'/'+str(m_date)+'.rdr', np.float32).reshape(rdr_ny,rdr_nx)
+    g_sdata = np.fromfile(gacos_dir+'/'+str(s_date)+'.rdr', np.float32).reshape(rdr_ny,rdr_nx)
+    
+    # Time difference GACOS data
+    g_data = np.subtract(g_sdata, g_mdata)
     
     # rebuild total G matrix (for mapping)
     G=np.zeros((len(i_data.flatten()),3))
@@ -252,67 +230,65 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     ramp_res_recons = np.dot(G, ramp_pars_recons).reshape(rdr_ny, rdr_nx)
     
     # correct IFG
-    ie_corr = i_data - e_data - ramp_res
-    ie_corr_recons = i_data - e_data - ramp_res_recons
+    ig_corr = i_data - g_data - ramp_res
+    ig_corr_recons = i_data - g_data - ramp_res_recons
     
     # Slice out reference zone
-    ie_data_refz = ie_corr[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
-    ie_data_refz_recons = ie_corr_recons[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
+    ig_data_refz = ig_corr[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
+    ig_data_refz_recons = ig_corr_recons[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
     
     # Do the same for 
     c_data_refz = c_data[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
-    indexref = np.nonzero(np.logical_and(~np.isnan(ie_data_refz), c_data_refz>1.e-6))
+    indexref = np.nonzero(np.logical_and(~np.isnan(ig_data_refz), c_data_refz>1.e-6))
     
     # Use the colinearity to weight mean in reference zone constant
-    ie_data_refz_cst = np.nansum(ie_data_refz[indexref]*c_data_refz[indexref])/ np.nansum(c_data_refz[indexref])
-    ie_data_refz_recons_cst = np.nansum(ie_data_refz_recons[indexref]*c_data_refz[indexref])/ np.nansum(c_data_refz[indexref])
+    ig_data_refz_cst = np.nansum(ig_data_refz[indexref]*c_data_refz[indexref])/ np.nansum(c_data_refz[indexref])
+    ig_data_refz_recons_cst = np.nansum(ig_data_refz_recons[indexref]*c_data_refz[indexref])/ np.nansum(c_data_refz[indexref])
     
-    # Apply reference zone constant shift to both IFG and ERA
-    i_data = i_data -  ie_data_refz_cst
-    e_data = e_data - ie_data_refz_cst
-    ie_corr = ie_corr -  ie_data_refz_cst
+    # Apply reference zone constant shift to both IFG and GACOS
+    i_data = i_data -  ig_data_refz_cst
+    g_data = g_data - ig_data_refz_cst
+    ig_corr = ig_corr -  ig_data_refz_cst
     
-    i_data_recons = i_data -  ie_data_refz_recons_cst
-    e_data_recons = e_data - ie_data_refz_recons_cst
-    ie_corr_recons = ie_corr_recons -  ie_data_refz_recons_cst
+    i_data_recons = i_data -  ig_data_refz_recons_cst
+    g_data_recons = g_data - ig_data_refz_recons_cst
+    ig_corr_recons = ig_corr_recons - ig_data_refz_recons_cst
     
-    # Save output in the output era int directory
-    if not os.path.exists(int_edir+'/'+int_did):
-        os.mkdir(int_edir+'/'+int_did)
+    # Save output in the output gacos int directory
+    if not os.path.exists(int_gdir+'/'+int_did):
+        os.mkdir(int_gdir+'/'+int_did)
     
     if maps=='yes':
-        # Plot phase maps of ifg, era, ramp, ifg_corr
-        maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, i_data, e_data + ramp_res, ie_corr, ramp_res-ie_data_refz_cst, ramp_res_recons-ie_data_refz_recons_cst, ie_corr_recons, c_data)
+        # Plot phase maps of ifg, gacos, ramp, ifg - gacos - ramp, ramp_recons, ifg - gacos - ramp_recons
+        maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, i_data, g_data + ramp_res, ig_corr, ramp_res-ig_data_refz_cst, ramp_res_recons-ig_data_refz_recons_cst, ig_corr_recons, c_data)
     
-    if phase_era=='yes':
-        # Plot IFG phase vs ERA+RAMP (return correlation and gradient)
-        ie_gradient, ie_correlation = phase_vs_era(int_did, m_date, s_date, i_data_recons-ramp_res_recons, e_data_recons, c_data, dem_data)
+    if phase_gacos=='yes':
+        # Plot IFG phase vs GACOS+RAMP (return correlation and gradient)
+        ig_gradient, ig_correlation = phase_vs_gacos(int_did, m_date, s_date, i_data_recons-ramp_res_recons, g_data_recons, c_data, dem_data)
     
     # Set areas outside = 0 using c_data (amplitude)
-    ie_corr_recons[c_data==0] = 0
+    ig_corr_recons[c_data==0] = 0
     
-    ie_corr_fid = int_edir+'/'+int_did+'/'+'eracorr_recons_'+int_fid
-
-    dst_ds = driver.Create(ie_corr_fid, ds.RasterXSize, ds.RasterYSize, 2, gdal.GDT_Float32)
-    dst_band1 = dst_ds.GetRasterBand(1)
-    dst_band2 = dst_ds.GetRasterBand(2)
-    dst_band1.WriteArray(c_data,0,0)
-    dst_band2.WriteArray(ie_corr_recons,0,0)
-    dst_band1.FlushCache()
-    dst_band2.FlushCache()
-    del dst_ds, ds
+    # Need to combine with c_data for nsbas format...
+    int_data_gcorr_recons = np.zeros((rdr_ny,rdr_nx*2))
+    int_data_gcorr_recons[:,rdr_nx:] = ig_corr_recons
+    int_data_gcorr_recons[:,:rdr_nx] = c_data
+    
+    # Now save in dir created above
+    ig_corr_fid = int_gdir+'/'+int_did+'/'+'gacoscorr_recons_'+int_fid
+    int_data_gcorr_recons.astype(np.float32).tofile(ig_corr_fid)
     
     # Copy across par files too...
-    if not os.path.exists(ie_corr_fid+'.rsc'):
-        copyfile(int_dir+'/'+int_did+'/'+int_fid+'.rsc', ie_corr_fid+'.rsc')
-    
+    if not os.path.exists(ig_corr_fid+'.rsc'):
+        copyfile(int_dir+'/'+int_did+'/'+int_fid+'.rsc', ig_corr_fid+'.rsc')
+        
     # Caculate standard deviation for inversion weighting...
-    e_std = np.nanstd(e_data + ramp_res_recons)
+    g_std = np.nanstd(g_data + ramp_res_recons)
     
-    return m_date, s_date, ie_gradient, ie_correlation, e_std
+    return m_date, s_date, ig_gradient, ig_correlation, g_std
 
-def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, map4, map5, map6, map_mask):
-    print('Plotting IFG - ERA - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
+def maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, map4, map5, map6, map_mask):
+    print('Plotting IFG - GACOS - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
     
     map1 = deepcopy(map1)
     map2 = deepcopy(map2)
@@ -382,7 +358,7 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     divider = make_axes_locatable(ax2)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax2, cax=c)
-    ax2.set_title('$\phi_{ERA} + \phi_{RAMP}$: '+str(m_date)+'_'+str(s_date))
+    ax2.set_title('$\phi_{GACOS} + \phi_{RAMP}$: '+str(m_date)+'_'+str(s_date))
     
     # Plotting the raw unw IFG data
     ax3 = fig.add_subplot(2,3,3)
@@ -395,7 +371,7 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     divider = make_axes_locatable(ax3)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax3, cax=c)
-    ax3.set_title('$\phi_{IFG} - \phi_{ERA} - \phi_{RAMP}$: '+str(m_date)+'_'+str(s_date))
+    ax3.set_title('$\phi_{IFG} - \phi_{GACOS} - \phi_{RAMP}$: '+str(m_date)+'_'+str(s_date))
     
     # Plotting the raw unw IFG data
     ax1 = fig.add_subplot(2,3,4)
@@ -434,34 +410,34 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     divider = make_axes_locatable(ax3)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax3, cax=c)
-    ax3.set_title('$\phi_{IFG} - \phi_{ERA} - \phi_{RAMPRECONS}$:: '+str(m_date)+'_'+str(s_date))
+    ax3.set_title('$\phi_{IFG} - \phi_{GACOS} - \phi_{RAMPRECONS}$:: '+str(m_date)+'_'+str(s_date))
     
-    fig.savefig(int_edir+'/'+int_did+'/'+'eracorr_recons_map_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', bbox_inches='tight')
+    fig.savefig(int_gdir+'/'+int_did+'/'+'gacoscorr_recons_map_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', bbox_inches='tight')
     if plot == 'yes':
         print('Plotting correction...')
         plt.show()
     
     plt.clf()
     
-def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
-    print('Generating IFG phase vs ERA phase estimation: {}_{}'.format(m_date, s_date))
+def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
+    print('Generating IFG phase vs GACOS phase estimation: {}_{}'.format(m_date, s_date))
     
     i_data = deepcopy(i_data)
-    e_data = deepcopy(e_data)
+    g_data = deepcopy(g_data)
     dem_data = deepcopy(dem_data)
     
     # 
     i_data[c_data==0] = np.nan
-    e_data[c_data==0] = np.nan
+    g_data[c_data==0] = np.nan
     dem_data[c_data==0] = np.nan
     
     #########################
-    ## Plotting IFG against ERA corr
+    ## Plotting IFG against GACOS corr
     data_interval = 10
-    mask = ~np.isnan(i_data) & ~np.isnan(e_data)
+    mask = ~np.isnan(i_data) & ~np.isnan(g_data)
     
     x_mask = i_data[mask]
-    y_mask = e_data[mask]
+    y_mask = g_data[mask]
     z_mask = dem_data[mask]
     
     x = x_mask[::data_interval].flatten()
@@ -527,7 +503,7 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
     ax1.set_ylim(np.nanpercentile(y, 0.15)-ylim_buffer, np.nanpercentile(y, 99.85)+ylim_buffer)
     ax1.xaxis.set_major_locator(plticker.MultipleLocator(base=5))
     ax1.yaxis.set_major_locator(plticker.MultipleLocator(base=5))
-    ax1.set_ylabel('$\phi_{ERA}$: '+str(m_date)+'_'+str(s_date))
+    ax1.set_ylabel('$\phi_{GACOS}$: '+str(m_date)+'_'+str(s_date))
     
     # scatter labels to fine for legend so...
     labels = ['Gradient: {:.2f}'.format(popt[0]), 'Correlation: {:.2f}'.format(rvalue)]
@@ -583,25 +559,15 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
     ax1h.set_axisbelow(True)
         
     ## Save figure
-    fig.savefig(int_edir+'/'+int_did+'/'+'phase-era'+'_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', dpi=300, bbox_inches='tight')
+    fig.savefig(int_gdir+'/'+int_did+'/'+'phase-gacos'+'_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', dpi=300, bbox_inches='tight')
     if plot == 'yes':
         print('Plotting phase vs. atmos...')
         plt.show()
-        
+    
     plt.clf()
     
     # Note slope = gradient, rvalue = correlation coefficient
     return popt[0], rvalue
-
-
-#####################################################################################
-# INIT LOG
-#####################################################################################
-
-# logging.basicConfig(level=logging.INFO,\
-logging.basicConfig(level=logging.INFO,\
-        format='line %(lineno)s -- %(levelname)s -- %(message)s')
-logger = logging.getLogger('nsb_unw_ERAcorr_stats.log')
 
 
 #####################################################################################
@@ -623,8 +589,8 @@ if arguments["--int_suffix"] != None:
 if arguments["--rdr_rsc"] != None:
     rdr_rsc_file = arguments["--rdr_rsc"]
 
-if arguments["--era_dir"] != None:
-    era_dir = arguments["--era_dir"]
+if arguments["--gacos_dir"] != None:
+    gacos_dir = arguments["--gacos_dir"]
 
 if arguments["--int_list"] != None:
     int_list = arguments["--int_list"]
@@ -644,12 +610,12 @@ if arguments["--nproc"] == None:
     nproc = 1
 else:
     nproc = int(arguments["--nproc"])
-    
+
 if arguments["--estim"] == 'no':
     estim== 'no'
 else:
     estim = 'yes'
-
+    
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
     logger.warning('plot is yes. Set nproc to 1')
@@ -661,7 +627,6 @@ else:
     plot = 'no'
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
-
 
 #####################################################################################
 # INITIALISE 
@@ -681,40 +646,35 @@ if __name__ == '__main__':
     rdr_nx, rdr_ny, rdr_dict = rdr_rsc(rdr_rsc_file, full=True)
     rdr_wl = np.float(rdr_dict['WAVELENGTH'])
     rdr_rad2mm = (rdr_wl/(4*const.pi))*1000
-
+    
     # Read in DEM (assume nsb format)
-    # dem = np.fromfile(rdr_dem, np.float32).reshape(rdr_ny,rdr_nx)
-    # dem_data = dem[:,rdr_nx:]
-    driver = gdal.GetDriverByName("roi_pac")
-    ds = gdal.Open(rdr_dem, gdal.GA_ReadOnly)
-    ds_band2 = ds.GetRasterBand(2)
-    rdr_ny, rdr_nx = ds.RasterYSize, ds.RasterXSize
-    dem_data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    dem = np.fromfile(rdr_dem, np.float32)[:rdr_ny*rdr_nx*2].reshape(rdr_ny,rdr_nx*2)
+    dem_data = dem[:,rdr_nx:]
 
     # Saving corrected IFGs in a new dir
-    int_edir = 'INTERFERO_era'
-    if not os.path.exists(int_edir):
-        os.mkdir(int_edir)
+    int_gdir = 'INTERFERO_gacos'
+    if not os.path.exists(int_gdir):
+        os.mkdir(int_gdir)
     
-    # Paralellize phase-era ramp estimation
+    # Paralellize phase-gacos ramp estimation
     ifg_pairs = list(zip(m_dates, s_dates))
     
     if estim == 'yes':
-        print('Estimating IFG = ERA + RAMP:')
+        print('Estimating IFG = GACOS + RAMP:')
     
         # Run this with a pool of agents (nproc)
         with Pool(processes=nproc) as pool:
-            ramps_results = pool.starmap(correct_int_era_ramp, ifg_pairs)
+            ramps_results = pool.starmap(correct_int_gacos_ramp, ifg_pairs)
         
         # Save ramp estimation results: m_date, s_date, ramp_pars
         ramp_results_array = np.concatenate((m_dates[:,None], s_dates[:,None], ramps_results), axis=1) 
-        np.savetxt(int_edir+'/phase-era_ramp_estim.txt', ramp_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
+        np.savetxt(int_gdir+'/phase-gacos_ramp_estim.txt', ramp_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
     else:
         print("Skipping ramp estimation (estim='no")
-        
+    
     # Read in results from txt file saved above...
-    ramps_results_txt = np.loadtxt(int_edir+'/phase-era_ramp_estim.txt', delimiter=', ')
-        
+    ramps_results_txt = np.loadtxt(int_gdir+'/phase-gacos_ramp_estim.txt', delimiter=', ')
+    
     # Read in results (avoid errors from chaging interf_pair...)
     ramp_pars = np.zeros((N_ifgs, 3))
     for i in range(N_ifgs):
@@ -722,7 +682,7 @@ if __name__ == '__main__':
         ramp_pars[i,0] = ramps_results_txt[idxs,2]
         ramp_pars[i,1] = ramps_results_txt[idxs,3]
         ramp_pars[i,2] = ramps_results_txt[idxs,4]
-    
+        
     ### Enforcing closure
     # Need to invert each ramp parameter independently
     d_a = ramp_pars[:,0]
@@ -753,24 +713,24 @@ if __name__ == '__main__':
     ramp_pars_recons[:,1] = d_b_recons
     ramp_pars_recons[:,2] = d_c_recons
 
-    # Paralellize phase-era correction and estimation
+    # Paralellize phase-gacos correction and estimation
     ifg_pairs_ramp_pars = list(zip(m_dates, s_dates, ramp_pars, ramp_pars_recons))
     
     # Save results as text file: m_date, s_date, ramp, ramp_recons
     ramp_recons_results_array = np.concatenate((m_dates[:,None], s_dates[:,None], ramp_pars_recons), axis=1)
-    np.savetxt(int_edir+'/phase-era_ramp_recons.txt', ramp_recons_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
+    np.savetxt(int_gdir+'/phase-gacos_ramp_recons.txt', ramp_recons_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
     
-    print('Correcting reconstr unw IFGs with ERA:')
+    print('Correcting recons unw IFGs with GACOS:')
     
     # Run this with a pool of agents (nproc)
     with Pool(processes=nproc) as pool:
-        results = pool.starmap(correct_int_era_recons, ifg_pairs_ramp_pars)
+        results = pool.starmap(correct_int_gacos_recons, ifg_pairs_ramp_pars)
 
-    print('Saving results for histogram of IFG vs. ERA (correlation and gradient)')
+    print('Saving results for histogram of IFG vs. GACOS (correlation and gradient)')
     
-    # Save results as text file
+    # Save results as text file: m_date, s_date, gradient, correlation, atmos_std
     results_array = np.asarray(results)
-    np.savetxt(int_edir+'/phase-era_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, .%3f', delimiter=' ')
+    np.savetxt(int_gdir+'/phase-gacos_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, .%3f', delimiter=' ')
     
     print('Calculating inversion weighting file using correlation and atmos standard deviation.')
     
@@ -786,4 +746,5 @@ if __name__ == '__main__':
         
     # Save to text file: m_date, s_date, corr, std, weighting
     sigma_corr_std_weights = np.concatenate((m_dates[:,None], s_dates[:,None], np.asarray(sigma_corr)[:,None], np.asarray(sigma_std)[:,None], np.asarray(sigma_weight)[:,None]), axis=1)
-    np.savetxt(int_edir+'/phase-era_sigma_corr_weights.txt', sigma_corr_std_weights, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
+    np.savetxt(int_gdir+'/phase-gacos_sigma_corr_weights.txt', sigma_corr_std_weights, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
+    
