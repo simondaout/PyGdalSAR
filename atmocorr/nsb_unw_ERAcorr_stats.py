@@ -16,7 +16,7 @@ analysis. In addition perform statistical analysis of corrections.
 
 Usage:
     nsb_unw_ERAcorr_stats.py --int_dir=<path> --int_prefix=<string> --int_suffix=<string> --era_dir=<path> --int_list=<path> 
-    --rdr_rsc=<path> --rdr_dem=<path> --ref_zone=<xstart,xend,ystart,yend> [--int_looks=<value>] [--nproc=<nb_cores>] [--plot=<yes/no>] [estim=<yes/no>]
+    --rdr_rsc=<path> --rdr_dem=<path> --ref_zone=<xstart,xend,ystart,yend> [--int_looks=<value>] [--nproc=<nb_cores>] [--plot=<yes/no>] [--estim=<yes/no>]
 
 Options:
     -h --help                   Show this screen
