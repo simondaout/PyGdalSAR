@@ -730,7 +730,7 @@ if __name__ == '__main__':
     
     # Save results as text file: m_date, s_date, gradient, correlation, atmos_std
     results_array = np.asarray(results)
-    np.savetxt(int_gdir+'/phase-gacos_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, .%3f', delimiter=' ')
+    np.savetxt(int_gdir+'/phase-gacos_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
     
     print('Calculating inversion weighting file using correlation and atmos standard deviation.')
     
