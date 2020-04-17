@@ -188,11 +188,6 @@ def correct_int_era_ramp(m_date, s_date):
     i_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
     c_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
 
-    #int_data = np.fromfile(int_dir + '/' + int_did + '/' + int_fid, np.float32).reshape(rdr_ny,rdr_nx*2)
-    # split into bands...
-    #i_data = int_data[:,rdr_nx:]
-    #c_data = int_data[:,:rdr_nx]
-    
     # Read in ERA data for master and slave respectively
     infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
     ds = gdal.Open(infile, gdal.GA_ReadOnly)
@@ -239,10 +234,10 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     int_did = 'int_' + str(m_date)+'_' + str(s_date)
 
     ds = gdal.Open(int_dir + '/' + int_did + '/' + int_fid, gdal.GA_ReadOnly)
-    ds_band1 = ds.GetRasterBand(1)
-    ds_band2 = ds.GetRasterBand(2)
-    c_data= ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    i_data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+    ds_band1 = ds.GetRasterBand(1); ds_band2 = ds.GetRasterBand(2)
+    i_data = np.zeros((rdr_ny,rdr_nx)); c_data = np.zeros((rdr_ny,rdr_nx))
+    i_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
+    c_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
     
     # Time difference ERA data (already in slant and radians)
     e_data = np.subtract(e_sdata, e_mdata)
@@ -300,7 +295,7 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     
     ie_corr_fid = int_edir+'/'+int_did+'/'+'eracorr_recons_'+int_fid
 
-    dst_ds = driver.Create(ie_corr_fid, ds.RasterXSize, ds.RasterYSize, 2, gdal.GDT_Float32)
+    dst_ds = driver.Create(ie_corr_fid, rdr_nx, rdr_ny, 2, gdal.GDT_Float32)
     dst_band1 = dst_ds.GetRasterBand(1)
     dst_band2 = dst_ds.GetRasterBand(2)
     dst_band1.WriteArray(c_data,0,0)
@@ -653,7 +648,7 @@ else:
     nproc = int(arguments["--nproc"])
     
 if arguments["--estim"] == 'no':
-    estim== 'no'
+    estim = 'no'
 else:
     estim = 'yes'
 
