@@ -480,8 +480,12 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
         return a*x + b
     
     # watch out for first element of sliding median equal to NaN
-    popt, pcov = curve_fit(linear_f, binned_xdata[1:], running_median[1:], sigma=running_std[1:], absolute_sigma=True)
-    
+    try:
+        popt, pcov = curve_fit(linear_f, binned_xdata[1:], running_median[1:], sigma=running_std[1:], absolute_sigma=True)
+    except:
+        print('Error linear fit  with ifg:', m_date, s_date)
+        popt, pcov = np.zeros((2)), np.zeros((2,2))
+
     # First, create the figure (size = x,y)
     fig = plt.figure(1, figsize=(10, 10))
     
