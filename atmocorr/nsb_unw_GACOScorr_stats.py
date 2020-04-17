@@ -52,6 +52,8 @@ from scipy.stats import pearsonr
 import scipy.optimize as opt
 import scipy.linalg as lst
 
+import gdal
+
 from shutil import copyfile
 from multiprocessing import Process, Pool
 import subprocess
@@ -177,11 +179,18 @@ def correct_int_gacos_ramp(m_date, s_date):
     # Add in: prefix, suffix, looks
     int_fid = int_prefix+'_' + str(m_date) + '-' + str(s_date) +'_'+int_suffix+'_'+int_looks+'.unw'
     int_did = 'int_' + str(m_date)+'_' + str(s_date)
-    int_data = np.fromfile(int_dir + '/' + int_did + '/' + int_fid, np.float32).reshape(rdr_ny,rdr_nx*2)
-    
-    # split into bands...
-    i_data = int_data[:,rdr_nx:]
-    c_data = int_data[:,:rdr_nx]
+
+    # Open ifg with gdal, force size to be equal to radar_hgt
+    ds = gdal.Open(int_dir + '/' + int_did + '/' + int_fid, gdal.GA_ReadOnly)
+    ds_band1 = ds.GetRasterBand(1); ds_band2 = ds.GetRasterBand(2)
+    i_data = np.zeros((rdr_ny,rdr_nx)); c_data = np.zeros((rdr_ny,rdr_nx))
+    i_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
+    c_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
+
+    #int_data = np.fromfile(int_dir + '/' + int_did + '/' + int_fid, np.float32).reshape(rdr_ny,rdr_nx*2)
+    ## split into bands...
+    #i_data = int_data[:,rdr_nx:]
+    #c_data = int_data[:,:rdr_nx]
     
     # Read in GACOS data for master and slave respectively
     g_mdata = np.fromfile(gacos_dir+'/'+str(m_date)+'.rdr', np.float32).reshape(rdr_ny,rdr_nx)
