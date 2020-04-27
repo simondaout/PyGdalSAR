@@ -173,13 +173,13 @@ def ramp_fit_int_gacos(rms_map, i_data, g_data):
 #    return binned_xdata, running_median, running_std
 
 def sliding_median(x_data,y_data):
-    perc = 98
+    perc = 90
     bins = np.arange(x_data.min(),x_data.max(),abs(x_data.max()-x_data.min())/200.)
     inds = np.digitize(x_data,bins)
     xbins, ybins, ystd = [], [], []
     for j in range(len(bins)-1):
         uu = np.flatnonzero(inds == j)
-        if len(uu)>200:
+        if len(uu)>1000:
             xbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
             # clean outliers within the  bins
             indice = np.flatnonzero(np.logical_and(y_data[uu]>np.percentile(\
