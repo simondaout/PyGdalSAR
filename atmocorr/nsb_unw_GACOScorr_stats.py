@@ -39,7 +39,7 @@ import os, sys, logging, glob
 import docopt
 import numpy as np
 import matplotlib.pyplot as plt 
-from os import path
+from os import path, environ
 import seaborn as sns
 from copy import deepcopy
 
@@ -157,20 +157,38 @@ def ramp_fit_int_gacos(rms_map, i_data, g_data):
     
     return pars
 
-def sliding_median(x_data, y_data):
-    # Generate bins and bin data
-    total_bins=int(round(y_data.shape[0]/5000))
-    bins = np.linspace(x_data.min(), x_data.max(), total_bins)
-    delta = bins[1] - bins[0]
-    idx  = np.digitize(x_data, bins)
-    # Calculate sliding median
-    running_median = np.array([np.median(y_data[idx==k]) for k in range(total_bins)])
-    # Calculate associated sliding standard deviation
-    running_std = np.array([y_data[idx==k].std() for k in range(total_bins)])
-    # Calculate bin centres for plotting
-    binned_xdata = np.array(bins-delta/2)
-    # return bin centres, median, and std
-    return binned_xdata, running_median, running_std
+#def sliding_median(x_data, y_data):
+#    # Generate bins and bin data
+#    total_bins=int(round(y_data.shape[0]/500))
+#    bins = np.linspace(x_data.min(), x_data.max(), total_bins)
+#    delta = bins[1] - bins[0]
+#    idx  = np.digitize(x_data, bins)
+#    # Calculate sliding median
+#    running_median = np.array([np.median(y_data[idx==k]) for k in range(total_bins)])
+#    # Calculate associated sliding standard deviation
+#    running_std = np.array([y_data[idx==k].std() for k in range(total_bins)])
+#    # Calculate bin centres for plotting
+#    binned_xdata = np.array(bins-delta/2)
+#    # return bin centres, median, and std
+#    return binned_xdata, running_median, running_std
+
+def sliding_median(x_data,y_data):
+    perc = 98
+    bins = np.arange(x_data.min(),x_data.max(),abs(x_data.max()-x_data.min())/200.)
+    inds = np.digitize(x_data,bins)
+    xbins, ybins, ystd = [], [], []
+    for j in range(len(bins)-1):
+        uu = np.flatnonzero(inds == j)
+        if len(uu)>200:
+            xbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+            # clean outliers within the  bins
+            indice = np.flatnonzero(np.logical_and(y_data[uu]>np.percentile(\
+                        y_data[uu],100-perc),y_data[uu]<np.percentile(y_data[uu],perc)))
+            ystd.append(np.nanstd(y_data[uu][indice]))
+            ybins.append(np.nanmedian(y_data[uu][indice]))
+    xbins,ybins,ystd = np.array(xbins), np.array(ybins),np.array(ystd)
+    
+    return xbins,ybins,ystd
 
 def correct_int_gacos_ramp(m_date, s_date):
     print('Estimating IFG - GACOS = RAMP for: {}_{}'.format(m_date, s_date))
@@ -239,7 +257,10 @@ def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='
     # compute residual ramp for ramp and recons ramp
     ramp_res = np.dot(G, ramp_pars).reshape(rdr_ny, rdr_nx)
     ramp_res_recons = np.dot(G, ramp_pars_recons).reshape(rdr_ny, rdr_nx)
-    
+    # set ramp to NaN when gacos is null
+    ramp_res[g_data == 0] = np.float('NaN')
+    ramp_res_recons[g_data == 0] = np.float('NaN')
+
     # correct IFG
     ig_corr = i_data - g_data - ramp_res
     ig_corr_recons = i_data - g_data - ramp_res_recons
@@ -257,13 +278,15 @@ def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='
     ig_data_refz_recons_cst = np.nansum(ig_data_refz_recons[indexref]*c_data_refz[indexref])/ np.nansum(c_data_refz[indexref])
     
     # Apply reference zone constant shift to both IFG and GACOS
-    i_data = i_data -  ig_data_refz_cst
-    g_data = g_data - ig_data_refz_cst
-    ig_corr = ig_corr -  ig_data_refz_cst
-    
     i_data_recons = i_data -  ig_data_refz_recons_cst
     g_data_recons = g_data - ig_data_refz_recons_cst
+    g_data_recons[g_data==0] = 0
     ig_corr_recons = ig_corr_recons - ig_data_refz_recons_cst
+    
+    i_data = i_data -  ig_data_refz_cst
+    g_data = g_data - ig_data_refz_cst
+    g_data[g_data == 0] = 0.
+    ig_corr = ig_corr -  ig_data_refz_cst
     
     # Save output in the output gacos int directory
     if not os.path.exists(int_gdir+'/'+int_did):
@@ -271,7 +294,7 @@ def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='
     
     if maps=='yes':
         # Plot phase maps of ifg, gacos, ramp, ifg - gacos - ramp, ramp_recons, ifg - gacos - ramp_recons
-        maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, i_data, g_data + ramp_res, ig_corr, ramp_res-ig_data_refz_cst, ramp_res_recons-ig_data_refz_recons_cst, ig_corr_recons, c_data)
+        maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, i_data, g_data + ramp_res, ig_corr, ramp_res+ig_data_refz_cst, ramp_res_recons+ig_data_refz_recons_cst, ig_corr_recons, c_data)
     
     if phase_gacos=='yes':
         # Plot IFG phase vs GACOS+RAMP (return correlation and gradient)
@@ -437,45 +460,44 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     g_data = deepcopy(g_data)
     dem_data = deepcopy(dem_data)
     
-    # 
     i_data[c_data==0] = np.nan
     g_data[c_data==0] = np.nan
     dem_data[c_data==0] = np.nan
     
     #########################
     ## Plotting IFG against GACOS corr
-    data_interval = 10
-    mask = ~np.isnan(i_data) & ~np.isnan(g_data)
-    
-    x_mask = i_data[mask]
-    y_mask = g_data[mask]
-    z_mask = dem_data[mask]
-    
-    x = x_mask[::data_interval].flatten()
-    y = y_mask[::data_interval].flatten()
-    z = z_mask[::data_interval].flatten()
-    
-    if x.size == 0 or y.size ==0:
-        print('INPUT ARRAY ZERO:', m_date, s_date)
-    
-    # Calculate the linear trend, pearson coefficient
+    #mask = ~np.isnan(i_data) & ~np.isnan(g_data)
+    #x_mask = i_data[mask]
+    #y_mask = g_data[mask]
+    #z_mask = dem_data[mask]
     
     # clean outliers
-    index = np.nonzero(
-        np.logical_and(x>np.nanpercentile(x, 1),
-        np.logical_and(x<np.nanpercentile(x, 99),
-        np.logical_and(y>np.nanpercentile(y, 1), y<np.nanpercentile(y, 99)
-        ))))
+    index = np.nonzero( 
+        np.logical_and(~np.isnan(i_data),
+        np.logical_and(~np.isnan(g_data),
+        np.logical_and(g_data!=0,
+        np.logical_and(i_data!=0,
+        np.logical_and(i_data>np.nanpercentile(i_data, .5),
+        np.logical_and(i_data<np.nanpercentile(i_data, 99.5),
+        np.logical_and(g_data>np.nanpercentile(g_data, .5), g_data<np.nanpercentile(g_data, 99.5)
+        ))))))))
+     
+    # no, the brutal downsampling is just for plotting
+    x = i_data[index].flatten()
+    y = g_data[index].flatten()
+    z = dem_data[index].flatten()
     
-    if x[index].shape[0] == 0:
+    if x.size == 0 or y.size ==0:
         print('MASK ERROR:', m_date, s_date)
     
-    # linear regression of data
-    slope, intercept, rvalue, pvalue, stderr = linregress(x[index], y[index])
-    
     # curvefit to sliding median with std weighting
-    binned_xdata, running_median, running_std = sliding_median(x[index], y[index])
-    
+    binned_xdata, running_median, running_std = sliding_median(x, y)
+   
+    # compute correlation
+    m = np.vstack([x,y])
+    cov = np.corrcoef(m)
+    rvalue = cov[0,1]
+
     def linear_f(x, a, b):
         return a*x + b
     
@@ -483,9 +505,14 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     try:
         popt, pcov = curve_fit(linear_f, binned_xdata[1:], running_median[1:], sigma=running_std[1:], absolute_sigma=True)
     except:
-        print('Error linear fit  with ifg:', m_date, s_date)
-        popt, pcov = np.zeros((2)), np.zeros((2,2))
+        # Calculate the linear trend, pearson coefficient
+        # linear regression of data
+        slope, intercept, rvalue, pvalue, stderr = linregress(x, y)
+        popt = [slope,intercept]
 
+    # plot subsample data
+    data_interval = 20
+    
     # First, create the figure (size = x,y)
     fig = plt.figure(1, figsize=(10, 10))
     
@@ -502,7 +529,7 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     cmin = np.nanpercentile(z, 2.5)
     
     # The plot itself
-    plt1 = ax1.scatter(x, y, c = z, 
+    plt1 = ax1.scatter(x[::data_interval], y[::data_interval], c = z[::data_interval], 
                     marker = 's', s = 5, edgecolor = 'none', alpha = 0.05,
                     cmap = cmap, vmin = cmin , vmax = cmax, rasterized=True)
     ax1.plot(binned_xdata, running_median, color='grey', lw=2)
@@ -584,6 +611,13 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     # Note slope = gradient, rvalue = correlation coefficient
     return popt[0], rvalue
 
+#####################################################################################
+# INIT LOG
+#####################################################################################
+
+logging.basicConfig(level=logging.INFO,\
+        format='line %(lineno)s -- %(levelname)s -- %(message)s')
+logger = logging.getLogger('nsb_unw_GACOScorr_stats.log')
 
 #####################################################################################
 # READ INPUT PARAM
