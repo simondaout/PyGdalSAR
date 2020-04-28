@@ -16,7 +16,7 @@ Clean a r4 file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
 [--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] \
-[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend>]
+[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--setzero=<yes/no>] [--cst=<value>]
 
 Options:
 -h --help           Show this screen.
@@ -30,7 +30,9 @@ Options:
 --buff VALUE        Number of pixels for crop smothing  (default: 50)
 --perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
 --ramp<lin/quad/cub/no>      Correct the map from ramp in range and azimuth
---ref=<jstart,jend> Set to zero displacements from jstart to jend
+--ref=<jstart,jend,istart,iend> Set to zero displacements from jstart to jend
+--setzero           Set mask to zero instead of NaN
+--cst               Add constante to map
 """
 
 # numpy
@@ -65,12 +67,22 @@ if arguments["--scale"] ==  None:
 else:
    scale = float(arguments["--scale"])
 
+if arguments["--setzero"] ==  None:
+   setzero = 'no'
+else:
+   setzero = arguments["--setzero"]
+
 if arguments["--perc"] ==  None:
     perc = 99.9
 else:
     perc = float(arguments["--perc"])
 
-if arguments["--ramp"] == None:
+if arguments["--cst"] ==  None:
+    shift = 0
+else:
+    shift = float(arguments["--cst"])
+
+if (arguments["--ramp"] == None) or (arguments["--ramp"] == 'no'):
     ramp = 'no'
 elif arguments["--ramp"] == 'lin':
     ramp = 'lin'
@@ -231,6 +243,7 @@ else:
 if (arguments["--ref"] is not None) :
     cst = np.nanmean(mf[lin_start:lin_end,col_start:col_end])
     mf = mf - cst
+    mf_ramp = mf_ramp - cst
 
 # crop
 if arguments["--crop"] ==  None:
@@ -289,14 +302,23 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
 #plt.show()
 #sys.exit()
 
-#save output
-fid3 = open(outfile,'wb')
-mf.flatten().astype('float32').tofile(fid3)
+# manual cst
+mf = mf - shift
 
 # Plot
 vmax = np.nanpercentile(mf,98) 
 # vmax= 2.
 vmin = np.nanpercentile(mf,2)
+
+if setzero == 'yes':
+    # replace "NaN" to 0
+    mf[np.isnan(mf)] = 0.
+
+
+#save output
+fid3 = open(outfile,'wb')
+mf.flatten().astype('float32').tofile(fid3)
+
 
 fig = plt.figure(0,figsize=(12,8))
 ax = fig.add_subplot(1,4,1)
