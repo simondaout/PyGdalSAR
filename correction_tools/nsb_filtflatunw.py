@@ -12,7 +12,7 @@ nsb_filtflatunw.py
 
 usage:
   nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] [--look=<value>] \
-  [--model=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>]  <proc_file> 
+  [--model=<path>] [--cutfile=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>]  <proc_file> 
   nsb_filtflatunw.py -h | --help
 
 options:
@@ -20,10 +20,11 @@ options:
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
   --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list = check_look/replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
-Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back
+Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_era_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
+  --cutfile=<path>      Cut file for unwrappin [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
   -v                    Verbose mode. Show more information about the processing
@@ -121,7 +122,7 @@ def checkoutfile(config,file):
 def force_link(src,dest):
     try:
         symlink(src,dest)
-    except OSError:
+    except:
         rm(dest)
         symlink(src,dest)
 
@@ -194,7 +195,7 @@ def run(cmd):
 
 class Job():
     """ Create a class of Jobs to be run: 
-    Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_flata_back add_flatr_back """
+    Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_era_back add_flata_back add_flatr_back """
 
     def __init__(self, names):
         self.names = names.split()
@@ -225,7 +226,7 @@ class Job():
     def info(self):
         print('List of possible Jobs:') 
         print('ecmwf look_int replace_amp filter flatr flat_atmo flat_model colin \
-            unwrapping add_model_back add_atmo_back add_ramp_back')
+            unwrapping add_model_back add_atmo_back add_ramp_back add_era_back')
         print('Choose them in the order that you want')
 
 class PileInt:
@@ -338,14 +339,14 @@ class PileInt:
         Assume model computed on the Rlooks_unw IFG...
         '''
         if int(self.Rlooks_unw) > 1:
-          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.strat'
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.acp'
         else:
-          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.strat'
+          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
         return _f
 
     def geterafiles(self,kk):
         ''' Return ERA model file names '''
-        if int(self.Rlooks_unw) > 1:
+        if int(self.Rlooks_int) > 1:
           mdel1 = str(self.EraDir) + '/'+ str(self._ifgs[kk].date1) + '_mdel' + '_' + self.Rlooks_int + 'rlks' + '.unw'
           mdel2 = str(self.EraDir) + '/'+ str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_int + 'rlks' + '.unw'
           mdel12 = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '_mdel' + '_' + self.Rlooks_int + 'rlks' + '.unw'
@@ -440,9 +441,10 @@ class FiltFlatUnw:
     defining the boundary of the mask zone for emprical estimations
     suffix, preffix: define name of the interferogram at the start of the processes
     model: model to be removed from wrapped interferograms (default: None)
+    cutfile: cut file fro unwrapping, decrease coh threshold for pixel with cut>0
     """
 
-    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False):
+    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir, self.EraDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -463,6 +465,7 @@ class FiltFlatUnw:
         # initialise model to be removed from wrapped int
         self.model = model
         self.strat = False
+        self.cutfile = cutfile
 
         # initilise radar file
         if int(self.Rlooks_int) > 1:
@@ -520,6 +523,8 @@ def check_look(config,kk):
 
         outfile =  config.stack.getname(kk) + '.int'
         outcor =  config.stack.getcor(kk)
+        if force:
+            rm(outfile); rm(outcor)
 
         look = int(int(config.Rlooks_int)/temp_rlook)
 
@@ -1107,12 +1112,28 @@ def flat_model(config,kk):
 
     with Cd(config.stack.getpath(kk)):
 
+        # lets asume we do this in look unw
+        config.stack.updatelook(kk,config.Rlooks_unw)
+
         infile = config.stack.getname(kk) + '.int'; checkinfile(infile)
         inrsc = infile + '.rsc'
 
         filtfile = config.stack.getfiltSW(kk) + '.int'
+        # filt must be done before changing name
+        if path.exists(filtfile) == False:
+            logger.info('{0} does not exist'.format(filtfile))
+            # call filter function
+            filterSW(config,kk)
+            checkinfile(filtfile)
+
+        width,length = computesize(config,filtfile)
+        if (int(width) == 0) or (int(length) == 0):
+            logger.info('{0} has zero size'.format(filtfile))
+            filterSW(config,kk)
+            checkinfile(filtfile)
+
         # param file
-        param = config.stack.getname(kk) + '.stack'
+        param = config.stack.getname(kk) + '.acp'
         newparam = config.stack.getmodelfile(kk)
 
         if path.exists(filtfile) == False:
@@ -1132,12 +1153,12 @@ def flat_model(config,kk):
         copyrsc(inrsc,filtoutrsc)
 
         if force:
-            rm(outfile)
+            rm(outfile); rm(param); rm(newparam)
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
                 try:
-                    run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
+                    run("flatten_acp "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
                     +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
                 except Exception as e:
                     logger.critical(e)
@@ -1277,14 +1298,11 @@ def unwrapping(config,kk):
         unwSWrsc = unwfiltSW + '.rsc'
         unwfiltROI = config.stack.getfiltROI(kk)+ '.unw'
         unwROIrsc = unwfiltROI + '.rsc'
-        copyrsc(inrsc,unwrsc)
-        copyrsc(inrsc,unwSWrsc)
-        copyrsc(inrsc,unwROIrsc)
 
         bridgefile = 'bridge.in'
 
         if force: 
-            rm(filtSWfile); rm(filtROIfile)
+            rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
 
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
@@ -1293,8 +1311,6 @@ def unwrapping(config,kk):
             logger.info("length.pl "+str(filtROIfile))
             r = subprocess.call("length.pl "+str(filtROIfile), shell=True)
 
-        if force: 
-            rm(unwfiltROI); rm(unwfiltSW)
         do = checkoutfile(config,unwfiltROI)
         if do:
           try:
@@ -1314,14 +1330,29 @@ def unwrapping(config,kk):
                     wf.write("1  1  1  1  0 ")
                     wf.close()
 
+                if config.cutfile==None:
+                    opt=0
+                else:
+                    opt=1
+
                 # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
-                run("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
+                #run("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
+                #    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" 0 > log_unw.txt")
+
+                run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
+                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
+
+            if config.unw_method == 'mpd_noSW':
+                logger.info("Unwraped IFG:{0} with MP.DOIN algorthim without using SW filter (Grandin et al., 2012) ".format(unwfile))
+
+                if path.exists(bridgefile) == False:
+                    wf = open(bridgefile,"w")
+                    wf.write("1  1  1  1  0 ")
+                    wf.close()
+
+                # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
+                run("my_deroul_interf_filt "+str(filtROIfile)+" cut "+str(infile)+" "+str(filtROIfile)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" 0 > log_unw.txt")
-                
-                # logger.info("deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                #     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unw)+" 0")
-                # r = subprocess.call("deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                #     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unw)+" 0  >> log_unw.txt", shell=True)
 
             if config.unw_method == 'roi':
 
@@ -1332,7 +1363,7 @@ def unwrapping(config,kk):
                 if force:
                     rm(mask); rm(cut)
 
-                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(0.0001)+" > log_unw_roi.txt")
+                run("make_mask.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(config.threshold_unw)+" > log_unw_roi.txt")
                 run("new_cut.pl "+str(path.splitext(filtROIfile)[0])+" >> log_unw_roi.txt")
                 run("unwrap.pl "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(path.splitext(filtROIfile)[0])\
                     +" "+str(config.threshold_unw)+" "+str(config.seedx)+" "+str(config.seedy)+" >> log_unw_roi.txt")
@@ -1367,7 +1398,55 @@ def unwrapping(config,kk):
             print(unwrapping.__doc__)
             logger.critical("Failed unwrapping IFG {0} ".format(unwfile))
             config.stack.updatesuccess(kk)
+        
+        copyrsc(inrsc,unwrsc)
+        copyrsc(inrsc,unwSWrsc)
+        copyrsc(inrsc,unwROIrsc)
 
+    return config.getconfig(kk)
+
+def add_era_back(config,kk):
+    '''Add back ERA Atmospheric corrections'''
+    
+    with Cd(config.stack.getpath(kk)):
+        # look era file
+        erafile = str(config.stack.geterafiles(kk)[2])
+        look_file(config,str(erafile))
+        
+        # update look unw in case not done already
+        config.stack.updatelook(kk,config.Rlooks_unw)
+
+        # the final product is always filtROI
+        unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
+        if "_era" in unwfile:
+            unwrsc = unwfile + '.rsc'
+
+            # update names
+            prefix, suffix = config.stack.getfix(kk)
+            newsuffix = suffix.replace("_era", "")
+            config.stack.updatefix(kk,prefix,newsuffix)
+            outfile = config.stack.getfiltROI(kk) + '.unw'
+            outrsc = outfile + '.rsc'
+            copyrsc(unwrsc,outrsc)
+
+            if force:
+                rm(outfile)
+            do = checkoutfile(config,outfile)
+            if do:
+                try:
+                    run("length.pl "+str(unwfile))
+                    run("add_rmg.py --infile="+str(unwfile)+" --outfile="+str(outfile)+" --add="+str(erafile)+" >> log_flatatmo.txt")
+                except Exception as e:
+                    logger.critical(e)
+                    logger.critical('Failed adding back {0} on IFG: {1}'.format(erafile,unwfile))
+                    config.stack.updatesuccess(kk)
+                    print(add_atmo_back.__doc__)
+
+        else:
+            logger.critical('ecmwf() does not seem to have been done... Exit!')
+            config.stack.updatesuccess(kk)
+            print(add_era_back.__doc__)
+ 
     return config.getconfig(kk)
 
 def add_atmo_back(config,kk):
@@ -1558,7 +1637,7 @@ def add_model_back(config,kk):
                     if do:
                         try:
                             run("length.pl "+str(unwfile))
-                            run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
+                            run("unflatten_acp "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
                         except Exception as e:
                             logger.critical(e)
                             logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
@@ -1621,6 +1700,11 @@ if arguments["--model"] == None:
 else:
     model = path.abspath(home)+'/'+arguments["--model"]
 
+if arguments["--cutfile"] == None:
+    cutfile = None
+else:
+    cutfile = path.abspath(home)+'/'+arguments["--cutfile"]
+
 if arguments["--ibeg_mask"] == None:
     ibeg_mask = 0
 else:
@@ -1677,7 +1761,7 @@ proc_defaults = {
     "Filt_method": "adapt_filt", # could be: adapt_filt
     "unw_method": "roi",
     "threshold_unw": "0.35", # threshold on filtered colinearity 
-    "threshold_unfilt": "0.03", # threshold on colinearity 
+    "threshold_unfilt": "0.02", # threshold on colinearity 
     "seedx": "50", # starting col for unw
     "seedy": "50", # starting line for unw
     }
@@ -1724,24 +1808,6 @@ if arguments["-v"]:
     # give me the time to read terminal
     time.sleep(3)
 
-##################################################################################
-###  TESTS
-##################################################################################
-
-## input parameters (not in the proc file)
-# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-# seedx=336 ## iw1
-# seedy=1840
-#home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw2/'
-#seedx=300 ## iw2
-#seedy=2384
-
-# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/Sentinel/iw1/'
-# IntDir=path.abspath(home)+'/'+'test/'
-# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
-# home='/home/cometraid14/daouts/work/tibet/qinghai/processing/T047/'
-# IntDir=path.abspath(home)+'/'+'test/'
-# ListInterfero=path.abspath(home)+'/'+'interf_pair_test.rsc'
 
 ###########
 #   MAIN 
@@ -1801,7 +1867,7 @@ for p in jobs:
         proc["FilterStrength"], proc["Filt_method"], 
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"]], 
-        prefix=prefix, suffix=suffix, look=look, model=model, force=force, 
+        prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
         ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask,
         ) 
 
