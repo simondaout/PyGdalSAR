@@ -148,7 +148,8 @@ def gacos2geo(int_date):
         # Make sure that GACOS coverage >= SAR geo coverage
         if ( geo_lat[0] < gacos_lat[0] or geo_lat[1] > gacos_lat[1] or \
                 geo_lon[0] < gacos_lon[0] or geo_lon[1] > gacos_lon[1] ):
-            raise Exception('GACOS correction covers a smaller area than your SAR (re-request GACOS for larger polygon).')
+            #raise Exception('GACOS correction covers a smaller area than your SAR (re-request GACOS for larger polygon).')
+            print('GACOS correction covers a smaller area than your SAR (re-request GACOS for larger polygon).')
 
         # read in gacos correction ztd and reshape
         gacos_ztd = np.fromfile(gacos_ztd_file, dtype=np.float32).reshape(gacos_ny, gacos_nx)
@@ -194,7 +195,10 @@ def gacosgeo2rdr(int_date):
         # calling roipac perl script for geocoding
         subprocess.call("geo2radar.pl %s %s %s %s" %(lt_file, gacos_geo_file, sim_dem_rdr, gacos_rdr_file), shell=True)
         if os.stat(gacos_rdr_file).st_size == 0:
-            raise Exception('Warning: Output radar geometry GACOS correction is size zero.')
+            #raise Exception('Warning: Output radar geometry GACOS correction is size zero.')
+            print('Warning: Output radar geometry GACOS correction is size zero.')
+            print(gacos_rdr_file)
+            sys.exit()
     else:
         print('GACOS rdr file for {} already exists. Must delete *.rdr *geo.hst first to re-generate.'.format(int_date))
 

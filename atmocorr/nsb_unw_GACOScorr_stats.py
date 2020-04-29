@@ -179,7 +179,7 @@ def sliding_median(x_data,y_data):
     xbins, ybins, ystd = [], [], []
     for j in range(len(bins)-1):
         uu = np.flatnonzero(inds == j)
-        if len(uu)>1000:
+        if len(uu)>2000:
             xbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
             # clean outliers within the  bins
             indice = np.flatnonzero(np.logical_and(y_data[uu]>np.percentile(\
