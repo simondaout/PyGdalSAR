@@ -56,7 +56,7 @@ import matplotlib.cm as cm
 from pylab import setp
 from osgeo import gdal
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+import os
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -66,7 +66,7 @@ if arguments["--cpt"] is  None:
     # cmap=cm.jet 
     try:
         from matplotlib.colors import LinearSegmentedColormap
-        cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
+        cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
         cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
         cmap = cmap.reversed()
     except:
