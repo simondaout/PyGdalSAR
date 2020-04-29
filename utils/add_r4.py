@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -90,11 +90,11 @@ if arguments["--outfile"] is not  None:
 in11, in22, out = in11*rad2mm, in22*rad2mm, out*rad2mm
 
 # plot maps
-if arguments["--vmax"] is not  None:
+if arguments["--vmax"] is not None:
     vmax = np.float(arguments["--vmax"])
 else:
     vmax = np.max( [np.nanpercentile(in11,95),np.abs(np.nanpercentile(in11,5))] )
-if arguments["--vmin"] is not  None:
+if arguments["--vmin"] is not None:
     vmin = np.float(arguments["--vmin"])
 else:
     vmin = -vmax
@@ -107,7 +107,7 @@ try:
 except:
         cmap=cm.jet
 
-fig = plt.figure(10, figsize=(10,8))
+fig = plt.figure(figsize=(16,4))
 fig.subplots_adjust(hspace=0.5)
 ax1 = fig.add_subplot(1,3,1)
 cax = ax1.imshow(in11, cmap = cmap, vmax=vmax, vmin=vmin, extent=None)
@@ -136,7 +136,9 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 fig.tight_layout()
 
-if arguments["--outfile"] is not  None:
-  fig.savefig('{}.pdf'.format('outfile'), format='PDF',dpi=150)
+if arguments["--outfile"] is None:
+  fig.savefig('{}.pdf'.format('add_raster'), format='PDF',dpi=150)
+else:  
+  fig.savefig('{}.pdf'.format(outfile), format='PDF',dpi=150)
 
 plt.show()
