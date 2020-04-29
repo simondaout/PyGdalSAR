@@ -45,7 +45,7 @@ print("number of interferogram: ",kmax)
 k = 0 
 wf = open(out_list, "w")
 for i in range((kmax)):
-    if date2dec(date_2[i]) - date2dec(date_1[i]) > bt/365.1:
+    if date2dec(date_2[i]) - date2dec(date_1[i]) >= bt/365.1:
         wf.write("%i %i\n" % (date_1[i],date_2[i]))
         k = k+1
 wf.close()
