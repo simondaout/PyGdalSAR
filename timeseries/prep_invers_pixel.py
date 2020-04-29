@@ -126,7 +126,7 @@ for f in unw_files:
 if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None): 
     print(arguments["--sigma"])
     shutil.copy(int_list,os.path.join(tsdir, "list_pair"))
-    do_sig = int(1)
+    do_sig = int(0)
 elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
