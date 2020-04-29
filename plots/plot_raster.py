@@ -57,8 +57,6 @@ from pylab import setp
 from osgeo import gdal
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-# Initialize a matplotlib figure
-fig, ax = plt.subplots(1,figsize=(8,10))
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -164,8 +162,12 @@ if arguments["<jend>"] ==  None:
 else:
     jend = int(arguments["<jend>"])
 
+# Initialize a matplotlib figure
+fig = plt.figure(1,figsize=(12,8))
+
 if sformat == "ROI_PAC":
     if (ds_extension == ".unw" or ds_extension ==".hgt"):
+        ax = fig.add_subplot(1,2,1)
         phi = phase_band.ReadAsArray(0, 0,
                                ds.RasterXSize, ds.RasterYSize,
                                ds.RasterXSize, ds.RasterYSize)
@@ -179,12 +181,17 @@ if sformat == "ROI_PAC":
 
         # Unwrapped inteferogram
         hax = ax.imshow(cutamp, cm.Greys,vmax=np.percentile(cutamp, 95))
+        divider = make_axes_locatable(ax)
+        c = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(hax, cax=c)
 
+        ax = fig.add_subplot(1,2,2)
     elif (ds_extension == ".r4" or ds_extension == ""):
-
+        ax = fig.add_subplot(1,1,1)
         cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm 
 
     else:
+        ax = fig.add_subplot(1,2,1)
         phi = phase_band.ReadAsArray(0, 0,
                                ds.RasterXSize, ds.RasterYSize,
                                ds.RasterXSize, ds.RasterYSize)
@@ -199,14 +206,20 @@ if sformat == "ROI_PAC":
             cutamp = np.absolute(cutphi)
             cutphi = np.angle(cutphi)
             hax = ax.imshow(cutamp, cm.Greys_r)
-
+            divider = make_axes_locatable(ax)
+            c = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(hax, cax=c)
+            
+            ax = fig.add_subplot(1,2,2)
 elif sformat == "GTIFF":
+    ax = fig.add_subplot(1,1,1)
     phi = phase_band.ReadAsArray(0, 0,
            ds.RasterXSize, ds.RasterYSize,
            ds.RasterXSize, ds.RasterYSize)
     cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm
 
 elif sformat == "GAMMA":
+    ax = fig.add_subplot(1,1,1)
     if ds_extension == ".diff":
         cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm 
         cutamp = np.absolute(cutphi)
@@ -228,11 +241,11 @@ else:
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
 
-cax = ax.imshow(cutphi, cmap, interpolation='nearest',vmax=vmax,vmin=vmin,alpha=0.6)
-
+cax = ax.imshow(cutphi, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
+
 if arguments["--title"] ==  None:
     fig.canvas.set_window_title(infile)
 else:
@@ -246,5 +259,8 @@ except:
 # Display the data
 fig.tight_layout()
 # ax.set_rasterized(True)
-fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
+try:
+    fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
+except:
+    pass
 plt.show()

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -109,20 +109,20 @@ if (ds_extension == ".tif") or (ds_extension == ".tiff"):
 los[los==255] = float('NaN')
 
 ds_geo=ds.GetGeoTransform()
-print 'Read infile:', infile
+print('Read infile:', infile)
 pix_az, pix_rg = np.indices((ds.RasterYSize,ds.RasterXSize))
 lat,lon = ds_geo[3]+ds_geo[5]*pix_az, ds_geo[0]+ds_geo[1]*pix_rg
 minx,maxx,maxy,miny = ds_geo[0], ds_geo[0]+ ds_geo[1]*ds.RasterXSize, ds_geo[3], ds_geo[3]+ds_geo[5]*ds.RasterYSize  
-print minx,maxx,miny,maxy
+print(minx,maxx,miny,maxy)
 # # print lat
 # sys.exit()
 
 if arguments["--geocrop"] is not  None:
-    geocrop = map(float,arguments["--geocrop"].replace(',',' ').split())
+    geocrop = list(map(float,arguments["--geocrop"].replace(',',' ').split()))
     latbeg,latend,lonbeg,lonend = float(geocrop[0]),float(geocrop[1]),float(geocrop[2]),float(geocrop[3])
 else:
     latbeg,latend,lonbeg,lonend = miny,maxy,minx,maxx
-print latbeg,latend,lonbeg,lonend
+print(latbeg,latend,lonbeg,lonend)
 
 los[los==0.]=np.float('NaN')
 kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(los), np.abs(los)<999.),los==0.0))
@@ -160,12 +160,11 @@ masked_array = np.ma.array(los, mask=np.isnan(los))
 prj = ds.GetProjection()
 srs=osr.SpatialReference(wkt=prj)
 if srs.GetAttrValue('projcs') is not None:
-  # print srs.GetAttrValue('projcs')
+  # print(srs.GetAttrValue('projcs'))
   projection = 'tmerc'
 else:
-  # print srs.GetAttrValue('geogcs')
+  # print(srs.GetAttrValue('geogcs'))
   projection = 'cyl'
-
 
 m = Basemap(
     projection=projection,\
@@ -191,8 +190,8 @@ if arguments["--dem"] is not None:
    ds2_band = ds2.GetRasterBand(1)
    dem = ds2_band.ReadAsArray(0, 0, ds2.RasterXSize, ds2.RasterYSize)
    dminx,dmaxx,dmaxy,dminy = ds2_geo[0], ds2_geo[0]+ ds2_geo[1]*ds2.RasterXSize, ds2_geo[3], ds2_geo[3]+ds2_geo[5]*ds2.RasterYSize  
-   print dminx,dmaxx,dmaxy,dminy
-   print np.nanpercentile(dem,98), np.nanpercentile(dem,2)
+   print(dminx,dmaxx,dmaxy,dminy)
+   print(np.nanpercentile(dem,98), np.nanpercentile(dem,2))
    # hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
    #  vmax=np.nanpercentile(dem,98),vmin=np.nanpercentile(dem,2),zorder=1)
    hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
