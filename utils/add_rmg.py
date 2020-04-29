@@ -64,6 +64,7 @@ else:
 
 gdal.UseExceptions()
 # Open int
+print(infile)
 ds = gdal.Open(infile,gdal.GA_ReadOnly)
 ds_band1 = ds.GetRasterBand(1)
 ds_band2 = ds.GetRasterBand(2)
