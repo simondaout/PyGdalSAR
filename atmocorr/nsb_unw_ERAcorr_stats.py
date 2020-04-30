@@ -176,7 +176,7 @@ def sliding_median(x_data,y_data):
     return xbins,ybins,ystd
 
 def correct_int_era_ramp(m_date, s_date):
-    print('Estimating IFG - ERA = RAMP for: {}_{}'.format(m_date, s_date))
+    logger.info('Estimating IFG - ERA = RAMP for: {}_{}'.format(m_date, s_date))
     
     # Reading in IFG data
     # Add in: prefix, suffix, looks
@@ -215,7 +215,7 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     '''
     Compare ramp and reconstructed ramp, perform correction and save.
     '''
-    print('Correcting IFG with IFG = ERA + RAMP: {}_{}'.format(m_date, s_date))
+    logger.info('Correcting IFG with IFG = ERA + RAMP: {}_{}'.format(m_date, s_date))
 
     # Read in ERA data for master and slave respectively
     infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
@@ -288,7 +288,7 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     
     if maps=='yes':
         # Plot phase maps of ifg, era, ramp, ifg_corr
-        maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, i_data, e_data + ramp_res, ie_corr, ramp_res-ie_data_refz_cst, ramp_res_recons-ie_data_refz_recons_cst, ie_corr_recons, c_data)
+        maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, i_data, e_data + ramp_res, ie_corr, ramp_res, ramp_res_recons, ie_corr_recons, c_data)
     
     if phase_era=='yes':
         # Plot IFG phase vs ERA+RAMP (return correlation and gradient)
@@ -318,7 +318,7 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     return m_date, s_date, ie_gradient, ie_correlation, e_std
 
 def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, map4, map5, map6, map_mask):
-    print('Plotting IFG - ERA - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
+    logger.info('Plotting IFG - ERA - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
     
     map1 = deepcopy(map1)
     map2 = deepcopy(map2)
@@ -444,13 +444,13 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     
     fig.savefig(int_edir+'/'+int_did+'/'+'eracorr_recons_map_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', bbox_inches='tight')
     if plot == 'yes':
-        print('Plotting correction...')
+        logger.info('Plotting correction...')
         plt.show()
     
     plt.clf()
     
 def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
-    print('Generating IFG phase vs ERA phase estimation: {}_{}'.format(m_date, s_date))
+    logger.info('Generating IFG phase vs ERA phase estimation: {}_{}'.format(m_date, s_date))
     
     i_data = deepcopy(i_data)
     e_data = deepcopy(e_data)
@@ -603,7 +603,7 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
     ## Save figure
     fig.savefig(int_edir+'/'+int_did+'/'+'phase-era'+'_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', dpi=300, bbox_inches='tight')
     if plot == 'yes':
-        print('Plotting phase vs. atmos...')
+        logger.info('Plotting phase vs. atmos...')
         plt.show()
         
     plt.clf()
@@ -686,7 +686,7 @@ else:
 #####################################################################################
 
 if __name__ == '__main__':
-    print('If using multi-processing and crashing, try (bash): unset DISPLAY')
+    logger.info('If using multi-processing and crashing, try (bash): unset DISPLAY')
 
     # Use int_list to obtain IFG date list for ts processing
     m_dates, s_dates = np.loadtxt(int_list, comments='#', usecols=(0,1), unpack=True, dtype='i,i')
@@ -718,7 +718,7 @@ if __name__ == '__main__':
     ifg_pairs = list(zip(m_dates, s_dates))
     
     if estim == 'yes':
-        print('Estimating IFG = ERA + RAMP:')
+        logger.info('Estimating IFG = ERA + RAMP:')
     
         # Run this with a pool of agents (nproc)
         with Pool(processes=nproc) as pool:
@@ -728,7 +728,7 @@ if __name__ == '__main__':
         ramp_results_array = np.concatenate((m_dates[:,None], s_dates[:,None], ramps_results), axis=1) 
         np.savetxt(int_edir+'/phase-era_ramp_estim.txt', ramp_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
     else:
-        print("Skipping ramp estimation (estim='no")
+        logger.info("Skipping ramp estimation (estim='no")
         
     # Read in results from txt file saved above...
     ramps_results_txt = np.loadtxt(int_edir+'/phase-era_ramp_estim.txt', delimiter=', ')
@@ -778,19 +778,19 @@ if __name__ == '__main__':
     ramp_recons_results_array = np.concatenate((m_dates[:,None], s_dates[:,None], ramp_pars_recons), axis=1)
     np.savetxt(int_edir+'/phase-era_ramp_recons.txt', ramp_recons_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
     
-    print('Correcting reconstr unw IFGs with ERA:')
+    logger.info('Correcting reconstr unw IFGs with ERA:')
     
     # Run this with a pool of agents (nproc)
     with Pool(processes=nproc) as pool:
         results = pool.starmap(correct_int_era_recons, ifg_pairs_ramp_pars)
 
-    print('Saving results for histogram of IFG vs. ERA (correlation and gradient)')
+    logger.info('Saving results for histogram of IFG vs. ERA (correlation and gradient)')
     
     # Save results as text file
     results_array = np.asarray(results)
     np.savetxt(int_edir+'/phase-era_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
     
-    print('Calculating inversion weighting file using correlation and atmos standard deviation.')
+    logger.info('Calculating inversion weighting file using correlation and atmos standard deviation.')
     
     # Calculate inversion weightings 
     sigma_corr = [i[3] for i in results]

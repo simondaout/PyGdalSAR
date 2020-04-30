@@ -177,7 +177,7 @@ def sliding_median(x_data,y_data):
     return xbins,ybins,ystd
 
 def correct_int_gacos_ramp(m_date, s_date):
-    print('Estimating IFG - GACOS = RAMP for: {}_{}'.format(m_date, s_date))
+    logger.info('Estimating IFG - GACOS = RAMP for: {}_{}'.format(m_date, s_date))
     
     # Reading in IFG data
     # Add in: prefix, suffix, looks
@@ -207,7 +207,7 @@ def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='
     '''
     Compare ramp and reconstructed ramp, perform correction and save.
     '''
-    print('Correcting IFG with IFG = GACOS + RAMP: {}_{}'.format(m_date, s_date))
+    logger.info('Correcting IFG with IFG = GACOS + RAMP: {}_{}'.format(m_date, s_date))
     
     # Reading in IFG data
     # Add in: prefix, suffix, looks
@@ -280,7 +280,7 @@ def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='
     
     if maps=='yes':
         # Plot phase maps of ifg, gacos, ramp, ifg - gacos - ramp, ramp_recons, ifg - gacos - ramp_recons
-        maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, i_data, g_data + ramp_res, ig_corr, ramp_res+ig_data_refz_cst, ramp_res_recons+ig_data_refz_recons_cst, ig_corr_recons, c_data)
+        maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, i_data, g_data + ramp_res, ig_corr, ramp_res, ramp_res_recons, ig_corr_recons, c_data)
     
     if phase_gacos=='yes':
         # Plot IFG phase vs GACOS+RAMP (return correlation and gradient)
@@ -308,7 +308,7 @@ def correct_int_gacos_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='
     return m_date, s_date, ig_gradient, ig_correlation, g_std
 
 def maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, map4, map5, map6, map_mask):
-    print('Plotting IFG - GACOS - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
+    logger.info('Plotting IFG - GACOS - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
     
     map1 = deepcopy(map1)
     map2 = deepcopy(map2)
@@ -434,13 +434,13 @@ def maps_phase_gacos_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3,
     
     fig.savefig(int_gdir+'/'+int_did+'/'+'gacoscorr_recons_map_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', bbox_inches='tight')
     if plot == 'yes':
-        print('Plotting correction...')
+        logger.info('Plotting correction...')
         plt.show()
     
     plt.clf()
     
 def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
-    print('Generating IFG phase vs GACOS phase estimation: {}_{}'.format(m_date, s_date))
+    logger.info('Generating IFG phase vs GACOS phase estimation: {}_{}'.format(m_date, s_date))
     
     i_data = deepcopy(i_data)
     g_data = deepcopy(g_data)
@@ -474,7 +474,7 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     z = dem_data[index].flatten()
     
     if x.size == 0 or y.size ==0:
-        print('MASK ERROR:', m_date, s_date)
+        logger.info('MASK ERROR:', m_date, s_date)
     
     # curvefit to sliding median with std weighting
     binned_xdata, running_median, running_std = sliding_median(x, y)
@@ -594,7 +594,7 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     ## Save figure
     fig.savefig(int_gdir+'/'+int_did+'/'+'phase-gacos'+'_'+str(m_date)+'_'+str(s_date)+'.png', format='PNG', dpi=300, bbox_inches='tight')
     if plot == 'yes':
-        print('Plotting phase vs. atmos...')
+        logger.info('Plotting phase vs. atmos...')
         plt.show()
     
     plt.clf()
@@ -673,7 +673,7 @@ else:
 #####################################################################################
 
 if __name__ == '__main__':
-    print('If using multi-processing and crashing, try (bash): unset DISPLAY')
+    logger.info('If using multi-processing and crashing, try (bash): unset DISPLAY')
 
     # Use int_list to obtain IFG date list for ts processing
     m_dates, s_dates = np.loadtxt(int_list, comments='#', usecols=(0,1), unpack=True, dtype='i,i')
@@ -700,7 +700,7 @@ if __name__ == '__main__':
     ifg_pairs = list(zip(m_dates, s_dates))
     
     if estim == 'yes':
-        print('Estimating IFG = GACOS + RAMP:')
+        logger.info('Estimating IFG = GACOS + RAMP:')
     
         # Run this with a pool of agents (nproc)
         with Pool(processes=nproc) as pool:
@@ -710,7 +710,7 @@ if __name__ == '__main__':
         ramp_results_array = np.concatenate((m_dates[:,None], s_dates[:,None], ramps_results), axis=1) 
         np.savetxt(int_gdir+'/phase-gacos_ramp_estim.txt', ramp_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
     else:
-        print("Skipping ramp estimation (estim='no")
+        logger.info("Skipping ramp estimation (estim='no")
     
     # Read in results from txt file saved above...
     ramps_results_txt = np.loadtxt(int_gdir+'/phase-gacos_ramp_estim.txt', delimiter=', ')
@@ -760,19 +760,19 @@ if __name__ == '__main__':
     ramp_recons_results_array = np.concatenate((m_dates[:,None], s_dates[:,None], ramp_pars_recons), axis=1)
     np.savetxt(int_gdir+'/phase-gacos_ramp_recons.txt', ramp_recons_results_array, fmt='%i, %i, %.7f, %.7f, %.7f', delimiter=' ')
     
-    print('Correcting recons unw IFGs with GACOS:')
+    logger.info('Correcting recons unw IFGs with GACOS:')
     
     # Run this with a pool of agents (nproc)
     with Pool(processes=nproc) as pool:
         results = pool.starmap(correct_int_gacos_recons, ifg_pairs_ramp_pars)
 
-    print('Saving results for histogram of IFG vs. GACOS (correlation and gradient)')
+    logger.info('Saving results for histogram of IFG vs. GACOS (correlation and gradient)')
     
     # Save results as text file: m_date, s_date, gradient, correlation, atmos_std
     results_array = np.asarray(results)
     np.savetxt(int_gdir+'/phase-gacos_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
     
-    print('Calculating inversion weighting file using correlation and atmos standard deviation.')
+    logger.info('Calculating inversion weighting file using correlation and atmos standard deviation.')
     
     # Calculate inversion weightings 
     sigma_corr = [i[3] for i in results]
