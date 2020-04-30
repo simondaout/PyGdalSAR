@@ -158,20 +158,22 @@ def ramp_fit_int_era(rms_map, i_data, e_data):
     
     return pars
 
-def sliding_median(x_data, y_data):
-    # Generate bins and bin data
-    total_bins=int(round(y_data.shape[0]/5000))
-    bins = np.linspace(x_data.min(), x_data.max(), total_bins)
-    delta = bins[1] - bins[0]
-    idx  = np.digitize(x_data, bins)
-    # Calculate sliding median
-    running_median = np.array([np.median(y_data[idx==k]) for k in range(total_bins)])
-    # Calculate associated sliding standard deviation
-    running_std = np.array([y_data[idx==k].std() for k in range(total_bins)])
-    # Calculate bin centres for plotting
-    binned_xdata = np.array(bins-delta/2)
-    # return bin centres, median, and std
-    return binned_xdata, running_median, running_std
+def sliding_median(x_data,y_data):
+    perc = 90
+    bins = np.arange(x_data.min(),x_data.max(),abs(x_data.max()-x_data.min())/200.)
+    inds = np.digitize(x_data,bins)
+    xbins, ybins, ystd = [], [], []
+    for j in range(len(bins)-1):
+        uu = np.flatnonzero(inds == j)
+        if len(uu)>2000:
+            xbins.append(bins[j] + (bins[j+1] - bins[j])/2.)
+            # clean outliers within the  bins
+            indice = np.flatnonzero(np.logical_and(y_data[uu]>np.percentile(\
+                        y_data[uu],100-perc),y_data[uu]<np.percentile(y_data[uu],perc)))
+            ystd.append(np.nanstd(y_data[uu][indice]))
+            ybins.append(np.nanmedian(y_data[uu][indice]))
+    xbins,ybins,ystd = np.array(xbins), np.array(ybins),np.array(ystd)
+    return xbins,ybins,ystd
 
 def correct_int_era_ramp(m_date, s_date):
     print('Estimating IFG - ERA = RAMP for: {}_{}'.format(m_date, s_date))
@@ -252,7 +254,9 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     # compute residual ramp for ramp and recons ramp
     ramp_res = np.dot(G, ramp_pars).reshape(rdr_ny, rdr_nx)
     ramp_res_recons = np.dot(G, ramp_pars_recons).reshape(rdr_ny, rdr_nx)
-    
+    ramp_res[e_data == 0] = np.float('NaN')
+    ramp_res_recons[e_data == 0] = np.float('NaN')
+
     # correct IFG
     ie_corr = i_data - e_data - ramp_res
     ie_corr_recons = i_data - e_data - ramp_res_recons
@@ -270,13 +274,13 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     ie_data_refz_recons_cst = np.nansum(ie_data_refz_recons[indexref]*c_data_refz[indexref])/ np.nansum(c_data_refz[indexref])
     
     # Apply reference zone constant shift to both IFG and ERA
-    i_data = i_data -  ie_data_refz_cst
-    e_data = e_data - ie_data_refz_cst
-    ie_corr = ie_corr -  ie_data_refz_cst
-    
     i_data_recons = i_data -  ie_data_refz_recons_cst
     e_data_recons = e_data - ie_data_refz_recons_cst
     ie_corr_recons = ie_corr_recons -  ie_data_refz_recons_cst
+    
+    i_data = i_data -  ie_data_refz_cst
+    e_data = e_data - ie_data_refz_cst
+    ie_corr = ie_corr -  ie_data_refz_cst
     
     # Save output in the output era int directory
     if not os.path.exists(int_edir+'/'+int_did):
@@ -459,46 +463,58 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
     
     #########################
     ## Plotting IFG against ERA corr
-    data_interval = 10
-    mask = ~np.isnan(i_data) & ~np.isnan(e_data)
-    
-    x_mask = i_data[mask]
-    y_mask = e_data[mask]
-    z_mask = dem_data[mask]
-    
-    x = x_mask[::data_interval].flatten()
-    y = y_mask[::data_interval].flatten()
-    z = z_mask[::data_interval].flatten()
-    
-    if x.size == 0 or y.size ==0:
-        print('INPUT ARRAY ZERO:', m_date, s_date)
-    
-    # Calculate the linear trend, pearson coefficient
+    #mask = ~np.isnan(i_data) & ~np.isnan(e_data)
+    #x_mask = i_data[mask]
+    #y_mask = e_data[mask]
+    #z_mask = dem_data[mask]
     
     # clean outliers
     index = np.nonzero(
-        np.logical_and(x>np.nanpercentile(x, 1),
-        np.logical_and(x<np.nanpercentile(x, 99),
-        np.logical_and(y>np.nanpercentile(y, 1), y<np.nanpercentile(y, 99)
-        ))))
+        np.logical_and(~np.isnan(i_data),
+        np.logical_and(~np.isnan(e_data),
+        np.logical_and(e_data!=0,
+        np.logical_and(i_data!=0,
+        np.logical_and(i_data>np.nanpercentile(i_data, .5),
+        np.logical_and(i_data<np.nanpercentile(i_data, 99.5),
+        np.logical_and(e_data>np.nanpercentile(e_data, .5), e_data<np.nanpercentile(e_data, 99.5)
+        ))))))))
     
-    if x[index].shape[0] == 0:
-        print('MASK ERROR:', m_date, s_date)
-    
-    # linear regression of data
-    slope, intercept, rvalue, pvalue, stderr = linregress(x[index], y[index])
+    # no, the brutal downsampling is just for plotting
+    x = i_data[index].flatten()
+    y = e_data[index].flatten()
+    z = dem_data[index].flatten()
+
+    if x.size == 0 or y.size ==0:
+        logger.critical('MASK ERROR:', m_date, s_date)
     
     # curvefit to sliding median with std weighting
-    binned_xdata, running_median, running_std = sliding_median(x[index], y[index])
-    
+    binned_xdata, running_median, running_std = sliding_median(x, y)
+   
+
     def linear_f(x, a, b):
         return a*x + b
     
     # watch out for first element of sliding median equal to NaN
-    popt, pcov = curve_fit(linear_f, binned_xdata[1:], running_median[1:], sigma=running_std[1:], absolute_sigma=True)
-    
+    try:
+      popt, pcov = curve_fit(linear_f, binned_xdata[1:], running_median[1:], sigma=running_std[1:], absolute_sigma=True)
+    except:
+        try:
+            # Calculate the linear trend, pearson coefficient
+            # linear regression of data
+            slope, intercept, rvalue, pvalue, stderr = linregress(x, y)
+            popt = [slope,intercept]
+        except:
+            popt = np.zeros((2))
+            logger.critical('Gradient ERROR:', m_date, s_date)
+    # compute correlation
+    m = np.vstack([x,y])
+    cov = np.corrcoef(m)
+    rvalue = cov[0,1]
+
     # First, create the figure (size = x,y)
     fig = plt.figure(1, figsize=(10, 10))
+    
+    data_interval = 10
     
     # Now, create the gridspec structure, as required
     gs = gridspec.GridSpec(3,2, height_ratios=[0.05, .8, .2], width_ratios=[.8, .2])
@@ -513,7 +529,7 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
     cmin = np.nanpercentile(z, 2.5)
     
     # The plot itself
-    plt1 = ax1.scatter(x, y, c = z, 
+    plt1 = ax1.scatter(x[::data_interval], y[::data_interval], c = z[::data_interval], 
                     marker = 's', s = 5, edgecolor = 'none', alpha = 0.05,
                     cmap = cmap, vmin = cmin , vmax = cmax, rasterized=True)
     ax1.plot(binned_xdata, running_median, color='grey', lw=2)
