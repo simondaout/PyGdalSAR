@@ -157,20 +157,6 @@ def ramp_fit_int_gacos(rms_map, i_data, g_data):
     
     return pars
 
-#def sliding_median(x_data, y_data):
-#    # Generate bins and bin data
-#    total_bins=int(round(y_data.shape[0]/500))
-#    bins = np.linspace(x_data.min(), x_data.max(), total_bins)
-#    delta = bins[1] - bins[0]
-#    idx  = np.digitize(x_data, bins)
-#    # Calculate sliding median
-#    running_median = np.array([np.median(y_data[idx==k]) for k in range(total_bins)])
-#    # Calculate associated sliding standard deviation
-#    running_std = np.array([y_data[idx==k].std() for k in range(total_bins)])
-#    # Calculate bin centres for plotting
-#    binned_xdata = np.array(bins-delta/2)
-#    # return bin centres, median, and std
-#    return binned_xdata, running_median, running_std
 
 def sliding_median(x_data,y_data):
     perc = 90
@@ -493,10 +479,6 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     # curvefit to sliding median with std weighting
     binned_xdata, running_median, running_std = sliding_median(x, y)
    
-    # compute correlation
-    m = np.vstack([x,y])
-    cov = np.corrcoef(m)
-    rvalue = cov[0,1]
 
     def linear_f(x, a, b):
         return a*x + b
@@ -505,13 +487,22 @@ def phase_vs_gacos(int_did, m_date, s_date, i_data, g_data, c_data, dem_data):
     try:
         popt, pcov = curve_fit(linear_f, binned_xdata[1:], running_median[1:], sigma=running_std[1:], absolute_sigma=True)
     except:
-        # Calculate the linear trend, pearson coefficient
-        # linear regression of data
-        slope, intercept, rvalue, pvalue, stderr = linregress(x, y)
-        popt = [slope,intercept]
+        try:
+          # Calculate the linear trend, pearson coefficient
+          # linear regression of data
+          slope, intercept, rvalue, pvalue, stderr = linregress(x, y)
+          popt = [slope,intercept]
+        except:
+            popt = np.zeros((2))
+            logger.critical('Gradient ERROR:', m_date, s_date)
+            
+    # compute correlation
+    m = np.vstack([x,y])
+    cov = np.corrcoef(m)
+    rvalue = cov[0,1]
 
     # plot subsample data
-    data_interval = 20
+    data_interval = 10
     
     # First, create the figure (size = x,y)
     fig = plt.figure(1, figsize=(10, 10))
@@ -704,7 +695,7 @@ if __name__ == '__main__':
     int_gdir = 'INTERFERO_gacos'
     if not os.path.exists(int_gdir):
         os.mkdir(int_gdir)
-    
+   
     # Paralellize phase-gacos ramp estimation
     ifg_pairs = list(zip(m_dates, s_dates))
     
