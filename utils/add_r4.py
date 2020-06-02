@@ -36,6 +36,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pylab import *
 # docopt (command line parser)
 import docopt
+import os
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -99,18 +100,15 @@ if arguments["--vmin"] is not None:
 else:
     vmin = -vmax
 
-try:
-        from matplotlib.colors import LinearSegmentedColormap
-        cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
-        cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
-        cmap = cmap.reversed()
-except:
-        cmap=cm.jet
+from matplotlib.colors import LinearSegmentedColormap
+cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+cmap = cmap.reversed()
 
 fig = plt.figure(figsize=(16,4))
 fig.subplots_adjust(hspace=0.5)
 ax1 = fig.add_subplot(1,3,1)
-cax = ax1.imshow(in11, cmap = cmap, vmax=vmax, vmin=vmin, extent=None)
+cax = ax1.imshow(in11, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
 divider = make_axes_locatable(ax1)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
@@ -118,7 +116,7 @@ setp( ax1.get_xticklabels(), visible=False)
 ax1.set_title(infile1)
 
 ax2 = fig.add_subplot(1,3,2)
-cax = ax2.imshow(in22, cmap = cmap, vmax=vmax, vmin=vmin, extent=None)
+cax = ax2.imshow(in22, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
 setp( ax2.get_xticklabels(), visible=False)
 ax2.set_title(infile2)
 divider = make_axes_locatable(ax2)
@@ -128,9 +126,8 @@ plt.colorbar(cax, cax=c)
 #vmax = np.max( [np.nanpercentile(out,95),np.abs(np.nanpercentile(out,5))] )
 
 ax3 = fig.add_subplot(1,3,3)
-cax = ax3.imshow(out, cmap = cmap, vmax=vmax, vmin=vmin, extent=None)
+cax = ax3.imshow(out, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
 setp( ax3.get_xticklabels(), visible=False)
-ax3.set_title(outfile)
 divider = make_axes_locatable(ax3)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
@@ -140,5 +137,6 @@ if arguments["--outfile"] is None:
   fig.savefig('{}.pdf'.format('add_raster'), format='PDF',dpi=150)
 else:  
   fig.savefig('{}.pdf'.format(outfile), format='PDF',dpi=150)
+  ax3.set_title(outfile)
 
 plt.show()

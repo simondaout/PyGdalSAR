@@ -127,8 +127,7 @@
       open(2,file=name_cut,form='unformatted',access='direct', &
          status='old',recl=4*nxr)
       do j=1,nyr
-        jj=2*j
-        read(2,rec=jj)(cut(i,j),i=1,nxr)
+        read(2,rec=j)(cut(i,j),i=1,nxr)
         do i=1,nxr
           if(cutmax.lt.cut(i,j))cutmax=cut(i,j)
           if(cut(i,j).lt.0)cut(i,j)=0.
@@ -140,7 +139,8 @@
       do i=1,nxr
         if(coh(i,j).gt.0)then
          cut(i,j)=1.-cut(i,j)/cutmax
-         coh(i,j)=seuilmin*0.99+(coh(i,j)-seuilmin*0.99)*cut(i,j)
+         coh(i,j)=seuilmin*1.01+(coh(i,j)-seuilmin*1.01)*cut(i,j)
+         !coh(i,j)=seuilmin*0.99+(coh(i,j)-seuilmin*0.99)*cut(i,j)
         endif
       enddo
       enddo

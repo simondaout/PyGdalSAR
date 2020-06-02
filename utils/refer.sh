@@ -1,17 +1,16 @@
 #!/bin/bash
 
-
 # Initial checkings
-if [ "$1" = ""] || ["$2" = ""] || [ "$3" = ""] || ["$4" = ""] || \
-   ["$5" = ""] [ "$6" = ""] || ["$7" = ""] [ "$8" = ""] || ["$9" = ""]; then
-	echo "usage : refer.sh home_dir liste_interfero.rsc suffix prefix rlook \
-   left top lenthr width "
-	echo "home_dir: full path to T??? dir "
-	echo "liste_interfero.rsc: path fom home dir to rsc file"
-   echo "suffix prefix int: ${prefix}$date1-$date2_${suffix}"
-	echo "left top lenthr width: define the referencing band"
-	echo ; exit         
-fi 
+#if [ "$1" = ""] || ["$2" = ""] || [ "$3" = ""] || ["$4" = ""] || \
+#   ["$5" = ""] [ "$6" = ""] || ["$7" = ""] [ "$8" = ""] || ["$9" = ""]; then
+#	echo "usage : refer.sh home_dir liste_interfero.rsc suffix prefix rlook \
+#   left top lenthr width "
+#	echo "home_dir: full path to T??? dir "
+#	echo "liste_interfero.rsc: path fom home dir to rsc file"
+#   echo "suffix prefix int: ${prefix}$date1-$date2_${suffix}"
+#	echo "left top lenthr width: define the referencing band"
+#	echo ; exit         
+#fi 
 
 home=$1
 list_int=$home/$2

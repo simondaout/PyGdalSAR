@@ -43,6 +43,7 @@ import scipy.linalg as lst
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.cm as cm
 from pylab import *
 
@@ -114,12 +115,6 @@ fid = open(infile, 'r')
 m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
 # m[m==0.0] = np.float('NaN')
 
-# clean
-maxlos,minlos=np.nanpercentile(m,perc),np.nanpercentile(m,(100-perc))
-print 'Clean outliers outside:', maxlos,minlos
-kk = np.nonzero(
-    np.logical_or(m<minlos,m>maxlos))
-m[kk] = np.float('NaN')
 mf = np.copy(m)
 
 # clean for ramp
@@ -133,7 +128,7 @@ m_ramp[kk] = np.float('NaN')
 # mask
 if maskf is not 'no':
     fid2 = open(maskf, 'r')
-    mask = np.fromfile(fid2,dtype=np.float32).reshape((nlign,ncol))
+    mask = np.fromfile(fid2,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))
     mask =  mask*scale
     kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
     mf[kk] = np.float('NaN')
@@ -175,12 +170,11 @@ if ramp=='quad':
     mi = m[index].flatten()
     az = temp[:,0]; rg = temp[:,1]
 
-    G=np.zeros((len(mi),5))
+    G=np.zeros((len(mi),4))
     G[:,0] = rg**2
     G[:,1] = rg
     G[:,2] = az
-    G[:,3] = az**2
-    G[:,4] = 1
+    G[:,3] = 1
 
     x0 = lst.lstsq(G,mi)[0]
     _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
@@ -188,16 +182,15 @@ if ramp=='quad':
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
 
     pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
-    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
-    print 'Remove ramp %f x**2 %f x  + %f y**2 + %f y + %f'%(a,b,c,d,e)
+    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3] 
+    print 'Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d)
 
-    G=np.zeros((len(mask.flatten()),5))
+    G=np.zeros((len(mask.flatten()),4))
     for i in xrange(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
-        G[i*ncol:(i+1)*ncol,2] = i**2
-        G[i*ncol:(i+1)*ncol,3] = i
-    G[:,4] = 1
+        G[i*ncol:(i+1)*ncol,2] = i
+    G[:,3] = 1
     temp = (mf.flatten() - np.dot(G,pars))
     mf=temp.reshape(nlign,ncol)
     mf_ramp=temp.reshape(nlign,ncol)
@@ -305,10 +298,17 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
 # manual cst
 mf = mf - shift
 
+# clean based on perc
+maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
+print 'Clean outliers outside:', maxlos,minlos
+kk = np.nonzero(
+    np.logical_or(mf<minlos,mf>maxlos))
+mf[kk] = np.float('NaN')
+
 # Plot
-vmax = np.nanpercentile(mf,98) 
+vmax = np.max([np.nanpercentile(mf,97),np.nanpercentile(m,97),np.nanpercentile(mf,3),np.nanpercentile(m,3)])
 # vmax= 2.
-vmin = np.nanpercentile(mf,2)
+vmin = -vmax
 
 if setzero == 'yes':
     # replace "NaN" to 0
@@ -319,47 +319,54 @@ if setzero == 'yes':
 fid3 = open(outfile,'wb')
 mf.flatten().astype('float32').tofile(fid3)
 
-
-fig = plt.figure(0,figsize=(12,8))
+fig = plt.figure(0,figsize=(16,6))
 ax = fig.add_subplot(1,4,1)
 cax = ax.imshow(m, cm.RdBu,vmin=vmin, vmax=vmax)
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
-cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+#cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,2)
 cax = ax.imshow(mf_ramp, cm.RdBu, vmin=vmin, vmax=vmax)
 ax.set_title('DATA - RAMP')
 setp( ax.get_xticklabels(), visible=False)
-cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+#cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,3)
 cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=seuil)
 ax.set_title('MASK')
 setp( ax.get_xticklabels(), visible=False)
-cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+#cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 
-if iend-ibeg<ncol and jend-jbeg<nlign:
-    ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(mf[jbeg-buf:jend+buf,ibeg-buf:iend+buf], cm.RdBu, vmin=vmin, vmax=vmax)
-    setp( ax.get_xticklabels(), visible=False)
-    setp( ax.get_xticklabels(), visible=False)
-    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
-    ax.set_title(outfile)
-
+#if iend-ibeg<ncol and jend-jbeg<nlign:
 #    ax = fig.add_subplot(1,4,4)
-#    cax = ax.imshow(mf[jbeg-buf:jend+buf,ibeg-buf:iend+buf]-m[jbeg-buf:jend+buf,ibeg-buf:iend+buf], cm.RdBu, vmin=vmin, vmax=vmax)
+#    cax = ax.imshow(mf[jbeg-buf:jend+buf,ibeg-buf:iend+buf], cm.RdBu, vmin=vmin, vmax=vmax)
 #    setp( ax.get_xticklabels(), visible=False)
-#    setp( ax.get_xticklabels(), visible=False)
-#    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
-#    ax.set_title('Check diff')
-else:
-    ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(mf, cm.RdBu, vmin=vmin, vmax=vmax)
-    setp( ax.get_xticklabels(), visible=False)
-    setp( ax.get_xticklabels(), visible=False)
-    cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
-    ax.set_title(outfile)
+#    #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+#    ax.set_title(outfile)
+#    divider = make_axes_locatable(ax)
+#    c = divider.append_axes("right", size="5%", pad=0.05)
+#    plt.colorbar(cax, cax=c)
+#else:
+
+ax = fig.add_subplot(1,4,4)
+cax = ax.imshow(mf, cm.RdBu, vmin=vmin, vmax=vmax)
+setp( ax.get_xticklabels(), visible=False)
+setp( ax.get_xticklabels(), visible=False)
+#cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+ax.set_title(outfile)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
 
 
 fig.tight_layout()

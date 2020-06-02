@@ -31,6 +31,7 @@ from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import seaborn as sns
+import scipy.stats as stats
 from scipy.optimize import curve_fit
 import docopt
 
@@ -77,14 +78,14 @@ except:
 # plot hist and phase topo diff
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
 
-cax = ax1.imshow(data, cmap = cmap, vmax=vmax, vmin=vmin, extent=None)
+cax = ax1.imshow(data, cmap = cmap, vmax=vmax, vmin=vmin,interpolation='nearest')
 divider = make_axes_locatable(ax1)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 plt.setp( ax1.get_xticklabels(), visible=False)
 ax1.set_title(infile)
 
-cax = ax2.imshow(dem, cmap = topomap, extent=None)
+cax = ax2.imshow(dem, cmap = topomap,interpolation='nearest')
 plt.setp( ax2.get_xticklabels(), visible=False)
 ax2.set_title(demfile)
 divider = make_axes_locatable(ax2)
@@ -98,7 +99,7 @@ index = np.nonzero(
             )))
 
 diff = data[index]
-diff_mean = np.nanmedian(diff)
+diff_med = np.nanmedian(diff)
 diff_std = np.nanstd(diff)
 dem_clean = dem[index]
 
@@ -107,16 +108,15 @@ opts = {'c':'red', 'linestyle':'--'}
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,4))
 sns.distplot(diff, norm_hist=True, hist=True, color="dodgerblue", ax=ax1)
 #ax1.set_xlim([vmin,vmax])
-ax1.axvline(x=diff_mean,alpha=0.4, **opts)
-ax1.set_xlabel('Mean: {:.3f} STD: {:.3f}'.format(diff_mean, diff_std))
+ax1.axvline(x=diff_med,alpha=0.4, **opts)
+ax1.set_xlabel('Median: {:.3f} STD: {:.3f}'.format(diff_med, diff_std))
 ax1.set_ylabel('Norm. PDF')
 ax1.set_ylim(bottom=0)
 
-f = ax1.lines[0]
-xf = f.get_xydata()[:,0]
-yf = f.get_xydata()[:,1]
-
-ax1.fill_between(xf, yf, color="dodgerblue", alpha=0.5, where=(xf>(diff_mean-1*diff_std)) & (xf<(diff_mean+1*diff_std)))
+#f = ax1.lines[0]
+#xf = f.get_xydata()[:,0]
+#yf = f.get_xydata()[:,1]
+#ax1.fill_between(xf, yf, color="dodgerblue", alpha=0.5, where=(xf>(diff_med-1*diff_std)) & (xf<(diff_med+1*diff_std)))
 
 def linear_f(x, a, b):
     return a*x + b
