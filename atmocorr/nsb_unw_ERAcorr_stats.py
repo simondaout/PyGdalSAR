@@ -78,6 +78,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 ### Load colormaps
 cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
 cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt")).reversed()
+seq_cmap = LinearSegmentedColormap.from_list('', np.loadtxt(cm_locs+"lajolla.txt"))
 
 ### Functions
 
@@ -281,6 +282,9 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     i_data = i_data -  ie_data_refz_cst
     e_data = e_data - ie_data_refz_cst
     ie_corr = ie_corr -  ie_data_refz_cst
+
+    # Calculate standard deviation reduction between input IFG and IFG corr
+    std_red = ((np.nanstd(i_data) - np.nanstd(ie_corr_recons))/np.nanstd(i_data))*100
     
     # Save output in the output era int directory
     if not os.path.exists(int_edir+'/'+int_did):
@@ -288,11 +292,11 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     
     if maps=='yes':
         # Plot phase maps of ifg, era, ramp, ifg_corr
-        maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, i_data, e_data + ramp_res, ie_corr, ramp_res, ramp_res_recons, ie_corr_recons, c_data)
+        maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, i_data, e_data, i_data-e_data, ramp_res, ramp_res_recons, ie_corr_recons, c_data)
     
     if phase_era=='yes':
         # Plot IFG phase vs ERA+RAMP (return correlation and gradient)
-        ie_gradient, ie_correlation = phase_vs_era(int_did, m_date, s_date, i_data_recons-ramp_res_recons, e_data_recons, c_data, dem_data)
+        ie_gradient, ie_correlation = phase_vs_era(int_did, m_date, s_date, i_data_recons-ramp_res_recons, e_data_recons, c_data, dem_data, std_red)
     
     # Set areas outside = 0 using c_data (amplitude)
     ie_corr_recons[c_data==0] = 0
@@ -315,7 +319,7 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     # Caculate standard deviation for inversion weighting...
     e_std = np.nanstd(e_data + ramp_res_recons)
     
-    return m_date, s_date, ie_gradient, ie_correlation, e_std
+    return m_date, s_date, ie_gradient, ie_correlation, e_std, std_red
 
 def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, map4, map5, map6, map_mask):
     logger.info('Plotting IFG - ERA - RAMP = IFGcorr phase maps: {}_{}'.format(m_date, s_date))
@@ -388,7 +392,7 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     divider = make_axes_locatable(ax2)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax2, cax=c)
-    ax2.set_title('$\phi_{ERA} + \phi_{RAMP}$: '+str(m_date)+'_'+str(s_date))
+    ax2.set_title('$\phi_{ERA}$: '+str(m_date)+'_'+str(s_date))
     
     # Plotting the raw unw IFG data
     ax3 = fig.add_subplot(2,3,3)
@@ -401,7 +405,7 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     divider = make_axes_locatable(ax3)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax3, cax=c)
-    ax3.set_title('$\phi_{IFG} - \phi_{ERA} - \phi_{RAMP}$: '+str(m_date)+'_'+str(s_date))
+    ax3.set_title('$\phi_{IFG} - \phi_{ERA}$: '+str(m_date)+'_'+str(s_date))
     
     # Plotting the raw unw IFG data
     ax1 = fig.add_subplot(2,3,4)
@@ -449,7 +453,7 @@ def maps_phase_era_ramp_corr_recons(int_did, m_date, s_date, map1, map2, map3, m
     
     plt.clf()
     
-def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
+def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data, std_red):
     logger.info('Generating IFG phase vs ERA phase estimation: {}_{}'.format(m_date, s_date))
     
     i_data = deepcopy(i_data)
@@ -548,8 +552,8 @@ def phase_vs_era(int_did, m_date, s_date, i_data, e_data, c_data, dem_data):
     ax1.set_ylabel('$\phi_{ERA}$: '+str(m_date)+'_'+str(s_date))
     
     # scatter labels to fine for legend so...
-    labels = ['Gradient: {:.2f}'.format(popt[0]), 'Correlation: {:.2f}'.format(rvalue)]
-    label_colours = [(0,0,0,0),(0,0,0,0)]
+    labels = ['Gradient: {:.2f}'.format(popt[0]), 'Correlation: {:.2f}'.format(rvalue), 'STD Reduction: {:.1f}%'.format(std_red)]
+    label_colours = [(0,0,0,0),(0,0,0,0),(0,0,0,0)]
     recs = []
     for i in range(0,len(label_colours)):
         recs.append(patches.Rectangle((0,0),1,1,fc=label_colours[i]))
@@ -788,7 +792,7 @@ if __name__ == '__main__':
     
     # Save results as text file
     results_array = np.asarray(results)
-    np.savetxt(int_edir+'/phase-era_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
+    np.savetxt(int_edir+'/phase-era_stats_estim.txt', results_array, fmt='%i, %i, %.3f, %.3f, %.3f, %.3f', delimiter=' ')
     
     logger.info('Calculating inversion weighting file using correlation and atmos standard deviation.')
     
@@ -805,3 +809,49 @@ if __name__ == '__main__':
     # Save to text file: m_date, s_date, corr, std, weighting
     sigma_corr_std_weights = np.concatenate((m_dates[:,None], s_dates[:,None], np.asarray(sigma_corr)[:,None], np.asarray(sigma_std)[:,None], np.asarray(sigma_weight)[:,None]), axis=1)
     np.savetxt(int_edir+'/phase-era_sigma_corr_weights.txt', sigma_corr_std_weights, fmt='%i, %i, %.3f, %.3f, %.3f', delimiter=' ')
+
+    ### Generate various histograms for analysis of overall performance...
+    print('Generating histograms for atmospheric correction performance analysis...')
+    atmos_data = np.loadtxt(int_edir+'/phase-era_stats_estim.txt', delimiter=',')
+    atmos_grads = np.asarray([i[2] for i in atmos_data])
+    atmos_corrs = np.asarray([i[3] for i in atmos_data])
+    atmos_stdreds = np.asarray([i[5] for i in atmos_data])
+    
+    # Plotting    
+    fig = plt.figure(constrained_layout=True, figsize=(22,5))
+    gs_ws = [1, 1, 1, 1.2]
+    gs_hs = [1]
+    spec = fig.add_gridspec(ncols=4, nrows=1, width_ratios=gs_ws, height_ratios=gs_hs)
+    ax1 = fig.add_subplot(spec[0, 0])
+    ax2 = fig.add_subplot(spec[0, 1])
+    ax3 = fig.add_subplot(spec[0, 2])
+    ax4 = fig.add_subplot(spec[0, 3])
+    
+    ## Gradients
+    sns.distplot(atmos_grads, norm_hist=True, hist=True, color="dodgerblue", ax=ax1)
+    ax1.set_xlabel(r'Gradient ($m$)')
+    ax1.set_ylabel('Norm. PDF')
+    ax1.set_ylim(bottom=0)
+    ## Correlations
+    sns.distplot(atmos_corrs, norm_hist=True, hist=True, color="lightcoral", ax=ax2)
+    ax2.set_xlabel(r'Correlation ($r$)')
+    ax2.set_ylabel('Norm. PDF')
+    ax2.set_ylim(bottom=0)
+    ## STD reduction
+    sns.distplot(atmos_stdreds, norm_hist=True, hist=True, color="darkseagreen", ax=ax3)
+    ax3.set_xlabel(r'Standard Deviation Reduction (%)')
+    ax3.set_ylabel('Norm. PDF')
+    ax3.set_ylim(bottom=0)
+    ## Scatter of gradients vs. correlation, colored by std reduction
+    points = ax4.scatter(atmos_grads, atmos_corrs, c=atmos_stdreds, s=50, cmap=seq_cmap, edgecolor='black')
+    divider = make_axes_locatable(ax4)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(points, cax=cax)
+    cbar.set_label(r'Standard Deviation Reduction (%)', rotation=270, labelpad=15)
+    ax4.set_xlabel(r'Gradient ($m$)')
+    ax4.set_ylabel('Correlation ($r$)')
+    ##
+    fig.savefig(int_edir+'/atmoscorr_histos.png', dpi=300, format='PNG', bbox_inches='tight')
+    plt.clf()
+    
+# program end
