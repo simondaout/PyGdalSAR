@@ -56,15 +56,6 @@ arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
 
 if arguments["--cpt"] is  None:
-    cmap=cm.rainbow
-else:  
-    try:
-        cmap = LinearSegmentedColormap.from_list(arguments["--cpt"].split("/")[-1].split('.')[0], np.loadtxt(arguments["--cpt"]))
-
-    except:
-        cmap=arguments["--cpt"]
-
-if arguments["--cpt"] is  None:
     try:
         from matplotlib.colors import LinearSegmentedColormap
         cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
@@ -202,7 +193,8 @@ else:
    #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4) 
+     vmax=vmax,vmin=vmin, zorder=4,interpolation=None)
+
 ax.set_title(basename,fontsize=6)
 ax.set_xticks(np.linspace(lonbeg,lonend,3))
 ax.set_yticks(np.linspace(latbeg,latend,3))

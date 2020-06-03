@@ -1,6 +1,5 @@
-!/usr/bin/env python2.7
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-
 ############################################
 #
 # PyGdalSAR: An InSAR post-processing package 
@@ -194,6 +193,7 @@ amp_map[dem_map<minelev] = np.float('NaN')
 lin_map[dem_map<minelev] = np.float('NaN')
 
 phi_map[amp_map<threshold_amp] = np.float('NaN')
+phi_map[amp_map>maxamp] = np.float('NaN')
 # lin_map[amp_map<threshold_amp] = np.float('NaN')
 
 # convert phi between 0 and 2pi

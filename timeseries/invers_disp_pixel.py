@@ -13,7 +13,7 @@ Temporal decomposition of the time series delays of selected pixels (used depl_c
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--linear=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
-[--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] 
+[--name=<value>] [--rad2mm=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] [--plot_dateslim=<values>] [--color=<value>] [--fillstyle=<value>] 
 
 invers_disp_pixel.py -h | --help
 Options:
@@ -49,6 +49,9 @@ iref                  colum numbers of the reference pixel [default: None]
 jref                  lign number of the reference pixel [default: None]
 --bounds                yMin,yMax time series plots 
 --dateslim              Datemin,Datemax time series  
+--plot_dateslim         Datemin,Datemax time series for plot only 
+--color                 Colors time series points [default:blue]
+--fillstyle             Fill Style time series points. Can be: none,full,top,bottom,right,left [default: none]
 """
 
 # numpy
@@ -435,6 +438,15 @@ if arguments["--info"] ==  None:
 else:
    infof = arguments["--info"]
 
+if arguments["--color"] ==  None:
+   color = "blue"
+else:
+   color = arguments["--color"]
+if arguments["--fillstyle"] ==  None:
+   fillstyle = "none"
+else:
+   fillstyle = arguments["--fillstyle"]
+
 if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
 
@@ -477,6 +489,7 @@ else:
     datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
     dmax = str(datemax) + '0101'
     dmin = str(datemin) + '0101'
+
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
@@ -815,6 +828,8 @@ for jj in xrange((Npix)):
     x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
     if arguments["--dateslim"] is not  None:
         dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+    elif arguments["--plot_dateslim"] is not  None:
+        dmin,dmax = arguments["--plot_dateslim"].replace(',',' ').split()
     else:
         dmax = str(datemax) + '0101'
         dmin = str(datemin) + '0101'
@@ -981,21 +996,21 @@ for jj in xrange((Npix)):
     # plot data and model minus dem error
     if infof is not None:
       # print infof, infm
-      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
+      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
     else:
-      ax.plot(x,disp-demerr,markers[jj],markersize=4,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
+      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
     
-    ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
+    ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
     
     # plot data and model minus dem error and linear term
     if inter=='yes':
-        ax3.plot(x,disp-demerr-lin,markers[jj],markersize=4,label='detrended data')
-        ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.5)
+        ax3.plot(x,disp-demerr-lin,markers[jj],color=color,fillstyle=fillstyle,markersize=4,label='detrended data')
+        ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
             
     if semianual=='yes' or seasonal=='yes' or bianual=='yes' or seasonalt == 'yes':
-        ax2.plot(x,disp-disp_seas-demerr,markers[jj],label='data -seasonal')
+        ax2.plot(x,disp-disp_seas-demerr,markers[jj],color=color,fillstyle=fillstyle,label='data -seasonal')
         # ax2.plot(x,mdisp-disp_seas-demerr,'o',color='red',alpha=0.5,label='model -seasonal')
-        ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor='blue',fmt='none', alpha=0.3)
+        ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.3)
 
     # create synthetic time
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
@@ -1058,7 +1073,7 @@ for jj in xrange((Npix)):
             ax3.plot(t,model-model_lin-model_dem,'-r')
     else:
         ax.plot(t,model-model_dem,'-r')
-            
+           
     if seasonal=='yes' or semianual=='yes' or bianual=='yes' or seasonalt=='yes':
         ax2.plot(t,model-mseas-model_dem,'-r')
         # ax2.plot(t,model-mseast-model_dem,'-r')

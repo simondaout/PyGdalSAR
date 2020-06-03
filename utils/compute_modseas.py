@@ -17,7 +17,7 @@ Compute the mod of the seasonality. Read output files from invers_dips2coef.py.
 
 Usage: clean_phi-amp.py [--cube=<path> ] [--ampfile=<path>] [--phifile=<path>] [--linfile=<path>] [--demerrfile=<path>] \
 [--ref_file=<path>] [--slopefile=<path>] [--outampfile=<path>] [--outphifile=<path>] [--crop=<values>] [--lectfile=<path>] \
-[--sigampfile=<path>] [--sigphifile=<path>] [--minamp=<value>] [--maxamp=<value>] [--maxslope=<value>] [--perc_sig=<value>] [--name=<value>] [--topofile=<path>] [--threshold=<amp/slope>]
+[--sigampfile=<path>] [--sigphifile=<path>] [--minamp=<value>] [--maxamp=<value>] [--maxslope=<value>] [--perc_sig=<value>] [--name=<value>] [--topofile=<path>] [--threshold=<amp/slope>] [--minelev=<value>]
 
 
 Options:
@@ -35,6 +35,7 @@ Options:
 --sigphifile=<file>   Uncertainty phi map file [default: phiwt_sigcoeff.r4]
 --minamp=<value>      Mask on minimum Amplitude in mm [default: 3.5]
 --maxamp=<value>      Threshold Amplitude limit in mm [default: 10.]
+--minelev=<value>     Mask based on elevation [default:3500]
 --maxslope=<value>    Threshold on Slope in % [default: 3.]
 --perc_sig=<value>    Percentile uncertainty for map cleaning [default: 99.]
 --name=<value>        Output file name
@@ -77,8 +78,6 @@ if arguments["--linfile"] ==  None:
     arguments["--linfile"] = 'lin_coeff.r4'
 if arguments["--lectfile"] ==  None:
     arguments["--lectfile"] = "lect_ts.in"
-if arguments["--slopefile"] ==  None:
-    arguments["--slopefile"] = "Slope.r4"
 if arguments["--sigampfile"] ==  None:
     arguments["--sigampfile"] = 'ampwt_sigcoeff.r4'
 if arguments["--sigphifile"] ==  None:
@@ -97,10 +96,18 @@ if arguments["--maxslope"] ==  None:
     maxslope = 3
 else:
     maxslope = np.float(arguments["--maxslope"])
+if arguments["--minelev"] ==  None:
+    minelev = 3500
+else:
+    minelev = np.float(arguments["--minelev"])
 if arguments["--topofile"] == None:
     demf = None
 else:
     demf = arguments["--topofile"]
+if arguments["--slopefile"] ==  None:
+    slopef = None
+else:
+    slopef = arguments["--slopefile"]
 if arguments["--threshold"] == None:
     threshold = "Amp"
     maxthreshold = maxamp
@@ -117,7 +124,6 @@ else:
 fimages='images_retenues'
 imref = 0
 rad2mm = -4.4563
-minelev = 3500 
 
 ##################################
 
@@ -144,7 +150,6 @@ phi_map = np.fromfile(arguments["--phifile"],dtype=np.float32)[:nlines*ncols].re
 lin_map = np.fromfile(arguments["--linfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 sigamp_map=np.fromfile(arguments["--sigampfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 sigphi_map = np.fromfile(arguments["--sigphifile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
-slope_map = np.fromfile(arguments["--slopefile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 ref_map = np.fromfile(arguments["--ref_file"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 if arguments["--demerrfile"] is not None:
     bperp_map = np.fromfile(arguments["--demerrfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
@@ -159,8 +164,14 @@ if demf ==  None:
         print('DEM file is not readible. Set elelvation to zeros.')
         dem_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 else:
-    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 print('Min Elev: {}, Max Elve: {}'.format(np.nanmin(dem_map), np.nanmax(dem_map)))
+
+if slopef ==  None:
+    print('Slope file is not readible. Set relief to one.')
+    slope_map = np.ones((nlines,ncols))[ibeg:iend,jbeg:jend]
+else:
+    slope_map = np.fromfile(slopef,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 
 # # clean
 if arguments["--perc_sig"] ==  None:

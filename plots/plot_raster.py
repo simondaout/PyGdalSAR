@@ -18,7 +18,7 @@ Display and Cut image file (.unw/.int/.r4/.tiff)
 Usage: plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
 [--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] 
        plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
-[--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>]
+[--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--cols=<values>] [--lines=<values>]
 
 
 Options:
@@ -37,6 +37,8 @@ Options:
 --tile=<value>        Title plot 
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
+--ncols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
+--nligns VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
 """
 
 from __future__ import print_function
@@ -88,6 +90,12 @@ if arguments["--rad2mm"] ==  None:
         rad2mm = 1
 else:
         rad2mm = np.float(arguments["--rad2mm"])
+
+if (arguments["--cols"] is not None and arguments["--lines"] is not None):
+    ipix = map(int,arguments["--cols"].replace(',',' ').split())
+    jpix = map(int,arguments["--lines"].replace(',',' ').split())
+    if len(jpix) != len(ipix):
+      raise Exception("ncols and nlines lists are not the same size")
 
 ds_extension = os.path.splitext(infile)[1]
 
@@ -235,8 +243,10 @@ if arguments["--wrap"] is not None:
 elif (arguments["--vmax"] is not None) or (arguments["--vmin"] is not None):
     if arguments["--vmax"] is not  None:
         vmax = np.float(arguments["--vmax"])
-    if arguments["--vmin"] is not  None:
-        vmin = np.float(arguments["--vmin"])
+        if arguments["--vmin"] is not  None:
+          vmin = np.float(arguments["--vmin"])
+        else:
+          vmin = -vmax
 else:
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
@@ -245,6 +255,11 @@ cax = ax.imshow(cutphi, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
+
+# plot optional crosses
+if (arguments["--cols"] is not None and arguments["--lines"] is not None):
+    for i in range(len(ipix)):
+      ax.scatter(ipix[i]-jbeg,jpix[i]-ibeg,marker='x',color='black',s=150.)
 
 if arguments["--title"] ==  None:
     fig.canvas.set_window_title(infile)

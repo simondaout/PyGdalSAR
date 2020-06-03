@@ -133,8 +133,6 @@ def convert(int_date):
     r = subprocess.call("gdalwarp -overwrite -tr "+str(geo_dx)+" "+str(geo_dy)+" -te "+str(geo_lon[0])+" "+str(geo_lat[0])+" "+str(geo_lon[1])+" "+str(geo_lat[1])+" -r bilinear "+temp+" "+gacos_tif_file+" -of GTiff", shell=True,stdout=sys.stdout, stderr=subprocess.STDOUT,env=os.environ)
     if r != 0:
         logger.critical(r)
-    # del temporary files
-    rm(temp)
 
     outfile = gacos_dir+'/'+str(int_date)+'.ztd.geo'
     if force:
@@ -174,9 +172,11 @@ Y_STEP                %.8f
         """ % (ds.RasterXSize, ds.RasterYSize, ds_geo[0], ds_geo[3], ds_geo[1], ds_geo[5]))
         f.close()
 
-        
     elif os.path.isfile(gacos_dir+'/'+str(int_date)+'.ztd.geo') == True:
         print('GACOS geo file for {} already exists. Use force mode.'.format(int_date))
+    
+    # del temporary files
+    rm(temp); rm(gacos_tif_file)
         
 def gacosgeo2rdr(int_date):
     # in file, ztd cropped and resampled to geo
@@ -227,6 +227,9 @@ def gacosztd2los(int_date):
         copyrsc(sim_dem_rdr+'.rsc',gacos_los_file+'.rsc')
     else:
         print('GACOS rdr file for {} already exists. Use force mode.'.format(int_date))
+    
+    # clean ztd.rdr files
+    rm(gacos_ztd_file)
 
 def gacosrdr2png(int_date, plot='yes'):
     # out file of gacosgeo2rdr
