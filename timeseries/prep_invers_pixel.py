@@ -188,7 +188,7 @@ else:
       date1, date2 = date_1[kk], date_2[kk]
       idate = str(date1) + '_' + str(date2)
       if sformat == 'GTIFF':
-        infile = os.path.abspath(int_path + '/' + prefix + str(date1) + '-' + str(date2) + suffix + '.tiff')
+        infile = os.path.abspath(int_path + '/' + prefix + str(date1) + '_' + str(date2) + suffix + '.tif')
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band = ds.GetRasterBand(1)
         los = ds_band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)

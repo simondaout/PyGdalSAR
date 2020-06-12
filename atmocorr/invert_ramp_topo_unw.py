@@ -1282,7 +1282,7 @@ def empirical_cor(kk):
 
 
     elif sformat == 'GTIFF':
-        infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
+        infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.geo.unw.tif'
 
         checkinfile(infile)
 
@@ -1291,6 +1291,7 @@ def empirical_cor(kk):
         ds_band2 = ds.GetRasterBand(1)
         lines, cols = ds.RasterYSize, ds.RasterXSize
 
+        los_map = np.zeros((mlines,mcols))
         los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
         # los_map[los_map==0] = np.float('NaN')
 
@@ -1314,13 +1315,23 @@ def empirical_cor(kk):
                 rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
                 k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
                 rms_map[k] = float('NaN')
+            elif sformat == 'GTIFF':
+                rmsfile=  int_path + str(date1) + '_' + str(date2) + '.geo.cc.tif'
+                checkinfile(rmsfile)
+                ds = gdal.Open(rmsfile, gdal.GA_ReadOnly)
+                ds_band1 = ds.GetRasterBand(1)
+                lines, cols = ds.RasterYSize, ds.RasterXSize
+                rms_map = np.zeros((mlines,mcols))
+                rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
+                k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
+                rms_map[k] = float('NaN')
             elif sformat == 'GAMMA':
                 rmsfile=  int_path + str(date1) + '_' + str(date2) + '.filt.cc'
                 rms_map = gm.readgamma(rmsfile,int_path)
                 # plt.imshow(rms_map,vmax=1,vmin=0)
                 # plt.show()
         except:
-            logger.warning('Coherence file cannot be read')
+           logger.warning('Coherence file cannot be read')
 
     # time.sleep(1.)
     # clean for estimation
@@ -1567,13 +1578,22 @@ def apply_cor(kk, sp, sp_inv):
 
     elif sformat == 'GTIFF':
 
-        infile = int_path + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.tiff'
-        outfile = out_path + prefix + str(date1) + '-' + str(date2) + suffix + suffout +  rlook + '.tiff' 
+        infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.geo.unw.tif'
+        outfile = out_path + prefix + str(date1) + '_' + str(date2) + suffix + suffout +  rlook + '.geo.unw.tif' 
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(1)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         rms_map = np.ones((ds.RasterYSize,ds.RasterXSize))
         lines, cols = ds.RasterYSize, ds.RasterXSize
+
+        if rmsf == 'yes':
+          rmsfile=  int_path + str(date1) + '_' + str(date2) + 'geo.cc.tif'
+          rmsfile=  int_path + str(date1) + '_' + str(date2) + '.geo.cc.tif'
+          ds = gdal.Open(rmsfile, gdal.GA_ReadOnly)
+          ds_band1 = ds.GetRasterBand(1)
+          rms_map = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        else:
+          rms_map = np.ones((lines,cols))
 
     elif sformat == 'GAMMA':
 
@@ -1633,11 +1653,10 @@ def apply_cor(kk, sp, sp_inv):
     logger.info('Remove reference frame: {}'.format(cst))
 
     # reset to 0 areas where no data (might change after time series inversion?)
-    flatlos[los_map==0], rms_map[los_map==0] = 0.0, 0.0
     flatlos[np.isnan(los_map)],rms_map[np.isnan(los_map)] = 0.0, 0.0
     flatlos[np.isnan(flatlos)],rms_map[np.isnan(flatlos)] = 0.0, 0.0
     rms_map[np.isnan(rms_map)],flatlos[np.isnan(rms_map)] = 0.0, 0.0
-    flatlos[rms_map==0] = 0.0
+    flatlos[los_map==0], rms_map[los_map==0] = 0.0, 0.0
 
     if sformat == 'ROI_PAC':
         dst_ds = driver.Create(outfile, cols, lines, 2, gdal.GDT_Float32)
@@ -1699,7 +1718,7 @@ def apply_cor(kk, sp, sp_inv):
 
     _los_map = np.copy(flatlos)
     _los_map[los_map==0] = np.float('NaN')
-    flatlos[los_map==0] = np.float('NaN')
+    #flatlos[los_map==0] = np.float('NaN')
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
 
     ax = fig.add_subplot(1,4,4)
@@ -1809,14 +1828,15 @@ if arguments["--threshold_mask"] ==  None:
     threshold_mask = -1
 else:
     threshold_mask = float(arguments["--threshold_mask"])
-if arguments["--cohpixel"] ==  None:
-    rmsf = 'no'
-else:
-    rmsf = arguments["--cohpixel"]
 if arguments["--threshold_coh"] ==  None:
     threshold_rms = -1
 else:
     threshold_rms = float(arguments["--threshold_coh"])
+if arguments["--cohpixel"] ==  None:
+    rmsf = 'no'
+    threshold_rms = -1
+else:
+    rmsf = arguments["--cohpixel"]
 if arguments["--topofile"] ==  None or not os.path.exists(arguments["--topofile"]):
    radar = None
 else:
@@ -1938,7 +1958,7 @@ for i in range((nmax)):
 if ref is not None:
     ds_extension = os.path.splitext(ref)[1]
     if sformat == 'GTIFF':
-        geotiff = arguments["--geotiff"]
+        geotiff = arguments["--ref"]
         georef = gdal.Open(ref)
         gt = georef.GetGeoTransform()
         proj = georef.GetProjection()
@@ -1957,7 +1977,6 @@ if ref is not None:
 # laod elevation map
 if radar is not None:
     extension = os.path.splitext(radar)[1]
-
     if extension == '.r4':  
       fid = open(radar,'r')
       elevi = np.fromfile(fid,dtype=np.float32)
