@@ -30,6 +30,8 @@ import docopt
 import os, sys
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -46,19 +48,25 @@ latp,lonp,defo,coh  = np.loadtxt(arguments["--csv_file"],comments="#", unpack=Tr
 print('Read infile:', arguments["--ref_file"])
 ds = gdal.Open(arguments["--ref_file"])
 ds_geo = ds.GetGeoTransform()
-# (95.201531714, 0.001666666667, 0.0, 39.02513845, 0.0, -0.001666666667)
 proj = ds.GetProjection()
 driver = gdal.GetDriverByName('GTiff')
+print("> Driver:   ", ds.GetDriver().ShortName)
+print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
+print("> Origin:   ", ds_geo[0], ds_geo[3] )
+print("> Pixel Size", = ds_geo[1], ds_geo[5])
 
-pix_az, pix_rg = np.indices((ds.RasterYSize,ds.RasterXSize))
-lats,lons = ds_geo[3]+ds_geo[5]*pix_az, ds_geo[0]+ds_geo[1]*pix_rg
+# extract lines,cols,lat,lon raster
+pix_lin, pix_col = np.indices((ds.RasterYSize,ds.RasterXSize))
+lats,lons = ds_geo[3]+ds_geo[5]*pix_lin, ds_geo[0]+ds_geo[1]*pix_col
 
 # initiate new band
 los = np.zeros((ds.RasterYSize,ds.RasterXSize))
 
-print('Convert csv to raster')
-for (lat,i) in zip(lats.flatten(),pix_az.flatten()):
-   for (lon,j) in zip(lons.flatten(),pix_rg.flatten()): 
+print('Convert csv to raster...this may take a while...')
+for (lat,i) in zip(lats.flatten(),pix_lin.flatten()):
+   for (lon,j) in zip(lons.flatten(),pix_col.flatten()): 
+     
+     # initialisation
      m = np.float('NaN')
      lat_min,lat_max = lat + ds_geo[5], lat
      lon_min,lon_max = lon, lon + ds_geo[1]
@@ -72,14 +80,14 @@ for (lat,i) in zip(lats.flatten(),pix_az.flatten()):
      np.logical_and(lonp<lon_max,
      lonp>lon_min))))
      
-     # mean
-     #m = np.nanmean(defo[index])
-     # max coherence
-     idx_cohm = coh[index].index(max(coh[index]))
-     m = defo[index][idx_cohm]
+     m = np.nanmean(defo[index])
+     #try:
+       #m = defo[index][np.argmax(coh[index])]
+     #except:
+      # pass
      los[i,j] = m 
 
-outfile = os.path.splitext(csv_file)[0] + '.tiff'
+outfile = os.path.splitext(arguments["--csv_file"])[0] + '.tiff'
 print('Convert output file:', outfile)
 dst_ds = driver.Create(outfile, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_Float32)
 dst_band2 = dst_ds.GetRasterBand(1)
@@ -113,7 +121,7 @@ divider = make_axes_locatable(ax1)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 plt.setp( ax1.get_xticklabels(), visible=False)
-ax1.set_title(csv_file)
+ax1.set_title(arguments["--csv_file"])
 
 ax2 = fig.add_subplot(1,2,2)
 cax = ax2.imshow(los, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
