@@ -40,20 +40,20 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 # read input parameters and arguments
 arguments = docopt.docopt(__doc__)
 
-print('Read infile:', arguments["--csv_file"])
+print('Read .csv file:', arguments["--csv_file"])
 #lat,lon,height,defo,coh  = np.loadtxt(arguments["--csv_file"],comments="#", delimiter=',', unpack=True, dtype='f,f,f,f,f')
 latp,lonp,defo,coh  = np.loadtxt(arguments["--csv_file"],comments="#", unpack=True, dtype='f,f,f,f')
 
 # open ref
-print('Read infile:', arguments["--ref_file"])
+print('Read reference raster file:', arguments["--ref_file"])
 ds = gdal.Open(arguments["--ref_file"])
 ds_geo = ds.GetGeoTransform()
 proj = ds.GetProjection()
 driver = gdal.GetDriverByName('GTiff')
-print("> Driver:   ", ds.GetDriver().ShortName)
-print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
-print("> Origin:   ", ds_geo[0], ds_geo[3] )
-print("> Pixel Size", = ds_geo[1], ds_geo[5])
+print("> Driver:     ", ds.GetDriver().ShortName)
+print("> Size:       ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
+print("> Origin:     ", ds_geo[0], ds_geo[3] )
+print("> Pixel Size: ", ds_geo[1], ds_geo[5])
 
 # extract lines,cols,lat,lon raster
 pix_lin, pix_col = np.indices((ds.RasterYSize,ds.RasterXSize))
