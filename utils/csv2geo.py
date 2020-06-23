@@ -44,6 +44,30 @@ print('Read .csv file:', arguments["--csv_file"])
 #lat,lon,height,defo,coh  = np.loadtxt(arguments["--csv_file"],comments="#", delimiter=',', unpack=True, dtype='f,f,f,f,f')
 latp,lonp,defo,coh  = np.loadtxt(arguments["--csv_file"],comments="#", unpack=True, dtype='f,f,f,f')
 
+print('Plot data')
+fig = plt.figure(figsize=(16,4))
+fig.subplots_adjust(hspace=0.5)
+
+try:
+   from matplotlib.colors import LinearSegmentedColormap
+   cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+   cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+   cmap = cmap.reversed()
+except:
+   cmap=cm.rainbow
+
+vmax = np.nanpercentile(defo,98)
+vmin = np.nanpercentile(defo,2)
+
+ax1 = fig.add_subplot(1,2,1)
+norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+m = cm.ScalarMappable(norm=norm,cmap=cmap)
+facel=m.to_rgba(defo[::4])
+cax = ax1.scatter(latp[::4],lonp[::4],s = 1., marker='o', color=facel) 
+ax1.set_title(arguments["--csv_file"])
+
+#plt.show()
+
 # open ref
 print('Read reference raster file:', arguments["--ref_file"])
 ds = gdal.Open(arguments["--ref_file"])
@@ -63,9 +87,14 @@ lats,lons = ds_geo[3]+ds_geo[5]*pix_lin, ds_geo[0]+ds_geo[1]*pix_col
 los = np.zeros((ds.RasterYSize,ds.RasterXSize))
 
 print('Convert csv to raster...this may take a while...')
-for (lat,i) in zip(lats.flatten(),pix_lin.flatten()):
-   for (lon,j) in zip(lons.flatten(),pix_col.flatten()): 
-     
+for (lat,lon,i,j) in zip(lats.flatten(),lons.flatten(),pix_lin.flatten(),pix_col.flatten()):
+#   for (lon,j) in zip(lons.flatten(),pix_col.flatten()): 
+    
+     #print(lat,lon)
+     #print(i,j)
+     if ((i % 5) == 0) and (j==0):
+         print('Processing line: {}'.format(i))
+
      # initialisation
      m = np.float('NaN')
      lat_min,lat_max = lat + ds_geo[5], lat
@@ -98,34 +127,9 @@ dst_band2.FlushCache()
 del dst_ds
 
 print('Plot results')
-fig = plt.figure(figsize=(16,4))
-fig.subplots_adjust(hspace=0.5)
-
-try:
-   from matplotlib.colors import LinearSegmentedColormap
-   cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
-   cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
-   cmap = cmap.reversed()
-except:
-   cmap=cm.rainbow
-
-vmax = np.nanpercentile(los,98)
-vmin = np.nanpercentile(los,2)
-
-ax1 = fig.add_subplot(1,2,1)
-norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-m = cm.ScalarMappable(norm=norm,cmap=cmap)
-facel=m.to_rgba(defo)
-cax = ax1.scatter(lats,lons,s = 1., marker='o', color=facel) 
-divider = make_axes_locatable(ax1)
-c = divider.append_axes("right", size="5%", pad=0.05)
-plt.colorbar(cax, cax=c)
-plt.setp( ax1.get_xticklabels(), visible=False)
-ax1.set_title(arguments["--csv_file"])
 
 ax2 = fig.add_subplot(1,2,2)
 cax = ax2.imshow(los, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
-plt.setp( ax2.get_xticklabels(), visible=False)
 divider = make_axes_locatable(ax2)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
