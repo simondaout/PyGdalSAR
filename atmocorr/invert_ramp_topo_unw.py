@@ -255,7 +255,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
         if radar is None:
-
+            pars = los_ref
             sol[8] = los_ref
             logger.info('Remove ref frame within the ref area %f'%(los_ref))
 
@@ -1244,9 +1244,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
 
 
     corr = np.dot(G,pars).reshape(mlines,mcols)
-    res = los - np.dot(G,pars)
+    res = los - np.dot(G,pars).flatten()
     var = np.nanstd(res)
-
     # plt.imshow(los.reshape(mlines,mcols))
     # plt.show()
     # plt.imshow(corr)
@@ -1427,16 +1426,16 @@ def empirical_cor(kk):
       nfit_temp=nfit
       ivar_temp=ivar
 
-    try:
-        sol, corr, var, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
+    #try:
+    sol, corr, var, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
         los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
         temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
-    except:
-        sol = np.zeros((13))
-        corr = np.zeros((mlines,mcols))
-        var = 1
-        rgbins, azbins = az[::samp],rg[::samp]
-        topobins,losbins,losstd = elev_clean[::samp],los_clean[::samp],rms_clean[::samp]
+    #except:
+    #    sol = np.zeros((13))
+    #    corr = np.zeros((mlines,mcols))
+    #    var = 1
+    #    rgbins, azbins = az[::samp],rg[::samp]
+    #    topobins,losbins,losstd = elev_clean[::samp],los_clean[::samp],rms_clean[::samp]
 
     logger.info('RMS: {0} '.format(var))
 
@@ -1480,7 +1479,7 @@ def empirical_cor(kk):
 
     fig = plt.figure(3,figsize=(11,4))
 
-    ax = fig.add_subplot(1,4,1)
+    ax = fig.add_subplot(2,3,1)
     cax = ax.imshow(los_map,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
@@ -1489,7 +1488,7 @@ def empirical_cor(kk):
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
 
-    ax = fig.add_subplot(1,4,2)
+    ax = fig.add_subplot(2,3,2)
     cax = ax.imshow(spacial_mask,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('LOS ESTIMATION')
     plt.setp( ax.get_xticklabels(), visible=None)
@@ -1497,9 +1496,18 @@ def empirical_cor(kk):
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
+    
+    ax = fig.add_subplot(2,3,3)
+    cax = ax.imshow(rms_map,cmap=cmap,interpolation=None)
+    ax.set_title('RMS')
+    plt.setp( ax.get_xticklabels(), visible=None)
+    plt.setp( ax.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
 
     # colormap correction must be same than data!!
-    ax = fig.add_subplot(1,4,3)
+    ax = fig.add_subplot(2,3,4)
     cax = ax.imshow(corr,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('RAMP+TOPO')
     plt.setp( ax.get_xticklabels(), visible=None)
@@ -1518,7 +1526,7 @@ def empirical_cor(kk):
     vmax = np.nanpercentile(_los_map,98)
     vmin = np.nanpercentile(_los_map,2)
 
-    ax = fig.add_subplot(1,4,4)
+    ax = fig.add_subplot(2,3,5)
     hax = ax.imshow(rms_map, cm.Greys,vmax=1,vmin=0.)
     cax = ax.imshow(flatlos,cmap=cmap,vmax=vmax,vmin=-vmax,alpha=1.,interpolation=None)
     ax.set_title('CORR LOS')
