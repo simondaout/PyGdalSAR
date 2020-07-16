@@ -63,6 +63,7 @@ else:
     phi2 = ds2.GetRasterBand(1).ReadAsArray(0, 0,
            ds2.RasterXSize, ds2.RasterYSize,
            ds2.RasterXSize, ds2.RasterYSize)
+    cols, lines = ds2.RasterXSize, ds2.RasterYSize
 
 data = phi1 - phi2
 data[data==0] = np.float('NaN')
@@ -114,8 +115,55 @@ plt.colorbar(cax, cax=c)
 fig.tight_layout()
 fig.savefig('{}.pdf'.format('dphi'), format='PDF',dpi=150)
 
-## plot histogram difference
+## remove ramp
+ramp = 'yes'
+if ramp == 'yes':
+    import scipy.optimize as opt
+    import scipy.linalg as lst
 
+    index = np.nonzero(~np.isnan(data))
+    temp = np.array(index).T
+    mi = data[index].flatten()
+    az = temp[:,0]; rg = temp[:,1]
+
+    G=np.zeros((len(mi),3))
+    G[:,0] = rg
+    G[:,1] = az
+    G[:,2] = 1
+
+    x0 = lst.lstsq(G,mi)[0]
+    _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+    _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+    a = pars[0]; b = pars[1]; c = pars[2]
+    print ('Remove ramp %f x  + %f y + %f'.format(a,b,c))
+    
+    G=np.zeros((len(data.flatten()),3))
+    for i in range(lines):
+        G[i*cols:(i+1)*cols,0] = np.arange((cols))
+        G[i*cols:(i+1)*cols,1] = i
+    G[:,2] = 1
+    temp = (data.flatten() - np.dot(G,pars))
+    data=temp.reshape(lines,cols)
+
+# save output 
+if (ds_extension == ".r4" or ds_extension == ""):
+    data.flatten().astype('float32').tofile('diff.r4')
+else:
+    outfile = 'diff.tiff'
+    ds_geo = ds1.GetGeoTransform()
+    proj = ds1.GetProjection()
+    driver = gdal.GetDriverByName('GTiff')
+    print('Convert output file:', outfile)
+    dst_ds = driver.Create(outfile, ds1.RasterXSize, ds1.RasterYSize, 1, gdal.GDT_Float32)
+    dst_band2 = dst_ds.GetRasterBand(1)
+    dst_band2.WriteArray(data,0,0)
+    dst_ds.SetGeoTransform(ds_geo)
+    dst_ds.SetProjection(proj)
+    dst_band2.FlushCache()
+    del dst_ds
+
+## plot histogram difference
 # # Calculate mean and standard deviation
 index = np.nonzero(
             np.logical_and(~np.isnan(data),

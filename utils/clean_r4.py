@@ -151,7 +151,7 @@ if ramp=='lin':
     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
 
-    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]
     print 'Remove ramp %f x  + %f y + %f'%(a,b,c)
 

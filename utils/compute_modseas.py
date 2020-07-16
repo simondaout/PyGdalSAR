@@ -97,7 +97,7 @@ if arguments["--maxslope"] ==  None:
 else:
     maxslope = np.float(arguments["--maxslope"])
 if arguments["--minelev"] ==  None:
-    minelev = 3500
+    minelev = -1
 else:
     minelev = np.float(arguments["--minelev"])
 if arguments["--topofile"] == None:

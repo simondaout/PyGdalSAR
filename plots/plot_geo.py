@@ -193,7 +193,7 @@ else:
    #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4,interpolation=None)
+     vmax=vmax,vmin=vmin, zorder=4,interpolation='nearest')
 
 ax.set_title(basename,fontsize=6)
 ax.set_xticks(np.linspace(lonbeg,lonend,3))

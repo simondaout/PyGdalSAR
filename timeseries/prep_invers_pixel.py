@@ -12,9 +12,9 @@ prep_invers_pixel.py
 This script prepares a work directory and input files for invers_pixel.
 
 Usage:
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] 
-        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--sigma=<path>]
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--Bc=<values>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] 
+        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>]  
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>]
 
 Options:
   --int_path=<dir>    Absolute path to interferograms directory 
@@ -23,6 +23,9 @@ Options:
   --int_list=<file>     Text file containing list of interferograms dates in two colums, $data1 $date2 [default: interf_pair.rsc]
   --prefix=<value>    Prefix name $prefix$date1-$date2$suffix.unw [default: '']
   --suffix=<vaue>     Suffix name $prefix$date1-$date2$suffix.unw [default: '']
+  --prefix_coh=<value>    Prefix coherence name $prefix$date1-$date2$suffix.cc [default: '']
+  --suffix_coh=<vaue>     Suffix coherence name $prefix$date1-$date2$suffix.cc [default: '']
+  --coh_path=<dir>    Absolute path to cohrence file directory 
   --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
   --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
   --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 0.5,100). Downweight small temporal baselines and large perpendicular baselines 
@@ -50,15 +53,30 @@ if arguments["--dates_list"] == None:
     baseline = 'baseline.rsc'
 else:
     baseline=arguments["--dates_list"]
+
 if arguments["--prefix"] == None:
   prefix = str(object='')
 else:
   prefix=arguments["--prefix"]
-
 if arguments["--suffix"] == None:
   suffix = str(object='')
 else:
   suffix=arguments["--suffix"]
+
+if arguments["--prefix_coh"] == None:
+  prefix_coh = str(object='')
+else:
+  prefix_coh=arguments["--prefix_coh"]
+if arguments["--suffix_coh"] == None:
+  suffix_coh = str(object='')
+else:
+  suffix_coh=arguments["--suffix_coh"]
+
+if arguments["--coh_path"] == None:
+  do_coh = 'no'
+else:
+  do_coh = 'yes'  
+  coh_path = arguments["--coh_path"]
 
 if arguments["--format"] ==  None:
     sformat = 'ROI_PAC'
@@ -161,6 +179,7 @@ elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
           wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
      wf.close()
 
+cohformat = int(0)
 if sformat == 'ROI_PAC':
   iformat = int(0)
   for kk in xrange((kmax)):
@@ -193,6 +212,15 @@ else:
         ds_band = ds.GetRasterBand(1)
         los = ds_band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         lines,cols =  ds.RasterYSize, ds.RasterXSize
+        del ds, ds_band
+
+        if do_coh == 'yes':
+            cohformat = int(1)
+            cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc.tif')
+            ds = gdal.Open(cohfile, gdal.GA_ReadOnly)
+            ds_band = ds.GetRasterBand(1)
+            coh = ds_band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+            del ds, ds_band
 
       elif sformat == 'GAMMA':
         infile = os.path.abspath(int_path + '/' + prefix + str(date1) + '_' + str(date2) + suffix + '.unw')
@@ -200,6 +228,12 @@ else:
         los = gm.readgamma(infile)
         los = np.float32(los)
         lines,cols = gm.readpar()
+
+        if do_coh == 'yes':
+            cohformat = int(1)
+            cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc')
+            coh = gm.readgamma(cohfile)
+            coh = np.float32(coh)
 
       # save output
       outfile =  str(date1) + '-' + str(date2) + '.r4'
@@ -218,6 +252,24 @@ else:
       YMAX                  %d
       """ % (cols, lines, cols-1, lines-1))
       f.close()
+
+      if do_coh == 'yes':
+        outcofile =  str(date1) + '-' + str(date2) + '-CC.r4'
+        print('Create  {} file, lines:{}, cols:{}'.format(outcofile,lines, cols)) 
+        fid = open(lndatadir +outcofile,'wb')
+        coh.flatten().astype('float32').tofile(fid)
+        fid.close()
+        outrsc= lndatadir + str(date1)  + '-' + str(date2) + '.r4.rsc' 
+        f = open(outrsc, "w")
+        f.write("""\
+        WIDTH                 %d
+        FILE_LENGTH           %d
+        XMIN                  0
+        XMAX                  %d
+        YMIN                  0
+        YMAX                  %d
+        """ % (cols, lines, cols-1, lines-1))
+        f.close()
 
       # driver = gdal.GetDriverByName("roi_pac")
       # outint=os.path.abspath(lndatadir + str(date1)  + '-' + str(date2) + '_pre_inv.unw')
@@ -260,8 +312,8 @@ list_dates
 list_pair
 %d     #  interferogram format (RMG : 0; R4 :1) (date1-date2_pre_inv.unw or date1-date2.r4)
 3100.  #  include interferograms with bperp lower than maximal baseline
-1      #  Weight input interferograms by coherence or correlation maps ? (y:0,n:1)
-0      #  coherence file format (RMG : 0; R4 :1) (date1-date2.cor or date1-date2-CC.r4)
+0      #  Weight input interferograms by coherence or correlation maps ? (y:0,n:1)
+%d      #  coherence file format (RMG : 0; R4 :1) (date1-date2.cor or date1-date2-CC.r4)
 1      #  minimal number of interferams using each image
 1      #  interferograms weighting so that the weight per image is the same (y=0;n=1)
 0.7    #  maximum fraction of discarded interferograms
@@ -276,7 +328,7 @@ list_pair
 1      #  smoothing by Laplacian, computed with a scheme at 3pts (0) or 5pts (1) ?
 2      #  weigthed smoothing by the average time step (y :0 ; n : 1, int : 2) ?
 1      # put the first derivative to zero (y :0 ; n : 1)?
-    """ % (iformat, do_sig))
+    """ % (iformat, cohformat, do_sig))
     f.close()
 
 # 0      #  compute DEM error proportional to perpendicular baseline ? (y:1;n:0)

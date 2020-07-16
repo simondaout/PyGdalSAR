@@ -30,14 +30,14 @@ Options:
 --sigampfile=<file>     Uncertainty amplitude map file [default: ampwt_sigcoeff.r4]
 --sigphifile=<file>     Uncertainty phase map file [default: phiwt_sigcoeff.r4]
 --lectfile=<file>       Path of the lect.in file for r4 format [default: lect_ts.in]
---threshold_amp=<value>  Mask on minimum Amplitude for Phase [default: 1.5]
+--threshold_amp=<value>  Mask on minimum Amplitude for Phase (rad) [default: 1.5]
 --perc_sig=<value>      Percentile uncertainty for map cleaning [default: 100]
 --slopelosfile=<file>   SLope in the LOS direction [default: None]
 --slopefile=<file>      SLope file [default: None]
 --aspectfile=<file>     Aspect file [default: None]
 --plotcorr=<yes/no>     Plot correlation plots [default: no]
 --maxamp=<value>        Maximum Amplitude limit [default: 3.]
---minelev=<value>       Minimum Elevation limit [default: 3500.]
+--minelev=<value>       Minimum Elevation limit [default: 0.]
 --rad2mm                Scaling value between input data (rad) and desired output [default: -4.4563]
 --outfig                Name for the output figure [default: clean_phi-amp]
 --crop=<values>       Crop data [default: 0,nlines,0,ncol]
@@ -113,7 +113,7 @@ if arguments["--maxamp"] ==  None:
 else:
     maxamp = np.float(arguments["--maxamp"])
 if arguments["--minelev"] ==  None:
-    minelev = 3500
+    minelev = 0
 else:
     minelev = np.float(arguments["--minelev"])
 if arguments["--rad2mm"] ==  None:

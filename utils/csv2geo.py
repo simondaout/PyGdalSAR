@@ -28,11 +28,16 @@ import gdal
 import numpy as np
 import docopt
 import os, sys
+from os import environ
+import matplotlib
+
+if environ["TERM"].startswith("screen"):
+    matplotlib.use('Agg')
+
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -109,7 +114,8 @@ for (lat,lon,i,j) in zip(lats.flatten(),lons.flatten(),pix_lin.flatten(),pix_col
      np.logical_and(lonp<lon_max,
      lonp>lon_min))))
      
-     m = np.nanmean(defo[index])
+     #m = np.nanmean(defo[index])
+     m =  np.nansum(defo[index]*coh[index]) / np.nansum(coh[index])
      #try:
        #m = defo[index][np.argmax(coh[index])]
      #except:
