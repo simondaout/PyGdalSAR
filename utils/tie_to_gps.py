@@ -16,8 +16,11 @@ import scipy.optimize as opt
 import scipy.linalg as lst
 import gdal, pyproj
 gdal.UseExceptions()
+from sys import argv,exit,stdin,stdout
+import getopt
+from os import path
 
-import os,sys,re
+import os, sys ,re
 import geopandas as gpd
 import pandas as pd
 import shapely.speedups
@@ -32,27 +35,39 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
 shapely.speedups.enable()
 
+##################################
+# EXAMPLE INPUT FILE 
+##################################
+
 # define projection
-UTM = pyproj.Proj("+init=EPSG:32646")
+#UTM = pyproj.Proj("+init=EPSG:32646")
+
+# define path to data
+#wdir = '/home/cometraid14/daouts/work/tibet/qinghai/'
 
 # define gnss file
-gps_file = '../gps/table_liang_eurasia_3d_ll.dat'
+#gps_file = wdir + 'data/gps/table_liang_eurasia_3d_ll.dat'
 
-# InSAR data
-insar_file = '../insar/T004_inter/T004_inter_LOSVelocity_nan_mmyr_s90.tiff'
-heading_file='../insar/T004_inter/T004_head_s90.tiff'
-inc_file='../insar/T004_inter/T004_look_s90.tiff'
+# InSAR data T099
+#insar_file = wdir + 'data/insar/T099_inter/T099_inter_LOSVelocity_nan_mmyr_s90.tiff'
+#heading_file= wdir + 'data/insar/T099_inter/T099_head_s90.tiff'
+#inc_file=wdir + 'data/insar/T099_inter/T099_look_s90.tiff'
 # define frame coordinates
-LAT_REF1=38.6042
-LAT_REF2=38.8860
-LAT_REF3=35.9663
-LAT_REF4=36.2203
-LON_REF1=98.6828
-LON_REF2=95.7729
-LON_REF3=98.0398
-LON_REF4=95.2283
-epsi=0.1
-#epsi=0.
+#LAT_REF1=36.4110
+#LAT_REF2=36.5941
+#LAT_REF3=38.8686
+#LAT_REF4=39.2552
+#LON_REF1=96.5509
+#LON_REF2=99.4075
+#LON_REF3=95.9484
+#LON_REF4=98.8625
+
+##################################
+
+def usage():
+  print('invers_los2comp.py infile.py [-v] [-h]')
+  print('-v Verbose mode. Show more information about the processing')
+  print('-h Show this screen')
 
 def load_gps(file):
     gps_gdf = gpd.GeoDataFrame()
@@ -87,15 +102,19 @@ def neu2los_roipac(vn, ve, vu, look, head):
     los = ve * np.cos(phi) * np.cos(theta) \
             + vn * np.sin(phi) * np.cos(theta) \
             + vu *np.sin(theta)
+    #print([np.cos(phi) * np.cos(theta),np.sin(phi) * np.cos(theta),np.sin(theta)])
+    #sys.exit()
     return los
 
 def add_inc_head_los(gps_df, look, heading):
     # extract pixel values from inc and heading based on gps lon lat and insert into geodataframe
     gps_df.loc[:, 'look'] = [look.extract_pixel_value(point.x, point.y, 0)[0] for point in gps_df['geometry']]
     gps_df.loc[:, 'heading'] = [heading.extract_pixel_value(point.x, point.y, 0)[0] for point in gps_df['geometry']]
+    
     # calculate los per gps point
     gps_df.loc[:, 'los'] = [neu2los_roipac(vn, ve, vu, look, heading) for vn, ve, vu, look, heading
                             in gps_df[['vn', 've', 'vu', 'look', 'heading']].to_numpy()]
+    
 
 def plot_gps_distribution(gps, poly):
     fig, ax = plt.subplots(figsize=(3, 2))
@@ -106,12 +125,12 @@ def plot_gps_distribution(gps, poly):
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
     #ax.set_title(poly.loc[0, 'Name']) #[:4][:4] + '_GPS'
-    plt.show()
-    fig.savefig('../gps+frame.png', format='PNG', dpi=150, bbox_inches='tight')
+    #plt.show()
+    fig.savefig(track+'gps_frame.png', format='PNG', dpi=150, bbox_inches='tight')
 
 class OpenTif(object):
     """ a Class that stores the band array and metadata of a Gtiff file."""
-    def __init__(self, filename):
+    def __init__(self, filename, sigfile=None):
         self.ds = gdal.Open(filename)
         self.basename = os.path.splitext(os.path.basename(filename))[0]
         self.band = self.ds.GetRasterBand(1)
@@ -127,27 +146,65 @@ class OpenTif(object):
         self.projection = self.ds.GetProjection()
         pix_lin, pix_col = np.indices((self.ds.RasterYSize,self.ds.RasterXSize))
         self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_col
+        
+        if sigfile is not None:
+            self.dst = gdal.Open(sigfile)
+            self.bandt = self.dst.GetRasterBand(1)
+            self.sigma = self.bandt.ReadAsArray()
+            if self.dst.RasterXSize != self.xsize or self.dst.RasterYSize != self.ysize:
+                print('Error: Sigma and Velocity file not the same size! Set sigma to 1.')
+                self.sigma = np.ones((self.ysize,self.xsize))
+        else:
+            self.sigma = np.ones((self.ysize,self.xsize))
 
     def extract_pixel_value(self, lon, lat, n):
         x = int((lon-self.left)/self.xres+0.5)
         y = int((lat - self.top) / self.yres + 0.5)
-        #print()
-        #print(self.xsize,self.ysize)
-        #print(x,y)
-        #if y > self.ysize:
-        #    y = self.ysize-1
-        #if y < 0:
-        #    y = 0
-        #if x > self.xsize:
-        #   x = self.xsize-1
-        #if x < 0:
-        #    x = 0
+        
         pixel_values = self.data[y - n: y + n + 1, x - n: x + n + 1]
-        return np.nanmean(pixel_values), np.nanstd(pixel_values)
+        pixel_sigma = self.sigma[y - n: y + n + 1, x - n: x + n + 1]
+      
+        m = np.average(pixel_values, weights=pixel_sigma)
+        if m == 0:  #if only NaN nanmean is 0 
+            m = np.float('NaN')
+
+        return m, np.nanstd(pixel_values)
 
 if __name__ == "__main__":
+    try:
+        opts,args = getopt.getopt(argv[1:], "h", ["help"])
+    except:
+        print(str(err))
+        print("for help use --help")
+        exit()
+
+    level = 'basic'
+    for o in argv:
+        if o in ("-h","--help"):
+            usage()
+            exit()
+        if o in ("-v","--verbose"):
+            level = 'debug'
+
+    if len(argv)>1:
+        try:
+            fname=argv[1]
+            print('Read input file {0}'.format(fname))
+            try:
+                sys.path.append(path.dirname(path.abspath(fname)))
+                exec ("from "+path.basename(fname)+" import *")
+            except:
+                exec(open(path.abspath(fname)).read())
+
+        except Exception as e:
+            print('Problem in input file')
+            print(e)
+            print(network.__doc__)
+            exit()
 
     # define poly
+    epsi=0.1
+    #epsi=0.
     coords = [(LON_REF2-epsi, LAT_REF2-epsi), (LON_REF1-epsi,LAT_REF1-epsi), (LON_REF3-epsi,LAT_REF3-epsi), (LON_REF4-epsi,LAT_REF4-epsi)]
     poly = Polygon(coords)
 
@@ -162,19 +219,39 @@ if __name__ == "__main__":
     # load insar
     inc = OpenTif(inc_file)
     heading = OpenTif(heading_file)
-    insar = OpenTif(insar_file)
-    
+
+    try:
+        print('Load InSAR file:', insar_file)
+        insar = OpenTif(insar_file,insar_sig_file)
+        print('Load uncertainty file:', insar_sig_file)
+    except:
+        print('Load InSAR file:', insar_file)
+        insar = OpenTif(insar_file)
+
+    # extract track numbered
+    m =re.search('\w+(?<=_)', insar_file)
+    track = m.group(0)
+
     # compute inc angle gps
     add_inc_head_los(gps, inc, heading)
     #print(gps)
-
+    
     # Plot frame and GPS
-    #plot_gps_distribution(gps, poly)
+    plot_gps_distribution(gps, poly)
 
     # compute diff GPS - InSAR
     gps.loc[:, 'diff'] = [gps_los -  insar.extract_pixel_value(point.x, point.y, 2)[0] for point,gps_los in gps[['geometry','los']].to_numpy()]
-    gps.loc[:, 'std'] = [gps_los -  insar.extract_pixel_value(point.x, point.y, 2)[1] for point,gps_los in gps[['geometry','los']].to_numpy()]
-    #print(gps['diff'].to_numpy())
+    gps.loc[:, 'std'] = [insar.extract_pixel_value(point.x, point.y, 2)[1] for point in gps['geometry'].to_numpy()]
+   
+    # if GPS_LOS - LOS is NaN, then increase window size
+    for n in range(10,400,10):
+        for index,g in gps.iterrows():
+            if np.isnan(g['diff']):
+                g['diff'] = g['los'] - insar.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0]
+                g['std'] = insar.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[1]
+    
+    # remove NaNs
+    gps = gps.dropna()
     print(gps)
 
     # data vector
@@ -197,7 +274,7 @@ if __name__ == "__main__":
     _func = lambda x: np.sum(((np.dot(G,x)-d)/sig)**2)
     _fprime = lambda x: 2*np.dot(G.T/sig, (np.dot(G,x)-d)/sig)
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=20000,full_output=True,iprint=0)[0]
-    print(pars)
+    #print(pars)
     
     # compute residual between data and model
     res = d - np.dot(G,pars).flatten()
@@ -216,9 +293,11 @@ if __name__ == "__main__":
     model_array = ramp_array + insar.data
     
     # Plot
-    vmin_insar = np.nanpercentile([insar.data,model_array], 2)
-    vmax_insar = np.nanpercentile([insar.data,model_array], 98)
-    
+    vmin = np.nanpercentile([insar.data,model_array], 10)
+    vmax = np.nanpercentile([insar.data,model_array], 90)
+    vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
+    vmin_insar = -vmax_insar
+
     try:
         from matplotlib.colors import LinearSegmentedColormap
         cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
@@ -249,6 +328,18 @@ if __name__ == "__main__":
     plt.colorbar(cax, cax=c)
     c.set_label('mm/yr')
     
+    fig.savefig(track +'tie_to_gps.png', format='PNG', dpi=150, bbox_inches='tight')
+
+    # save output file
+    # Export merged data to tif format.
+    driver = gdal.GetDriverByName("GTiff")
+    outdata = driver.Create(track+'projected.tif', insar.xsize, insar.ysize, 1, gdal.GDT_Float32)
+    outdata.SetGeoTransform([insar.left, insar.xres, 0, insar.top, 0, insar.yres])  ##sets same geotransform as input
+    outdata.SetProjection(insar.projection)  ##sets same projection as input
+    outdata.GetRasterBand(1).WriteArray(model_array)
+    outdata.FlushCache()
+    outdata.FlushCache()
+
     plt.show()
     
 
