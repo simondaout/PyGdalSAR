@@ -89,7 +89,7 @@ except:
 
 fig = plt.figure(figsize=(16,4))
 fig.subplots_adjust(hspace=0.5)
-ax1 = fig.add_subplot(1,3,1)
+ax1 = fig.add_subplot(2,2,1)
 cax = ax1.imshow(phi1, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
 divider = make_axes_locatable(ax1)
 c = divider.append_axes("right", size="5%", pad=0.05)
@@ -97,7 +97,7 @@ plt.colorbar(cax, cax=c)
 plt.setp( ax1.get_xticklabels(), visible=False)
 ax1.set_title(file1)
 
-ax2 = fig.add_subplot(1,3,2)
+ax2 = fig.add_subplot(2,2,2)
 cax = ax2.imshow(phi2, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
 plt.setp( ax2.get_xticklabels(), visible=False)
 divider = make_axes_locatable(ax2)
@@ -106,14 +106,13 @@ plt.colorbar(cax, cax=c)
 ax2.set_title(file2)
 
 #vmax = np.max( [np.nanpercentile(out,95),np.abs(np.nanpercentile(out,5))] )
-ax3 = fig.add_subplot(1,3,3)
+ax3 = fig.add_subplot(2,2,3)
 cax = ax3.imshow(data, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
 plt.setp( ax3.get_xticklabels(), visible=False)
 divider = make_axes_locatable(ax3)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
-fig.tight_layout()
-fig.savefig('{}.pdf'.format('dphi'), format='PDF',dpi=150)
+ax3.set_title('Diff')
 
 ## remove ramp
 ramp = 'yes'
@@ -136,7 +135,7 @@ if ramp == 'yes':
     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
     a = pars[0]; b = pars[1]; c = pars[2]
-    print ('Remove ramp %f x  + %f y + %f'.format(a,b,c))
+    print('Remove ramp %f x  + %f y + %f'.format(a,b,c))
     
     G=np.zeros((len(data.flatten()),3))
     for i in range(lines):
@@ -145,6 +144,18 @@ if ramp == 'yes':
     G[:,2] = 1
     temp = (data.flatten() - np.dot(G,pars))
     data=temp.reshape(lines,cols)
+
+#vmax = np.max( [np.nanpercentile(out,95),np.abs(np.nanpercentile(out,5))] )
+ax4 = fig.add_subplot(2,2,4)
+cax = ax4.imshow(data, cmap = cmap, vmax=vmax, vmin=vmin, extent=None,interpolation='nearest')
+plt.setp( ax4.get_xticklabels(), visible=False)
+divider = make_axes_locatable(ax4)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+ax4.set_title('Diff-Ramp')
+fig.tight_layout()
+
+fig.savefig('{}.pdf'.format('dphi'), format='PDF',dpi=150)
 
 # save output 
 if (ds_extension == ".r4" or ds_extension == ""):
