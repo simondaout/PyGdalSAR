@@ -146,6 +146,10 @@ class OpenTif(object):
         self.projection = self.ds.GetProjection()
         pix_lin, pix_col = np.indices((self.ds.RasterYSize,self.ds.RasterXSize))
         self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_col
+
+        # convert 0 and 255 to NaN
+        self.data[self.data==0.] = np.float('NaN')
+        self.data[self.data==255] = np.float('NaN')
         
         if sigfile is not None:
             self.dst = gdal.Open(sigfile)
@@ -158,17 +162,28 @@ class OpenTif(object):
             self.sigma = np.ones((self.ysize,self.xsize))
 
     def extract_pixel_value(self, lon, lat, n):
+       
         x = int((lon-self.left)/self.xres+0.5)
         y = int((lat - self.top) / self.yres + 0.5)
-        
+
         pixel_values = self.data[y - n: y + n + 1, x - n: x + n + 1]
         pixel_sigma = self.sigma[y - n: y + n + 1, x - n: x + n + 1]
-      
-        m = np.average(pixel_values, weights=pixel_sigma)
+
+        index = np.nonzero(~np.isnan(pixel_values))
+        if len(index) > 0:
+            m = np.nanmean(pixel_values)
+            #m = np.sum(pixel_values[index] * pixel_sigma[index]) / np.sum(pixel_sigma[index])
+            std = np.nanstd(pixel_values)
+        else:
+            m = np.float('NaN')
+            std = np.float('NaN')
+        
         if m == 0:  #if only NaN nanmean is 0 
             m = np.float('NaN')
+        if std == 0:
+            std = np.float('NaN')
 
-        return m, np.nanstd(pixel_values)
+        return m, std
 
 if __name__ == "__main__":
     try:
@@ -203,8 +218,8 @@ if __name__ == "__main__":
             exit()
 
     # define poly
-    epsi=0.1
-    #epsi=0.
+    #epsi=0.1
+    epsi=0.
     coords = [(LON_REF2-epsi, LAT_REF2-epsi), (LON_REF1-epsi,LAT_REF1-epsi), (LON_REF3-epsi,LAT_REF3-epsi), (LON_REF4-epsi,LAT_REF4-epsi)]
     poly = Polygon(coords)
 
@@ -238,18 +253,28 @@ if __name__ == "__main__":
     
     # Plot frame and GPS
     plot_gps_distribution(gps, poly)
+    
+    # if heading, then increase window size
+    for n in range(4,200,2):
+        #print(n)
+        for index,g in gps.iterrows():
+            if np.isnan(g['heading']):
+
+                gps.loc[index, 'look'] = inc.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0] 
+                gps.loc[index, 'heading'] = heading.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0] 
+                gps.loc[index, 'los'] = neu2los_roipac(g['vn'], g['ve'], g['vu'], gps.loc[index,'look'], gps.loc[index,'heading']) 
 
     # compute diff GPS - InSAR
     gps.loc[:, 'diff'] = [gps_los -  insar.extract_pixel_value(point.x, point.y, 2)[0] for point,gps_los in gps[['geometry','los']].to_numpy()]
     gps.loc[:, 'std'] = [insar.extract_pixel_value(point.x, point.y, 2)[1] for point in gps['geometry'].to_numpy()]
    
     # if GPS_LOS - LOS is NaN, then increase window size
-    for n in range(10,400,10):
+    for n in range(4,200,2):
         for index,g in gps.iterrows():
-            if np.isnan(g['diff']):
-                g['diff'] = g['los'] - insar.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0]
-                g['std'] = insar.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[1]
-    
+            if np.isnan(g['diff']) or np.isnan(g['std']):
+                gps.loc[index,'diff'] = g['los'] - insar.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0]
+                gps.loc[index,'std'] = insar.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[1]
+
     # remove NaNs
     gps = gps.dropna()
     print(gps)
@@ -293,8 +318,8 @@ if __name__ == "__main__":
     model_array = ramp_array + insar.data
     
     # Plot
-    vmin = np.nanpercentile([insar.data,model_array], 10)
-    vmax = np.nanpercentile([insar.data,model_array], 90)
+    vmin = np.nanpercentile(insar.data, 2)
+    vmax = np.nanpercentile(insar.data, 98)
     vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
     vmin_insar = -vmax_insar
 
@@ -312,11 +337,22 @@ if __name__ == "__main__":
     ax1.set_title('InSAR')
     plt.setp( ax1.get_xticklabels(), visible=None)
     plt.setp( ax1.get_yticklabels(), visible=None)
+    divider = make_axes_locatable(ax1)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
+    c.set_label('mm/yr')
 
     cax = ax2.imshow(ramp_array, cmap=cmap, vmin=vmin_insar, vmax=vmax_insar,interpolation='nearest')
     ax2.set_title('Ramp')
     plt.setp( ax2.get_xticklabels(), visible=None)
     plt.setp( ax2.get_yticklabels(), visible=None)
+    
+    # Plot
+    vmin = np.nanpercentile(model_array, 2)
+    vmax = np.nanpercentile(model_array, 98)
+    vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
+    vmin_insar = -vmax_insar
+
 
     cax = ax3.imshow(model_array, cmap=cmap, vmin=vmin_insar, vmax=vmax_insar,interpolation='nearest')
     ax3.set_title('InSAR - Ramp')
