@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -17,9 +17,9 @@ Usage:
 Options:
   --outputdir PATH    Output directory where .jpeg are saved
   --homedir PATH      Path to home directory  [default: ./]
-  --dates_list PATH   Text file containing list of dates [default: baselines.rsc]
+  --dates_list PATH   Text file containing list of dates [default: baseline.rsc]
   --pixel_ratio Value Pixel ratio [default: 0.25]
-  --look value        Look value [default: 1]
+  --look value        Look value [default: 4]
   --nproc Value       Number of processor [default: 4]
   -h --help           Show this screen
 """
@@ -39,7 +39,7 @@ else:
 outputdir=os.path.join(homedir, arguments["--outputdir"]) + '/'
 
 if arguments["--dates_list"] == None:
-  dates_list = os.path.join(homedir,'baselines.rsc')
+  dates_list = os.path.join(homedir,'baseline.rsc')
 else:
   dates_list = os.path.join(homedir,arguments["--dates_list"])
 
@@ -49,29 +49,22 @@ else:
   pixel_ratio = float(arguments["--pixel_ratio"])
 
 if arguments["--look"] == None:
-  look = 1
+  look = 4
 else:
   look = int(arguments["--look"])
 
-if look > 1:
-  look = '_' + look + 'rlks'
-else:
-  look = ''
-
-look_az = int(look) * float(pixel_ratio)
-
 if arguments["--nproc"] == None:
-  nproc = 4
+  nproc = 1
 else:
   nproc = int(arguments["--nproc"])
 
-dates=np.loadtxt(dates_list,comments="#",unpack=True,usecols=(0),dtype='i')
+dates,bid=np.loadtxt(dates_list,comments="#",unpack=True,usecols=(0,1),dtype='i,f')
 kmax=len(dates)
 
 # cleanif 
 if os.path.exists(outputdir):
   # print '{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook)
-  jpeg_files = glob.glob('{0}/*_coreg.jpeg'.format(outputdir))
+  jpeg_files = glob.glob('{0}/*_coreg*.jpeg'.format(outputdir))
   for f in jpeg_files:
     os.remove(f)
 else:
@@ -79,39 +72,40 @@ else:
 
 def dolook(kk):
   date = dates[kk]
-  infile = str(date) + '/'+ str(date)+ '_coreg'+str(look)+'.slc'
+  infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look)+'rlks.slc'
 
   if os.path.exists(infile):
     pass
   else:
     temp = str(date) + '/'+str(date)+ '_coreg.slc'
-    os.system("look.pl "+str(temp)+" "+str(look)+" "+str(look_az))
+    os.system("look.pl "+str(temp)+" "+str(look*5)+" "+str(look))
 
 pool = multiprocessing.Pool(nproc)
-work = [(kk) for kk in range(kmax)]
+work = [(kk) for kk in xrange(kmax)]
 pool.map(dolook, work)
 
 def preview(kk):
     date = dates[kk]
-    infile = str(date) + '/'+ str(date)+ '_coreg'+str(look)+'.slc'
-    jpeg = str(date) + '/'+ str(date)+ '_coreg'+str(look)+'.jpeg'
+    infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look*5)+'rlks.slc'
+    jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(look*5)+'rlks.jpeg'
 
     try:
       r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg), shell=True)
       if r != 0:
             raise Exception("nsb_preview_slc failed for date: ", infile)
       else:
-            print('Create: ', jpeg)
+            print 'Create: ', jpeg
     except:
       pass
 
 
 pool = multiprocessing.Pool(nproc)
-work = [(kk) for kk in range(kmax)]
+work = [(kk) for kk in xrange(kmax)]
 pool.map(preview, work)
 
+# print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
 jpeg_files = glob.glob('*/*_coreg*.jpeg')
-print()
-print('Move files into:', outputdir)
+print
+print 'Move files into:', outputdir
 for f in jpeg_files:
     shutil.move(f,outputdir)
