@@ -202,7 +202,7 @@ class network:
 ################################
 
 def usage():
-  print('plotPro.py infile.py [-v] [-h]')
+  print('invers_los2comp.py infile.py [-v] [-h]')
   print('-v Verbose mode. Show more information about the processing')
   print('-h Show this screen')
 
@@ -225,7 +225,7 @@ for o in argv:
 if level == 'debug':
     logging.basicConfig(level=logging.DEBUG,\
         format='%(lineno)s -- %(levelname)s -- %(message)s')
-    logger = logging.getLogger('plotPro.log')
+    logger = logging.getLogger('invers_los2comp.log')
     logger.info('Initialise log file {0} in DEBUG mode'.format('invers_los2comp.log'))
 
 else:
