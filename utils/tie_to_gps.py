@@ -39,33 +39,33 @@ shapely.speedups.enable()
 # EXAMPLE INPUT FILE 
 ##################################
 
-# define projection
+## define projection
 #UTM = pyproj.Proj("+init=EPSG:32646")
 
-# define path to data
+## define path to data
 #wdir = '/home/cometraid14/daouts/work/tibet/qinghai/'
 
-# define gnss file
+## define gnss file
 #gps_file = wdir + 'data/gps/table_liang_eurasia_3d_ll.dat'
 
-# InSAR data T099
-#insar_file = wdir + 'data/insar/T099_inter/T099_inter_LOSVelocity_nan_mmyr_s90.tiff'
-#heading_file= wdir + 'data/insar/T099_inter/T099_head_s90.tiff'
-#inc_file=wdir + 'data/insar/T099_inter/T099_look_s90.tiff'
-# define frame coordinates
-#LAT_REF1=36.4110
-#LAT_REF2=36.5941
-#LAT_REF3=38.8686
-#LAT_REF4=39.2552
-#LON_REF1=96.5509
-#LON_REF2=99.4075
-#LON_REF3=95.9484
-#LON_REF4=98.8625
+## define format incidence and heading file
+## not same convention in GAMMA or ROIPAC format
+#iformat = 'ROIPAC'
+
+## InSAR data T004
+#insar_file = wdir + 'data/insar/T004_inter/T004_inter_LOSVelocity_nan_mmyr_s90.tiff'
+#insar_sig_file = wdir + 'data/insar/T004_inter/T004_LOS_sigVelocity.tiff'
+#heading_file= wdir + 'data/insar/T004_inter/T004_head_s90.tiff'
+#inc_file=wdir + 'data/insar/T004_inter/T004_look_s90.tiff'
+
+## define frame coordinates
+#LAT_REF1=38.6042
+#LAT_REF2=38.8860
 
 ##################################
 
 def usage():
-  print('invers_los2comp.py infile.py [-v] [-h]')
+  print('tie_to_gps.py infile.py [-v] [-h]')
   print('-v Verbose mode. Show more information about the processing')
   print('-h Show this screen')
 
@@ -112,9 +112,16 @@ def add_inc_head_los(gps_df, look, heading):
     gps_df.loc[:, 'heading'] = [heading.extract_pixel_value(point.x, point.y, 0)[0] for point in gps_df['geometry']]
     
     # calculate los per gps point
-    gps_df.loc[:, 'los'] = [neu2los_roipac(vn, ve, vu, look, heading) for vn, ve, vu, look, heading
+    if iformat == 'ROIPAC':
+            gps_df.loc[:, 'los'] = [neu2los_roipac(vn, ve, vu, look, heading) for vn, ve, vu, look, heading
                             in gps_df[['vn', 've', 'vu', 'look', 'heading']].to_numpy()]
-    
+            gps_df.loc[:, 'siglos'] = [neu2los_roipac(vn, ve, vu, look, heading) for vn, ve, vu, look, heading
+                            in gps_df[['sn', 'se', 'su', 'look', 'heading']].to_numpy()]
+    elif iformat == 'GAMMA':
+            gps_df.loc[:, 'los'] = [neu2los_gamma(vn, ve, vu, look, heading) for vn, ve, vu, look, heading
+                            in gps_df[['vn', 've', 'vu', 'look', 'heading']].to_numpy()]
+            gps_df.loc[:, 'siglos'] = [neu2los_gamma(vn, ve, vu, look, heading) for vn, ve, vu, look, heading
+                            in gps_df[['sn', 'se', 'su', 'look', 'heading']].to_numpy()]
 
 def plot_gps_distribution(gps, poly):
     fig, ax = plt.subplots(figsize=(3, 2))
@@ -218,20 +225,44 @@ if __name__ == "__main__":
             exit()
 
     # define poly
-    #epsi=0.1
-    epsi=0.
+    try:
+        epsi
+    except NameError:
+        epsi = 0
+    try:
+        LON_REF2;LON_REF1;LON_REF3; LON_REF4
+    except NameError:
+        print('LAT_REF* and LON_REF* not defined. Exit!')
+        sys.exit()
     coords = [(LON_REF2-epsi, LAT_REF2-epsi), (LON_REF1-epsi,LAT_REF1-epsi), (LON_REF3-epsi,LAT_REF3-epsi), (LON_REF4-epsi,LAT_REF4-epsi)]
     poly = Polygon(coords)
 
+    try:
+        gps_file
+    except NameError:
+        print('gps_file not defined. Exit!')
+        sys.exit()
     # load gnss
     all_gps = load_gps(gps_file)
-    #print(all_gps)
 
     # gps within poly
     gps = all_gps[all_gps.within(poly)]
     #print(gps)
 
     # load insar
+    # read format incidence heading angle
+    # not same convention in GAMMA or ROIPAC
+    try:
+        print('Read incidence and heading file in {} format'.format(iformat))
+    except:
+        iformat='ROIPAC'
+        print('Read incidence and heading file in {} format'.format(iformat))
+   
+    try:
+        inc_file; heading_file; insar_file
+    except NameError:
+         print('inc_file or heading_file or insar_file not defined. Exit!')
+         sys.exit()
     inc = OpenTif(inc_file)
     heading = OpenTif(heading_file)
 
@@ -262,7 +293,11 @@ if __name__ == "__main__":
 
                 gps.loc[index, 'look'] = inc.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0] 
                 gps.loc[index, 'heading'] = heading.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0] 
-                gps.loc[index, 'los'] = neu2los_roipac(g['vn'], g['ve'], g['vu'], gps.loc[index,'look'], gps.loc[index,'heading']) 
+                if iformat == 'ROIPAC':
+                    gps.loc[index, 'los'] = neu2los_roipac(g['vn'], g['ve'], g['vu'], gps.loc[index,'look'], gps.loc[index,'heading']) 
+                    gps.loc[index, 'siglos'] = neu2los_roipac(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading']) 
+                elif iformat == 'GAMMA':
+                    gps.loc[index, 'siglos'] = neu2los_gamma(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading'])
 
     # compute diff GPS - InSAR
     gps.loc[:, 'diff'] = [gps_los -  insar.extract_pixel_value(point.x, point.y, 2)[0] for point,gps_los in gps[['geometry','los']].to_numpy()]
@@ -281,7 +316,7 @@ if __name__ == "__main__":
 
     # data vector
     d = gps['diff'].to_numpy()
-    sig = gps['std'].to_numpy()
+    sig = (gps['std'].to_numpy() + gps['siglos'].to_numpy()) / 2
 
     # convert GPS lat/lon to km
     x =  [ point.x for point in gps['geometry'] ]
