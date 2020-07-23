@@ -59,7 +59,7 @@ class network:
         self.bounds = bounds
         self.format=format
         if outname is None:
-            self.outname = os.path.splitext(self.name)[0] + '_projected.tiff'
+            self.outname = os.path.splitext(self.name)[0] + '_projected.tif'
         else:
             self.outname = outname
 
@@ -209,6 +209,10 @@ class network:
         self.los_corr = self.los_corr - cst
 
     def save(self):
+
+        if path.exists(self.outname):
+            os.remove(self.outname)
+
         # Export merged data to tif format.
         driver = gdal.GetDriverByName("GTiff")
         outdata = driver.Create(self.outname, self.xsize, self.ysize, 1, gdal.GDT_Float32)
@@ -406,6 +410,9 @@ if __name__ == "__main__":
     # Inversion
     ################################
 
+    print()
+    logger.info('Inversion ....')
+
     data = np.array(data).flatten()
     rms = np.array(rms).flatten()
     G = np.array(G).reshape(len(data),Mbasis)
@@ -425,14 +432,13 @@ if __name__ == "__main__":
     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
     pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
 
-    # save ramp param
+    # apply ramp param
     for i in range(M):
         insar[i].ramp = pars[N+3*k:N+3*k+3]
         # print(insar[i].ramp)
 
         # compute and save results
         insar[i].project()
-        insar[i].save()
 
     ################################
     # plot DATA
@@ -454,7 +460,7 @@ if __name__ == "__main__":
         d = insar[i]
         # plot LOS
         ax = fig.add_subplot(2,M,i+1)
-        cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+        cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation='nearest')
         ax.set_title('{}'.format(d.reduction))
         ax.set_title('LOS {}'.format(d.reduction))
         # Colorbar
@@ -463,7 +469,7 @@ if __name__ == "__main__":
         plt.colorbar(cax, cax=c)
         # plot SIGMA LOS
         ax = fig.add_subplot(2,M,i+1+M)
-        cax = ax.imshow(d.los_corr,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+        cax = ax.imshow(d.los_corr,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation='nearest')
         ax.set_title('CORR LOS {}'.format(d.reduction))
         # Colorbar
         divider = make_axes_locatable(ax)
@@ -474,6 +480,16 @@ if __name__ == "__main__":
     fig.savefig('data_tie_decomposition{}.png'.format(output),format='PNG',dpi=300)
     plt.show()
 
+    ################################
+    # save DATA
+    ################################
+
+    print()
+    logger.info('Save Output files ....')
+
+    # save ramp param
+    for i in range(M):
+        insar[i].save()
 
 
 
