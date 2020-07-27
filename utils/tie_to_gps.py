@@ -177,9 +177,9 @@ class OpenTif(object):
         pixel_sigma = self.sigma[y - n: y + n + 1, x - n: x + n + 1]
 
         index = np.nonzero(~np.isnan(pixel_values))
-        if len(index) > 0:
-            m = np.nanmean(pixel_values)
-            #m = np.sum(pixel_values[index] * pixel_sigma[index]) / np.sum(pixel_sigma[index])
+        if len(index[0]) > 0:
+            #m1 = np.nanmean(pixel_values)
+            m = np.nansum(pixel_values[index] * pixel_sigma[index]) / np.nansum(pixel_sigma[index])
             std = np.nanstd(pixel_values)
         else:
             m = np.float('NaN')
@@ -282,8 +282,6 @@ if __name__ == "__main__":
     add_inc_head_los(gps, inc, heading)
     #print(gps)
     
-    # Plot frame and GPS
-    plot_gps_distribution(gps, poly)
     
     # if heading, then increase window size
     for n in range(4,200,2):
@@ -313,6 +311,9 @@ if __name__ == "__main__":
     # remove NaNs
     gps = gps.dropna()
     print(gps)
+    
+    # Plot frame and GPS
+    plot_gps_distribution(gps, poly)
 
     # data vector
     d = gps['diff'].to_numpy()
@@ -322,6 +323,7 @@ if __name__ == "__main__":
     x =  [ point.x for point in gps['geometry'] ]
     y =  [ point.y for point in gps['geometry'] ]
     east, north = UTM(x,y)
+    #east, north = x, y
 
     # invers G matrix
     G = np.zeros((len(d),3))
@@ -344,6 +346,7 @@ if __name__ == "__main__":
     
     # Build G matrix for all insar points
     east, north = UTM(insar.lon.flatten(), insar.lat.flatten())
+    #east, north = insar.lon.flatten(), insar.lat.flatten()
     G = np.zeros((len(insar.data.flatten()),3))
     G[:,0] = north
     G[:,1] = east
@@ -352,11 +355,17 @@ if __name__ == "__main__":
     ramp_array = np.dot(G, pars).reshape(insar.ysize, insar.xsize)
     model_array = ramp_array + insar.data
     
+    # remove cst
+    cst = np.nanmean(model_array)
+    model_array = model_array - cst
+
     # Plot
     vmin = np.nanpercentile(insar.data, 2)
     vmax = np.nanpercentile(insar.data, 98)
     vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
     vmin_insar = -vmax_insar
+    vmin_insar = -10
+    vmax_insar = 10
 
     try:
         from matplotlib.colors import LinearSegmentedColormap
@@ -383,11 +392,10 @@ if __name__ == "__main__":
     plt.setp( ax2.get_yticklabels(), visible=None)
     
     # Plot
-    vmin = np.nanpercentile(model_array, 2)
-    vmax = np.nanpercentile(model_array, 98)
-    vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
-    vmin_insar = -vmax_insar
-
+    #vmin = np.nanpercentile(model_array, 2)
+    #vmax = np.nanpercentile(model_array, 98)
+    #vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
+    #vmin_insar = -vmax_insar
 
     cax = ax3.imshow(model_array, cmap=cmap, vmin=vmin_insar, vmax=vmax_insar,interpolation='nearest')
     ax3.set_title('InSAR - Ramp')
