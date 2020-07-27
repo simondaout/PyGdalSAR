@@ -285,7 +285,7 @@ for i in range(M):
     driver = insar[0].driver
 
 # Apply reference zone shift...
-if ref_zone is not None:
+if insar[i].ref_zone is not None:
     if ref_zone[1]<=insar[i].los.shape[0] and ref_zone[3]<=insar[i].los.shape[1]:
         for i in range(M):
             ref_z = insar[i].los[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
