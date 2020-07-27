@@ -284,21 +284,20 @@ for i in range(M):
     projref = insar[0].projref
     driver = insar[0].driver
 
-# Apply reference zone shift...
-if insar[i].ref_zone is not None:
-    if ref_zone[1]<=insar[i].los.shape[0] and ref_zone[3]<=insar[i].los.shape[1]:
+    # Apply reference zone shift...
+    if insar[i].ref_zone is not None:
+      if insar[i].ref_zone[1]<=insar[i].los.shape[0] and insar[i].ref_zone[3]<=insar[i].los.shape[1]:
         for i in range(M):
-            ref_z = insar[i].los[ref_zone[0]:ref_zone[1],ref_zone[2]:ref_zone[3]]
+            ref_z = insar[i].los[insar[i].ref_zone[0]:insar[i].ref_zone[1],insar[i].ref_zone[2]:insar[i].ref_zone[3]]
             if np.isnan(np.nanmean(ref_z)) is True:
                 logger.critical('Reference zone given contains only NaN values. Re-choose [y0, y1, x0, x1]. Exit!')
                 exit()
             insar[i].los = insar[i].los - np.nanmean(ref_z)
-    else:
+      else:
         logger.critical('Reference zone given is outside image. Re-choose [y0, y1, x0, x1]. Exit!')
         exit()
-else:
-    logger.critical('No reference zone given. Need [y0, y1, x0, x1]. Exit!')
-    exit()
+    else:
+      pass
 
 # define invert components
 comp = np.array(comp) - 1 
@@ -353,8 +352,9 @@ for i in range(M):
     cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('{}'.format(d.reduction))
     # Add the patch to the Axes
-    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
-    ax.add_patch(rect)
+    if d.ref_zone is not None:
+        rect = patches.Rectangle((d.ref_zone[2],d.ref_zone[0]),(d.ref_zone[3]-d.ref_zone[2]),(d.ref_zone[1]-d.ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
+        ax.add_patch(rect)
     # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
@@ -365,8 +365,9 @@ for i in range(M):
     cax = ax.imshow(d.sigma,cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
     ax.set_title('SIGMA {}'.format(d.reduction))
     # Add the patch to the Axes
-    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
-    ax.add_patch(rect)
+    if d.ref_zone is not None:
+        rect = patches.Rectangle((d.ref_zone[2],d.ref_zone[0]),(d.ref_zone[3]-d.ref_zone[2]),(d.ref_zone[1]-d.ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
+        ax.add_patch(rect)
     # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
@@ -466,10 +467,8 @@ for n in range(N):
     ax = fig.add_subplot(2,N,n+1)
     cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=-vmax,interpolation=None)
     ax.set_title('{}'.format(comp_name[n]))
-    # Add the patch to the Axes
-    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
-    ax.add_patch(rect)
-    # Colorbar
+
+
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
@@ -483,9 +482,7 @@ for n in range(N):
     ax = fig.add_subplot(2,N,n+1+N)
     cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
     ax.set_title('SIGMA {}'.format(comp_name[n]))
-    # Add the patch to the Axes
-    rect = patches.Rectangle((ref_zone[2],ref_zone[0]),(ref_zone[3]-ref_zone[2]),(ref_zone[1]-ref_zone[0]), linewidth=1, edgecolor='grey', facecolor='none')
-    ax.add_patch(rect)
+
     # Colorbar
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
