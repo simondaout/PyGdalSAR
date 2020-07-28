@@ -421,7 +421,7 @@ if __name__ == "__main__":
     ################################
     
     n = 2 # window size for insar
-    nn = 30 # window size for gnss
+    nn = 20 # window size for gnss
     d = insar[0]
     data = []
     G = []
@@ -565,12 +565,12 @@ if __name__ == "__main__":
         pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
 
     # apply ramp param
-    for i in range(M):
-        insar[i].ramp = pars[Mp + 3*k : Mp + 3*k + 3]
+    for k in range(M):
+        insar[k].ramp = pars[Mp + 3*k : Mp + 3*k + 3]
         # print(insar[i].ramp)
 
         # compute and save results
-        insar[i].project(ngps)
+        insar[k].project(ngps)
 
     ################################
     # plot DATA
