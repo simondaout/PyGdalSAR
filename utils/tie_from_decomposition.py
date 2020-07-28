@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -14,6 +14,7 @@ import getopt
 import os, math
 from os import path
 import logging
+import sys
 
 import numpy as np
 import scipy.optimize as opt
@@ -32,6 +33,53 @@ import matplotlib.dates as mdates
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.patches as patches
 
+### Define GNSS class
+class gpsnetwork:
+    def __init__(self,network,reduction,wdir,scale=1,weight=1.):
+
+        self.network=network
+        self.reduction=reduction
+        self.wdir=wdir
+        self.scale=scale
+        # inititialisation
+        self.sigmad=1./weight
+        self.N = 0
+        self.x,self.y= [], []
+
+    def load(self,rot):
+        self.rot = rot
+        fname=self.wdir + self.network
+        if not path.isfile(fname):
+            raise ValueError("invalid file name: " + fname)
+        else:
+            print('Load GPS time series: ', fname)
+            print()
+        f=open(fname,"r")
+        lon, lat, ve, vn, vu, se, sn, su, cen, name = \
+        np.loadtxt(f,comments='#',unpack=True,dtype='f,f,f,f,f,f,f,f,f,S4')
+        
+        self.lon, self.lat, self.ve, self.vn, self.vu, self.se, self.sn, self.su, self.cen,\
+         self.name=np.atleast_1d(lon, lat, ve, vn, vu, se, sn, su, cen, name)
+
+        # rotation of the axis of an angle rot in clockwise direction
+        self.vep = np.cos(rot)*self.ve - np.sin(rot)*self.vn
+        self.vnp = np.sin(rot)*self.ve + np.sin(rot)*self.vn
+
+        self.sep=((self.se*np.cos(self.rot))**2 + (self.sn*np.sin(self.rot))**2)**0.5
+        self.snp=((self.se*np.sin(self.rot))**2 + (self.sn*np.cos(self.rot))**2)**0.5
+
+        self.N = len(self.name)*3
+        self.d = np.column_stack([self.vep,self.vnp,self.vu])
+        self.sigmad = self.sigmad*np.column_stack([self.sep,self.snp,self.su])
+        self.Npoints = len(self.name)
+
+    def info(self):
+        print()
+        print('GPS network:',self.network)
+        print('Number of stations:', self.Npoints)
+        print('Number of points:', self.N)
+
+
 class network:
     """
     Load InSAR displacements and LOS angle maps
@@ -46,7 +94,7 @@ class network:
     bounds: optional bounds for plot [losmin,losmax]
     """
     
-    def __init__(self,name,wdir,reduction,lookf,headf,sigmaf=None,scale=1,scale_sig=1000,format='ROIPAC',bounds=None,outname=None):
+    def __init__(self,name,wdir,reduction,lookf,headf,sigmaf=None,scale=1,scale_sig=1,format='ROIPAC',bounds=None,outname=None):
         self.name = name
         self.wdir = wdir
         self.reduction = reduction
@@ -62,7 +110,6 @@ class network:
             self.outname = os.path.splitext(self.name)[0] + '_projected.tif'
         else:
             self.outname = outname
-
 
     def load(self,rot):
         logger.info('Read track: {}'.format(self.name))
@@ -195,7 +242,7 @@ class network:
 
         return m, std, proj
 
-    def project(self):
+    def project(self,ngps=0):
         x, y = UTM(self.lon.flatten(), self.lat.flatten())
         G = np.zeros((len(self.los.flatten()),3))
         G[:,0] = y
@@ -205,8 +252,10 @@ class network:
         self.ramp_array = np.dot(G, self.ramp).reshape(self.ysize, self.xsize)
         self.los_corr = self.ramp_array + self.los
 
-        cst = np.nanmean(self.los_corr)
-        self.los_corr = self.los_corr - cst
+        # if no gps, no reference, remove a cst
+        if ngps < 1 :
+            cst = np.nanmean(self.los_corr)
+            self.los_corr = self.los_corr - cst
 
     def save(self):
 
@@ -270,11 +319,19 @@ if __name__ == "__main__":
     # rotation angle: angle between comp1 and East
     rot = np.deg2rad(-rotation)
 
-    # Load data
+    # load gnss
+    Mgnss = len(gnss)
+    for i in range(Mgnss):
+        gnss[i].load(-rot)
+        gnss[i].info()
+
+    # Load insar
     M = len(insar)
     vmax=0; vmin=0; sigmax=0; sigmin=0
     for i in range(M):
         insar[i].load(rot)
+
+        # extract bounds
         if insar[i].losmax > vmax:
             vmax = insar[i].losmax
         if insar[i].losmin < vmin:
@@ -286,9 +343,9 @@ if __name__ == "__main__":
 
     # define invert components
     comp = np.array(comp) - 1 
-    N = len(comp)
+    Ncomp = len(comp)
     comp_name = []
-    for n in range(N):
+    for n in range(Ncomp):
         if int(comp[n]) == 0:
             name = 'East + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
         elif int(comp[n]) == 1:
@@ -330,6 +387,19 @@ if __name__ == "__main__":
     #     divider = make_axes_locatable(ax)
     #     c = divider.append_axes("right", size="5%", pad=0.05)
     #     plt.colorbar(cax, cax=c)
+    #     plt.setp( ax.get_xticklabels(), visible=False)
+    #     plt.setp( ax.get_yticklabels(), visible=False)
+
+    #     for j in range(Mgnss):
+    #         gps = gnss[j]
+    #         index = np.nonzero((gps.lon>insar[i].left)&(gps.lon<insar[i].right)&(gps.lat>insar[i].bottom)&(gps.lat<insar[i].top))
+    #         gpslon,gpslat = gps.lon[index], gps.lat[index]
+    #         gpsve,gpsvn = gps.ve[index], gps.vn[index]
+
+    #         x = map(int, (gpslon - insar[i].left) / insar[i].xres + 0.5)
+    #         y = map(int, (gpslat - insar[i].top) / insar[i].yres + 0.5)
+    #         ax.quiver(x,y,gpsve,gpsvn,scale = 100,width = 0.005,color = 'black')
+        
     #     # plot SIGMA LOS
     #     ax = fig.add_subplot(2,M,i+1+M)
     #     cax = ax.imshow(d.sigma,cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
@@ -338,28 +408,41 @@ if __name__ == "__main__":
     #     divider = make_axes_locatable(ax)
     #     c = divider.append_axes("right", size="5%", pad=0.05)
     #     plt.colorbar(cax, cax=c)
+    #     plt.setp( ax.get_xticklabels(), visible=False)
+    #     plt.setp( ax.get_yticklabels(), visible=False)
 
     # # fig.tight_layout()
     # fig.savefig('data_tie_decomposition{}.png'.format(output),format='PNG',dpi=300)
-    # plt.show()
+    # # plt.show()
+    # # sys.exit()
 
     ################################
     # Extract pixel values in common 
     ################################
     
-    n = 4
+    n = 2 # window size for insar
+    nn = 30 # window size for gnss
     d = insar[0]
     data = []
     G = []
     rms = []
 
-    Mbasis = N+(3*M)
 
-    # loop over the first data set values
+    #Ngnss = sum(map((lambda x: getattr(x,'Npoints')),gnss))
+    # Nmax is the number max of points to be inverted
+    # Size max of the matrix is Nmax*Ncomp + Ngnss*Ncomp + Mramp
+    # hardcode number max of gnss within insar0 to 20
+    Mp = Nmax*Ncomp + 20*Ncomp
+    Mbasis = (3*M) + Mp
+
+    # initialisation number of points
+    p = 0 # count number of insar points
+    ngps = 0 # count number of gnss
+
+    # loop over the first insar data set values
     for x,y,i,j in zip(d.lon.flatten()[::sampling],d.lat.flatten()[::sampling],\
         d.pix_lin.flatten()[::sampling],d.pix_col.flatten()[::sampling]):
         
-        # loop over the data sets
         do = False
         for k in range(1,M):      
             
@@ -371,7 +454,7 @@ if __name__ == "__main__":
 
             # if m is not NaN, we fill data and G matrix
             if ~np.isnan(m) and ~np.isnan(std) and ~np.isnan(np.sum(proj)) \
-            and ~np.isnan(m0):
+            and m0 != 0  and ~np.isnan(m0) and p < Nmax:
                 #print(m)
                 do = True
                 
@@ -381,30 +464,75 @@ if __name__ == "__main__":
 
                 # build G matrix for insark
                 Gt = np.zeros((1,Mbasis))
-                for n in range(N):  
-                    Gt[0,n] = proj[int(comp[n])]
+                for n in range(Ncomp):  
+                    Gt[0, n + p*Ncomp] = proj[int(comp[n])]
             
                 # ramp param
-                Gt[0,N+3*k+2] = 1               
+                Gt[0, Mp + 3*k + 2] = 1               
                 x, y = UTM(np.nanmean(insar[k].lon[i-n: i+n+1, j-n: j+n+1]), np.nanmean(insar[k].lat[i-n: i+n+1, j-n: j+n+1])) 
-                Gt[0,N+3*k], Gt[0,N+3*k+1] = y, x
+                Gt[0, Mp + 3*k ], Gt[0, Mp + 3*k + 1] = y, x
                 G.append(Gt)
 
+        # loop over gnss first and select zone within insar0
+        gpsx, gpsy = [], []
+        for g in range(Mgnss):
+            gps = gnss[g]
+
+            # select gnss withing the insar frame 0
+            index = np.nonzero((gps.lon>d.left)&(gps.lon<d.right)&(gps.lat>d.bottom)&(gps.lat<d.top))
+            gpslon,gpslat = gps.lon[index], gps.lat[index]
+            gpsd = np.array([gps.vep[index], gps.vnp[index], gps.vu[index]]).T
+            gpssigmad = np.array([gps.sep[index], gps.snp[index], gps.su[index]]).T
+
+            # extract pixel values
+            gpsx = map(int, (gpslon - d.left) / d.xres + 0.5)
+            gpsy = map(int, (gpslat - d.top) / d.yres + 0.5)
+
+            # if we find a gnss point, then include insar too
+            for gpsxx,gpsyy in zip(gpsx,gpsy):
+
+                index =  np.nonzero((gpsxx < i+nn+1) & (gpsxx > i-nn) & (gpsyy < j+nn+1) & (gpsyy > j-nn))
+                if not np.isnan(np.mean(index)) :
+                    do = True
+                    
+                    Gt = np.zeros((1,Mbasis))
+                    for n in range(Ncomp):
+                        Gt[0, n + p*Ncomp] =  1
+
+                        # fill data and rms vector
+                        data.append(gpsd[index].flatten()[int(comp[n])])
+                        rms.append(gpssigmad[index].flatten()[int(comp[n])])
+
+                        # fill G for Gnss
+                        G.append(Gt)
+                    
+                    # count number of added gnss
+                    ngps = ngps + 1
         
         if do:
-            # value insar0
-            data.append(np.mean(d.los[i-n: i+n+1, j-n: j+n+1]))
+            # add value insar0
+            data.append(np.nanmean(d.los[i-n: i+n+1, j-n: j+n+1]))
             rms.append(np.nanstd(d.los[i-n: i+n+1, j-n: j+n+1]))
 
             # build G matrix for insar0
             Gt = np.zeros((1,Mbasis))
-            for n in range(N):
-                Gt[0,n] = np.nanmean(d.proj[int(comp[n])][i-n: i+n+1, j-n: j+n+1])
-            Gt[0,N+2] = 1
+            for n in range(Ncomp):
+                Gt[0, n + p*Ncomp] = np.nanmean(d.proj[int(comp[n])][i-n: i+n+1, j-n: j+n+1])
+            
+            Gt[0, Mp + 2] = 1
             x, y = UTM(np.nanmean(d.lon[i-n: i+n+1, j-n: j+n+1]), \
                 np.nanmean(d.lat[i-n: i+n+1, j-n: j+n+1])) 
-            Gt[0,N], Gt[0,N+1] = y, x
+            
+            Gt[0, Mp], Gt[0, Mp + 1] = y, x
             G.append(Gt)
+
+            # one more point
+            p = p + 1
+
+            # loop over the data sets
+            if p == Nmax:
+                print('Number of points superior to {} ! Consider more undersampling.'.format(Nmax))
+
 
     ################################
     # Inversion
@@ -414,6 +542,9 @@ if __name__ == "__main__":
     logger.info('Inversion ....')
 
     data = np.array(data).flatten()
+    print('Number of inverted points: ', p)
+    print('Number of inverted GNSS points: ', ngps )
+
     rms = np.array(rms).flatten()
     G = np.array(G).reshape(len(data),Mbasis)
 
@@ -428,17 +559,18 @@ if __name__ == "__main__":
     G = G[~np.isnan(G.any(axis=1))]
 
     pars = lst.lstsq(G,data)[0]
-    _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-    _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-    pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
+    if iter > 1:
+        _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+        pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
 
     # apply ramp param
     for i in range(M):
-        insar[i].ramp = pars[N+3*k:N+3*k+3]
+        insar[i].ramp = pars[Mp + 3*k : Mp + 3*k + 3]
         # print(insar[i].ramp)
 
         # compute and save results
-        insar[i].project()
+        insar[i].project(ngps)
 
     ################################
     # plot DATA
@@ -463,11 +595,26 @@ if __name__ == "__main__":
         cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation='nearest')
         ax.set_title('{}'.format(d.reduction))
         ax.set_title('LOS {}'.format(d.reduction))
+
+        # plot gnss
+        for j in range(Mgnss):
+            gps = gnss[j]
+            index = np.nonzero((gps.lon>insar[i].left)&(gps.lon<insar[i].right)&(gps.lat>insar[i].bottom)&(gps.lat<insar[i].top))
+            gpslon,gpslat = gps.lon[index], gps.lat[index]
+            gpsve,gpsvn = gps.ve[index], gps.vn[index]
+
+            x = map(int, (gpslon - insar[i].left) / insar[i].xres + 0.5)
+            y = map(int, (gpslat - insar[i].top) / insar[i].yres + 0.5)
+            ax.quiver(x,y,gpsve,gpsvn,scale = 100,width = 0.005,color = 'black')
+
         # Colorbar
         divider = make_axes_locatable(ax)
         c = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(cax, cax=c)
-        # plot SIGMA LOS
+        plt.setp( ax.get_xticklabels(), visible=False)
+        plt.setp( ax.get_yticklabels(), visible=False)
+
+        # plot  LOS corr
         ax = fig.add_subplot(2,M,i+1+M)
         cax = ax.imshow(d.los_corr,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation='nearest')
         ax.set_title('CORR LOS {}'.format(d.reduction))
@@ -475,6 +622,8 @@ if __name__ == "__main__":
         divider = make_axes_locatable(ax)
         c = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(cax, cax=c)
+        plt.setp( ax.get_xticklabels(), visible=False)
+        plt.setp( ax.get_yticklabels(), visible=False)
 
     # fig.tight_layout()
     fig.savefig('data_tie_decomposition{}.png'.format(output),format='PNG',dpi=300)
