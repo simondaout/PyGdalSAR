@@ -33,6 +33,10 @@ import matplotlib.dates as mdates
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.patches as patches
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 ### Define GNSS class
 class gpsnetwork:
     def __init__(self,network,reduction,wdir,scale=1,weight=1.):
@@ -451,10 +455,11 @@ if __name__ == "__main__":
             
             m,std,proj = insar[k].extract_pixel_value(x,y,n)
             m0 = np.mean(d.los[i-n: i+n+1, j-n: j+n+1])
+            rms0 = np.std(d.los[i-n: i+n+1, j-n: j+n+1])
 
             # if m is not NaN, we fill data and G matrix
             if ~np.isnan(m) and ~np.isnan(std) and ~np.isnan(np.sum(proj)) \
-            and m0 != 0  and ~np.isnan(m0) and p < Nmax:
+            and m0 != 0  and ~np.isnan(m0) and ~np.isnan(rms0) and p < Nmax:
                 #print(m)
                 do = True
                 
@@ -554,14 +559,30 @@ if __name__ == "__main__":
     rms = rms[index]
     G = G[index,:]
 
+    # check for NaN in rms vector
+    index = np.flatnonzero(~np.isnan(rms))
+    data = data[index]
+    rms = rms[index]
+    G = G[index,:]
+
     # check for NaN in G
     data = data[~np.isnan(G.any(axis=1))]
     G = G[~np.isnan(G.any(axis=1))]
 
+    # Now lets remove column in G matrix with only zeros
+    G = G[:,~np.all(G == 0, axis = 0)]
+    #  recompute Mp
+    Mp = G.shape[1] - 3*M
+
     pars = lst.lstsq(G,data)[0]
+    # if iter > 1:
+    #     _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+    #     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+    #     pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
+
     if iter > 1:
-        _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
+        _func = lambda x: np.sum(((np.dot(G,x)-data))**2)
+        _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-data))
         pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
 
     # apply ramp param
