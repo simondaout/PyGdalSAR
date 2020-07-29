@@ -71,6 +71,8 @@ class gpsnetwork:
 
         self.sep=((self.se*np.cos(self.rot))**2 + (self.sn*np.sin(self.rot))**2)**0.5
         self.snp=((self.se*np.sin(self.rot))**2 + (self.sn*np.cos(self.rot))**2)**0.5
+        # self.sep = np.ones(len(self.vep)) 
+        # self.snp =  np.ones(len(self.vnp)) 
 
         self.N = len(self.name)*3
         self.d = np.column_stack([self.vep,self.vnp,self.vu])
@@ -466,6 +468,8 @@ if __name__ == "__main__":
                 # value insark
                 data.append(m)
                 rms.append(std)
+                #print(std)
+                #rms.append(1)
 
                 # build G matrix for insark
                 Gt = np.zeros((1,Mbasis))
@@ -551,23 +555,29 @@ if __name__ == "__main__":
     print('Number of inverted GNSS points: ', ngps )
 
     rms = np.array(rms).flatten()
+
+    # normalised and artifically increase small values
+    rms = rms/np.nanmax(rms)
+    index = np.flatnonzero(rms<0.1)
+    rms[index] = 0.1
+
     G = np.array(G).reshape(len(data),Mbasis)
 
-    # check for NaN in data vector
-    index = np.flatnonzero(~np.isnan(data))
-    data = data[index]
-    rms = rms[index]
-    G = G[index,:]
+    # # check for NaN in data vector
+    # index = np.flatnonzero(~np.isnan(data))
+    # data = data[index]
+    # rms = rms[index]
+    # G = G[index,:]
 
-    # check for NaN in rms vector
-    index = np.flatnonzero(~np.isnan(rms))
-    data = data[index]
-    rms = rms[index]
-    G = G[index,:]
+    # # check for NaN in rms vector
+    # index = np.flatnonzero(~np.isnan(rms))
+    # data = data[index]
+    # rms = rms[index]
+    # G = G[index,:]
 
-    # check for NaN in G
-    data = data[~np.isnan(G.any(axis=1))]
-    G = G[~np.isnan(G.any(axis=1))]
+    # # check for NaN in G
+    # data = data[~np.isnan(G.any(axis=1))]
+    # G = G[~np.isnan(G.any(axis=1))]
 
     # Now lets remove column in G matrix with only zeros
     G = G[:,~np.all(G == 0, axis = 0)]
@@ -575,15 +585,15 @@ if __name__ == "__main__":
     Mp = G.shape[1] - 3*M
 
     pars = lst.lstsq(G,data)[0]
-    # if iter > 1:
-    #     _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-    #     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-    #     pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
-
     if iter > 1:
-        _func = lambda x: np.sum(((np.dot(G,x)-data))**2)
-        _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-data))
+        _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
+        _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
         pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
+
+    # if iter > 1:
+    #     _func = lambda x: np.sum(((np.dot(G,x)-data))**2)
+    #     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-data))
+    #     pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
 
     # apply ramp param
     for k in range(M):
