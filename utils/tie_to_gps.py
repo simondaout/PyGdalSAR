@@ -293,9 +293,10 @@ if __name__ == "__main__":
                 gps.loc[index, 'heading'] = heading.extract_pixel_value(g['geometry'].x, g['geometry'].y, n)[0] 
                 if iformat == 'ROIPAC':
                     gps.loc[index, 'los'] = neu2los_roipac(g['vn'], g['ve'], g['vu'], gps.loc[index,'look'], gps.loc[index,'heading']) 
-                    gps.loc[index, 'siglos'] = neu2los_roipac(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading']) 
+                    gps.loc[index, 'siglos'] = np.abs(neu2los_roipac(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading'])) 
                 elif iformat == 'GAMMA':
-                    gps.loc[index, 'siglos'] = neu2los_gamma(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading'])
+                    gps.loc[index, 'los'] = neu2los_gamma(g['vn'], g['ve'], g['vu'], gps.loc[index,'look'], gps.loc[index,'heading'])
+                    gps.loc[index, 'siglos'] = np.abs(neu2los_gamma(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading']))
 
     # compute diff GPS - InSAR
     gps.loc[:, 'diff'] = [gps_los -  insar.extract_pixel_value(point.x, point.y, 2)[0] for point,gps_los in gps[['geometry','los']].to_numpy()]
