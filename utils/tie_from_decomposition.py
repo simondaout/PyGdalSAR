@@ -37,6 +37,50 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
+##### EXAMPLE INPUT FILE
+
+## define proj
+#UTM = pyproj.Proj("+init=EPSG:32646")
+## define output name
+#output = 'qinghai'
+#
+## define angle between north and new axis
+## e.g if axis = [east, north, up], rotation = 0
+## e.g if axis = [N70W, N20E, Up], rotation = 20
+#rotation = 22
+#
+## define desired invert components
+## e.g [east, north, up], comp = [1,2,3]
+## e.g [east, up], comp = [1,3]
+#comp = [2,3]
+#
+## parameters inversion
+## iter: number of least-square iterations (default:2000)
+## acc: desired accuracy results of the sequential least-square
+#iter = 200
+#acc=1.e-9
+#
+#insar = [
+#network(name='T004_inter_LOSVelocity_nan_mmyr_s90.tiff',wdir='../insar/T004_inter/',\
+#    reduction='T004',lookf='T004_look_s90.tiff',headf='T004_head_s90.tiff',\
+#    sigmaf='T004_LOS_sigVelocity_mmyr.tiff',\
+#    scale=1,scale_sig=1000,format='ROIPAC',bounds=[-10,10]),
+#
+#network(name='T172_inter_LOSVelocity_nan_s90.tiff',wdir='../insar/T172_inter/',\
+#    reduction='T172',lookf='T172_look_s90.tiff',headf='T172_head_s90.tiff',\
+#    sigmaf='T172_LOS_sigVelocity_mmyr.tiff',\
+#    scale=1,scale_sig=1000,format='ROIPAC',bounds=[-10,10]),
+#
+#network(name='T099_inter_LOSVelocity_nan_mmyr_s90.tiff',wdir='../insar/T099_inter/',\
+#    reduction='T099',lookf='T099_look_s90.tiff',headf='T099_head_s90.tiff',\
+#    sigmaf='T099_LOS_sigVelocity_mmyr.tiff',\
+#    scale=1,scale_sig=1000,format='ROIPAC',bounds=[-10,10])
+#]
+## define subsampling
+#sampling = 200
+
+#######
+
 ### Define GNSS class
 class gpsnetwork:
     def __init__(self,network,reduction,wdir,scale=1,weight=1.):
