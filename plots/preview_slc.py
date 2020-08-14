@@ -28,6 +28,8 @@ import docopt
 import numpy as np
 import os, subprocess, glob, sys, shutil
 import multiprocessing
+from contextlib import contextmanager
+from os import environ
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -52,6 +54,7 @@ if arguments["--look"] == None:
   look = 4
 else:
   look = int(arguments["--look"])
+alook=look*5
 
 if arguments["--nproc"] == None:
   nproc = 1
@@ -70,6 +73,21 @@ if os.path.exists(outputdir):
 else:
   os.makedirs(outputdir)
 
+def run(cmd):
+    print(cmd)
+    r = subprocess.call(cmd, shell=True, stdout=sys.stdout, stderr=subprocess.STDOUT,
+        env=environ)
+    if r != 0:
+        print(r)
+    return
+
+@contextmanager
+def poolcontext(*arg, **kargs):
+    pool = multiprocessing.Pool(*arg, **kargs)
+    yield pool
+    pool.terminate()
+    pool.join()
+
 def dolook(kk):
   date = dates[kk]
   infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look)+'rlks.slc'
@@ -78,30 +96,25 @@ def dolook(kk):
     pass
   else:
     temp = str(date) + '/'+str(date)+ '_coreg.slc'
-    os.system("look.pl "+str(temp)+" "+str(look*5)+" "+str(look))
+    run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
 
-pool = multiprocessing.Pool(nproc)
 work = [(kk) for kk in xrange(kmax)]
-pool.map(dolook, work)
+with poolcontext(processes=nproc) as pool:
+    results = pool.map(dolook, work)
 
 def preview(kk):
     date = dates[kk]
-    infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look*5)+'rlks.slc'
-    jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(look*5)+'rlks.jpeg'
+    infile = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.slc'
+    jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.jpeg'
 
     try:
-      r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg), shell=True)
-      if r != 0:
-            raise Exception("nsb_preview_slc failed for date: ", infile)
-      else:
-            print 'Create: ', jpeg
+      run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
     except:
       pass
 
-
-pool = multiprocessing.Pool(nproc)
 work = [(kk) for kk in xrange(kmax)]
-pool.map(preview, work)
+with poolcontext(processes=nproc) as pool:
+    results = pool.map(preview, work)
 
 # print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
 jpeg_files = glob.glob('*/*_coreg*.jpeg')
