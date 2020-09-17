@@ -20,14 +20,15 @@ Options:
 
 import docopt
 import re
+import sys
 
 arguments = docopt.docopt(__doc__)
 infile = arguments["<file>"]
 
 
 # there is probably a better way to do that re search... 
-# _re = re.compile(r"(.*) COL:(.*?) ROW:(.*) ", re.IGNORECASE)
-_re = re.compile(r"(.*) COL:(.*) ROW:(.*)", re.IGNORECASE)
+#_re = re.compile(r"(.*) COL:(.*?) ROW:(.*) ", re.IGNORECASE)
+_re = re.compile(r"(.*) COL: (.*) ROW: {1,6}([0-9]*) ([0-9]*)", re.IGNORECASE)
 
 file = open('bridge.in', "w")
 lines = []
@@ -42,6 +43,8 @@ with open(infile) as in_file:
 
         m = _re.match(line)
         if m:
+           # print(m.group(0))
+           # print(m.group(2),m.group(3))
             col, row =  m.group(2).strip(), m.group(3).strip()
             print(count, col, row)
             if count % 2:
