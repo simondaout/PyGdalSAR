@@ -19,15 +19,19 @@ Usage: plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg
 [--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] 
        plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
 [--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--cols=<values>] [--lines=<values>]
+       plot\_raster.py --infile=<path> [--cpt=<values>] [--crop=<values>] \
+[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] 
+
 
 
 Options:
 -h --help             Show this screen.
 --infile=<file>       Raster to be displayed 
 --ibeg=<value>        Ligne numbers bounded the cutting zone [default: 0]
---iend=<value>        Ligne numbers bounded the cutting zone [default: nlign]
+--iend=<value>        Ligne numbers bounded the cutting zone [default: nlines]
 --jbeg=<value>        Column numbers bounded the cutting zone [default: 0]
---jend=<value>        Column numbers bounded the cutting zone [default: ncol]
+--jend=<value>        Column numbers bounded the cutting zone [default: ncols]
+--crop=<values>          Crop option with smoothing of boundaries (same as ibeg,iend..) [default: 0,ncols,0,nlines]
 --format=<value>      Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --cpt==<value>        Indicate colorscale for phase
 --wrap=<value>        Wrapped phase between value for unwrapped files 
@@ -38,7 +42,7 @@ Options:
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
 --ncols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
---nligns VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
+--nliness VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
 """
 
 from __future__ import print_function
@@ -153,22 +157,28 @@ elif sformat == 'GAMMA':
             phi = gm.readgamma(infile)
 
 
-if arguments["<ibeg>"] ==  None:
-    ibeg = 0
+# crop
+if arguments["--crop"] ==  None:
+    if arguments["<ibeg>"] ==  None:
+        ibeg = 0
+    else:
+        ibeg = int(arguments["<ibeg>"])
+    if arguments["<iend>"] ==  None:
+        iend = nlines
+    else:
+        iend = int(arguments["<iend>"])
+    if arguments["<jbeg>"] ==  None:
+        jbeg = 0
+    else:
+        jbeg = int(arguments["<jbeg>"])
+    if arguments["<jend>"] ==  None:
+        jend = ncols
+    else:
+        jend = int(arguments["<jend>"])
+    crop = [0,jend,0,iend]
 else:
-    ibeg = int(arguments["<ibeg>"])
-if arguments["<iend>"] ==  None:
-    iend = nlines
-else:
-    iend = int(arguments["<iend>"])
-if arguments["<jbeg>"] ==  None:
-    jbeg = 0
-else:
-    jbeg = int(arguments["<jbeg>"])
-if arguments["<jend>"] ==  None:
-    jend = ncols
-else:
-    jend = int(arguments["<jend>"])
+    crop = map(float,arguments["--crop"].replace(',',' ').split())
+jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # Initialize a matplotlib figure
 fig = plt.figure(1,figsize=(12,8))
@@ -251,7 +261,13 @@ else:
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
 
-cax = ax.imshow(cutphi, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
+
+
+# replace 0 by nan
+cutphi[cutphi==0] = np.float('NaN')
+masked_array = np.ma.array(cutphi, mask=np.isnan(cutphi))
+
+cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
