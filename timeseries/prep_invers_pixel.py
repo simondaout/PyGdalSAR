@@ -312,7 +312,7 @@ list_dates
 list_pair
 %d     #  interferogram format (RMG : 0; R4 :1) (date1-date2_pre_inv.unw or date1-date2.r4)
 3100.  #  include interferograms with bperp lower than maximal baseline
-0      #  Weight input interferograms by coherence or correlation maps ? (y:0,n:1)
+1      #  Weight input interferograms by coherence or correlation maps ? (y:0,n:1)
 %d      #  coherence file format (RMG : 0; R4 :1) (date1-date2.cor or date1-date2-CC.r4)
 1      #  minimal number of interferams using each image
 1      #  interferograms weighting so that the weight per image is the same (y=0;n=1)
@@ -324,13 +324,14 @@ list_pair
 1      #  Weigthing by image quality (y:0,n:1) ? (then read quality in the list of input images)
 %d     #  Weigthing by interferogram variance (y:0,n:1) or user given weight (2)?
 1      #  use of covariance (y:0,n:1) ? (Obsolete)
-0      #  Adjust functions to phase history ? (y:1;n:0) Require to use smoothing option (smoothing coefficient) !
+1      #  Adjust functions to phase history ? (y:1;n:0) Require to use smoothing option (smoothing coefficient) !
+0      #  compute DEM error proportional to perpendicular baseline ? (y:1;n:0)
+0, 2003.0     #  include a step function ? (y:1;n:0)
+0      #  include a cosinus / sinus function ? (y:1;n:0)
 1      #  smoothing by Laplacian, computed with a scheme at 3pts (0) or 5pts (1) ?
 2      #  weigthed smoothing by the average time step (y :0 ; n : 1, int : 2) ?
 1      # put the first derivative to zero (y :0 ; n : 1)?
     """ % (iformat, cohformat, do_sig))
     f.close()
 
-# 0      #  compute DEM error proportional to perpendicular baseline ? (y:1;n:0)
-# 0 0     #  include a step function ? (y:1;n:0)
-# 0      #  include a cosinus / sinus function ? (y:1;n:0)
+
