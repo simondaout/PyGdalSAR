@@ -24,7 +24,6 @@ usage: invert_ramp_topo_unw.py --int_list=<path> [--ref_zone=<jstart,jend,istart
 
 --int_list PATH       Text file containing list of interferograms dates in two colums, $data1 $date2
 --int_path PATh       Relative path to input interferograms directory
---int_path PATh       Relative path to output interferograms directory
 --ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None] 
 --prefix VALUE        Prefix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
 --suffix value        Suffix name $prefix$date1-$date2$suffix_$rlookrlks.unw [default: '']
@@ -1691,7 +1690,7 @@ def apply_cor(kk, sp, sp_inv):
         flatlos.flatten().astype('>f4').tofile(fid)
         fid.close()
 
-    fig = plt.figure(5,figsize=(9,4))
+    fig = plt.figure(5,figsize=(9,6))
 
     _los_map = np.copy(los_map)
     _los_map[los_map==0] = np.float('NaN')
@@ -1699,7 +1698,7 @@ def apply_cor(kk, sp, sp_inv):
     
     ax = fig.add_subplot(1,4,1)
     cax = ax.imshow(los_map,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
-    ax.set_title('LOS')
+    ax.set_title(str(date1) + '_' + str(date2))
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
     divider = make_axes_locatable(ax)
@@ -1708,7 +1707,7 @@ def apply_cor(kk, sp, sp_inv):
 
     ax = fig.add_subplot(1,4,2)
     cax = ax.imshow(corr,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
-    ax.set_title('RAMP+TOPO ORIG.')
+    ax.set_title('Best-fit Ramp')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
     divider = make_axes_locatable(ax)
@@ -1717,7 +1716,7 @@ def apply_cor(kk, sp, sp_inv):
 
     ax = fig.add_subplot(1,4,3)
     cax = ax.imshow(corr_inv,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
-    ax.set_title('RAMP+TOPO RECONST.')
+    ax.set_title('Reconstructed')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
     divider = make_axes_locatable(ax)
@@ -1725,13 +1724,13 @@ def apply_cor(kk, sp, sp_inv):
     plt.colorbar(cax, cax=c)
 
     _los_map = np.copy(flatlos)
-    _los_map[los_map==0] = np.float('NaN')
+    _los_map[_los_map==0] = np.float('NaN')
     #flatlos[los_map==0] = np.float('NaN')
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
 
     ax = fig.add_subplot(1,4,4)
-    cax = ax.imshow(flatlos,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
-    ax.set_title('CORRECTED LOS')
+    cax = ax.imshow(_los_map,cmap=cmap,vmax=vmax,vmin=vmin,alpha=1,interpolation=None)
+    ax.set_title('Flattened LOS')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
     divider = make_axes_locatable(ax)
@@ -1922,7 +1921,10 @@ else:
     samp = int(arguments["--samp"])
 
 if arguments["--cpt"] is  None:
-    cmap=cm.rainbow
+    #cmap=cm.rainbow
+    ### Load colormaps
+    cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
+    cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt")).reversed()
 else:  
     try:
         cmap = LinearSegmentedColormap.from_list(arguments["--cpt"].split("/")[-1].split('.')[0], np.loadtxt(arguments["--cpt"]))
