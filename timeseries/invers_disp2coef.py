@@ -3326,8 +3326,8 @@ def empirical_cor(l):
                 ))))))))))))
                 ))
         
-        ## Set data to zero in the ref area
-        zone = as_strided(map_flata[:,:])
+        ## Set data minus temporal model to zero in the ref area
+        zone = as_strided(map_flata[:,:] - models[:,:])
         los_ref2 = zone[indexref].flatten()
         rms_ref = rmsmap[indexref].flatten()
         amp_ref = 1./rms_ref
