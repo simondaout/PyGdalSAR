@@ -24,7 +24,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 [--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--slowslip=<value,value>] \
 [--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
-[--sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
+[--sampling=<value>] [--emp_sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
 [--mask=<path>] [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--tempmask=<yes/no>]\
 [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--crop=<value,value,value,value>] [--crop_emp=<value,value,value,value>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
@@ -52,7 +52,8 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
 --flat=<0/1/2/3/4/5/6/7/8/9>             Remove a spatial ramp at each iteration [default: 0].
 --spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, coseismic...) [default: yes]
---sampling=<value>      Downsampling factor temporal decomposition [default: 1]
+--sampling=<value>      Downsampling factor for temporal decomposition [default: 1]
+--emp_sampling=<value>      Downsampling factor for empirical estimations [default: 1]
 --imref=<value>         Reference image number [default: 1]
 --mask=<path>           Path to mask file in r4 or tif format for the empirical spatial estimations. Keep only values > threshold_mask for ramp estimation [default: no].
 --rampmask=<yes/no>     Remove a quadratic ramp in range and linear ramp in azimuth on the mask [default: no].
@@ -375,6 +376,8 @@ else:
     flat = 0
 if arguments["--sampling"] ==  None:
     arguments["--sampling"] = 1
+if arguments["--emp_sampling"] ==  None:
+    arguments["--emp_sampling"] = 1
 if arguments["--mask"] ==  None:
     arguments["--mask"] = None
 if arguments["--rampmask"] ==  None:
@@ -3302,7 +3305,7 @@ def empirical_cor(l):
 
     # call ramp estim
     los = as_strided(maps[:,:,l]).flatten()
-    samp = 1
+    samp = int(arguments["--emp_sampling"])
 
     map_ramp, map_flata, map_topo, rmsi = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
       y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
@@ -3327,7 +3330,7 @@ def empirical_cor(l):
                 ))
         
         ## Set data minus temporal model to zero in the ref area
-        zone = as_strided(map_flata[:,:] - models[:,:])
+        zone = as_strided(map_flata[:,:] - models[:,:,l])
         los_ref2 = zone[indexref].flatten()
         rms_ref = rmsmap[indexref].flatten()
         amp_ref = 1./rms_ref
