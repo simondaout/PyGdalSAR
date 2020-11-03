@@ -51,7 +51,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
 --nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
 --flat=<0/1/2/3/4/5/6/7/8/9>             Remove a spatial ramp at each iteration [default: 0].
---spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, coseismic...) [default: no]
+--spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, coseismic...) [default: yes]
 --sampling=<value>      Downsampling factor temporal decomposition [default: 1]
 --imref=<value>         Reference image number [default: 1]
 --mask=<path>           Path to mask file in r4 or tif format for the empirical spatial estimations. Keep only values > threshold_mask for ramp estimation [default: no].
@@ -366,7 +366,7 @@ if arguments["--dem"] ==  None:
 if arguments["--niter"] ==  None:
     arguments["--niter"] = 1
 if arguments["--spatialiter"] ==  None:
-    arguments["--spatialiter"] = 'no'
+    arguments["--spatialiter"] = 'yes'
 if arguments["--flat"] == None:
     flat = 0
 elif int(arguments["--flat"]) <  10:
@@ -3494,7 +3494,7 @@ for ii in range(np.int(arguments["--niter"])):
       figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
       if arguments["--topofile"] is not None:
-          fig.savefig('phase-topo.eps', format='EPS',dpi=150)
+          fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
           nfigure +=1
           figtopo = plt.figure(nfigure,figsize=(14,10))
           figtopo.subplots_adjust(hspace=.001,wspace=0.001)
