@@ -179,7 +179,7 @@ cax = ax.imshow(aspect,cmap=cm.hsv)
 ax.set_title('Aspect',fontsize=6)
 fig.colorbar(cax, orientation='vertical',aspect=10)
 
-plt.show()
+#plt.show()
 
 
 

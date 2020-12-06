@@ -17,7 +17,8 @@ Plot georeferenced file in RMG or Tif format with optional DEM or ARCGISIMAGE
 
 Usage: plot_geots.py --infile=<value> [--vmin=<value>] [--vmax=<value>] \
 [--geocrop=<values>] [--wrap=<values>] [--cpt=<values>] [--dem=<values>] \
-[--coeff=<values>] [--plot=<yes/no>] [--rad2mm=<value>] [--outfile=<name>]
+[--coeff=<values>] [--plot=<yes/no>] [--rad2mm=<value>] [--outfile=<name>] \
+[--shapefile=<file>]
 
 Options:
 -h --help           Show this screen.
@@ -32,6 +33,7 @@ Options:
 --plot              Display results [default: yes] 
 --rad2mm            Scaling value between input data (rad) and desired output [default: -4.4563]
 --outfile           Give a name to output file
+--shapefile         Plot shape file
 """
 
 # gdal
@@ -49,6 +51,7 @@ import matplotlib.cm as cm
 from pylab import *
 from mpl_toolkits.basemap import Basemap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import shapefile as shp  # Requires the pyshp package
 
 import docopt, os
 arguments = docopt.docopt(__doc__)
@@ -188,18 +191,29 @@ if arguments["--dem"] is not None:
    hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
     vmax=255,vmin=1,zorder=3)
 else:
-   m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=3)
+   m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=0)
    # hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
    #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
      vmax=vmax,vmin=vmin, zorder=4,interpolation='nearest')
 
+if arguments["--shapefile"] is not None and os.exists(arguments["--shapefile"]):
+    sf = shp.Reader(arguments["--shapefile"])
+    for shape in sf.shapeRecords():
+        x = [i[0] for i in shape.shape.points[:]]
+        y = [i[1] for i in shape.shape.points[:]]
+        ax.plot(x,y,color='black',alpha=0.5,zorder=3)
+
+
 ax.set_title(basename,fontsize=6)
 ax.set_xticks(np.linspace(lonbeg,lonend,3))
 ax.set_yticks(np.linspace(latbeg,latend,3))
 
-outfile = basename+'.pdf'
+if arguments["--outfile"] ==  None:
+    outfile = basename+'.pdf'
+else:
+    outfile = arguments["--outfile"]+'.pdf'
 del ds, ds_band1
 # fig.tight_layout()
 plt.suptitle(outfile)

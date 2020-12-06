@@ -21,19 +21,19 @@ baseline="$home/baseline_top_bot.rsc"
 ACP_unw $list_int $prefix $suffix $jstart $jend $istart $iend
 
 # temp invers
-invers_fit_frange  << END
-$baseline
-acp_vecteurs
-0
-1
-1
-1
-END
-mv inverted_cst inverted_acp1
-mv inverted_lin inverted_acp2
-mv inverted_quad inverted_acp3
-mv inverted_cub inverted_acp4
-rm inverted_cst_interf
-rm inverted_lin_interf
-rm inverted_quad_interf
-rm inverted_cub_interf
+#invers_fit_frange  << END
+#$baseline
+#acp_vecteurs
+#0
+#1
+#1
+#1
+#END
+#mv inverted_cst inverted_acp1
+#mv inverted_lin inverted_acp2
+#mv inverted_quad inverted_acp3
+#mv inverted_cub inverted_acp4
+#rm inverted_cst_interf
+#rm inverted_lin_interf
+#rm inverted_quad_interf
+#rm inverted_cub_interf

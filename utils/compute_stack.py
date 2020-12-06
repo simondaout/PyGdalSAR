@@ -85,7 +85,7 @@ for i in xrange((kmax)):
     ds = gdal.Open(infile, gdal.GA_ReadOnly)
     ds_band2 = ds.GetRasterBand(2)
     ds_band1 = ds.GetRasterBand(1)
-    print 'Nlign:{}, Ncol:{}, int:{}-{}'.format(ds.RasterYSize, ds.RasterXSize,interf1,interf2)
+    print 'Nlines:{}, Ncol:{}, int:{}-{}'.format(ds.RasterYSize, ds.RasterXSize,interf1,interf2)
 
     los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
     # cor_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
@@ -104,7 +104,7 @@ count=np.zeros((nlines,ncols))
 for i in xrange(0,nlines,1):
     for j in xrange(0,ncols,1):
         k=np.flatnonzero(alllos[i,j,:])
-        if len(k) > 1:
+        if len(k) > 0:
             sumlos[i,j]=np.sum(alllos[i,j,k[:]])/len(k)
             # sumlos[i,j]=np.sum(alllos[i,j,k[:]]*allcor[i,j,k[:]])/np.sum(allcor[i,j,k[:]])
                
@@ -122,7 +122,7 @@ except:
 fig = plt.figure(figsize=(12,5))
 ax = fig.add_subplot(1,1,1)
 ax.set_title('colorMap')
-plt.imshow(sumlos,cmap=cmap)
+plt.imshow(sumlos,vmax=np.nanpercentile(sumlos,98),vmin=np.nanpercentile(sumlos,2),cmap=cmap)
 ax.set_aspect('equal')
 
 cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])

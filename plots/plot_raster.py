@@ -291,7 +291,7 @@ except:
 fig.tight_layout()
 # ax.set_rasterized(True)
 try:
-    fig.savefig('{}.eps'.format(infile), format='EPS',dpi=150)
+    fig.savefig('{}.pdf'.format(infile), format='PDF',dpi=180)
 except:
     pass
 plt.show()

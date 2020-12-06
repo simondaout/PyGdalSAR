@@ -63,15 +63,15 @@ def check(kk):
     name = prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw'
 
     if path.exists(infile) is not False:
-        print("Open: {0} in {1}!".format(name,folder))
+        print("Open: {0} in {1}".format(name,folder))
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         los = ds.GetRasterBand(2).ReadAsArray()
         del ds
     else:
-        print("File: {0} not found in {1}!".format(name,folder))
+        print("File: {0} not found in {1}".format(name,folder))
         los = np.zeros((2,2))
     los[np.isnan(los)] = 0.
-    return los
+    return los, name
 
 print('----------------------------------')
 print('Check interferograms list:', int_list)
@@ -85,8 +85,9 @@ print('Save empty interferogram list:', ListInterfero)
 wf = open(ListInterfero, 'w')
 
 for j in range(Nifg):
-    los = check(j)
+    los,name = check(j)
     if np.sum(los) == 0:
+        print("File {0} empty!".format(name))
         wf.write("%i  %i\n" % (date_1[j], date_2[j]))
 wf.close()
 
