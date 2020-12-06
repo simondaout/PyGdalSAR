@@ -796,9 +796,8 @@ for l in range((N)):
 
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
-fig.tight_layout()
+#fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
-
 
 if plot=='yes':
         plt.show()

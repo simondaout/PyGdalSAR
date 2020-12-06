@@ -12,9 +12,9 @@ prep_invers_pixel.py
 This script prepares a work directory and input files for invers_pixel.
 
 Usage:
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] 
-        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>]  
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] 
+        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>]  
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>]
 
 Options:
   --int_path=<dir>    Absolute path to interferograms directory 
@@ -25,7 +25,8 @@ Options:
   --suffix=<vaue>     Suffix name $prefix$date1-$date2$suffix.unw [default: '']
   --prefix_coh=<value>    Prefix coherence name $prefix$date1-$date2$suffix.cc [default: '']
   --suffix_coh=<vaue>     Suffix coherence name $prefix$date1-$date2$suffix.cc [default: '']
-  --coh_path=<dir>    Absolute path to cohrence file directory 
+  --do_coh<yes/no>    If yes, link coherence files used to weigth time series analysis
+  --coh_path=<dir>    Absolute path to cohrence file directory  
   --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
   --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
   --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 0.5,100). Downweight small temporal baselines and large perpendicular baselines 
@@ -72,10 +73,14 @@ if arguments["--suffix_coh"] == None:
 else:
   suffix_coh=arguments["--suffix_coh"]
 
-if arguments["--coh_path"] == None:
-  do_coh = 'no'
+if arguments["--do_coh"] == None:
+  do_coh = int(1)
 else:
-  do_coh = 'yes'  
+  do_coh = int(0) 
+
+if arguments["--coh_path"] == None:
+  coh_path = ''
+else:
   coh_path = arguments["--coh_path"]
 
 if arguments["--format"] ==  None:
@@ -192,14 +197,27 @@ if sformat == 'ROI_PAC':
       outint=os.path.abspath(lndatadir + str(date1)  + '-' + str(date2) + '_pre_inv.unw')
       if os.path.exists(infile):
         print('Create link:',infile )
+        if os.path.exists(outint) is False:
+	    os.symlink(infile,outint)
+            os.symlink(rscfile,outrsc)    
       else:
         print('Can not find:', infile)
 	
-      try:  
-	os.symlink(infile,outint)
-        os.symlink(rscfile,outrsc)    
-      except:
-        pass
+      if do_coh == 0:
+          cohformat = int(0) 
+          cohfile = os.path.abspath(folder + '/' + str(date1) + '-' + str(date2) + suffix_coh + '.cor')
+          cohrsc =  os.path.abspath(folder + '/' + str(date1) + '-' + str(date2) + suffix_coh +'.cor.rsc')
+          outcoh = os.path.abspath(lndatadir + '/' + str(date1) + '-' + str(date2) + '.cor')
+          outrsc  = os.path.abspath(lndatadir + '/' + str(date1) + '-' + str(date2) + '.cor.rsc')
+
+          if os.path.exists(cohfile):
+            print('Create link:',cohfile)
+            if os.path.exists(outcoh) is False:
+	        os.symlink(cohfile,outcoh)
+                os.symlink(cohrsc,outrsc)    
+          else:
+            print('Can not find:', cohfile)
+          
 
 else:
   iformat = int(1)
@@ -214,7 +232,7 @@ else:
         lines,cols =  ds.RasterYSize, ds.RasterXSize
         del ds, ds_band
 
-        if do_coh == 'yes':
+        if do_coh == 0:
             cohformat = int(1)
             cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc.tif')
             ds = gdal.Open(cohfile, gdal.GA_ReadOnly)
@@ -229,7 +247,7 @@ else:
         los = np.float32(los)
         lines,cols = gm.readpar()
 
-        if do_coh == 'yes':
+        if do_coh == 0:
             cohformat = int(1)
             cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc')
             coh = gm.readgamma(cohfile)
@@ -253,7 +271,7 @@ else:
       """ % (cols, lines, cols-1, lines-1))
       f.close()
 
-      if do_coh == 'yes':
+      if do_coh == 0:
         outcofile =  str(date1) + '-' + str(date2) + '-CC.r4'
         print('Create  {} file, lines:{}, cols:{}'.format(outcofile,lines, cols)) 
         fid = open(lndatadir +outcofile,'wb')
@@ -312,7 +330,7 @@ list_dates
 list_pair
 %d     #  interferogram format (RMG : 0; R4 :1) (date1-date2_pre_inv.unw or date1-date2.r4)
 3100.  #  include interferograms with bperp lower than maximal baseline
-1      #  Weight input interferograms by coherence or correlation maps ? (y:0,n:1)
+%d      #  Weight input interferograms by coherence or correlation maps ? (y:0,n:1)
 %d      #  coherence file format (RMG : 0; R4 :1) (date1-date2.cor or date1-date2-CC.r4)
 1      #  minimal number of interferams using each image
 1      #  interferograms weighting so that the weight per image is the same (y=0;n=1)
@@ -326,12 +344,12 @@ list_pair
 1      #  use of covariance (y:0,n:1) ? (Obsolete)
 1      #  Adjust functions to phase history ? (y:1;n:0) Require to use smoothing option (smoothing coefficient) !
 0      #  compute DEM error proportional to perpendicular baseline ? (y:1;n:0)
-0, 2003.0     #  include a step function ? (y:1;n:0)
+0 2003.0     #  include a step function ? (y:1;n:0)
 0      #  include a cosinus / sinus function ? (y:1;n:0)
 1      #  smoothing by Laplacian, computed with a scheme at 3pts (0) or 5pts (1) ?
 2      #  weigthed smoothing by the average time step (y :0 ; n : 1, int : 2) ?
 1      # put the first derivative to zero (y :0 ; n : 1)?
-    """ % (iformat, cohformat, do_sig))
+    """ % (iformat, do_coh, cohformat, do_sig))
     f.close()
 
 
