@@ -1130,7 +1130,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             ramp = np.zeros((new_lines,new_cols))
             # rms = np.sqrt(np.nanmean((los)**2))
             rms = np.nanstd(los)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
+            logger.info('Flat=0: no corrections. RMS dates %i: %f'%(idates[l], rms))
 
         else:
 
