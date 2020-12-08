@@ -247,9 +247,7 @@ if __name__ == "__main__":
 
     # gps within poly
     gps = all_gps[all_gps.within(poly)]
-    #print(gps)
-
-    # load insar
+     # load insar
     # read format incidence heading angle
     # not same convention in GAMMA or ROIPAC
     try:
@@ -297,11 +295,16 @@ if __name__ == "__main__":
                 elif iformat == 'GAMMA':
                     gps.loc[index, 'los'] = neu2los_gamma(g['vn'], g['ve'], g['vu'], gps.loc[index,'look'], gps.loc[index,'heading'])
                     gps.loc[index, 'siglos'] = np.abs(neu2los_gamma(g['sn'], g['se'], g['su'], gps.loc[index,'look'], gps.loc[index,'heading']))
+   
+    if gps.los.count() == 0:
+        print('No GPS within polygon. You may increase epsi value. Exit!')
+        sys.exit()
 
     # compute diff GPS - InSAR
     gps.loc[:, 'diff'] = [gps_los -  insar.extract_pixel_value(point.x, point.y, 2)[0] for point,gps_los in gps[['geometry','los']].to_numpy()]
     gps.loc[:, 'std'] = [insar.extract_pixel_value(point.x, point.y, 2)[1] for point in gps['geometry'].to_numpy()]
    
+
     # if GPS_LOS - LOS is NaN, then increase window size
     for n in range(4,200,2):
         for index,g in gps.iterrows():
