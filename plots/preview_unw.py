@@ -84,11 +84,12 @@ if os.path.exists(outputdir):
 else:
   os.makedirs(outputdir)
 
-os.remove(os.path.join(outputdir, "interf_pair_fail.txt"))
-os.remove(os.path.join(outputdir, "interf_pair_success.txt"))
+if os.path.exists(os.path.join(outputdir, "interf_pair_problems.txt")):
+    os.remove(os.path.join(outputdir, "interf_pair_problems.txt"))
+    os.remove(os.path.join(outputdir, "interf_pair_success.txt"))
 def preview(kk):
     successf = open(os.path.join(outputdir, "interf_pair_success.txt"), "a")
-    failf =  open(os.path.join(outputdir, "interf_pair_fail.txt"), "a")
+    failf =  open(os.path.join(outputdir, "interf_pair_problems.txt"), "a")
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
     folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
@@ -96,6 +97,7 @@ def preview(kk):
     jpeg = int_path + folder +  prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.jpeg'
     outjpeg = outputdir + prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.jpeg'
 
+    subprocess.call("length.pl "+str(infile),shell=True)
     try:
       r = subprocess.call("nsb_preview_unw -croipac -m"+str(-wrap)+" -M"+str(wrap)+" "+str(radarf)\
       +" "+str(infile)+" "+str(jpeg), shell=True)
@@ -116,7 +118,7 @@ pool.map(preview, work)
 
 print 
 print 'Write successed IFG in: interf_pair_success.txt'
-print 'Write failed IFG in: interf_pair_fail.txt'
+print 'Write failed IFG in: interf_pair_problems.txt'
 
 # print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
 jpeg_files = glob.glob('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))
