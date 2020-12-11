@@ -15,8 +15,8 @@ clean_r4.py
 Clean a r4 file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
-[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] \
-[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--setzero=<yes/no>] [--cst=<value>]
+[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
+[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>]
 
 Options:
 -h --help           Show this screen.
@@ -24,14 +24,15 @@ Options:
 --outfile PATH      output file
 --mask PATH         r4 file used as mask
 --threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
---scale VALUE       scale the mask [default:1]
+--scale VALUE       scale data [default:1]
+--scale_mask VALUE  scale the mask [default:1]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --crop VALUE       Crop option with smoothing of boundaries [default: 0,ncol,0,nlign]
 --buff VALUE        Number of pixels for crop smothing  (default: 50)
 --perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
 --ramp<lin/quad/cub/no>      Correct the map from ramp in range and azimuth
 --ref=<jstart,jend,istart,iend> Set to zero displacements from jstart to jend
---setzero           Set mask to zero instead of NaN
+--removeNAN         replace NaN by 0
 --cst               Add constante to map
 """
 
@@ -67,11 +68,15 @@ if arguments["--scale"] ==  None:
    scale = 1.
 else:
    scale = float(arguments["--scale"])
+if arguments["--scale_mask"] ==  None:
+   scale_mask = 1.
+else:
+   scale_mask = float(arguments["--scale_mask"])
 
-if arguments["--setzero"] ==  None:
+if arguments["--removeNAN"] ==  None:
    setzero = 'no'
 else:
-   setzero = arguments["--setzero"]
+   setzero = arguments["--removeNAN"]
 
 if arguments["--perc"] ==  None:
     perc = 99.9
@@ -113,7 +118,7 @@ else:
 
 fid = open(infile, 'r')
 m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
-# m[m==0.0] = np.float('NaN')
+m[m==0.0] = np.float('NaN')
 
 mf = np.copy(m)
 
@@ -129,7 +134,7 @@ m_ramp[kk] = np.float('NaN')
 if maskf is not 'no':
     fid2 = open(maskf, 'r')
     mask = np.fromfile(fid2,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))
-    mask =  mask*scale
+    mask =  mask*scale_mask
     kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
     mf[kk] = np.float('NaN')
 else:
@@ -295,8 +300,8 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
 #plt.show()
 #sys.exit()
 
-# manual cst
-mf = mf - shift
+# apply  scale and manual cst
+mf = scale*(mf - shift)
 
 # clean based on perc
 maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
@@ -306,18 +311,17 @@ kk = np.nonzero(
 mf[kk] = np.float('NaN')
 
 # Plot
-vmax = np.max([np.nanpercentile(mf,97),np.nanpercentile(m,97),np.nanpercentile(mf,3),np.nanpercentile(m,3)])
-# vmax= 2.
+vmax = np.max([np.nanpercentile(mf,99),np.nanpercentile(m,99),np.nanpercentile(mf,1),np.nanpercentile(m,1)])
 vmin = -vmax
 
 if setzero == 'yes':
     # replace "NaN" to 0
     mf[np.isnan(mf)] = 0.
 
-
 #save output
 fid3 = open(outfile,'wb')
 mf.flatten().astype('float32').tofile(fid3)
+fid3.close()
 
 fig = plt.figure(0,figsize=(16,6))
 ax = fig.add_subplot(1,4,1)
@@ -367,7 +371,6 @@ ax.set_title(outfile)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
-
 
 fig.tight_layout()
 plt.show()

@@ -697,6 +697,7 @@ def invSVD(A,b,cond):
     try:
         U,eignv,V = lst.svd(A, full_matrices=False)
         s = np.diag(eignv)
+        print(s)
         index = np.nonzero(s<cond)
         inv = lst.inv(s)
         inv[index] = 0.

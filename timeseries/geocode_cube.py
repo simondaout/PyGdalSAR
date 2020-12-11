@@ -69,7 +69,7 @@ amp = np.zeros((nlign,ncol))
 fid = open(ampf, 'r')
 amp[:nlign,:ncol] = np.fromfile(fid,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))
 
-# for l in xrange((N)):
+for l in xrange((N)):
 # for l in xrange(3):
     data = as_strided(maps[:,:,l])
     drv = gdal.GetDriverByName("roi_pac")

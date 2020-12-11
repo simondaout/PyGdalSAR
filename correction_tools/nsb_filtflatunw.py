@@ -19,7 +19,7 @@ options:
   --nproc=<nb_cores>    Use <nb_cores> local cores to create delay maps [Default: 4]
   --prefix=<value>      Prefix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '']
   --suffix=<value>      Suffix of the IFG at the starting of the processes $prefix$date1-$date2$suffix_$rlookrlks.int [default: '_sd']
-  --jobs<job1/job2/...> List of Jobs to be done (eg. --jobs=#do_list = check_look/replace_amp/flat_atmo/colin/look_int/unwrapping/add_atmo_back) 
+  --jobs<job1/job2/...> List of Jobs to be done (eg. check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_atmo_back add_era_back add_flata_back add_flatr_back refer) 
 Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat_atmo flat_model colin unwrapping add_model_back add_era_back add_atmo_back add_flata_back add_flatr_back
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
@@ -435,8 +435,8 @@ class PileInt:
 class FiltFlatUnw:
     """ Create a class FiltFlatUnw defining all the post-procesing functions 
     list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
-    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle,SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref, min_z, detla_z,
-    seedx, seedy.threshold_unw, unw_method
+    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle, SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref, min_z, detla_z,
+    seedx, seedy.threshold_unw, unw_method, ref_top, ref_left, ref_width, ref_length
     Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask (default: 0.)
     defining the boundary of the mask zone for emprical estimations
     suffix, preffix: define name of the interferogram at the start of the processes
@@ -451,8 +451,8 @@ class FiltFlatUnw:
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
         self.FilterStrength,self.Filt_method,
-        self.nfit_atmo,self.thresh_amp_atmo, self.ivar, self.z_ref, self.min_z, self.delta_z,
-        self.seedx, self.seedy,self.threshold_unw,self.threshold_unfilt,self.unw_method,
+        self.nfit_atmo,self.thresh_amp_atmo,self.ivar,self.z_ref,self.min_z,self.delta_z,
+        self.seedx, self.seedy,self.threshold_unw,self.threshold_unfilt,self.unw_method,self.ref_top,        self.ref_left,self.ref_width,self.ref_length
         ) = map(str, params)
 
         # initialise prefix, suffix
@@ -703,8 +703,8 @@ def filterROI(config, kk):
         do = checkoutfile(config,filtfile)
         if do:
           try:
-            run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.FilterStrength)+"> log_filtROI.txt")
-            # run("filter.pl "+str(inbase)+" "+str(config.FilterStrength)+" "+str(config.Filt_method)+" "+str(filtbase)+"> log_filtROI.txt")
+            #run("adapt_filt "+str(infile)+" "+str(filtfile)+" "+str(width)+" 0.25"+" "+str(config.FilterStrength)+"> log_filtROI.txt")
+            run("filter.pl "+str(inbase)+" "+str(config.FilterStrength)+" "+str(config.Filt_method)+" "+str(filtbase)+"> log_filtROI.txt")
           except Exception as e:
             logger.critical(e)
             logger.critical('Failed filtering {0} with ROI-PAC filter Failed!'.format(infile))
@@ -1158,7 +1158,7 @@ def flat_model(config,kk):
             do = checkoutfile(config,outfile)
             if do:
                 try:
-                    run("flatten_acp "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
+                    run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
                     +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
                 except Exception as e:
                     logger.critical(e)
@@ -1336,23 +1336,8 @@ def unwrapping(config,kk):
                     opt=1
 
                 # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
-                #run("my_deroul_interf_filt "+str(filtSWfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                #    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" 0 > log_unw.txt")
-
                 run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
-
-            if config.unw_method == 'mpd_noSW':
-                logger.info("Unwraped IFG:{0} with MP.DOIN algorthim without using SW filter (Grandin et al., 2012) ".format(unwfile))
-
-                if path.exists(bridgefile) == False:
-                    wf = open(bridgefile,"w")
-                    wf.write("1  1  1  1  0 ")
-                    wf.close()
-
-                # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
-                run("my_deroul_interf_filt "+str(filtROIfile)+" cut "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" 0 > log_unw.txt")
 
             if config.unw_method == 'roi':
 
@@ -1387,11 +1372,11 @@ def unwrapping(config,kk):
                 if force:
                     rm(mask)
 
-                run("snaphu_mcf.pl smooth "+str(path.splitext(infile)[0])+" "+str(path.splitext(infile)[0])+" "+str(mask)+" "+str(path.splitext(corfile)[0])+" "+str(config.threshold_unw)+ " > log_unw_snaphu.txt")
+                run("snaphu_mcf.pl smooth"+str(path.splitext(infile)[0])+" "+str(path.splitext(infile)[0])+" "+str(mask)+" "+str(path.splitext(corfile)[0])+" "+str(config.threshold_unw)+ " > log_unw_snaphu.txt")
                 snaphu_file = "lp_" + path.splitext(filtSWfile)[0] 
                 run("lowpass.pl "+str(path.splitext(filtROIfile)[0])+" "+str(path.splitext(corfile)[0])+" "+str(snaphu_file)+" 3 Phase_Sigma > log_unw_icu.txt")
                 snaphu_file = "lp_" + path.splitext(filtSWfile)[0] + "_phsig"
-                run("snaphu_mcf.pl smooth "+str(path.splitext(filtROIfile)[0])+" "+str(path.splitext(filtROIfile)[0])+" "+str(mask)+" "+str(snaphu_file)+" "+str(config.threshold_unw)+" > log_unw_snaphu.txt")
+                run("snaphu_mcf.pl smooth "+str(path.splitext(filtROIfile)[0])+" "+str(path.splitext(unwfile)[0])+" "+str(mask)+" "+str(snaphu_file)+" "+str(config.threshold_unw)+" > log_unw_snaphu.txt")
 
           except Exception as e:
             logger.critical(e)
@@ -1605,6 +1590,38 @@ def add_flata_back(config,kk):
 
     return config.getconfig(kk)
 
+def refer(config,kk):
+    "  Refer unwrapped interferograms to a rectangular area  "
+    " Define ref_left, ref_top, ref_width, ref_length in the proc file !"
+
+    with Cd(config.stack.getpath(kk)):
+        config.stack.updatelook(kk,config.Rlooks_unw)
+        unwfile = config.stack.getfiltROI(kk) + '.unw'; checkinfile(unwfile)
+        unwrsc = unwfile + '.rsc'
+        
+        # update names
+        prefix, suffix = config.stack.getfix(kk)
+        newsuffix = suffix + '_refer'
+        config.stack.updatefix(kk,prefix,newsuffix)
+        outfile = config.stack.getfiltROI(kk) + '.unw'
+        outrsc = outfile + '.rsc'
+        copyrsc(unwrsc,outrsc)
+        
+        if force:
+            rm(outfile)
+        
+        try:
+          run("length.pl "+str(unwfile))
+          run("refer_interf "+str(unwfile)+" "+str(outfile)+" "+str(config.ref_left)+" "+str(config.ref_top)+" "+str(config.ref_width)+" "+str(config.ref_length)+" >> log_refer.txt")
+          run("length.pl "+str(outfile))
+        except Exception as e:
+          logger.critical(e)
+          logger.critical("Refer failed for int. {0} Failed!".format(unwfile))
+          print(refer.__doc__)
+          config.stack.updatesuccess(kk)
+
+    return config.getconfig(kk)
+
 def add_model_back(config,kk):
     ''' Function adding model on unwrapped IFG previously removed on wrapped IFG  (See Daout et al., 2017)
         Requiered model file and parameter file .stack
@@ -1637,7 +1654,7 @@ def add_model_back(config,kk):
                     if do:
                         try:
                             run("length.pl "+str(unwfile))
-                            run("unflatten_acp "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
+                            run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
                         except Exception as e:
                             logger.critical(e)
                             logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
@@ -1764,6 +1781,10 @@ proc_defaults = {
     "threshold_unfilt": "0.02", # threshold on colinearity 
     "seedx": "50", # starting col for unw
     "seedy": "50", # starting line for unw
+    "ref_left": "0", # left corner for refer
+    "ref_top": "0", # top corner for  refer
+    "ref_width": "200", # box width for refer
+    "ref_length": "200", # box length for refer
     }
 
 proc = procparser.ProcParser(proc_defaults)
@@ -1792,15 +1813,15 @@ print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
     filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
     FilterStrength : {13}, Filt_method : {14}\n\
     nfit_topo: {15}, thresh_amp_topo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
-    seedx: {21}, seedy: {22}, threshold_unw: {23}, threshold_unfilt: {24} unw_method: {25}'.\
-    format(ListInterfero,SARMasterDir,IntDir,EraDir,\
+    seedx: {21}, seedy: {22}, threshold_unw: {23}, threshold_unfilt: {24}, unw_method: {25}, ref_top: {26}, ref_left: {27}, ref_width: {28}, ref_length: {29}'.format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
     proc["FilterStrength"],proc["Filt_method"],\
     proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
-    proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"]\
+    proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"],\
+    proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]
     ))
 print()
 
@@ -1866,7 +1887,7 @@ for p in jobs:
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
         proc["FilterStrength"], proc["Filt_method"], 
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
-        proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"]], 
+        proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"],proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
         ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask,
         ) 

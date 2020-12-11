@@ -51,7 +51,7 @@ else:
   pixel_ratio = float(arguments["--pixel_ratio"])
 
 if arguments["--look"] == None:
-  look = 4
+  look = 1
 else:
   look = int(arguments["--look"])
 alook=look*5
@@ -98,17 +98,25 @@ def dolook(kk):
     temp = str(date) + '/'+str(date)+ '_coreg.slc'
     run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
 
-work = [(kk) for kk in xrange(kmax)]
-with poolcontext(processes=nproc) as pool:
-    results = pool.map(dolook, work)
+if look>1:
+    work = [(kk) for kk in xrange(kmax)]
+    with poolcontext(processes=nproc) as pool:
+        results = pool.map(dolook, work)
 
 def preview(kk):
     date = dates[kk]
-    infile = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.slc'
-    jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.jpeg'
+    if look > 1:
+        infile = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.slc'
+        jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.jpeg'
+    else:
+        infile = str(date) + '/'+ str(date)+ '_coreg'+'.slc'
+        jpeg = str(date) + '/'+ str(date)+ '_coreg'+'.jpeg'
 
     try:
-      run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
+      if look>1:
+          run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
+      else:
+          run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
     except:
       pass
 
