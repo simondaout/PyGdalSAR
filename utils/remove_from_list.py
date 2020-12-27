@@ -38,10 +38,10 @@ print("Input number of interferogram: ",kmax)
 k = 0 
 wf = open(out_list, "w")
 for i in range((kmax)):
-    write=False
+    write=True
     for j in range((kkmax)):
         if (date_1[i] == date_11[j]) & (date_2[i] == date_22[j]):
-            write=True
+            write=False
     if write:    
         wf.write("%i %i\n" % (date_1[i],date_2[i]))
         k = k+1
