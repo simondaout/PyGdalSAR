@@ -86,7 +86,9 @@ wf = open(ListInterfero, 'w')
 
 for j in range(Nifg):
     los,name = check(j)
-    if np.sum(los) == 0:
+    occurences = np.count_nonzero(los != 0)
+    #if np.sum(los) == 0:
+    if occurences < 500:
         print("File {0} empty!".format(name))
         wf.write("%i  %i\n" % (date_1[j], date_2[j]))
 wf.close()
