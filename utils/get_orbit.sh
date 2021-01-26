@@ -14,8 +14,8 @@ while [ $count_images -le $num_images ]
 	  echo $NameDate/${NameDate}.slc
 	  touch $NameDate/${NameDate}.slc
           
-	  /home/cometsoft/Ubuntu-18.04/nsbas//scripts/nsb_fetch_s1_orb.py -s $NameDate/${NameDate}.slc -t  RESORB -v 4
-	  /home/cometsoft/Ubuntu-18.04/nsbas//scripts/nsb_fetch_s1_orb.py -s $NameDate/${NameDate}.slc -t  POEORB -v 4
+	  nsb_fetch_s1_orb.py -s $NameDate/${NameDate}.slc -t  RESORB -v 4
+	  nsb_fetch_s1_orb.py -s $NameDate/${NameDate}.slc -t  POEORB -v 4
 	  number_try=$(( $number_try+1 ))
 	  echo $number_try
   done
