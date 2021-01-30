@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ################################################################################
 #
@@ -100,7 +100,7 @@ else:
 
 if arguments["--suffix_azimuth_file"] == None and arguments["--preffix_azimuth_file"] == None and \
 arguments["--suffix_range_file"] == None and arguments["--preffix_range_file"] == None:
-    print 'No input files for ramp corrections'
+    print('No input files for ramp corrections')
     sys.exit()
 
 if arguments["--rlook_factor"] ==  None:
@@ -116,13 +116,13 @@ else:
     plot = str(arguments["--plot"])
 
 
-print
+print()
 # read int
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')
 kmax=len(date_1)
-print "number of interferogram: ",kmax
+print("number of interferogram: ",kmax)
 
-for kk in xrange((kmax)):
+for kk in range((kmax)):
     date1, date2 = date_1[kk], date_2[kk]
     idate = str(date1) + '-' + str(date2) 
     folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
@@ -133,14 +133,14 @@ for kk in xrange((kmax)):
         az_a, az_b, az_c, az_d, az_f, az_g = 0, 0, 0, 0, 0, 0
     else:
         azfile = folder + preaz + str(idate) + sufaz + '_' + wlook + 'rlks.flata'
-        print 'Open azimuth file:', azfile
+        print('Open azimuth file:', azfile)
         az_a, az_b, az_c, az_d, az_f, az_g = np.loadtxt(azfile,comments="#",usecols=(0,1,2,3,4,5),unpack=True,dtype='f,f,f,f,f,f')
 
     if arguments["--suffix_range_file"] == None and arguments["--preffix_range_file"] == None:
         rg_a, rg_b, rg_c, rg_d, rg_f, rg_g = 0, 0, 0, 0, 0, 0
     else:
         rgfile = folder + prerg + str(idate) + sufrg + '_' + wlook + 'rlks.flatr'
-        print 'Open range file:', rgfile
+        print('Open range file:', rgfile)
         rg_a, rg_b, rg_c, rg_d, rg_f, rg_g = np.loadtxt(rgfile,comments="#",usecols=(0,1,2,3,4,5),unpack=True,dtype='f,f,f,f,f,f')
 
     ds = gdal.Open(infile, gdal.GA_ReadOnly)
@@ -150,18 +150,18 @@ for kk in xrange((kmax)):
 
     los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
     coh_map = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    print
-    print 'Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate)
+    print()
+    print('Nlign:{}, Ncol:{}, int:{}:'.format(ds.RasterYSize, ds.RasterXSize, idate))
 
     corr_map = np.ones((ds.RasterYSize, ds.RasterXSize))
     az = np.tile(np.arange(1,ds.RasterYSize+1)*factor,ds.RasterXSize).reshape(ds.RasterXSize,ds.RasterYSize).T
     rg = np.tile(np.arange(1,ds.RasterXSize+1)*factor,ds.RasterYSize).reshape(ds.RasterYSize, ds.RasterXSize)
 
     rg_corr = rg_a*rg + rg_b*rg**2 + rg_c*rg**3 + rg_d**rg**4 + rg_f*rg**5 + rg_g*rg**6
-    print 'Add range ramp %f r, %f r**2  + %f r**3 + %f r**4 + %f r**5 + %f r**6'%(rg_a, rg_b, rg_c, rg_d, rg_f, rg_g)
+    print('Add range ramp %f r, %f r**2  + %f r**3 + %f r**4 + %f r**5 + %f r**6'%(rg_a, rg_b, rg_c, rg_d, rg_f, rg_g))
 
     az_corr = az_a*az + az_b*az**2 + az_c*az**3 + az_d**az**4 + az_f*az**5 + az_g*az**6
-    print 'Add azimuthal ramp %f az, %f az**2  + %f az**3 + %f az**4 + %f az**5 + %f az**6'%(az_a, az_b, az_c, az_d, az_f, az_g)
+    print('Add azimuthal ramp %f az, %f az**2  + %f az**3 + %f az**4 + %f az**5 + %f az**6'%(az_a, az_b, az_c, az_d, az_f, az_g))
     
     corr_map = rg_corr + az_corr
 
