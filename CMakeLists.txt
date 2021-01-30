@@ -6,4 +6,4 @@ if(NOT(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/contrib/nsbas-playground/CMakeLists.t
   message(FATAL_ERROR "nsbas-playground submodule not found. You probably want to run:\n$ git submodule init\n$ git submodule update")
 endif()
 add_subdirectory(contrib/nsbas-playground nsbas-playground EXCLUDE_FROM_ALL)
-add_custom_target(nsbas-playground ALL DEPENDS nsb_preview_int nsb_preview_unw)
+add_custom_target(nsbas-playground ALL DEPENDS nsb_preview_int nsb_preview_unw nsb_preview_slc)

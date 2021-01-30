@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -80,7 +80,7 @@ def consInvert(A,b,sigmad=1,ineq=[None,None], cond=1.0e-10, iter=250,acc=1e-06):
     else:
         res = opt.fmin_slsqp(_func,x0,f_ieqcons=_f_ieqcons,fprime=_fprime, fprime_ieqcons=_fprime_ieqcons,iter=iter,full_output=True,acc=acc)
         if res[3] != 0:
-            print 'Exit mode %d: %s \n'%(res[3],res[4])
+            print('Exit mode %d: %s \n'%(res[3],res[4]))
 
     fsoln = res[0]
     return fsoln
@@ -107,28 +107,28 @@ else:
     noise = arguments["--noise"]
 
 #Data loading
-print "int list=",liste_int
+print("int list=",liste_int)
 source1=file(liste_int,'r')
 date1,date2,spint=np.loadtxt(source1,comments="#",unpack=True,dtype='i,i,f')
 kmax=len(date1)
-print "number of interferogram: ",kmax
+print("number of interferogram: ",kmax)
 
-print "image list=",basefile
+print("image list=",basefile)
 nmax=len(imd)
-print "number of image: ",nmax
+print("number of image: ",nmax)
 
 #build G
 G=np.zeros((kmax+1,nmax))
 if noise=='yes':
-  for k in xrange((kmax)):
-    for n in xrange((nmax)):
+  for k in range((kmax)):
+    for n in range((nmax)):
         if (date1[k]==im[n]): 
           G[k,n]=1
         elif (date2[k]==im[n]):
           G[k,n]=1
 else:
-  for k in xrange((kmax)):
-    for n in xrange((nmax)):
+  for k in range((kmax)):
+    for n in range((nmax)):
         if (date1[k]==im[n]): 
           G[k,n]=-1
         elif (date2[k]==im[n]):
@@ -140,32 +140,32 @@ G[-1,0]=1
 d=np.zeros((kmax+1))
 d[:kmax]=spint
 
-print
+print()
 # Constrain
 if cons=='yes':
-    print "Add positive constrain to the inversion"
+    print("Add positive constrain to the inversion")
     f = np.zeros(nmax)
     E = np.diag(np.ones(nmax))
     
-    print "Inversion...."
+    print("Inversion....")
     sp = consInvert(G,d,ineq=[E,f])
 
 else:
-    print "Inversion...."
+    print("Inversion....")
     sp = consInvert(G,d)
 
 ## check resolution of the inversion
 #Res = np.diag(np.dot(np.dot(G,np.linalg.pinv(np.dot(G.T,G))),G.T))
-#print 'date , phase, res: '
-#for n in xrange(len(imd)):
-#    print imd[n], sp[n], Res[n]
-#print
+#print('date , phase, res: ')
+#for n in range(len(imd)):
+#    print(imd[n], sp[n], Res[n])
+#print()
 
-#for n in xrange(len(imd)):
-#    print imd[n], sp[n]
-#print
+#for n in range(len(imd)):
+#    print(imd[n], sp[n])
+#print()
 
-print 'Saving in the output file', outfile
+print('Saving in the output file', outfile)
 # save in output file
 np.savetxt(outfile, np.vstack([imd,sp]).T, fmt='%.6f')
 

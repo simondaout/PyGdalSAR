@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -82,9 +82,9 @@ def plot(ldates,time,mode,temp,fit,amp,dphi,lat,lon,level,nfigure):
 ds = gdal.Open("NETCDF:"+sys.argv[1], gdal.GA_ReadOnly)
 dsmd = ds.GetMetadata()
 ds_geo = ds.GetGeoTransform()
-print 'Coordinates:', ds.GetGeoTransform()
-print 'Grid:', ds.RasterYSize,ds.RasterXSize, ds.RasterCount
-print
+print('Coordinates:', ds.GetGeoTransform())
+print('Grid:', ds.RasterYSize,ds.RasterXSize, ds.RasterCount)
+print()
 
 pix_az, pix_rg = np.indices((ds.RasterYSize,ds.RasterXSize))
 llat,llon = ds_geo[3]+ds_geo[5]*pix_az, ds_geo[0]+ds_geo[1]*pix_rg
@@ -103,7 +103,7 @@ date_ref = datetime.datetime(1900, 01, 01)
 
 # number of pressure levband = ds.GetRasterBand(b)el
 levels_values = map(int,dsmd["NETCDF_DIM_level_VALUES"].replace('{','').replace('}','').replace(',',' ').split())
-print 'Pressure levels values:', levels_values
+print('Pressure levels values:', levels_values)
 M = len(levels_values)
 temp = np.zeros((N,ds.RasterCount)) 
 dates,time,mode,levels=[],[],[],[]
@@ -118,7 +118,7 @@ for b in range(1, ds.RasterCount+1):
     # convert date to dec
     dec = float(date.strftime('%j'))/365.1
     year = float(date.strftime('%Y'))
-    #print date,dec,year
+    #print(date,dec,year)
     mode.append(dec)
     time.append(year+dec)
     
@@ -128,7 +128,7 @@ for b in range(1, ds.RasterCount+1):
     data = band.ReadAsArray()[index]*scale + offset
    
     levels.append(bandmd["NETCDF_DIM_level"]) 
-    #print date, " -> ", np.mean(data)
+    #print(date, " -> ", np.mean(data))
     temp[:,b-1] = data-273.15    
 
 time,dates,mode,levels = np.array(time), np.array(dates),np.array(mode),np.array(levels)
@@ -139,11 +139,11 @@ date0 = 2007
 doplot='yes'
    
 
-for i in xrange(N):
-# for i in xrange(2):
-    for j in xrange(M):
+for i in range(N):
+# for i in range(2):
+    for j in range(M):
         level = levels_values[j]
-        print 'lon: {}, lat: {}, level: {}'.format(lon[i],lat[i],level)
+        print('lon: {}, lat: {}, level: {}'.format(lon[i],lat[i],level))
         data = temp[i,j::M]
         t = time[j::M]
         v, a, b, c = invers(data,t,date0)
@@ -152,7 +152,7 @@ for i in xrange(N):
         print('Vitesse: {:0.3f} °/yr'.format(v))
         print('Amplitude: {:0.3f} °'.format(np.sqrt(a**2+b**2)))
         print('Phase Shift: {:0.3f} rad'.format(np.arctan2(b,a)))
-        print
+        print()
         if doplot=='yes':
             fit = seasonal(t,v,a,b,c)
             plot(dates[j::M],t,mode[j::M],data,fit,amp,dphi,lat[i],lon[i],level,nfigure)

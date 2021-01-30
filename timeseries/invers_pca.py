@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ############################################
@@ -141,7 +141,7 @@ if __name__ == "__main__":
   ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
   nb,idates,dt,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
   N=len(dt)
-  print 'Number images: ', N
+  print('Number images: ', N)
 
   if arguments["--n_comp"] ==  None:
     n_comp = 10
@@ -154,7 +154,7 @@ if __name__ == "__main__":
   if arguments["--imref"] ==  None:
     imref = 0
   elif arguments["--imref"] < 1:
-    print '--imref must be between 1 and Nimages'
+    print('--imref must be between 1 and Nimages')
   else:
     imref = int(arguments["--imref"]) - 1
   if arguments["--crop"] ==  None:
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     crop = map(float,arguments["--crop"].replace(',',' ').split())
     docrop = 'yes'
   ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-  print 'Compute PCA between ibeg:{} - iend:{} and jbeg:{} - jend:{} '.format(ibeg,iend,jbeg,jend)
+  print('Compute PCA between ibeg:{} - iend:{} and jbeg:{} - jend:{} '.format(ibeg,iend,jbeg,jend))
 
   if arguments["--plot"] ==  None:
     plot = 'yes'
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     plot = arguments["--plot"]
   if arguments["--cube"] ==  None:
     cubef = "depl_cumule"
-    print "Carefull: Data should be detrend"
+    print("Carefull: Data should be detrend")
   else:
     cubef = arguments["--cube"]
 
@@ -209,24 +209,24 @@ if not os.path.exists(outdir):
 
 cubei = np.fromfile(cubef,dtype=np.float32)
 cube = as_strided(cubei[:nlign*ncol*N])
-print 'Number of line in the cube: ', cube.shape
+print('Number of line in the cube: ', cube.shape)
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
 maps = cube.reshape((nlign,ncol,N))
-print 'Reshape cube: ', maps.shape
+print('Reshape cube: ', maps.shape)
 # ref
 cst = np.copy(maps[:,:,imref])
-for l in xrange((N)):
+for l in range((N)):
     maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l] - base[imref])
 
 
 if docrop == 'yes':
     ncol, nlign = iend-ibeg, jend-jbeg
     crop_maps = np.zeros((nlign,ncol,N))
-    for j in xrange((N)):
+    for j in range((N)):
         crop_maps[:,:,j] = maps[jbeg:jend,ibeg:iend,j]
     maps = np.copy(crop_maps)
-    print 'Crop cube: ', maps.shape
+    print('Crop cube: ', maps.shape)
 
 
 if type_decomp =='space':
@@ -279,7 +279,7 @@ xmin = datetime.strptime('{}'.format(dmin),'%Y%m%d')
 xmax = datetime.strptime('{}'.format(dmax),'%Y%m%d')
 xlim=date2num(np.array([xmin,xmax]))
 
-print m.T.shape
+print(m.T.shape)
 
 if type_decomp == 'space':
     m = m.T
@@ -291,7 +291,7 @@ for i in range(n_comp):
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
     ax.plot(x_d, m[:,i])
     ax.scatter(x_d, m[:,i])
-    for j in xrange(len(x_eq)):
+    for j in range(len(x_eq)):
         ax.axvline(x=x_eq[j],linestyle='--', color = 'r', linewidth = 1)
     ax.set_xlim(xlim)
 fig.autofmt_xdate()
@@ -379,7 +379,7 @@ for i in range(n_comp):
     #ax_n = fig.add_subplot(n_comp,1,1)
     ax_n.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
     ax_n.plot(x_d, comp_norm[:,i], label='IC{}'.format(i+1))
-    for j in xrange(len(x_eq)):
+    for j in range(len(x_eq)):
         ax.axvline(x=x_eq[j],linestyle='--', color = 'r', linewidth = 1)
     ax_n.legend()
 fig.autofmt_xdate()

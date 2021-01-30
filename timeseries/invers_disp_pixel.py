@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -101,7 +101,7 @@ class pattern:
         self.date=date
     
     def info(self):
-        print self.name, self.date
+        print(self.name, self.date)
 
 def Heaviside(t):
         h=np.zeros((len(t)))
@@ -150,7 +150,7 @@ class sint(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=(t[i]-self.to)*math.sin(2*math.pi*(t[i]-self.to))
         return func
 
@@ -161,7 +161,7 @@ class cost(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=(t[i]-self.to)*math.cos(2*math.pi*(t[i]-self.to))
         return func
 
@@ -172,7 +172,7 @@ class sinvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.sin(2*math.pi*(t[i]-self.to))
         return func
 
@@ -183,7 +183,7 @@ class cosvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.cos(2*math.pi*(t[i]-self.to))
         return func
 
@@ -194,7 +194,7 @@ class sin2var(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.sin(4*math.pi*(t[i]-self.to))
         return func
 
@@ -205,7 +205,7 @@ class cos2var(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.cos(4*math.pi*(t[i]-self.to))
         return func
 
@@ -216,7 +216,7 @@ class sin5var(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.sin(math.pi*(t[i]-self.to))
         return func
 
@@ -227,7 +227,7 @@ class cos5var(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.cos(math.pi*(t[i]-self.to))
         return func
 
@@ -276,7 +276,7 @@ class corrdem(pattern):
         self.bp=bp
 
     def info(self):
-        print self.name
+        print(self.name)
 
     def g(self,index):
         func = (self.bp-self.bpo)
@@ -289,7 +289,7 @@ class vector(pattern):
         self.func = vect
 
     def info(self):
-        print self.name
+        print(self.name)
 
     def g(self,index):
         return self.func[index]
@@ -498,7 +498,7 @@ nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 # lect cube
 cubei = np.fromfile(cubef,dtype=np.float32)
 cube = as_strided(cubei[:nlign*ncol*N])
-print 'Number of line in the cube: ', cube.shape
+print('Number of line in the cube: ', cube.shape)
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
 # ATTENTION: here i convert rad to mm
@@ -507,22 +507,22 @@ maps = cube.reshape((nlign,ncol,N))
 
 # set to NaN lakes and ocean, new image ref.
 cst = np.copy(maps[:,:,imref])
-for l in xrange((N)):
+for l in range((N)):
     d = as_strided(maps[:,:,l])
     maps[:,:,l] = maps[:,:,l] - cst
 
 # new number of dates
 N = len(dates)
 maps = as_strided(maps[:,:,indexd])
-print 'Reshape cube: ', maps.shape
+print('Reshape cube: ', maps.shape)
 
 # perp baseline term
 base_moy = np.mean(base)
 
 if apsf is not None:
     inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*abs(rad2mm)
-    print 'Input uncertainties:', inaps
-    print 'Set very low values to the 2 percentile to avoid overweighting...'
+    print('Input uncertainties:', inaps)
+    print('Set very low values to the 2 percentile to avoid overweighting...')
     # maxinaps = np.nanmax(inaps) 
     # inaps= inaps/maxinaps
 
@@ -533,11 +533,11 @@ if apsf is not None:
         inaps = inaps[indexd]
     except:
         pass
-    print 'Output uncertainties for first iteration:', inaps
+    print('Output uncertainties for first iteration:', inaps)
 
 if vectf is not None:
     v = np.zeros((len(vectf),N))
-    for i in xrange(len(vectf)):
+    for i in range(len(vectf)):
         v[i,:] = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')[indexd]
 
 
@@ -568,7 +568,7 @@ for i in range(len(ipix)):
     ax.scatter(ipix[i]-istart,jpix[i]-jstart,marker=markers[i],color='black',s=10.)
 if iref is not None and jref is not None:
     ax.scatter(iref-istart,jref-jstart,marker='x',color='red',s=20.)
-for i in xrange((Npix)):
+for i in range((Npix)):
     ax.text(ipix[i]-istart,jpix[i]-jstart,i)
 plt.suptitle('Black cross: pixels, red cross: reference point')
 
@@ -577,7 +577,7 @@ im = ax.imshow(maps[:,:,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
 for i in range(len(ipix)):
     ax.scatter(ipix[i],jpix[i],marker=markers[i],color='black',s=10.)
 ax.scatter(iref,jref,marker='x',color='red',s=20.)
-for i in xrange((Npix)):
+for i in range((Npix)):
     ax.text(ipix[i],jpix[i],i)
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -635,7 +635,7 @@ if bianual=='yes':
    index = index + 2
 
 indexco = np.zeros(len(cos))
-for i in xrange(len(cos)):
+for i in range(len(cos)):
    # 6
    indexco[i] = int(index)
    basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
@@ -643,14 +643,14 @@ for i in xrange(len(cos)):
    iteration=True
 
 indexsse = np.zeros(len(sse_time))
-for i in xrange(len(sse_time)):
+for i in range(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
     indexsse[i] = int(index)
     index = index + 1
     iteration=True
 
 indexpo,indexpofull = [],[]
-for i in xrange(len(pos)):
+for i in range(len(pos)):
   if pos[i] > 0. :
     basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
     indexpo.append(int(index))
@@ -671,7 +671,7 @@ if dem=='yes':
 if vectf != None:
   indexvect = np.zeros(len(vectf))
   fig = plt.figure(100,figsize=(12,8))
-  for i in xrange(len(vectf)):
+  for i in range(len(vectf)):
     kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v[i]))
     ax = fig.add_subplot(len(vectf),1,i+1)
     ax.plot(dates,kernels[-1].g(~np.isnan(dates)))
@@ -683,13 +683,13 @@ indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
 
 # define size G matrix
-print
+print()
 Mbasis=len(basis)
-print 'Number of basis functions:', Mbasis
+print('Number of basis functions:', Mbasis)
 Mker=len(kernels)
-print 'Number of kernel functions:', Mker
+print('Number of kernel functions:', Mker)
 M = Mbasis + Mker
-for i in xrange((Mbasis)):
+for i in range((Mbasis)):
     basis[i].info()
 
 # SVD inversion with cut-off eigenvalues
@@ -724,26 +724,26 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        print 'ineq=no: SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond)
+        print('ineq=no: SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
         fsoln = invSVD(A,b,cond)
-        print 'SVD solution:', fsoln
+        print('SVD solution:', fsoln)
 
     else:
-        print 'ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.'
+        print('ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.')
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
           try:
               U,eignv,V = lst.svd(Ain, full_matrices=False)
               s = np.diag(eignv) 
-              print 'Eigenvalues:', eignv
+              print('Eigenvalues:', eignv)
               index = np.nonzero(s<cond)
               inv = lst.inv(s)
               inv[index] = 0.
               mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
           except:
               mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
-          print 'SVD solution:', mtemp
+          print('SVD solution:', mtemp)
 
           # rebuild full vector
           for z in range(len(indexpo)):
@@ -754,7 +754,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
 
           # We here define bounds for postseismic to be the same sign than coseismic
           # and coseismic inferior or egual to the coseimic initial 
-          print 'ineq=yes: Impose postseismic to be the same sign than coseismic'
+          print('ineq=yes: Impose postseismic to be the same sign than coseismic')
           for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
@@ -766,7 +766,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
         
         else:
           minit=invSVD(A,b,cond)
-          print 'SVD solution:', minit
+          print('SVD solution:', minit)
           bounds=None
         
         ####Objective function and derivative
@@ -775,7 +775,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
-        print 'Optimization:', fsoln
+        print('Optimization:', fsoln)
 
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
@@ -789,7 +789,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
-    print 'model errors:', sigmam
+    print('model errors:', sigmam)
 
     return fsoln,sigmam
 
@@ -811,20 +811,20 @@ if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes' or seasonalt == '
         fig2 = plt.figure(nfigure+2,figsize=(10,4))
 
 
-for jj in xrange((Npix)):
+for jj in range((Npix)):
     # initialize aps before iterations   
     if apsf is None:
         aps = np.ones((N))
     else:
         aps = inaps
 
-    # for ll in xrange(niter):
+    # for ll in range(niter):
     i, j = ipix[jj], jpix[jj]
-    print
-    print '---------------------------------------'
-    print 'pixel:{} {}'.format(i,j)
-    print '---------------------------------------'
-    print 
+    print()
+    print('---------------------------------------')
+    print('pixel:{} {}'.format(i,j))
+    print('---------------------------------------')
+    print() 
 
     x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
     if arguments["--dateslim"] is not  None:
@@ -864,7 +864,7 @@ for jj in xrange((Npix)):
     bp = base[k]
     sigmad = aps  
     names = []
-    # print 'data uncertainties', sigmad    
+    # print('data uncertainties', sigmad)    
 
     # Inisilize 
     G=np.zeros((kk,M))
@@ -875,14 +875,14 @@ for jj in xrange((Npix)):
         t = time.time()
 
         names = []
-        for l in xrange((Mbasis)):
+        for l in range((Mbasis)):
             G[:,l]=basis[l].g(tabx)
             names.append(basis[l].reduction)
-        for l in xrange((Mker)):
+        for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
             names.append(kernels[l].reduction)
 
-        print 'basis functions:', names
+        print('basis functions:', names)
         mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq)
 
         # rebuild full vectors
@@ -899,9 +899,9 @@ for jj in xrange((Npix)):
         else:
             demerr = np.zeros((N))
         
-        print
-        print 'computation time:', time.time() - t
-        print
+        print()
+        print('computation time:', time.time() - t)
+        print()
         
 
     # plot at the end of iterations for each points
@@ -925,7 +925,7 @@ for jj in xrange((Npix)):
     # plot data and model minus dem error and seasonal terms
     if seasonal=='yes':
             G=np.zeros((kk,2))
-            for l in xrange((2)):
+            for l in range((2)):
                 G[:,l]=basis[l+indexseas].g(tabx)
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseas:indexseas+2])
             amp,phi = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),np.arctan2(m[indexseas+1],m[indexseas])
@@ -935,7 +935,7 @@ for jj in xrange((Npix)):
 
     if seasonalt=='yes':
             G=np.zeros((kk,2))
-            for l in xrange((2)):
+            for l in range((2)):
                 G[:,l]=basis[l+indexseast].g(tabx)
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
             disp_seast[k] = disp_seast[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
@@ -984,19 +984,19 @@ for jj in xrange((Npix)):
         
     if semianual=='yes':
             G=np.zeros((kk,2))
-            for l in xrange((2)):
+            for l in range((2)):
                 G[:,l]=basis[l+indexsemi].g(tabx)
             disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexsemi:indexsemi+2])
 
     if bianual=='yes':
             G=np.zeros((kk,2))
-            for l in xrange((2)):
+            for l in range((2)):
                 G[:,l]=basis[l+indexbi].g(tabx)
             disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexbi:indexbi+2])
 
     # plot data and model minus dem error
     if infof is not None:
-      # print infof, infm
+      # print(infof, infm)
       ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
     else:
       ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
@@ -1020,9 +1020,9 @@ for jj in xrange((Npix)):
     mseast = np.zeros(len(tdec))
 
     G=np.zeros((len(tdec),M))
-    for l in xrange((Mbasis)):
+    for l in range((Mbasis)):
         G[:,l]=basis[l].g(tdec)
-    for l in xrange((Mker)):
+    for l in range((Mker)):
         G[:,Mbasis+l]=np.interp(tdec,tabx,kernels[l].g(k))
     model = np.dot(G,m)
     
@@ -1035,26 +1035,26 @@ for jj in xrange((Npix)):
         
     if seasonal=='yes':
         G=np.zeros((len(tdec),2))
-        for l in xrange((2)):
+        for l in range((2)):
             G[:,l]=basis[l+indexseas].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexseas:indexseas+2])
         
     if semianual=='yes':
         G=np.zeros((len(tdec),2))
-        for l in xrange((2)):
+        for l in range((2)):
             G[:,l]=basis[l+indexsemi].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexsemi:indexsemi+2])
 
     if seasonalt=='yes':
         G=np.zeros((len(tdec),2))
-        for l in xrange((2)):
+        for l in range((2)):
             G[:,l]=basis[l+indexseast].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexseast:indexseast+2])
         # mseast = mseast + np.dot(G[:,:],m[indexseast:indexseast+2])
 
     if bianual=='yes':
         G=np.zeros((len(tdec),2))
-        for l in xrange((2)):
+        for l in range((2)):
             G[:,l]=basis[l+indexbi].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexbi:indexbi+2])
 
@@ -1117,7 +1117,7 @@ for jj in xrange((Npix)):
         sine = as_strided(m[indexseas+1])
         amp = np.sqrt(cosine**2+sine**2)
         phi = np.arctan2(sine,cosine)
-        # print amp,phi
+        # print(amp,phi)
 
 if plot == 'yes':
     plt.show()

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -55,7 +55,7 @@ else:
 
 if arguments["--imref"] !=  None:
     if arguments["--imref"] < 1:
-        print '--imref must be between 1 and Nimages'
+        print('--imref must be between 1 and Nimages')
     else:
         imref = int(arguments["--imref"]) - 1
 
@@ -75,7 +75,7 @@ else:
 # lect cube
 ds = gdal.Open(infile)
 if not ds:
-  print '.hdr file time series cube {0}, not found, open {1}'.format(infile,lecfile)
+  print('.hdr file time series cube {0}, not found, open {1}'.format(infile,lecfile))
   # read lect.in 
   ncol, nlines = map(int, open(lecfile).readline().split(None, 2)[0:2])
 else:
@@ -94,7 +94,7 @@ else:
 
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 N=len(dates)
-print 'Number images: ', N
+print('Number images: ', N)
 
 # lect cube
 cubei = np.fromfile(infile,dtype=np.float32)
@@ -104,12 +104,12 @@ cube[kk] = float('NaN')
 
 _cube=np.copy(cube)
 _cube[cube==0] = np.float('NaN')
-print 'Number of line in the cube: ', cube.shape
+print('Number of line in the cube: ', cube.shape)
 maps = cube.reshape((nlines,ncol,N))
-print 'Reshape cube: ', maps.shape
+print('Reshape cube: ', maps.shape)
 if arguments["--imref"] !=  None:
     cst = np.copy(maps[:,:,imref])
-    for l in xrange((N)):
+    for l in range((N)):
         maps[:,:,l] = maps[:,:,l] - cst
         if l != imref:
             index = np.nonzero(maps[:,:,l]==0.0)

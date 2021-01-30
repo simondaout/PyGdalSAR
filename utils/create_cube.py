@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from os import environ
@@ -45,7 +45,7 @@ for d in idates:
     print("> Driver:   ", ds.GetDriver().ShortName)
     print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
     print("> Datatype: ", gdal.GetDataTypeName(band.DataType))
-    print
+    print()
     phi = band.ReadAsArray() 
     maps[:,:,i] = phi[:nlign,:ncol]
     plt.imshow(maps[:,:,i])

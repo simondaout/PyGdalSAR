@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ############################################
@@ -84,7 +84,7 @@ date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='
 kmax=len(date_1)
 # cleanif 
 if os.path.exists(outputdir):
-  # print '{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook)
+  # print('{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook))
   jpeg_files = glob.glob('{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook))
   for f in jpeg_files:
     os.remove(f)
@@ -121,16 +121,16 @@ def preview(kk):
     failf.close()
 
 pool = multiprocessing.Pool(nproc)
-work = [(kk) for kk in xrange(kmax)]
+work = [(kk) for kk in range(kmax)]
 pool.map(preview, work)
 
-print
-print 'Write successed IFG in: interf_pair_success.txt'
-print 'Write failed IFG in: interf_pair_problems.txt'
+print()
+print('Write successed IFG in: interf_pair_success.txt')
+print('Write failed IFG in: interf_pair_problems.txt')
 
-# print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
+# print('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))
 jpeg_files = glob.glob('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))
-print
-print 'Move files into:', outputdir
+print()
+print('Move files into:', outputdir)
 for f in jpeg_files:
     shutil.move(f,outputdir)

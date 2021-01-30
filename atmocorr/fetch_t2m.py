@@ -25,7 +25,6 @@ Options:
 
 """
 
-from __future__ import print_function
 import datetime, os, itertools, string
 
 import docopt

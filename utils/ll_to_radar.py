@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -46,11 +46,11 @@ else:
 # ncol, nlines = map(int, open(lecfile).readline().split(None, 2)[0:2])
 # fid = open(latfile, 'r')
 # lat = np.fromfile(fid,dtype=np.float32)
-# for i in xrange(len(lat)):
+# for i in range(len(lat)):
 #     lat[i] = round(lat[i],prec)
 # fid = open(lonfile, 'r')
 # lon = np.fromfile(fid,dtype=np.float32)
-# for i in xrange(len(lon)):
+# for i in range(len(lon)):
 # #     lon[i] = round(lon[i],prec)
 # lon = lon.reshape((nlines,ncol))
 # lat = lat.reshape((nlines,ncol))
@@ -73,7 +73,7 @@ list_lon = map(float,arguments["--lons"].replace(',',' ').split())
 if len(list_lat) != len(list_lon):
    raise Exception("ncols and nligns lists are not the same size")
 
-# print list_lat,list_lon
+# print(list_lat,list_lon)
 # Decimal(list_lat[0])
 # sys.exit()
 
@@ -82,15 +82,15 @@ epsi = 10**(-prec)
 for llat,llon in zip(list_lat,list_lon):
     kk = np.nonzero(np.logical_and(np.logical_and(lat>llat-epsi,lat<llat+epsi), \
         np.logical_and(lon>llon-epsi,lon<llon+epsi)))
-    # print kk
+    # print(kk)
     ligns.append(kk[0][0])
     cols.append(kk[1][0])
 
 ligns=np.array(ligns)
 cols=np.array(cols)
-print 'ligns:',ligns
-print 'cols:',cols
+print('ligns:',ligns)
+print('cols:',cols)
 
 if arguments["--outfile"] is not None:
-  print 'Saving in the output file', arguments["--outfile"]
+  print('Saving in the output file', arguments["--outfile"])
   np.savetxt(arguments["--outfile"], np.vstack([ligns,cols]).T, header='ligns cols', fmt='%d')

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -45,7 +45,6 @@ Options:
 --nliness VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
 """
 
-from __future__ import print_function
 import os, sys
 
 # docopt (command line parser)

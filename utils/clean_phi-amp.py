@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -43,7 +43,6 @@ Options:
 --crop=<values>       Crop data [default: 0,nlines,0,ncol]
 """
 
-from __future__ import print_function
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import matplotlib as mpl

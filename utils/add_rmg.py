@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -50,7 +50,7 @@ if arguments["--remove"] == None:
 else:
     remove = arguments["--remove"]
 if arguments["--add"] == None and arguments["--remove"] == None:
-    print "Nothing to do, add or remove a file!"
+    print("Nothing to do, add or remove a file!")
     sys.exit()
 
 if arguments["--plot"] == None:
@@ -58,8 +58,8 @@ if arguments["--plot"] == None:
 else:
     plot = arguments["--plot"]
 
-# print infile
-# print add
+# print(infile)
+# print(add)
 # print remove
 
 gdal.UseExceptions()

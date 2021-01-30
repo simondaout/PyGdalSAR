@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -71,7 +71,7 @@ class pattern:
         self.date=date
 
     def info(self):
-        print self.name, self.date
+        print(self.name, self.date)
 
 ### BASIS FUNCTIONS: function of time
 
@@ -126,7 +126,7 @@ class sin2var(pattern):
 
      def g(self,t):
          func=np.zeros(t.size)
-         for i in xrange(t.size):
+         for i in range(t.size):
              func[i]=math.sin(4*math.pi*(t[i]-self.to))
          return func
 
@@ -137,7 +137,7 @@ class cos2var(pattern):
 
      def g(self,t):
          func=np.zeros(t.size)
-         for i in xrange(t.size):
+         for i in range(t.size):
              func[i]=math.cos(4*math.pi*(t[i]-self.to))
          return func
 
@@ -148,7 +148,7 @@ class sinvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.sin(2*math.pi*(t[i]-self.to))
         return func
 
@@ -159,7 +159,7 @@ class cosvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.cos(2*math.pi*(t[i]-self.to))
         return func
 
@@ -183,7 +183,7 @@ class corrdem(pattern):
         self.bp=bp
 
     def info(self):
-        print self.name
+        print(self.name)
 
     def g(self,index):
         func = (self.bp-self.bpo)
@@ -261,15 +261,15 @@ base_moy = np.mean(base)
 
 if apsf is not 'no':
     inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*rad2mm
-    print 'Input uncertainties:', inaps
-    print 'Set very low values to the 2 percentile to avoid overweighting...'
+    print('Input uncertainties:', inaps)
+    print('Set very low values to the 2 percentile to avoid overweighting...')
     # maxinaps = np.nanmax(inaps) 
     # inaps= inaps/maxinaps
 
     minaps= np.nanpercentile(inaps,2)
     index = flatnonzero(inaps<minaps)
     inaps[index] = minaps
-    print 'Output uncertainties for first iteration:', inaps
+    print('Output uncertainties for first iteration:', inaps)
 else: 
     inaps = np.ones((N))
 
@@ -299,20 +299,20 @@ if semianual=='yes':
 
 
 indexco = np.zeros(len(cos))
-for i in xrange(len(cos)):
+for i in range(len(cos)):
    # 6
    indexco[i] = int(index)
    basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
    index = index + 1
 
 indexsse = np.zeros(len(sse_time))
-for i in xrange(len(sse_time)):
+for i in range(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
     indexsse[i] = int(index)
     index = index + 1
 
 indexpo = []
-for i in xrange(len(pos)):
+for i in range(len(pos)):
    if pos[i] > 0. :
       basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
       indexpo.append(int(index))
@@ -331,13 +331,13 @@ indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
 
 # define size G matrix
-print
+print()
 Mbasis=len(basis)
-print 'Number of basis functions:', Mbasis
+print('Number of basis functions:', Mbasis)
 Mker=len(kernels)
-print 'Number of kernel functions:', Mker
+print('Number of kernel functions:', Mker)
 M = Mbasis + Mker
-for i in xrange((Mbasis)):
+for i in range((Mbasis)):
     basis[i].info()
 
 # SVD inversion with cut-off eigenvalues
@@ -357,7 +357,7 @@ def invSVD(A,b,cond=0.1):
 nfigure = 0
 fig = plt.figure(nfigure,figsize=(10,4))
 nfigure =+ 1 
-for jj in xrange((Nv)):
+for jj in range((Nv)):
     if apsf is None:
         aps = np.ones((N))
     else:
@@ -385,21 +385,21 @@ for jj in xrange((Nv)):
     taby = disp[k]
     bp = base[k]
     sigmad = aps[k]
-    print 'data uncertainties', sigmad
+    print('data uncertainties', sigmad)
     
     m = np.zeros((M))
     G=np.zeros((kk,M))
-    for l in xrange((Mbasis)):
+    for l in range((Mbasis)):
         G[:,l]=basis[l].g(tabx)
-    for l in xrange((Mker)):
+    for l in range((Mker)):
         G[:,Mbasis+l]=kernels[l].g(k)
 
     m = invSVD(G,taby)
     mdisp[k] = np.dot(G,m)
     rmsd = np.sqrt(np.sum(pow((disp[k] - mdisp[k]),2))/kk)
-    print
-    print 'rmsd:', rmsd
-    print
+    print()
+    print('rmsd:', rmsd)
+    print()
 
     if dem=='yes':
         demerr[k] =  np.dot(G[:,indexdem],m[indexdem])
@@ -418,9 +418,9 @@ for jj in xrange((Nv)):
     tdec = np.array([float(date.strftime('%Y')) + float(date.strftime('%j'))/365.1 for date in t])
 
     G=np.zeros((len(tdec),M))
-    for l in xrange((Mbasis)):
+    for l in range((Mbasis)):
         G[:,l]=basis[l].g(tdec)
-    for l in xrange((Mker)):
+    for l in range((Mker)):
         G[:,Mbasis+l]=np.interp(tdec,tabx,kernels[l].g(k))
     model = np.dot(G,m)
     if dem=='yes':

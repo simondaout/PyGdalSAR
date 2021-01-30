@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -33,7 +33,6 @@ Options:
   -h --help           Show this screen
 """
 
-from __future__ import print_function
 import glob, math, os, sys
 import dateutil.parser
 from osgeo import gdal
@@ -132,7 +131,7 @@ print("number of image: ",nmax)
 
 # Now, write list_pair
 wf = open(os.path.join(tsdir, "list_dates"), "w")
-for i in xrange((nmax)):
+for i in range((nmax)):
     wf.write("%i %.6f %.6f %.6f\n" % (im[i], imd[i], bt[i], bp[i]))
 wf.close()
 
@@ -159,8 +158,8 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     # print (sigma, weight)
     if len(sigma) != kmax:
       w2 = []
-      for j in xrange((kmax)):
-        for i in xrange(len(sigma)):
+      for j in range((kmax)):
+        for i in range(len(sigma)):
           if (bid[i]==date_1[j]) and  (bid2[i]==date_2[j]):
               w2.append(weight[i])
       if len(w2) != kmax:
@@ -168,26 +167,26 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
          sys.exit()
       weigth = np.array(w2)
     wf = open(os.path.join(tsdir, "list_pair"), "w")
-    for i in xrange((kmax)):
+    for i in range((kmax)):
         wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
     wf.close()
 elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      print('Weigth interferograms based on their baselines with Btc:{} and Bpc:{}'.format(btc,bpc))
      do_sig = int(2)
      weight=np.zeros((kmax))
-     for i in xrange((kmax)):
+     for i in range((kmax)):
      	deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
      	deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
         weight[i] = (np.float(np.exp(-deltap)) + np.float(np.exp(-deltat)))/2
      wf = open(os.path.join(tsdir, "list_pair"), "w")
-     for i in xrange((kmax)):
+     for i in range((kmax)):
           wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
      wf.close()
 
 cohformat = int(0)
 if sformat == 'ROI_PAC':
   iformat = int(0)
-  for kk in xrange((kmax)):
+  for kk in range((kmax)):
       date1, date2 = date_1[kk], date_2[kk]
       idate = str(date1) + '-' + str(date2)
       folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
@@ -221,7 +220,7 @@ if sformat == 'ROI_PAC':
 
 else:
   iformat = int(1)
-  for kk in xrange((kmax)):
+  for kk in range((kmax)):
       date1, date2 = date_1[kk], date_2[kk]
       idate = str(date1) + '_' + str(date2)
       if sformat == 'GTIFF':

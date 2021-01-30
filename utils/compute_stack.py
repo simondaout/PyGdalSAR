@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -73,7 +73,7 @@ nlines,ncols= ds.RasterYSize, ds.RasterXSize
 alllos = np.zeros((nlines,ncols,kmax))
 allcor = np.zeros((nlines,ncols,kmax))
 
-for i in xrange((kmax)):
+for i in range((kmax)):
 
     interf1,interf2 = date1[i],date2[i]
     los_map = np.zeros((nlines,ncols))
@@ -85,7 +85,7 @@ for i in xrange((kmax)):
     ds = gdal.Open(infile, gdal.GA_ReadOnly)
     ds_band2 = ds.GetRasterBand(2)
     ds_band1 = ds.GetRasterBand(1)
-    print 'Nlines:{}, Ncol:{}, int:{}-{}'.format(ds.RasterYSize, ds.RasterXSize,interf1,interf2)
+    print('Nlines:{}, Ncol:{}, int:{}-{}'.format(ds.RasterYSize, ds.RasterXSize,interf1,interf2))
 
     los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
     # cor_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
@@ -101,8 +101,8 @@ count=np.zeros((nlines,ncols))
 # allcor[:,:,:] = allcor[:,:,:]/maxcoh
 # allcor[np.isnan(allcor)] = 0.0
 
-for i in xrange(0,nlines,1):
-    for j in xrange(0,ncols,1):
+for i in range(0,nlines,1):
+    for j in range(0,ncols,1):
         k=np.flatnonzero(alllos[i,j,:])
         if len(k) > 0:
             sumlos[i,j]=np.sum(alllos[i,j,k[:]])/len(k)

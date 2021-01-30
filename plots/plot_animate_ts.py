@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 #!/usr/bin/env python2
@@ -33,7 +33,6 @@ Options:
 """
 
 
-from __future__ import print_function
 import sys
 import numpy as np
 from osgeo import gdal

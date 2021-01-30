@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -124,7 +124,7 @@ mf = np.copy(m)
 
 # clean for ramp
 maxlos,minlos=np.nanpercentile(m,90),np.nanpercentile(m,10)
-print 'Clean outliers for ramp estimation outside:', maxlos,minlos
+print('Clean outliers for ramp estimation outside:', maxlos,minlos)
 kk = np.nonzero(
     np.logical_or(m<minlos,m>maxlos))
 m_ramp = np.copy(m)
@@ -158,7 +158,7 @@ if ramp=='lin':
 
     #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]
-    print 'Remove ramp %f x  + %f y + %f'%(a,b,c)
+    print('Remove ramp %f x  + %f y + %f'%(a,b,c))
 
     G=np.zeros((len(mask.flatten()),3))
     for i in xrange(nlign):
@@ -188,7 +188,7 @@ if ramp=='quad':
 
     pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3] 
-    print 'Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d)
+    print('Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d))
 
     G=np.zeros((len(mask.flatten()),4))
     for i in xrange(nlign):
@@ -221,7 +221,7 @@ elif ramp=='cub':
 
     pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-    print 'Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f)
+    print('Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f))
 
     G=np.zeros((len(mask.flatten()),6))
     for i in xrange(nlign):
@@ -276,7 +276,7 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
     if jbeg2 < nlign:
         for j in xrange(buf):
           for i in xrange(ibeg,iend):
-            # print jbeg2-(buf-j)
+            # print(jbeg2-(buf-j))
             mf[jbeg2-(buf-j),i] = mf[jbeg2-(buf-j),i] - mf[jbeg2-(buf-j),i]*(np.float(j+1)/buf)
 
     # left
@@ -305,7 +305,7 @@ mf = scale*(mf - shift)
 
 # clean based on perc
 maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
-print 'Clean outliers outside:', maxlos,minlos
+print('Clean outliers outside:', maxlos,minlos)
 kk = np.nonzero(
     np.logical_or(mf<minlos,mf>maxlos))
 mf[kk] = np.float('NaN')

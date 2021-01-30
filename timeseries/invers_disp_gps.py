@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -115,7 +115,7 @@ class gpspoint(point):
         self.Nt = 0
 
     def info(self):
-        print 'gps station: {}, self.east(km): {}, self.north(km): {}'.format(self.name,self.x,self.y)
+        print('gps station: {}, self.east(km): {}, self.north(km): {}'.format(self.name,self.x,self.y))
 
 class gpstimeseries:
     def __init__(self,network,reduction,dim,wdir,extension,proj,scale,weight=1.):
@@ -142,23 +142,24 @@ class gpstimeseries:
         if not path.isfile(fname):
             raise ValueError("invalid file name: " + fname)
         else:
-            print 'Load GPS time series: ', fname
-            print 
+            print('Load GPS time series: ', fname)
+            print() 
         
         f=file(fname,'r')
         # name, self.east(km), self.north(km)
         name,x,y=np.loadtxt(f,comments='#',unpack=True,dtype='S4,f,f')
 
         self.name,self.x,self.y=np.atleast_1d(name,x,y)
-        # print self.name
+        # print(self.name)
+
         self.Npoints=len(self.name)
         self.N=0
         self.d = []
         
-        print 'Load time series... '
-        for i in xrange(self.Npoints):
+        print('Load time series... ')
+        for i in range(self.Npoints):
             station=self.wdir+self.reduction+'/'+self.name[i]+self.extension 
-            print station
+            print(station)
             if not path.isfile(station):
                 raise ValueError("invalid file name: " + station)
                 pass
@@ -210,10 +211,10 @@ class gpstimeseries:
         self.sigmad = self.sigmad*np.ones(self.N)
 
     def info(self):
-        print
-        print 'GPS time series from network:',self.network
-        print 'Number of stations:', self.Npoints
-        print 'Lenght data vector:', self.N
+        print()
+        print('GPS time series from network:',self.network)
+        print('Number of stations:', self.Npoints)
+        print('Lenght data vector:', self.N)
 
 
 manifold = gpstimeseries(network=network,reduction=reduction,dim=dim,wdir=wdir,extension=ext,proj=proj,scale=scale)
@@ -245,9 +246,9 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
             fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,Cov),A)),np.dot(np.dot(A.T,Cov),b))
         except:
             fsoln = lst.lstsq(A,b,cond=cond)[0]
-        print 'least-square solution:'
-        print fsoln
-        print 
+        print('least-square solution:')
+        print(fsoln)
+        print() 
             # fsoln = np.ones((A.shape[1]))*float('NaN')
 
     else:
@@ -257,7 +258,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
 
         ## We here want a solution as much conservatif as possible, ie only coseismic steps 
         ## least-squqre solution without post-seismic
-        for i in xrange(len(indexco)):
+        for i in range(len(indexco)):
             if pos[i] > 0.:
                 Ain[:,indexpo[i]] = 0
         minit = lst.lstsq(Ain,bin,cond=cond)[0]
@@ -267,7 +268,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
 
         # We here define bounds for postseismic to be the same sign than coseismic
         # and coseisnic inferior or egal to the coseimic initial 
-        for i in xrange(len(indexco)):
+        for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpo[i])], mmax[int(indexpo[i])] = 0, minit[int(indexco[i])] 
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
@@ -279,7 +280,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
                 if minit[int(indexpo[i])] > 0 :
                     minit[int(indexpo[i])] = 0.
         
-        # print mmin,mmax
+        # print(mmin,mmax)
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
@@ -288,9 +289,9 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
         res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
             iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
-        print 'optimization:'
-        print fsoln
-        print
+        print('optimization:')
+        print(fsoln)
+        print()
 
     # tarantola:
     # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
@@ -298,7 +299,7 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
-       # print 'rms:', np.sqrt((1./A.shape[0])*res2)
+       # print('rms:', np.sqrt((1./A.shape[0])*res2))
        scale = 1./(A.shape[0]-A.shape[1])
        #scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
@@ -306,8 +307,8 @@ def consInvert(A,b,sigmad,ineq='no',cond=1.0e-10, iter=2000,acc=1e-09):
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
 
-    print 'model errors:'
-    print sigmam
+    print('model errors:')
+    print(sigmam)
     # sys.exit()
 
     return fsoln,sigmam
@@ -320,7 +321,7 @@ class pattern:
         self.date=date
     
     def info(self):
-        print self.name, self.date
+        print(self.name, self.date)
 
 def Heaviside(t):
         h=np.zeros((len(t)))
@@ -369,7 +370,7 @@ class sinvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.sin(2*math.pi*(t[i]-self.to))
         return func
 
@@ -380,7 +381,7 @@ class cosvar(pattern):
 
     def g(self,t):
         func=np.zeros(t.size)
-        for i in xrange(t.size):
+        for i in range(t.size):
             func[i]=math.cos(2*math.pi*(t[i]-self.to))
         return func
 
@@ -399,13 +400,13 @@ if seasonal=='yes':
    index = index +2
 
 indexco = np.zeros(len(cos))
-for i in xrange(len(cos)):
+for i in range(len(cos)):
    basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
    indexco[i] = index
    index = index + 1
 
 indexpo = np.zeros(len(pos))
-for i in xrange(len(pos)):
+for i in range(len(pos)):
    if pos[i] > 0. :
       basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
       indexpo[i] = index
@@ -415,10 +416,10 @@ for i in xrange(len(pos)):
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 
-print
+print()
 M=len(basis)
-print 'Number of basis functions:', M
-for i in xrange((M)):
+print('Number of basis functions:', M)
+for i in range((M)):
     basis[i].info()
 
 
@@ -430,9 +431,9 @@ fig2 = plt.figure(nfigure+2,figsize=(12,8))
 
 colors = ['royalblue','darkgreen','darkorchid','firebrick']
 
-for jj in xrange((manifold.Npoints)):
+for jj in range((manifold.Npoints)):
     name, i, j = manifold.name[jj], manifold.x[jj], manifold.y[jj]
-    print 'station:', name,i,j
+    print('station:', name,i,j)
     pt = manifold.points[jj]
     
     # plot date
@@ -448,13 +449,13 @@ for jj in xrange((manifold.Npoints)):
 
     pt.md, pt.md_lin, pt.d_lin, md, md_lin = [], [], [], [], []
     # iter over all components
-    for i in xrange(len(pt.comp)):
-        print pt.comp[i]
+    for i in range(len(pt.comp)):
+        print(pt.comp[i])
         # inversion model
         mdisp=np.ones((pt.Nt))*float('NaN')
 
         G=np.zeros((pt.Nt,M))
-        for l in xrange((M)):
+        for l in range((M)):
             G[:,l]=basis[l].g(pt.t)
 
         # Inisilize m
@@ -464,9 +465,9 @@ for jj in xrange((manifold.Npoints)):
         # inversion
         m,sigmam = consInvert(G,pt.d[i],pt.sigmad[i],cond=rcond,ineq=ineq)
         
-        print 
-        print 'computation time:', time.time() - t
-        print
+        print() 
+        print('computation time:', time.time() - t)
+        print()
 
         # forward model in original order
         mdisp = np.dot(G,m)
@@ -474,7 +475,7 @@ for jj in xrange((manifold.Npoints)):
         
         dmisp_lin = np.zeros((pt.Nt))
         G=np.zeros((pt.Nt,2))
-        for l in xrange((1)):
+        for l in range((1)):
             G[:,l+1]=basis[l+1].g(pt.t)
         mdisp_lin = np.dot(G[:,:],m[0:2])
         pt.md_lin.append(mdisp-mdisp_lin)
@@ -482,13 +483,13 @@ for jj in xrange((manifold.Npoints)):
 
         tdec = np.arange(datemin, datemax, 0.01)
         G=np.zeros((len(tdec),M))
-        for l in xrange((M)):
+        for l in range((M)):
             G[:,l]=basis[l].g(tdec)
         model = np.dot(G[:,:M],m[:M])
         md.append(model)
 
         G=np.zeros((len(tdec),2))
-        for l in xrange((1)):
+        for l in range((1)):
             G[:,l+1]=basis[l+1].g(tdec)
         model_lin = np.dot(G[:,:],m[0:2])
         md_lin.append(model-model_lin)

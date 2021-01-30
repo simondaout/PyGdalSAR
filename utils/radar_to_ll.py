@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -58,5 +58,5 @@ index = np.array(list_lines),np.array(list_cols)
 list_lats = lat[index]
 list_lons = lon[index]
 
-print 'lats:',list_lats
-print 'lons:',list_lons
+print('lats:',list_lats)
+print('lons:',list_lons)

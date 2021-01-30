@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -126,20 +126,20 @@ insarxp, insaryp = insarxp.flatten(), insaryp.flatten()
 # plot profile
 ypmin,ypmax = -l/2, +l/2
 xpmin,xpmax = -w/2, +w/2
-print 'Coordinate profile: '
-print 'x: %i, xpmin: %i, xpmax: %i '%(x0,xpmin,xpmax)
-print 'y: %i, ypmin: %i, ypmax: %i '%(y0,ypmin,ypmax)
+print('Coordinate profile: ')
+print('x: %i, xpmin: %i, xpmax: %i '%(x0,xpmin,xpmax))
+print('y: %i, ypmin: %i, ypmax: %i '%(y0,ypmin,ypmax))
 
 # select data in the profile
 index=np.nonzero((abs(insarxp)>w/2)|(abs(insaryp)>l/2))
-#print shape(index)
+#print(shape(index))
 iilos,iix,iiy,iixp,iiyp=np.delete(los,index),np.delete(insarx,index),np.delete(insary,index),np.delete(insarxp,index),np.delete(insaryp,index)
 if plotdem is 'yes':
     iitopo = np.delete(topo,index)
 
 # clean profile
 index=np.nonzero((np.isnan(iilos)==True))
-#print shape(index)
+#print(shape(index))
 ilos,ix,iy,ixp,iyp=np.delete(iilos,index),np.delete(iix,index),np.delete(iiy,index),np.delete(iixp,index),np.delete(iiyp,index)
 if plotdem is 'yes':
     itopo = np.delete(iitopo,index)
@@ -170,9 +170,9 @@ if arguments["--ramp"] is not None:
     
     a = pars[0]; b = pars[1]
     blos = a*iyp + b - cst
-    print 'Remove ramp estimated on the {}: '.format(arguments["--ramp"])
-    print '%f yperp  + %f  '%(a,b)
-    print
+    print('Remove ramp estimated on the {}: '.format(arguments["--ramp"]))
+    print('%f yperp  + %f  '%(a,b))
+    print()
     ilos = ilos - blos
 
     # remove ramp from all the track
@@ -183,7 +183,7 @@ if arguments["--ramp"] is not None:
 
 # save output file
 if arguments["--outfile"] ==  None:
-     print 'No output file save'
+     print('No output file save')
 else:
      fid = open(arguments["--outfile"], 'wb')
      sar = -insar
