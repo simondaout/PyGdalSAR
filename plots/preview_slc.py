@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -66,7 +66,7 @@ kmax=len(dates)
 
 # cleanif 
 if os.path.exists(outputdir):
-  # print '{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook)
+  # print ('{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook))
   jpeg_files = glob.glob('{0}/*_coreg*.jpeg'.format(outputdir))
   for f in jpeg_files:
     os.remove(f)
@@ -99,7 +99,7 @@ def dolook(kk):
     run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
 
 if look>1:
-    work = [(kk) for kk in xrange(kmax)]
+    work = [(kk) for kk in range(kmax)]
     with poolcontext(processes=nproc) as pool:
         results = pool.map(dolook, work)
 
@@ -120,13 +120,13 @@ def preview(kk):
     except:
       pass
 
-work = [(kk) for kk in xrange(kmax)]
+work = [(kk) for kk in range(kmax)]
 with poolcontext(processes=nproc) as pool:
     results = pool.map(preview, work)
 
-# print '{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook)
+# print ('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))
 jpeg_files = glob.glob('*/*_coreg*.jpeg')
-print
-print 'Move files into:', outputdir
+print()
+print ('Move files into:', outputdir)
 for f in jpeg_files:
     shutil.move(f,outputdir)
