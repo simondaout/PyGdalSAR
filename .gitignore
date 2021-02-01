@@ -5,3 +5,4 @@ depl_cumule_flat
 *.pyc
 parsers/__init__.py
 parsers/*.pyc
+bin
