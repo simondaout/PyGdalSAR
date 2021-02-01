@@ -36,6 +36,44 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
 shapely.speedups.enable()
 
+############################
+# USAGE: convertGNSS_to_LOS.py input.py
+# EXAMPLE INPUT FILE: input.py
+###########################
+
+## define path to data
+#wdir = '/Users/symeone/work/italy/'
+
+# define track name
+#track = 'Ascending'
+
+## define gnss file
+#gps_file = wdir + 'gps/02_COMB_99UncSc_Filt_CLASS_ABC_Rout_100_Tsig_3.txt'
+
+## define format incidence and heading file
+## not same convention in GAMMA or ROIPAC format
+#iformat = 'ROIPAC'
+
+## InSAR data T004
+#heading_file= wdir + '/insar/T117_head_s90.tiff'
+#inc_file=wdir + '/insar/T117_look_s90.tiff'
+#av_heading = 76.71
+#av_inc = 32
+
+#plot optional shapefile
+#shapefile = '/gps/italian-maps-shapefiles/italy-with-regions/reg2011_g.shp'
+
+## define frame coordinates
+#LAT_REF1=38
+#LAT_REF2=38
+#LAT_REF3=46
+#LAT_REF4=46
+#LON_REF1=9.5
+#LON_REF2=17
+#LON_REF3=9.5
+#LON_REF4=17
+
+##########################
 def usage():
   print('convertGNSS_to_LOS.py infile.py [-v] [-h]')
   print('-v Verbose mode. Show more information about the processing')
