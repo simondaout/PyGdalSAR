@@ -28,7 +28,7 @@ from shapely.geometry import Point, Polygon
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.basemap import Basemap
+import matplotlib.colors as mcolors
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -103,39 +103,63 @@ def plot_gps_distribution(gps, poly):
     ax.xaxis.set_visible(True)
     ax.yaxis.set_visible(True)
     #plt.show()
-    fig.savefig(track+'gps_frame.png', format='PNG', dpi=150, bbox_inches='tight')
+    fig.savefig(track+'_gps_frame.png', format='PNG', dpi=150, bbox_inches='tight')
 
-def plot_gps_in_LOS(gps, insar, poly):
-    fig = plt.figure(2,figsize=(8,9))
+def plot_gps_in_LOS(gps, poly):
+    fig = plt.figure(2,figsize=(10,8))
     fig.subplots_adjust(wspace=0.001)
-    
     ax = fig.add_subplot(1,1,1)
 
     x,y = poly.exterior.xy
-    minx,maxx,maxy,miny = np.min(x),np.max(x),np.min(y),np.max(y)
-    print(minx,maxx,maxy,miny)
-    projection = 'cyl'
-    
-    m = Basemap(
-    projection=projection,\
-    llcrnrlon=minx, \
-    llcrnrlat=miny, \
-    urcrnrlon=maxx, \
-    urcrnrlat=maxy, \
-    resolution='i',
-    ax=ax,
-    suppress_ticks = False,
-    )
+    minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
+    ax.axis((minx,maxx,miny,maxy))
 
-    m.drawcoastlines(linewidth=0.25) 
-    m.drawcountries(linewidth=0.25)
-    m.fillcontinents(color='coral',lake_color='aqua')
-    # draw the edge of the map projection region (the projection limb)
-    m.drawmapboundary(fill_color='aqua')
-    # draw lat/lon grid lines every 30 degrees.
+    # plot contextfile
+    try:
+      import contextily as ctx    
+      ctx.add_basemap(ax,crs=4326)        
+    except:
+      print('Contextily package not installed. Skip backgroup topography plot')
+
+    # plot world
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    if shapefile: 
+      bounds = gpd.read_file(wdir + shapefile)
+      bounds = bounds.to_crs(world.crs)
+      bounds.plot(ax=ax,facecolor='none', color='none',edgecolor='black',zorder=1)
+    else:
+      world.plot(ax=ax,facecolor='none',color='none', edgecolor='black',zorder=1)
+
+    los = gps['los'].to_numpy()
+    lmin = np.nanpercentile(los, 2)
+    lmax = np.nanpercentile(los, 98)
+    vmax = np.max([lmin,lmax])
+    vmin = -vmax 
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    try:
+        from matplotlib.colors import LinearSegmentedColormap
+        cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+        cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+        cmap = cmap.reversed()
+    except:
+        cmap=cm.rainbow   
+    m = cm.ScalarMappable(norm=norm, cmap=cmap)
+    facelos = m.to_rgba(los) 
+    gps.plot(ax=ax, facecolor=facelos, zorder=3)
     
     ax.set_xticks(np.linspace(minx,maxx,3))
     ax.set_yticks(np.linspace(miny,maxy,3))
+    
+    ax.set_xlim([minx,maxx]) 
+    ax.set_ylim([miny,maxy])  
+
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(m, cax=c)
+    cbar.set_label('LOS Velocity (mm/yr)', rotation=270)
+    ax.title.set_text('{}'.format(track))
+    fig.savefig(track+'_gps_LOS.png', format='PNG', dpi=150, bbox_inches='tight')
+    fig.savefig(track+'_gps_LOS.pdf', format='PDF', dpi=150)
 
 class OpenTif(object):
     """ a Class that stores the band array and metadata of a Gtiff file."""
@@ -193,7 +217,7 @@ class CreateTif(object):
         self.xsize = np.int((self.right - self.left)/self.xres) + 1
         self.ysize = np.int((self.top - self.bottom)/self.yres) + 1
         pix_lin, pix_col = np.indices((self.ysize,self.xsize))
-        self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_coli
+        self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_col
 
         # set average value to band
         self.data = np.ones((self.xsize,self.ysize))
@@ -332,6 +356,7 @@ if __name__ == "__main__":
     print(gps)
 
     # Plot frame and GPS
-    plot_gps_distribution(gps, poly)
+    #plot_gps_distribution(gps, poly)
+    plot_gps_in_LOS(gps, poly)
     plt.show()
 
