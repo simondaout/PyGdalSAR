@@ -146,7 +146,7 @@ def crop_egm96(geo_coordinates, currdir,egm_file, out_file, xres, yres):
                                  "+proj=longlat +datum=WGS84 +no_defs", "-te",
                                  str_geo_coordinates[0], str_geo_coordinates[1],
                                  str_geo_coordinates[2], str_geo_coordinates[3],
-                                 "-tr", xres, yres,
+                                 "-tr", str(xres), str(yres),
                                  "-r", "cubic",
                                  os.path.join(currdir, egm_file),
                                  out_file],
@@ -326,7 +326,7 @@ if __name__ == "__main__":
     
     ds = gdal.Open(resample_file_name, gdal.GA_ReadOnly)
     xres = ds.GetGeoTransform()[1]
-    yres =  self.ds.GetGeoTransform()[5]
+    yres =  ds.GetGeoTransform()[5]
 
     # =====================
     # Crop geoid
