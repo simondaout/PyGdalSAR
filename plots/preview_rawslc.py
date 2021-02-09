@@ -103,7 +103,14 @@ if look>1:
     with poolcontext(processes=nproc) as pool:
         results = pool.map(dolook, work)
 
+try:
+ os.remove(os.path.join(outputdir, "dates_problems.txt"))
+ os.remove(os.path.join(outputdir, "dates_success.txt"))
+except:
+ pass
 def preview(kk):
+    successf = open(os.path.join(outputdir, "dates_success.txt"), "a")
+    failf =  open(os.path.join(outputdir, "dates_problems.txt"), "a")
     date = dates[kk]
     if look > 1:
         infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
@@ -117,8 +124,11 @@ def preview(kk):
           run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
       else:
           run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
+      print ('Create: ', jpeg)
+      successf.write("%s\n" % ( str(date)))
     except:
-      pass
+      failf.write("%s\n" % ( str(date)))
+      raise Exception("nsb_preview_slc failed for date: ", infile)
 
 work = [(kk) for kk in range(kmax)]
 with poolcontext(processes=nproc) as pool:
