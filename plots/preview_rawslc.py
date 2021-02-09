@@ -112,23 +112,27 @@ def preview(kk):
     successf = open(os.path.join(outputdir, "dates_success.txt"), "a")
     failf =  open(os.path.join(outputdir, "dates_problems.txt"), "a")
     date = dates[kk]
-    if look > 1:
-        infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
-        jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
-    else:
-        infile = str(date) + '/'+ str(date)+ '.slc'
-        jpeg = str(date) + '/'+ str(date)+ '.jpeg'
 
     try:
       if look>1:
-          run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
+          infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
+          jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
+          r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg),  shell=True)
       else:
-          run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
-      print ('Create: ', jpeg)
-      successf.write("%s\n" % ( str(date)))
+          infile = str(date) + '/'+ str(date)+ '.slc'
+          jpeg = str(date) + '/'+ str(date)+ '.jpeg'
+          r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25",  shell=True)
+      print(r)
+      if r != 0:
+            raise Exception("nsb_preview_slc failed for date: ", infile)
+            failf.write("%s\n" % ( str(date)))
+      else:
+            print ('Create: ', jpeg)
+            successf.write("%s\n" % ( str(date)))
     except:
-      failf.write("%s\n" % ( str(date)))
-      raise Exception("nsb_preview_slc failed for date: ", infile)
+        failf.write("%s\n" % ( str(date)))
+    successf.close()
+    failf.close()
 
 work = [(kk) for kk in range(kmax)]
 with poolcontext(processes=nproc) as pool:
