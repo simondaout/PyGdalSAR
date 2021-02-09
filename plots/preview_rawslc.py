@@ -79,7 +79,7 @@ def run(cmd):
         env=environ)
     if r != 0:
         print(r)
-    return
+    return r
 
 @contextmanager
 def poolcontext(*arg, **kargs):
@@ -117,12 +117,11 @@ def preview(kk):
       if look>1:
           infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
           jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
-          r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg),  shell=True)
+          r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
       else:
           infile = str(date) + '/'+ str(date)+ '.slc'
           jpeg = str(date) + '/'+ str(date)+ '.jpeg'
-          r = subprocess.call("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25",  shell=True)
-      print(r)
+          r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
       if r != 0:
             raise Exception("nsb_preview_slc failed for date: ", infile)
             failf.write("%s\n" % ( str(date)))
