@@ -79,7 +79,7 @@ def run(cmd):
         env=environ)
     if r != 0:
         print(r)
-    return
+    return r
 
 @contextmanager
 def poolcontext(*arg, **kargs):
@@ -96,29 +96,41 @@ def dolook(kk):
     pass
   else:
     temp = str(date) + '/'+str(date)+ '_coreg.slc'
-    run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
+    r= run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
 
 if look>1:
     work = [(kk) for kk in range(kmax)]
     with poolcontext(processes=nproc) as pool:
         results = pool.map(dolook, work)
 
+try:
+ os.remove(os.path.join(outputdir, "dates_problems.txt"))
+ os.remove(os.path.join(outputdir, "dates_success.txt"))
+except:
+ pass
 def preview(kk):
+    successf = open(os.path.join(outputdir, "dates_success.txt"), "a")
+    failf =  open(os.path.join(outputdir, "dates_problems.txt"), "a")
     date = dates[kk]
-    if look > 1:
-        infile = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.slc'
-        jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.jpeg'
-    else:
-        infile = str(date) + '/'+ str(date)+ '_coreg'+'.slc'
-        jpeg = str(date) + '/'+ str(date)+ '_coreg'+'.jpeg'
-
     try:
       if look>1:
-          run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
+          infile = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.slc'
+          jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.jpeg'
+          r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
       else:
-          run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
+          infile = str(date) + '/'+ str(date)+ '_coreg'+'.slc'
+          jpeg = str(date) + '/'+ str(date)+ '_coreg'+'.jpeg'
+          r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
+      if r != 0:
+            raise Exception("nsb_preview_slc failed for date: ", infile)
+            failf.write("%s\n" % ( str(date)))
+      else:
+            print ('Create: ', jpeg)
+            successf.write("%s\n" % ( str(date)))
     except:
-      pass
+        failf.write("%s\n" % ( str(date)))
+    successf.close()
+    failf.close()
 
 work = [(kk) for kk in range(kmax)]
 with poolcontext(processes=nproc) as pool:
