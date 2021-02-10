@@ -61,7 +61,7 @@ if arguments["--nproc"] == None:
 else:
   nproc = int(arguments["--nproc"])
 
-dates,bid=np.loadtxt(dates_list,comments="#",unpack=True,usecols=(0,1),dtype='i,f')
+dates=np.loadtxt(dates_list,comments="#",unpack=True,usecols=(0),dtype='i')
 kmax=len(dates)
 
 # cleanif 
