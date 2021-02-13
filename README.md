@@ -41,6 +41,7 @@ cmake --build bin
 Setting specific compilers is also done the usual CMake way, for example to
 use gcc, gfortran and python2.7 as C, Fortran, an python compilers, do:
 
+  $ cmake -DCMAKE\_C\_COMPILER=/home/daouts/.guix-profile/bin/gcc -DCMAKE\_Fortran\_COMPILER=/home/daouts/.guix-profile/bin/gfortran -S . -B bin
   $ cmake -DPYTHON\_EXECUTABLE=/opt/local/bin/python2.7 -DCMAKE\_C\_COMPILER=gcc -DCMAKE\_Fortran\_COMPILER=gfortran -S . -B bin
 
 
