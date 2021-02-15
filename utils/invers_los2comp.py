@@ -17,7 +17,7 @@
 
 from sys import argv,exit,stdin,stdout
 import getopt
-import os, math
+import os, math, sys
 from os import path
 import logging
 
@@ -63,7 +63,7 @@ class network:
         self.path = wdir + name
         self.lookf = wdir + lookf
         self.headf = wdir + headf
-        self.sigmaf = wdir + sigmaf
+        self.sigmaf = sigmaf
         self.scale = scale
         self.scale_sig = scale_sig
         self.bounds = bounds
@@ -101,6 +101,7 @@ class network:
         del ds, band
 
         if self.sigmaf is not None:
+            self.sigmaf = self.wdir + self.sigmaf
             ds = gdal.Open(self.sigmaf,gdal.GA_ReadOnly)
             band = ds.GetRasterBand(1)
             self.sigma = self.scale_sig*band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
@@ -277,7 +278,7 @@ for i in range(M):
     nlines, ncols = insar[0].nlines, insar[0].ncols
     # check size maps identical
     if (insar[i].nlines != nlines) or (insar[i].ncols != ncols):
-        logger.critical('Size input maps are not idenical. Exit!')
+        logger.critical('Size input maps are not idenical. Please crop your data to the same area. Exit!')
         exit()
     # get param output files
     gt = insar[0].gt
@@ -463,7 +464,7 @@ for n in range(N):
     data[data==0] = np.float('NaN')
 
     # plot comps
-    vmax =  np.nanpercentile(data,98)
+    vmax =  np.nanpercentile(data,92)
     ax = fig.add_subplot(2,N,n+1)
     cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=-vmax,interpolation=None)
     ax.set_title('{}'.format(comp_name[n]))
