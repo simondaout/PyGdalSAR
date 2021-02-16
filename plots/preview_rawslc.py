@@ -61,7 +61,7 @@ if arguments["--nproc"] == None:
 else:
   nproc = int(arguments["--nproc"])
 
-dates,bid=np.loadtxt(dates_list,comments="#",unpack=True,usecols=(0,1),dtype='i,f')
+dates=np.loadtxt(dates_list,comments="#",unpack=True,usecols=(0),dtype='i')
 kmax=len(dates)
 
 # cleanif 
@@ -79,7 +79,7 @@ def run(cmd):
         env=environ)
     if r != 0:
         print(r)
-    return
+    return r
 
 @contextmanager
 def poolcontext(*arg, **kargs):
@@ -103,22 +103,35 @@ if look>1:
     with poolcontext(processes=nproc) as pool:
         results = pool.map(dolook, work)
 
+try:
+ os.remove(os.path.join(outputdir, "dates_problems.txt"))
+ os.remove(os.path.join(outputdir, "dates_success.txt"))
+except:
+ pass
 def preview(kk):
+    successf = open(os.path.join(outputdir, "dates_success.txt"), "a")
+    failf =  open(os.path.join(outputdir, "dates_problems.txt"), "a")
     date = dates[kk]
-    if look > 1:
-        infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
-        jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
-    else:
-        infile = str(date) + '/'+ str(date)+ '.slc'
-        jpeg = str(date) + '/'+ str(date)+ '.jpeg'
 
     try:
       if look>1:
-          run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
+          infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
+          jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
+          r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
       else:
-          run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
+          infile = str(date) + '/'+ str(date)+ '.slc'
+          jpeg = str(date) + '/'+ str(date)+ '.jpeg'
+          r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
+      if r != 0:
+            raise Exception("nsb_preview_slc failed for date: ", infile)
+            failf.write("%s\n" % ( str(date)))
+      else:
+            print ('Create: ', jpeg)
+            successf.write("%s\n" % ( str(date)))
     except:
-      pass
+        failf.write("%s\n" % ( str(date)))
+    successf.close()
+    failf.close()
 
 work = [(kk) for kk in range(kmax)]
 with poolcontext(processes=nproc) as pool:

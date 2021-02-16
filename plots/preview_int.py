@@ -113,7 +113,7 @@ def preview(kk):
             raise Exception("nsb_preview_int failed for date: ", infile)
             failf.write("%s %s\n" % ( str(date1), str(date2) ))
       else:
-            print 'Create: ', jpeg
+            print ('Create: ', jpeg)
             successf.write("%s %s\n" % ( str(date1), str(date2) ))
     except:
       failf.write("%s %s\n" % ( str(date1), str(date2) ))
