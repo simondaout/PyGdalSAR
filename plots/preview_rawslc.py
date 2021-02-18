@@ -96,6 +96,7 @@ def dolook(kk):
     pass
   else:
     temp = str(date) + '/'+str(date)+ '.slc'
+    r= run("length.pl "+str(temp))
     run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
 
 if look>1:
@@ -116,10 +117,12 @@ def preview(kk):
     try:
       if look>1:
           infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
+          r= run("length.pl "+str(infile))
           jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
           r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
       else:
           infile = str(date) + '/'+ str(date)+ '.slc'
+          r= run("length.pl "+str(infile))
           jpeg = str(date) + '/'+ str(date)+ '.jpeg'
           r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
       if r != 0:
