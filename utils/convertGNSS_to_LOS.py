@@ -87,7 +87,12 @@ def load_gps(file):
     for line in fl:
         if not line.startswith(('#')):
             # Name lon lat Ve Vn Vup Se Sn Sup C
-            sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup, dLon = line.split()
+            try:
+              sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup = line.split()
+            except:
+              print("Fail reading GNSS data block. Please organise input file as follow:")
+              print("sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup")
+              print("Exit.")
             gps_gdf.loc[index, 'geometry'] = Point(float(lon), float(lat))
             gps_gdf.loc[index, 'station'] = sta[:4]
             gps_gdf.loc[index, 've'] = float(Ve)  # eastern velocity in mm/yr in fixed eurasia reference frame
@@ -162,17 +167,17 @@ def plot_gps_in_LOS(gps, poly):
     # plot world
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     if shapefile: 
-      bounds = gpd.read_file(wdir + shapefile)
+      bounds = gpd.read_file(shapefile)
       bounds = bounds.to_crs(world.crs)
       bounds.plot(ax=ax,facecolor='none', color='none',edgecolor='black',zorder=1)
     else:
       world.plot(ax=ax,facecolor='none',color='none', edgecolor='black',zorder=1)
 
     los = gps['los'].to_numpy()
-    lmin = np.nanpercentile(los, 2)
-    lmax = np.nanpercentile(los, 98)
-    vmax = np.max([lmin,lmax])
-    vmin = -vmax 
+    vmin = np.nanpercentile(los, 8)
+    vmax = np.nanpercentile(los, 92)
+    #vmax = abs(np.max([lmin,lmax]))
+    #vmin = -vmax 
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
     try:
         from matplotlib.colors import LinearSegmentedColormap
