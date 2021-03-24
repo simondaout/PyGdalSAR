@@ -47,8 +47,11 @@ import logging
 import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
-# from nsbas import docopt, gdal, procparser, subprocess
-import subprocess, gdal, procparser
+import subprocess 
+if "GDAL_SYS" in environ and environ["GDAL_SYS"] == 'True':
+    from osgeo import gdal
+else:
+    import nsbas.gdal as gdal
 gdal.UseExceptions()
 import filecmp
 from operator import methodcaller
@@ -57,6 +60,10 @@ try:
     from nsbas import docopt
 except:
     import docopt
+try:
+    from nsbas import procparser
+except:
+    from parsers import procparser
 
 ##################################################################################
 ###  Extras functions and context maganers
