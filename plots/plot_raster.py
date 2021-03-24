@@ -137,7 +137,7 @@ elif sformat == "GTIFF":
     nlines, ncols = ds.RasterYSize, ds.RasterXSize
 
 elif sformat == 'GAMMA':
-    import gamma as gm
+    from parsers import gamma as gm
     if ds_extension == ".diff":
         if arguments["--parfile"] !=  None:
             par_file =  arguments["--parfile"]

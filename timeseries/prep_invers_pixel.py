@@ -38,7 +38,7 @@ import dateutil.parser
 from osgeo import gdal
 import numpy as np
 import docopt
-import gamma as gm
+from parsers import gamma as gm
 import gdal
 gdal.UseExceptions()
 import shutil

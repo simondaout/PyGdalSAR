@@ -1980,7 +1980,7 @@ if ref is not None:
         ds = gdal.Open(ref, gdal.GA_ReadOnly)
         mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'GAMMA':
-        import gamma as gm
+        from parsers import gamma as gm
         # par_file = ref 
         mlines,mcols = gm.readpar(int_path)
 
@@ -2015,7 +2015,7 @@ if radar is not None:
             del ds
         
         elif sformat == 'GAMMA':
-            import gamma as gm
+            from parsers import gamma as gm
             # par_file = ref 
             mlines,mcols = gm.readpar()
             elev_map = gm.readgamma(radar)
