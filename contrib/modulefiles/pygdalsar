@@ -5,7 +5,7 @@ set exec_prefix ${prefix}
 setenv PYGDALSAR           $prefix
 
 prepend-path PYTHONPATH      $prefix/contrib/python
-prepend-path PYTHONPATH      $prefix/contrib/python/parsers
+
 prepend-path PATH  $prefix/correction_tools
 prepend-path PATH  $prefix/timeseries
 prepend-path PATH  $prefix/utils
