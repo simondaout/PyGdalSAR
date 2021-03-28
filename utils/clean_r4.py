@@ -104,12 +104,12 @@ else:
     sys.exit()
 
 # read lect.in 
-ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
+ncol, nlign = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
 
 if arguments["--ref"] == None:
     lin_start, lin_jend, col_start, col_jend = None,None,None,None
 else:
-    ref = map(int,arguments["--ref"].replace(',',' ').split())
+    ref = list(map(int,arguments["--ref"].replace(',',' ').split()))
     try:
         lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
     except:
@@ -161,7 +161,7 @@ if ramp=='lin':
     print('Remove ramp %f x  + %f y + %f'%(a,b,c))
 
     G=np.zeros((len(mask.flatten()),3))
-    for i in xrange(nlign):
+    for i in range(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,1] = i
     G[:,2] = 1
@@ -191,7 +191,7 @@ if ramp=='quad':
     print('Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d))
 
     G=np.zeros((len(mask.flatten()),4))
-    for i in xrange(nlign):
+    for i in range(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,2] = i
@@ -224,7 +224,7 @@ elif ramp=='cub':
     print('Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f))
 
     G=np.zeros((len(mask.flatten()),6))
-    for i in xrange(nlign):
+    for i in range(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,2] = i**3
@@ -247,7 +247,7 @@ if (arguments["--ref"] is not None) :
 if arguments["--crop"] ==  None:
     crop = [0,ncol,0,nlign]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 if iend>ncol:
     iend=ncol
@@ -268,28 +268,28 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
 
     # top 
     if jend1 > 0:
-        for j in xrange(buf):
-          for i in xrange(ibeg,iend):
+        for j in range(buf):
+          for i in range(ibeg,iend):
                 mf[jend1+j,i] = mf[jend1+j,i]*(np.float(j+1)/buf)
     
     #bottom
     if jbeg2 < nlign:
-        for j in xrange(buf):
-          for i in xrange(ibeg,iend):
+        for j in range(buf):
+          for i in range(ibeg,iend):
             # print(jbeg2-(buf-j))
             mf[jbeg2-(buf-j),i] = mf[jbeg2-(buf-j),i] - mf[jbeg2-(buf-j),i]*(np.float(j+1)/buf)
 
     # left
     if iend1 > 0:
-        for j in xrange(buf):
-          for i in xrange(jbeg,jend):   
+        for j in range(buf):
+          for i in range(jbeg,jend):   
             mf[i,iend1+(buf-(j+1))] = mf[i,iend1+(buf-(j+1))] - mf[i,iend1+(buf-(j+1))]*(np.float(j+1)/buf)
         # sys.exit()
 
     # right
     if ibeg2 < ncol:
-        for j in xrange(buf):
-          for i in xrange(jbeg,jend):
+        for j in range(buf):
+          for i in range(jbeg,jend):
             mf[i,ibeg2-(buf-j)] = mf[i,ibeg2-(buf-j)] - mf[i,ibeg2-(buf-j)]*(np.float(j+1)/buf)
 
     mf[jbeg1:jend1,:] = np.float('NaN')
