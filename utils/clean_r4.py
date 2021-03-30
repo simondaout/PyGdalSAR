@@ -117,8 +117,8 @@ else:
         col_start, col_end = 0, ncol
 
 fid = open(infile, 'r')
-m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
-m[m==0.0] = np.float('NaN')
+m = np.fromfile(fid,dtype=float32).reshape((nlign,ncol))
+m[m==0.0] = float('NaN')
 
 mf = np.copy(m)
 
@@ -128,15 +128,15 @@ print('Clean outliers for ramp estimation outside:', maxlos,minlos)
 kk = np.nonzero(
     np.logical_or(m<minlos,m>maxlos))
 m_ramp = np.copy(m)
-m_ramp[kk] = np.float('NaN')
+m_ramp[kk] = float('NaN')
 
 # mask
 if maskf is not 'no':
     fid2 = open(maskf, 'r')
-    mask = np.fromfile(fid2,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))
+    mask = np.fromfile(fid2,dtype=float32)[:nlign*ncol].reshape((nlign,ncol))
     mask =  mask*scale_mask
     kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
-    mf[kk] = np.float('NaN')
+    mf[kk] = float('NaN')
 else:
     mask = np.zeros((nlign,ncol))
 
@@ -270,32 +270,32 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
     if jend1 > 0:
         for j in range(buf):
           for i in range(ibeg,iend):
-                mf[jend1+j,i] = mf[jend1+j,i]*(np.float(j+1)/buf)
+                mf[jend1+j,i] = mf[jend1+j,i]*(float(j+1)/buf)
     
     #bottom
     if jbeg2 < nlign:
         for j in range(buf):
           for i in range(ibeg,iend):
             # print(jbeg2-(buf-j))
-            mf[jbeg2-(buf-j),i] = mf[jbeg2-(buf-j),i] - mf[jbeg2-(buf-j),i]*(np.float(j+1)/buf)
+            mf[jbeg2-(buf-j),i] = mf[jbeg2-(buf-j),i] - mf[jbeg2-(buf-j),i]*(float(j+1)/buf)
 
     # left
     if iend1 > 0:
         for j in range(buf):
           for i in range(jbeg,jend):   
-            mf[i,iend1+(buf-(j+1))] = mf[i,iend1+(buf-(j+1))] - mf[i,iend1+(buf-(j+1))]*(np.float(j+1)/buf)
+            mf[i,iend1+(buf-(j+1))] = mf[i,iend1+(buf-(j+1))] - mf[i,iend1+(buf-(j+1))]*(float(j+1)/buf)
         # sys.exit()
 
     # right
     if ibeg2 < ncol:
         for j in range(buf):
           for i in range(jbeg,jend):
-            mf[i,ibeg2-(buf-j)] = mf[i,ibeg2-(buf-j)] - mf[i,ibeg2-(buf-j)]*(np.float(j+1)/buf)
+            mf[i,ibeg2-(buf-j)] = mf[i,ibeg2-(buf-j)] - mf[i,ibeg2-(buf-j)]*(float(j+1)/buf)
 
-    mf[jbeg1:jend1,:] = np.float('NaN')
-    mf[jbeg2:jend2,:] = np.float('NaN')
-    mf[:,ibeg1:iend1] = np.float('NaN')
-    mf[:,ibeg2:iend2] = np.float('NaN')
+    mf[jbeg1:jend1,:] = float('NaN')
+    mf[jbeg2:jend2,:] = float('NaN')
+    mf[:,ibeg1:iend1] = float('NaN')
+    mf[:,ibeg2:iend2] = float('NaN')
 #plt.imshow(mf)
 #plt.show()
 #sys.exit()
@@ -308,7 +308,7 @@ maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
 print('Clean outliers outside:', maxlos,minlos)
 kk = np.nonzero(
     np.logical_or(mf<minlos,mf>maxlos))
-mf[kk] = np.float('NaN')
+mf[kk] = float('NaN')
 
 # Plot
 vmax = np.max([np.nanpercentile(mf,99),np.nanpercentile(m,99),np.nanpercentile(mf,1),np.nanpercentile(m,1)])
