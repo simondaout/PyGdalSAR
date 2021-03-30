@@ -72,7 +72,7 @@ else:
 if arguments["--coeff"] is  None:
   vel2disp=1
 else:
-  vel2disp=np.float(arguments["--coeff"])
+  vel2disp=float(arguments["--coeff"])
 
 if arguments["--plot"] ==  None:
     plot = 'yes'
@@ -93,7 +93,7 @@ if ds_extension == ".unw":
   ds_band2 = ds.GetRasterBand(2)
   los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp
   amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-  los[amp==0] = np.float('NaN')
+  los[amp==0] = float('NaN')
 
 if (ds_extension == ".tif") or (ds_extension == ".tiff"):
   ds = gdal.Open(infile, gdal.GA_ReadOnly)
@@ -118,19 +118,19 @@ else:
     latbeg,latend,lonbeg,lonend = miny,maxy,minx,maxx
 print(latbeg,latend,lonbeg,lonend)
 
-los[los==0.]=np.float('NaN')
+los[los==0.]=float('NaN')
 kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(los), np.abs(los)<999.),los==0.0))
 mprim = los[kk]
 
 if arguments["--vmax"] ==  None:
   vmax = np.nanpercentile(mprim, 90)
 else:
-  vmax = np.float(arguments["--vmax"])
+  vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
   vmin = np.nanpercentile(mprim, 10)
 else:
-  vmin = np.float(arguments["--vmin"])
+  vmin = float(arguments["--vmin"])
 
 if arguments["--wrap"] is not None: 
   los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
@@ -168,7 +168,7 @@ m = Basemap(
     urcrnrlat=latend, \
     resolution='i',
     ax=ax,
-    suppress_ticks = False,
+    #suppress_ticks = False,
     )
 
 # m.drawparallels(np.linspace(latbeg,latend,3),linewidth=0.25,zorder=1)
