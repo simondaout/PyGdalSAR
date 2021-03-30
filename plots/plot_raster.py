@@ -95,8 +95,8 @@ else:
         rad2mm = np.float(arguments["--rad2mm"])
 
 if (arguments["--cols"] is not None and arguments["--lines"] is not None):
-    ipix = map(int,arguments["--cols"].replace(',',' ').split())
-    jpix = map(int,arguments["--lines"].replace(',',' ').split())
+    ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
+    jpix = list(map(int,arguments["--lines"].replace(',',' ').split()))
     if len(jpix) != len(ipix):
       raise Exception("ncols and nlines lists are not the same size")
 
@@ -114,7 +114,7 @@ if sformat == "ROI_PAC":
         nlines, ncols = ds.RasterYSize, ds.RasterXSize
     elif (ds_extension == ".r4" or ds_extension == ""):
         fid = open(infile, 'r')
-        ncols, nlines = map(int, open(lecfile).readline().split(None, 2)[0:2])
+        ncols, nlines = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
         phi = np.fromfile(fid,dtype=np.float32)[:nlines*ncols].reshape((nlines,ncols))
         print("> Driver:   REAL4  band file")
         print("> Size:     ", ncols,'x',nlines,'x')
@@ -176,7 +176,7 @@ if arguments["--crop"] ==  None:
         jend = int(arguments["<jend>"])
     crop = [0,jend,0,iend]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # Initialize a matplotlib figure
