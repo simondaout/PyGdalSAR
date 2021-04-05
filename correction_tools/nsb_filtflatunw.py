@@ -127,9 +127,10 @@ def checkoutfile(config,file):
     return do
 
 def force_link(src,dest):
-    try:
+    if path.exists(dest):
+      try:
         symlink(src,dest)
-    except:
+      except:
         rm(dest)
         symlink(src,dest)
 
@@ -1342,8 +1343,8 @@ def unwrapping(config,kk):
                 else:
                     opt=1
 
-                # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
-                run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
+                # my deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
+                run("deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
                     +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
 
             if config.unw_method == 'roi':
