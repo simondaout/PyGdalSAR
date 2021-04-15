@@ -131,7 +131,7 @@ m_ramp = np.copy(m)
 m_ramp[kk] = float('NaN')
 
 # mask
-if maskf is not 'no':
+if maskf != 'no':
     fid2 = open(maskf, 'r')
     mask = np.fromfile(fid2,dtype=float32)[:nlign*ncol].reshape((nlign,ncol))
     mask =  mask*scale_mask
@@ -238,7 +238,7 @@ elif ramp=='cub':
 else:
     mf_ramp= np.copy(mf)
 
-if (arguments["--ref"] is not None) :
+if (arguments["--ref"] != None) :
     cst = np.nanmean(mf[lin_start:lin_end,col_start:col_end])
     mf = mf - cst
     mf_ramp = mf_ramp - cst
