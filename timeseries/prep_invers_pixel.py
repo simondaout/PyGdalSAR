@@ -123,8 +123,7 @@ date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')
 kmax=len(date_1)
 print("number of interferogram: ",kmax)
 # open baseline.rsc
-source2=file(baseline,'r')
-im,bp,bt,imd=np.loadtxt(source2,comments="#",usecols=(0,1,2,4),unpack=True,dtype='i,f,f,f')
+im,bp,bt,imd=np.loadtxt(baseline,comments="#",usecols=(0,1,2,4),unpack=True,dtype='i,f,f,f')
 print("image list=",baseline)
 nmax=len(imd)
 print("number of image: ",nmax)
@@ -175,8 +174,8 @@ elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      do_sig = int(2)
      weight=np.zeros((kmax))
      for i in range((kmax)):
-     	deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
-     	deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
+        deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
+        deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
         weight[i] = (np.float(np.exp(-deltap)) + np.float(np.exp(-deltat)))/2
      wf = open(os.path.join(tsdir, "list_pair"), "w")
      for i in range((kmax)):
@@ -197,7 +196,7 @@ if sformat == 'ROI_PAC':
       if os.path.exists(infile):
         print('Create link:',infile )
         if os.path.exists(outint) is False:
-	    os.symlink(infile,outint)
+            os.symlink(infile,outint)
             os.symlink(rscfile,outrsc)    
       else:
         print('Can not find:', infile)
@@ -212,12 +211,11 @@ if sformat == 'ROI_PAC':
           if os.path.exists(cohfile):
             print('Create link:',cohfile)
             if os.path.exists(outcoh) is False:
-	        os.symlink(cohfile,outcoh)
+                os.symlink(cohfile,outcoh)
                 os.symlink(cohrsc,outrsc)    
           else:
             print('Can not find:', cohfile)
           
-
 else:
   iformat = int(1)
   for kk in range((kmax)):
