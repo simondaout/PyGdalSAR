@@ -127,10 +127,9 @@ def checkoutfile(config,file):
     return do
 
 def force_link(src,dest):
-    if path.exists(dest):
-      try:
+    if path.exists(dest) is False:
         symlink(src,dest)
-      except:
+    else:
         rm(dest)
         symlink(src,dest)
 
