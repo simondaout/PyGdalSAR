@@ -1167,6 +1167,8 @@ def flat_model(config,kk):
                 try:
                     run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
                     +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
+                    # move param file into a file name independent of prefix and suffix
+                    force_link(param,newparam)
                 except Exception as e:
                     logger.critical(e)
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
@@ -1177,8 +1179,6 @@ def flat_model(config,kk):
             logger.critical('Model file is not defined. Exit!')
             sys.exit()
 
-        # move param file into a file name independent of prefix and suffix
-        force_link(param,newparam)
 
     return config.getconfig(kk)
 
