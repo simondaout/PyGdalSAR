@@ -71,14 +71,15 @@ c        seuil_cor=0.1
         print*, 'Check coh in 6th column in ncycle_acp'
 c seuil variabilité du stack
 c        std_stack=3.
-        std_stack=1.
+        std_stack=.7
         print*, 'Harcoding threshold variability stack:',std_stack
         print*, 'Check std in 11th column in ncycle_acp'
 c stack minimale
         seuil_stack=-200
         print*, 'Harcoding minimum value stack:',seuil_stack
 c seuil sur le nb min de points valables dans chaque cellule
-        seuil_nb=10
+        c seuil_nb=10
+        seuil_nb=5
         print*, 'Harcoding minimum number of points windows:',seuil_nb
 c       
       stackmin=10000.
