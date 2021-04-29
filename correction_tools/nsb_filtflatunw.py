@@ -1347,8 +1347,10 @@ def unwrapping(config,kk):
                     opt=1
 
                 # my deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
+                #run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
+                #    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
                 run("deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
+                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
 
             if config.unw_method == 'roi':
 
