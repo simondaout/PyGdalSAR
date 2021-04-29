@@ -12,7 +12,7 @@ nsb_filtflatunw.py
 
 usage:
   nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] [--look=<value>] \
-  [--model=<path>] [--cutfile=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>]  <proc_file> 
+  [--model=<path>] [--cutfile=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>] [--remove_bridges=yes/no]  <proc_file> 
   nsb_filtflatunw.py -h | --help
 
 options:
@@ -27,6 +27,7 @@ Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat
   --cutfile=<path>      Cut file for unwrappin [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
+  --remove_bridges      If Yes remove bridge.in file before running unwrapping
   -v                    Verbose mode. Show more information about the processing
   -f                    Force mode. Overwrite output files
   -h --help             Show this screen.
@@ -451,7 +452,7 @@ class FiltFlatUnw:
     cutfile: cut file fro unwrapping, decrease coh threshold for pixel with cut>0
     """
 
-    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None):
+    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None,remove_bridges=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir, self.EraDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -473,6 +474,7 @@ class FiltFlatUnw:
         self.model = model
         self.strat = False
         self.cutfile = cutfile
+        self.remove_bridges = remove_bridges
 
         # initilise radar file
         if int(self.Rlooks_int) > 1:
@@ -1307,7 +1309,9 @@ def unwrapping(config,kk):
         unwROIrsc = unwfiltROI + '.rsc'
 
         bridgefile = 'bridge.in'
-
+        if config.remove_bridges and path.exists(bridgefile):
+            shutil.move(bridgefile,'bridge_save.in')
+   
         if force: 
             rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
 
@@ -1749,6 +1753,11 @@ if arguments["--jend_mask"] == None:
 else:
     jend_mask = int(arguments["--jend_mask"])
 
+if arguments["--remove_bridges"] == "yes":
+     remove_bridges = True
+else:
+     remove_bridges = False
+
 if arguments["-f"]:
     force = True
 else:
@@ -1896,7 +1905,7 @@ for p in jobs:
         proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"],proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
-        ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask,
+        ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask, remove_bridges = remove_bridges,
         ) 
 
     print()
