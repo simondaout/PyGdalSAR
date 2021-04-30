@@ -1923,8 +1923,11 @@ else:
 if arguments["--cpt"] is  None:
     #cmap=cm.rainbow
     ### Load colormaps
-    cm_locs = '/home/comethome/jdd/ScientificColourMaps5/by_platform/python/'
-    cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt")).reversed()
+    try:
+      cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+      cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt")).reversed()
+    except:
+      cmap=cm.rainbow
 else:  
     try:
         cmap = LinearSegmentedColormap.from_list(arguments["--cpt"].split("/")[-1].split('.')[0], np.loadtxt(arguments["--cpt"]))
