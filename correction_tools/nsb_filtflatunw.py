@@ -346,10 +346,11 @@ class PileInt:
         ''' Return model file name 
         Assume model computed on the Rlooks_unw IFG...
         '''
-        if int(self.Rlooks_unw) > 1:
-          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.acp'
-        else:
-          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
+        _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
+        #if int(self.Rlooks_unw) > 1:
+        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.acp'
+        #else:
+        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
         return _f
 
     def geterafiles(self,kk):
