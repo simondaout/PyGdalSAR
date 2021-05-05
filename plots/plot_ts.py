@@ -14,8 +14,8 @@ plot_ts.py
 -------------
 Plot a time series file (cube in binary format) 
 
-Usage: clean_ts.py --infile=<path> [--vmin=<value>] [--vmax=<value>] [--lectfile=<path>] [--imref=<value>] \
-[--list_images=<path>] [--crop=<values>] [--cpt=<values>] 
+Usage: plot_ts.py --infile=<path> [--vmin=<value>] [--vmax=<value>] [--lectfile=<path>] [--imref=<value>] \
+[--list_images=<path>] [--crop=<values>] [--cpt=<values>] [--dateslim=<values>] 
 
 Options:
 -h --help           Show this screen.
@@ -26,6 +26,7 @@ Options:
 --crop VALUE        Crop option [default: 0,nlines,0,ncol]
 --vmax              Max colorscale [default: 98th percentile]
 --vmin              Min colorscale [default: 2th percentile]
+--dateslim              Datemin,Datemax time series
 """
 
 # numpy
@@ -44,9 +45,22 @@ import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
 import gdal
-
+from datetime import datetime as datetimes
+import datetime
 import docopt
 arguments = docopt.docopt(__doc__)
+
+
+def date2dec(dates):
+    dates  = np.atleast_1d(dates)
+    times = []
+    for date in dates:
+        x = datetimes.strptime('{}'.format(date),'%Y%m%d')
+        dec = float(x.strftime('%j'))/365.1
+        year = float(x.strftime('%Y'))
+        times.append(year + dec)
+    return times
+
 infile = arguments["--infile"]
 if arguments["--lectfile"] ==  None:
    lecfile = "lect.in"
@@ -71,7 +85,6 @@ if arguments["--cpt"] is  None:
 else:
     cmap=arguments["--cpt"]
 
-
 # lect cube
 ds = gdal.Open(infile)
 if not ds:
@@ -84,7 +97,7 @@ else:
 if arguments["--crop"] ==  None:
     crop = [0,nlines,0,ncol]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 if arguments["--list_images"] ==  None:
@@ -93,17 +106,22 @@ else:
     listim = arguments["--list_images"]
 
 nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-N=len(dates)
-print('Number images: ', N)
+N = len(dates)
 
-# lect cube
+if arguments["--dateslim"] is not  None:
+    dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+    datemin = date2dec(dmin)
+    datemax = date2dec(dmax)
+else:
+    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    dmax = str(datemax) + '0101'
+    dmin = str(datemin) + '0101'
+
 cubei = np.fromfile(infile,dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
-
-_cube=np.copy(cube)
-_cube[cube==0] = np.float('NaN')
+cube[cube==0] = np.float('NaN')
 print('Number of line in the cube: ', cube.shape)
 maps = cube.reshape((nlines,ncol,N))
 print('Reshape cube: ', maps.shape)
@@ -114,6 +132,14 @@ if arguments["--imref"] !=  None:
         if l != imref:
             index = np.nonzero(maps[:,:,l]==0.0)
             maps[:,:,l][index] = np.float('NaN')
+
+# clean dates
+indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
+nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
+# new number of dates
+N = len(dates)
+maps = as_strided(maps[:,:,indexd])
+print('Reshape cube: ', maps.shape)
 
 if arguments["--vmax"] ==  None:
     vmax = np.nanpercentile(maps, 98)*4.4563
@@ -154,8 +180,7 @@ plt.suptitle('Time series maps')
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
-fig.savefig('maps_clean.eps', format='EPS',dpi=150)
-
+fig.savefig('maps_clean.pdf', format='PDF',dpi=150)
 
 plt.show()
 
