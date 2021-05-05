@@ -3328,6 +3328,10 @@ def empirical_cor(l):
                 ))))))))))))
                 ))
         
+        if len(indexref[0]) == 0:
+             logger.warning('Ref zone is empty! Re-define --ref_zone argument. Exit!')
+             sys.exit()
+
         ## Set data minus temporal model to zero in the ref area
         zone = as_strided(map_flata[:,:] - models[:,:,l])
         los_ref2 = zone[indexref].flatten()
