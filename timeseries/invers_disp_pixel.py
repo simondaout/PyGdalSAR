@@ -378,16 +378,16 @@ else:
 if arguments["--coseismic"] ==  None:
     cos = []
 else:
-    cos = map(float,arguments["--coseismic"].replace(',',' ').split())
+    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
 if arguments["--postseismic"] ==  None:
     pos = np.zeros(len(cos))
 else:
-    pos = map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split())
+    pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
 
 if arguments["--slowslip"] == None:
     sse=[]
 else:
-    sse = map(float,arguments["--slowslip"].replace(',',' ').split()) 
+    sse = list(map(float,arguments["--slowslip"].replace(',',' ').split())) 
 sse_time = sse[::2]
 sse_car = sse[1::2]  
 
@@ -396,7 +396,7 @@ if arguments["--degreeday"] ==  None:
 else:
     degreeday = 'yes'
     try:
-        ddt,ddf = map(float,arguments["--degreeday"].replace(',',' ').split()) 
+        ddt,ddf = list(map(float,arguments["--degreeday"].replace(',',' ').split())) 
     except:
         print('degreeday argument must contain two float values corresponding to the thawing and freezing onsets')
         sys.exit(0)
@@ -407,7 +407,7 @@ else:
     vectf = None
 
 if arguments["--bounds"] is not  None:
-    ylim = map(float,arguments["--bounds"].replace(',',' ').split())
+    ylim = list(map(float,arguments["--bounds"].replace(',',' ').split()))
 
 if arguments["<iref>"] ==  None:
     iref = None
@@ -453,15 +453,15 @@ if len(pos)>0 and len(cos) != len(pos):
 # markers = ['o','v','^','s','P','X','o','v','^','s','P','X']
 markers = ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
 
-ipix = map(int,arguments["--cols"].replace(',',' ').split())
-jpix = map(int,arguments["--ligns"].replace(',',' ').split())
+ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
+jpix = list(map(int,arguments["--ligns"].replace(',',' ').split()))
 if len(jpix) != len(ipix):
    raise Exception("ncols and nligns lists are not the same size")
 # number of pixels
 Npix = len(ipix)
 
 # read lect.in 
-ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
+ncol, nlign = list(map(int, open(infile).readline().split(None, 2)[0:2]))
 
 # bounds plots
 istart,iend = np.min(ipix) - 100, np.max(ipix) + 100
