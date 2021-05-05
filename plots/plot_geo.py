@@ -197,14 +197,14 @@ else:
    #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4,interpolation='nearest')
+     vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
 
 if arguments["--shapefile"] is not None and os.path.exists(arguments["--shapefile"]):
     sf = shp.Reader(arguments["--shapefile"])
     for shape in sf.shapeRecords():
         x = [i[0] for i in shape.shape.points[:]]
         y = [i[1] for i in shape.shape.points[:]]
-        ax.plot(x,y,color='black',alpha=0.5,zorder=5)
+        ax.plot(x,y,color='black',linewidth=2.,alpha=0.8,zorder=5)
 
 ax.set_xlim([lonbeg,lonend])
 ax.set_ylim([latbeg,latend])

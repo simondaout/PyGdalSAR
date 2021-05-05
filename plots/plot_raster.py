@@ -266,7 +266,8 @@ else:
 cutphi[cutphi==0] = np.float('NaN')
 masked_array = np.ma.array(cutphi, mask=np.isnan(cutphi))
 
-cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
+#cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
+cax = ax.imshow(masked_array, cmap, interpolation='none',vmax=vmax,vmin=vmin)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
