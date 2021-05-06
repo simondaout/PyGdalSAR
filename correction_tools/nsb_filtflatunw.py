@@ -570,7 +570,7 @@ def computesize(config,file):
     try:
         dirname, filename = path.split(path.abspath(file))
         with Cd(dirname):
-            ds_int = gdal.Open(filename, gdal.GA_ReadOnly)
+            ds_int = gdal.OpenEx(filename, allowed_drivers=["ROI_PAC"])
             driver = ds_int.GetDriver()
             return ds_int.RasterXSize, ds_int.RasterYSize
     except OSError as err:
@@ -913,8 +913,8 @@ def flat_atmo(config, kk):
         if int(config.ivar)>1 :
             logger.warning("ivar=2, no masking implemented !!!")
 
-        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),np.float(config.min_z),config.delta_z)       
-        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0. or  np.float(config.delta_z) != 75.)  and int(config.ivar)<2 :
+        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),float(config.min_z),config.delta_z)       
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or float(config.min_z) > 0. or  float(config.delta_z) != 75.)  and int(config.ivar)<2 :
 
             import scipy.optimize as opt
             import scipy.linalg as lst
@@ -927,9 +927,9 @@ def flat_atmo(config, kk):
             # print(config.thresh_amp_atmo,config.min_z,config.delta_z)
 
             index = np.nonzero(
-            np.logical_and(coh>np.float(config.thresh_amp_atmo),
-            np.logical_and(z>np.float(config.min_z),
-            np.logical_and(deltaz>np.float(config.delta_z),
+            np.logical_and(coh>float(config.thresh_amp_atmo),
+            np.logical_and(z>float(config.min_z),
+            np.logical_and(deltaz>float(config.delta_z),
             np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
             np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
             )))))
@@ -1072,12 +1072,12 @@ def flat_atmo(config, kk):
         phi_select = dphi_select*z_select
 
         if int(config.ivar)<2:
-            fit = b1*(z_select - np.float(config.z_ref)) + (b2/2.)*((z_select)**2 -np.float(config.z_ref)**2) + \
-            (b3/3.)*((z_select)**3-np.float(config.z_ref)**3) + (b4/4.)*((z_select)**4 - np.float(config.z_ref)**4)
+            fit = b1*(z_select - float(config.z_ref)) + (b2/2.)*((z_select)**2 -float(config.z_ref)**2) + \
+            (b3/3.)*((z_select)**3-float(config.z_ref)**3) + (b4/4.)*((z_select)**4 - float(config.z_ref)**4)
         elif (config.nfit_atmo) == 3 :
-            fit = (b1+b2*az_select)/2.*(z_select-np.float(config.z_ref))**2 + (b3+b4*az_select)/3.*(z_select-np.float(config.z_ref))**3
+            fit = (b1+b2*az_select)/2.*(z_select-float(config.z_ref))**2 + (b3+b4*az_select)/3.*(z_select-float(config.z_ref))**3
         else:
-            fit = b1*(z_select-np.float(config.z_ref)) +(b2+b3*az_select)/2.*(z_select-np.float(config.z_ref))**2 + (b4+b5*az_select)/3.*(z_select-np.float(config.z_ref))**3
+            fit = b1*(z_select-float(config.z_ref)) +(b2+b3*az_select)/2.*(z_select-float(config.z_ref))**2 + (b4+b5*az_select)/3.*(z_select-float(config.z_ref))**3
 
         # compute crappy constant for the plot
         cst = np.nanmedian(fit-phi_select)

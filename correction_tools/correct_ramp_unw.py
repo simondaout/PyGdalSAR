@@ -143,7 +143,7 @@ for kk in range((kmax)):
         print('Open range file:', rgfile)
         rg_a, rg_b, rg_c, rg_d, rg_f, rg_g = np.loadtxt(rgfile,comments="#",usecols=(0,1,2,3,4,5),unpack=True,dtype='f,f,f,f,f,f')
 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     # Get the band that have the data we want
     ds_band1 = ds.GetRasterBand(1)
     ds_band2 = ds.GetRasterBand(2)
@@ -167,10 +167,10 @@ for kk in range((kmax)):
 
     flatlos = los_map - corr_map
     flatlos[los_map==0] = 0
-    flatlos[np.isnan(los_map)] = np.float('NaN')
+    flatlos[np.isnan(los_map)] = float('NaN')
 
     wrapfile =  folder + prerg + str(date1) + '-' + str(date2) + sufrg + '_' + wlook + 'rlks.int'
-    ds2 = gdal.Open(wrapfile, gdal.GA_ReadOnly)
+    ds2 = gdal.OpenEx(wrapfile, allowed_drivers=["ROI_PAC"])
     ds2_band = ds2.GetRasterBand(1)
     wrapphi = ds2_band.ReadAsArray(0, 0, ds2.RasterXSize, ds2.RasterYSize, \
         ds2.RasterXSize, ds2.RasterYSize)
@@ -181,10 +181,10 @@ for kk in range((kmax)):
     
     flatwrap = wrapphi*wrapcorr
     flatwrap[wrapphi==0] = 0
-    flatwrap[np.isnan(wrapphi)] = np.float('NaN')
+    flatwrap[np.isnan(wrapphi)] = float('NaN')
 
     corwrapfile =  folder + prerg + str(date1) + '-' + str(date2) + sufrg + '_flatrange' + '_' + wlook + 'rlks.int'
-    ds3 = gdal.Open(corwrapfile, gdal.GA_ReadOnly)
+    ds3 = gdal.OpenEx(corwrapfile, allowed_drivers=["ROI_PAC"])
     ds3_band = ds3.GetRasterBand(1)
     corwrapphi = np.angle(ds3_band.ReadAsArray(0, 0, ds3.RasterXSize, ds3.RasterYSize, \
         ds3.RasterXSize, ds3.RasterYSize))
