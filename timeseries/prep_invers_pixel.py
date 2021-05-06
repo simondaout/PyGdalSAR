@@ -176,7 +176,7 @@ elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      for i in range((kmax)):
         deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
         deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
-        weight[i] = (np.float(np.exp(-deltap)) + np.float(np.exp(-deltat)))/2
+        weight[i] = (float(np.exp(-deltap)) + float(np.exp(-deltat)))/2
      wf = open(os.path.join(tsdir, "list_pair"), "w")
      for i in range((kmax)):
           wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
@@ -241,14 +241,14 @@ else:
         infile = os.path.abspath(int_path + '/' + prefix + str(date1) + '_' + str(date2) + suffix + '.unw')
 
         los = gm.readgamma(infile)
-        los = np.float32(los)
+        los = float32(los)
         lines,cols = gm.readpar()
 
         if do_coh == 0:
             cohformat = int(1)
             cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc')
             coh = gm.readgamma(cohfile)
-            coh = np.float32(coh)
+            coh = float32(coh)
 
       # save output
       outfile =  str(date1) + '-' + str(date2) + '.r4'

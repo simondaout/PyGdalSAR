@@ -63,7 +63,7 @@ for l in range((N)):
     infile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw'
     print('Read file:', infile) 
     # read data
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 
     if l == 0:
         dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, N, gdal.GDT_Float32)
