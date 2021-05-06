@@ -41,8 +41,8 @@ Options:
 --tile=<value>        Title plot 
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
---ncols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
---nliness VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
+--cols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
+--lines VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
 """
 
 import os, sys
