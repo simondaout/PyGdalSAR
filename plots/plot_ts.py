@@ -124,7 +124,7 @@ cubei = np.fromfile(infile,dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
-cube[cube==0] = np.float('NaN')
+cube[cube==0] = float('NaN')
 print('Number of line in the cube: ', cube.shape)
 maps = cube.reshape((nlines,ncol,N))
 print('Reshape cube: ', maps.shape)
@@ -134,7 +134,7 @@ if arguments["--imref"] !=  None:
         maps[:,:,l] = maps[:,:,l] - cst
         if l != imref:
             index = np.nonzero(maps[:,:,l]==0.0)
-            maps[:,:,l][index] = np.float('NaN')
+            maps[:,:,l][index] = float('NaN')
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
@@ -147,12 +147,12 @@ print('Reshape cube: ', maps.shape)
 if arguments["--vmax"] ==  None:
     vmax = np.nanpercentile(maps, 98)*4.4563
 else:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
     vmin = np.nanpercentile(maps, 2)*4.4563 
 else:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 
 # plot diplacements maps
 fig = plt.figure(1,figsize=(14,10))

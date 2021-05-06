@@ -85,10 +85,10 @@ else:
     imref = int(arguments["--imref"]) - 1
 
 if arguments["--vmax"] is not  None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] is not  None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
@@ -153,7 +153,7 @@ for l in range((N)):
         los = los - dem*(base[l]-base[imref])
 
     amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    los[index] = np.float('NaN')
+    los[index] = float('NaN')
 
     if arguments["--wrap"] is not None:
         los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])

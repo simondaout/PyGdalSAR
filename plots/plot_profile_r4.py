@@ -74,7 +74,7 @@ else:
 if arguments["--rad2mm"] ==  None:
         rad2mm = -4.4563
 else:
-        rad2mm = np.float(arguments["--rad2mm"])
+        rad2mm = float(arguments["--rad2mm"])
 
 if arguments["--cpt"] is  None:
     # cmap=cm.jet 
@@ -191,11 +191,11 @@ else:
      fid.close()
 
 if arguments["--vmax"] is not  None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 else:
     vmax = np.nanpercentile(ilos,98.)
 if arguments["--vmin"] is not  None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 else:
     vmin = np.nanpercentile(ilos,2.)
 

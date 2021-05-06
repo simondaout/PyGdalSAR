@@ -67,10 +67,10 @@ vmax = np.nanpercentile(m[ibeg:iend,jbeg:jend], 95)
 vmin = np.nanpercentile(m[ibeg:iend,jbeg:jend], 5)
 
 if arguments["--vmax"] is not  None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] is not  None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
     
 if arguments["--wrap"] is not None:
     vmax=float(arguments["--wrap"])
