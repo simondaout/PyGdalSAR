@@ -40,7 +40,7 @@ for d in idates:
     infile = '{}_mdel_{}rlks.unw'.format(d,inlook)
     run("look.pl "+str(infile)+" "+str(rlook))
     infile = '{}_mdel_{}rlks.unw'.format(d,outlook)
-    ds = gdal.Open(infile,gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile,allowed_drivers=["ROI_PAC"])
     band = ds.GetRasterBand(2)
     print("> Driver:   ", ds.GetDriver().ShortName)
     print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)

@@ -40,7 +40,7 @@ arguments = docopt.docopt(__doc__)
 if arguments["--rad2mm"] ==  None:
         rad2mm = 1
 else:
-        rad2mm = np.float(arguments["--rad2mm"])
+        rad2mm = float(arguments["--rad2mm"])
 file1 = arguments["--file1"]
 file2 = arguments["--file2"]
 ds_extension = os.path.splitext(file1)[1]
@@ -66,17 +66,17 @@ else:
     cols, lines = ds2.RasterXSize, ds2.RasterYSize
 
 data = phi1 - phi2
-data[data==0] = np.float('NaN')
-data[phi1==0] = np.float('NaN')
-data[phi2==0] = np.float('NaN')
+data[data==0] = float('NaN')
+data[phi1==0] = float('NaN')
+data[phi2==0] = float('NaN')
 
 # plot maps
 if arguments["--vmax"] is not None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 else:
     vmax = np.max( [np.nanpercentile(data,98),np.abs(np.nanpercentile(data,2))] )
 if arguments["--vmin"] is not None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 else:
     vmin = -vmax
 try:

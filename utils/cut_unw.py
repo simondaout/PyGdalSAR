@@ -52,7 +52,7 @@ plot = arguments["--plot"]
 
 gdal.UseExceptions()
 # Open dataset (image)
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
+ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 
 # Ok, assume this is a roipac image, so we can rely on the file extension
 # to know how to display the data (in the real world, we would probably write

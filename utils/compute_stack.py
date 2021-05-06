@@ -67,7 +67,7 @@ kmax = len(date1)
 
 # radar file
 driver = gdal.GetDriverByName("roi_pac")
-ds = gdal.Open(radar, gdal.GA_ReadOnly)
+ds = gdal.OpenEx(radar, allowed_drivers=["ROI_PAC"])
 nlines,ncols= ds.RasterYSize, ds.RasterXSize
 
 alllos = np.zeros((nlines,ncols,kmax))
@@ -82,7 +82,7 @@ for i in range((kmax)):
     folder= int_path  + 'int_' + str(interf1) + '_' + str(interf2) + '/'    
     infile=folder + str(prefix) + str(interf1) + '-' + str(interf2) + str(suffix) + str(rlook) + 'rlks.unw'
 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     ds_band1 = ds.GetRasterBand(1)
     print('Nlines:{}, Ncol:{}, int:{}-{}'.format(ds.RasterYSize, ds.RasterXSize,interf1,interf2))

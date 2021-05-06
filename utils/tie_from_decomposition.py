@@ -179,8 +179,8 @@ class network:
         self.pix_lin, self.pix_col = np.indices((ds.RasterYSize,ds.RasterXSize))
         self.lat,self.lon = self.top + self.yres*self.pix_lin, self.left+self.xres*self.pix_col
         # convert 0 and 255 to NaN
-        self.los[self.los==0.] = np.float('NaN')
-        self.los[self.los==255] = np.float('NaN')
+        self.los[self.los==0.] = float('NaN')
+        self.los[self.los==255] = float('NaN')
         band.FlushCache()
         del ds, band
 
@@ -200,7 +200,7 @@ class network:
         band = ds.GetRasterBand(1)
         self.look = np.ones((self.ysize,self.xsize))
         self.look[:ds.RasterYSize,:ds.RasterXSize] = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:self.ysize,:self.xsize]
-        self.look[np.isnan(self.los)] = np.float('NaN') 
+        self.look[np.isnan(self.los)] = float('NaN') 
         band.FlushCache()
         del ds, band
 
@@ -209,7 +209,7 @@ class network:
             ds = gdal.Open(self.sigmaf,gdal.GA_ReadOnly)
             band = ds.GetRasterBand(1)
             self.sigma[:ds.RasterYSize,:ds.RasterXSize] = self.scale_sig*band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:self.ysize,:self.xsize]
-            self.sigma[np.isnan(self.los)] = np.float('NaN') 
+            self.sigma[np.isnan(self.los)] = float('NaN') 
             band.FlushCache()
             del ds, band
         else:
@@ -223,7 +223,7 @@ class network:
         band = ds.GetRasterBand(1)
         self.head  = np.ones((self.ysize,self.xsize))
         self.head[:ds.RasterYSize,:ds.RasterXSize] = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:self.ysize,:self.xsize]
-        self.head[np.isnan(self.los)] = np.float('NaN') 
+        self.head[np.isnan(self.los)] = float('NaN') 
         band.FlushCache()
         del ds, band
 
@@ -279,16 +279,16 @@ class network:
             proj = [np.nanmean(pixel_proj[0][index]),np.nanmean(pixel_proj[1][index]),np.nanmean(pixel_proj[2][index])]
 
         else:
-            m = np.float('NaN')
-            std = np.float('NaN')
-            proj = [np.float('NaN'),np.float('NaN'),np.float('NaN')]
+            m = float('NaN')
+            std = float('NaN')
+            proj = [float('NaN'),float('NaN'),float('NaN')]
                             
         if m == 0:  #if only NaN nanmean is 0 
-            m = np.float('NaN')
+            m = float('NaN')
         if std == 0:
-            std = np.float('NaN')
+            std = float('NaN')
         if proj ==0:
-            proj = [np.float('NaN'),np.float('NaN'),np.float('NaN')]
+            proj = [float('NaN'),float('NaN'),float('NaN')]
 
         return m, std, proj
 

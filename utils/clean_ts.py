@@ -246,7 +246,7 @@ for l in range((N)):
     d = as_strided(maps[:,:,l])
     
     _d=np.copy(d)
-    _d[d==0] = np.float('NaN')
+    _d[d==0] = float('NaN')
     maxlos,minlos=np.nanpercentile(_d,perc),np.nanpercentile(_d,(100-perc))
     # print('Min, Max LOS:', minlos, maxlos)
     # set at NaN zero values for all dates
@@ -257,16 +257,16 @@ for l in range((N)):
         np.isnan(maskflat), 
         ))))
     
-    d[kk] = np.float('NaN')
+    d[kk] = float('NaN')
     # carefull stupid unit 
     maps[:,:,l] = maps[:,:,l] - cst - dem*(base[l]-base[imref])/100.
     if l != imref:
         index = np.nonzero(d==0.0)
-        d[index] = np.float('NaN')
-    maps[mibeg:miend,mjbeg:mjend,l] = np.float('NaN')
+        d[index] = float('NaN')
+    maps[mibeg:miend,mjbeg:mjend,l] = float('NaN')
 
 # _cube=np.copy(cube)
-# _cube[cube==0] = np.float('NaN')
+# _cube[cube==0] = float('NaN')
 # maxlos,minlos=np.nanpercentile(_cube,perc),np.nanpercentile(_cube,(100-perc))
 # print('Min, Max LOS:', minlos, maxlos)
 
@@ -292,12 +292,12 @@ fig.subplots_adjust(wspace=0.001)
 if arguments["--vmax"] ==  None:
     vmax = np.nanpercentile(maps, 98)
 else:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
     vmin = np.nanpercentile(maps, 2)
 else:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 
 for l in range((N)):
     d = as_strided(maps[:,:,l])

@@ -101,7 +101,7 @@ for (lat,lon,i,j) in zip(lats.flatten(),lons.flatten(),pix_lin.flatten(),pix_col
          print('Processing line: {}'.format(i))
 
      # initialisation
-     m = np.float('NaN')
+     m = float('NaN')
      lat_min,lat_max = lat + ds_geo[5], lat
      lon_min,lon_max = lon, lon + ds_geo[1]
      #print(i,j) 

@@ -65,7 +65,7 @@ else:
 gdal.UseExceptions()
 # Open int
 print(infile)
-ds = gdal.Open(infile,gdal.GA_ReadOnly)
+ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 ds_band1 = ds.GetRasterBand(1)
 ds_band2 = ds.GetRasterBand(2)
 
@@ -80,12 +80,12 @@ phi = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
 nlign,ncol = ds.RasterYSize, ds.RasterXSize
 temp = np.copy(phi)
 kk = np.nonzero(temp==0.0)
-temp[kk]=np.float('NaN')
+temp[kk]=float('NaN')
 
 del ds
 
 if remove is not "no":
-    ds = gdal.Open(remove,gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(remove, allowed_drivers=["ROI_PAC"])
     # print("> Driver:   ", ds.GetDriver().ShortName)
     # print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
     # print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
@@ -97,7 +97,7 @@ if remove is not "no":
 
 #Open new model
 if add is not "no":
-    ds = gdal.Open(add,gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(add, allowed_drivers=["ROI_PAC"])
     # print("> Driver:   ", ds.GetDriver().ShortName)
     # print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
     # print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))

@@ -64,7 +64,7 @@ def check(kk):
 
     if path.exists(infile) is not False:
         print("Open: {0} in {1}".format(name,folder))
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
         los = ds.GetRasterBand(2).ReadAsArray()
         del ds
     else:

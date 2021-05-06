@@ -155,8 +155,8 @@ class OpenTif(object):
         self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_col
 
         # convert 0 and 255 to NaN
-        self.data[self.data==0.] = np.float('NaN')
-        self.data[self.data==255] = np.float('NaN')
+        self.data[self.data==0.] = float('NaN')
+        self.data[self.data==255] = float('NaN')
         
         if sigfile is not None:
             self.dst = gdal.Open(sigfile)
@@ -182,13 +182,13 @@ class OpenTif(object):
             m = np.nansum(pixel_values[index] * pixel_sigma[index]) / np.nansum(pixel_sigma[index])
             std = np.nanstd(pixel_values)
         else:
-            m = np.float('NaN')
-            std = np.float('NaN')
+            m = float('NaN')
+            std = float('NaN')
         
         if m == 0:  #if only NaN nanmean is 0 
-            m = np.float('NaN')
+            m = float('NaN')
         if std == 0:
-            std = np.float('NaN')
+            std = float('NaN')
 
         return m, std
 
