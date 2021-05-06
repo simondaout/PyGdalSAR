@@ -109,10 +109,10 @@ def convert(int_date):
     # read .rsc
     nncol = np.int(open(rsc).readlines()[0].split(None, 2)[1])
     nnlines = np.int(open(rsc).readlines()[1].split(None, 2)[1])
-    xfirst = np.float(open(rsc).readlines()[6].split(None, 2)[1])
-    yfirst = np.float(open(rsc).readlines()[7].split(None, 2)[1])
-    xstep = np.float(open(rsc).readlines()[8].split(None, 2)[1])
-    ystep = np.float(open(rsc).readlines()[9].split(None, 2)[1])
+    xfirst = float(open(rsc).readlines()[6].split(None, 2)[1])
+    yfirst = float(open(rsc).readlines()[7].split(None, 2)[1])
+    xstep = float(open(rsc).readlines()[8].split(None, 2)[1])
+    ystep = float(open(rsc).readlines()[9].split(None, 2)[1])
     geotransform = (xfirst, xstep, 0, yfirst, 0, ystep)
     logger.info('Read .rsc and set Geotransform: {}'.format(geotransform))
     ztd_ = np.fromfile(gacos_ztd_file, dtype='float32').reshape(nnlines,nncol)
@@ -307,11 +307,11 @@ if __name__ == '__main__':
 
     # read in radar geometry parameters
     rdr_nx, rdr_ny, rdr_dict = rdr_rsc(rdr_rsc_file, full=True)
-    rdr_wl = np.float(rdr_dict['WAVELENGTH'])
+    rdr_wl = float(rdr_dict['WAVELENGTH'])
     rdr_rad2mm = (rdr_wl/(4*const.pi))*1000
     
     # incidence file for S1 TOPS (nsbas, in degrees)
-    ds = gdal.Open(inc_file, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(inc_file, allowed_drivers=["ROI_PAC"])
     inc = ds.GetRasterBand(2).ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
     inc_rad = np.deg2rad(inc)
 

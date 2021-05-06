@@ -185,7 +185,7 @@ def correct_int_era_ramp(m_date, s_date):
     int_did = 'int_' + str(m_date)+'_' + str(s_date)
     
     # Open ifg with gdal, force size to be equal to radar_hgt 
-    ds = gdal.Open(int_dir + '/' + int_did + '/' + int_fid, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(int_dir + '/' + int_did + '/' + int_fid, allowed_drivers=["ROI_PAC"])
     ds_band1 = ds.GetRasterBand(1); ds_band2 = ds.GetRasterBand(2)
     i_data = np.zeros((rdr_ny,rdr_nx)); c_data = np.zeros((rdr_ny,rdr_nx))
     i_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
@@ -193,13 +193,13 @@ def correct_int_era_ramp(m_date, s_date):
 
     # Read in ERA data for master and slave respectively
     infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     e_mdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
     del ds
 
     infile = era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     e_sdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
     del ds
@@ -220,13 +220,13 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
 
     # Read in ERA data for master and slave respectively
     infile = era_dir+'/'+str(m_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     e_mdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
     del ds
     
     infile = era_dir+'/'+str(s_date)+'_mdel_'+int_looks+'.unw'
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     e_sdata = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
     del ds
@@ -236,7 +236,7 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     int_fid = int_prefix+'_' + str(m_date) + '-' + str(s_date) +'_'+int_suffix+'_'+int_looks+'.unw'
     int_did = 'int_' + str(m_date)+'_' + str(s_date)
 
-    ds = gdal.Open(int_dir + '/' + int_did + '/' + int_fid, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(int_dir + '/' + int_did + '/' + int_fid, allowed_drivers=["ROI_PAC"])
     ds_band1 = ds.GetRasterBand(1); ds_band2 = ds.GetRasterBand(2)
     i_data = np.zeros((rdr_ny,rdr_nx)); c_data = np.zeros((rdr_ny,rdr_nx))
     i_data[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:rdr_ny,:rdr_nx]
@@ -255,8 +255,8 @@ def correct_int_era_recons(m_date, s_date, ramp_pars, ramp_pars_recons, maps='ye
     # compute residual ramp for ramp and recons ramp
     ramp_res = np.dot(G, ramp_pars).reshape(rdr_ny, rdr_nx)
     ramp_res_recons = np.dot(G, ramp_pars_recons).reshape(rdr_ny, rdr_nx)
-    ramp_res[e_data == 0] = np.float('NaN')
-    ramp_res_recons[e_data == 0] = np.float('NaN')
+    ramp_res[e_data == 0] = float('NaN')
+    ramp_res_recons[e_data == 0] = float('NaN')
 
     # correct IFG
     ie_corr = i_data - e_data - ramp_res
@@ -701,14 +701,14 @@ if __name__ == '__main__':
 
     # read in radar geometry parameters
     rdr_nx, rdr_ny, rdr_dict = rdr_rsc(rdr_rsc_file, full=True)
-    rdr_wl = np.float(rdr_dict['WAVELENGTH'])
+    rdr_wl = float(rdr_dict['WAVELENGTH'])
     rdr_rad2mm = (rdr_wl/(4*const.pi))*1000
 
     # Read in DEM (assume nsb format)
     # dem = np.fromfile(rdr_dem, np.float32).reshape(rdr_ny,rdr_nx)
     # dem_data = dem[:,rdr_nx:]
     driver = gdal.GetDriverByName("roi_pac")
-    ds = gdal.Open(rdr_dem, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(rdr_dem, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     rdr_ny, rdr_nx = ds.RasterYSize, ds.RasterXSize
     dem_data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)

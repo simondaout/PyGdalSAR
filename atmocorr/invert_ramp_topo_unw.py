@@ -1268,14 +1268,14 @@ def empirical_cor(kk):
         checkinfile(infile)
         checkinfile(rscfile)
 
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
         # Get the band that have the data we want
         ds_band1 = ds.GetRasterBand(1)
         ds_band2 = ds.GetRasterBand(2)
 
         los_map = np.zeros((mlines,mcols))
         los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
-        # los_map[los_map==0] = np.float('NaN')
+        # los_map[los_map==0] = float('NaN')
         lines, cols = ds.RasterYSize, ds.RasterXSize
 
 
@@ -1291,7 +1291,7 @@ def empirical_cor(kk):
 
         los_map = np.zeros((mlines,mcols))
         los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
-        # los_map[los_map==0] = np.float('NaN')
+        # los_map[los_map==0] = float('NaN')
 
     elif sformat == 'GAMMA':
         # scfile=prefix + str(date1) + '-' + str(date2) + suffix + rlook + '.unw.par'
@@ -1304,7 +1304,7 @@ def empirical_cor(kk):
     logger.info('lines:{0}, cols:{1}, IFG:{2}'.format(lines, cols, idate))
 
     # load coherence or whatever
-    spacial_mask = np.ones((mlines,mcols))*np.float('NaN')
+    spacial_mask = np.ones((mlines,mcols))*float('NaN')
     
     rms_map = np.ones((mlines,mcols))
     if rmsf=='yes':
@@ -1334,7 +1334,7 @@ def empirical_cor(kk):
     # time.sleep(1.)
     # clean for estimation
     _los_map = np.copy(los_map)
-    _los_map[los_map==0] = np.float('NaN')
+    _los_map[los_map==0] = float('NaN')
     maxlos,minlos = np.nanpercentile(_los_map,perc),np.nanpercentile(_los_map,(100-perc))
 
     ## CRITICAL STEP ####
@@ -1472,7 +1472,7 @@ def empirical_cor(kk):
           fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
 
     _los_map = np.copy(los_map)
-    _los_map[los_map==0] = np.float('NaN')
+    _los_map[los_map==0] = float('NaN')
     vmax = np.nanpercentile(_los_map,98)
     vmin = np.nanpercentile(_los_map,2)
 
@@ -1521,7 +1521,7 @@ def empirical_cor(kk):
 
     flatlos = los_map - corr
     _los_map = np.copy(flatlos)
-    _los_map[los_map==0] = np.float('NaN')
+    _los_map[los_map==0] = float('NaN')
     vmax = np.nanpercentile(_los_map,98)
     vmin = np.nanpercentile(_los_map,2)
 
@@ -1575,7 +1575,7 @@ def apply_cor(kk, sp, sp_inv):
         # print(infile)
         # print(outfile)
         
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
         # Get the band that have the data we want
         ds_band1 = ds.GetRasterBand(1)
         ds_band2 = ds.GetRasterBand(2)
@@ -1693,7 +1693,7 @@ def apply_cor(kk, sp, sp_inv):
     fig = plt.figure(5,figsize=(9,6))
 
     _los_map = np.copy(los_map)
-    _los_map[los_map==0] = np.float('NaN')
+    _los_map[los_map==0] = float('NaN')
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
     
     ax = fig.add_subplot(1,4,1)
@@ -1724,8 +1724,8 @@ def apply_cor(kk, sp, sp_inv):
     plt.colorbar(cax, cax=c)
 
     _los_map = np.copy(flatlos)
-    _los_map[_los_map==0] = np.float('NaN')
-    #flatlos[los_map==0] = np.float('NaN')
+    _los_map[_los_map==0] = float('NaN')
+    #flatlos[los_map==0] = float('NaN')
     vmax, vmin = np.nanpercentile(_los_map,99), np.nanpercentile(_los_map,1)
 
     ax = fig.add_subplot(1,4,4)
@@ -1980,7 +1980,7 @@ if ref is not None:
         mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'ROI_PAC':
         driver = gdal.GetDriverByName("roi_pac")
-        ds = gdal.Open(ref, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(ref, allowed_drivers=["ROI_PAC"])
         mlines,mcols = ds.RasterYSize, ds.RasterXSize
     elif sformat == 'GAMMA':
         from parsers import gamma as gm
@@ -2011,7 +2011,7 @@ if radar is not None:
 
         elif sformat == 'ROI_PAC':
             driver = gdal.GetDriverByName("roi_pac")
-            ds = gdal.Open(radar, gdal.GA_ReadOnly)
+            ds = gdal.OpenEx(radar, allowed_drivers=["ROI_PAC"])
             ds_band2 = ds.GetRasterBand(2)
             mlines,mcols = ds.RasterYSize, ds.RasterXSize
             elev_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
