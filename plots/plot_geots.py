@@ -113,7 +113,7 @@ else:
         ds = gdal.Open(demf, gdal.GA_ReadOnly)
         dem = ds.GetRasterBand(1).ReadAsArray()
     elif extension == ".unw":
-        ds = gdal.Open(demf, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(demf, allowed_drivers=["ROI_PAC"])
         dem = ds.GetRasterBand(2).ReadAsArray()*rad2mm
     else:
         dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
@@ -132,7 +132,7 @@ fig.subplots_adjust(wspace=0.001)
 
 # LOOK for Nan on the last date
 infile = 'geo_'+str(idates[-1])+'_'+str(N-1)+'.unw'
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
+ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 ds_band2 = ds.GetRasterBand(2)
 los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
 index = np.nonzero(los==0)
@@ -144,7 +144,7 @@ for l in range((N)):
     infile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw'
     rscfile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw.rsc'
 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band1 = ds.GetRasterBand(1)
     ds_band2 = ds.GetRasterBand(2)
     los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm

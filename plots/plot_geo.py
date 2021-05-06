@@ -88,7 +88,7 @@ ds_extension = os.path.splitext(infile)[1]
 # print(ds_extension)  
 
 if ds_extension == ".unw":
-  ds = gdal.Open(infile, gdal.GA_ReadOnly)
+  ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
   ds_band1 = ds.GetRasterBand(1)
   ds_band2 = ds.GetRasterBand(2)
   los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp

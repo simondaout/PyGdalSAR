@@ -109,7 +109,7 @@ fig, ax = plt.subplots(1)
 
 # LOOK for Nan on the last date
 infile = 'geo_'+str(idates[-1])+'_'+str(N-1)+'.unw'
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
+ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 ds_band2 = ds.GetRasterBand(2)
 los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
 index = np.nonzero(los==0)
@@ -154,7 +154,7 @@ def f(i):
     rscfile = 'geo_'+str(idates[i])+'_'+str(i)+'.unw.rsc'
     print('Read image {}: {}'.format(i,infile))
 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band2 = ds.GetRasterBand(2)
     los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
     los[index] = np.float('NaN')

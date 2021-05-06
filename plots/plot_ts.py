@@ -86,7 +86,10 @@ else:
     cmap=arguments["--cpt"]
 
 # lect cube
-ds = gdal.Open(infile)
+try:
+    ds = gdal.Open(infile)
+except:
+    passs
 if not ds:
   print('.hdr file time series cube {0}, not found, open {1}'.format(infile,lecfile))
   # read lect.in 

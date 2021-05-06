@@ -92,7 +92,7 @@ else:
 if arguments["--rad2mm"] ==  None:
         rad2mm = 1
 else:
-        rad2mm = np.float(arguments["--rad2mm"])
+        rad2mm = float(arguments["--rad2mm"])
 
 if (arguments["--cols"] is not None and arguments["--lines"] is not None):
     ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
@@ -103,7 +103,7 @@ if (arguments["--cols"] is not None and arguments["--lines"] is not None):
 ds_extension = os.path.splitext(infile)[1]
 
 if sformat == "ROI_PAC": 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     if (ds_extension == ".unw" or ds_extension ==".hgt"):
         phase_band = ds.GetRasterBand(2)
         amp_band = ds.GetRasterBand(1)
@@ -251,9 +251,9 @@ if arguments["--wrap"] is not None:
     vmin = -vmax
 elif (arguments["--vmax"] is not None) or (arguments["--vmin"] is not None):
     if arguments["--vmax"] is not  None:
-        vmax = np.float(arguments["--vmax"])
+        vmax = float(arguments["--vmax"])
         if arguments["--vmin"] is not  None:
-          vmin = np.float(arguments["--vmin"])
+          vmin = float(arguments["--vmin"])
         else:
           vmin = -vmax
 else:
@@ -263,7 +263,7 @@ else:
 
 
 # replace 0 by nan
-cutphi[cutphi==0] = np.float('NaN')
+cutphi[cutphi==0] = float('NaN')
 masked_array = np.ma.array(cutphi, mask=np.isnan(cutphi))
 
 #cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)

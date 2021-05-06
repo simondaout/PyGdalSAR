@@ -50,7 +50,6 @@ else:
 
 # Open input dataset
 ds = gdal.Open(arguments["--cube"])
-#ds = gdal.Open(sys.argv[1])
 if not ds:
     exit(1)
 md = ds.GetMetadata()
