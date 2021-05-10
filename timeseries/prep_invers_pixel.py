@@ -317,10 +317,10 @@ if os.path.exists(name) is False:
 1.7    #  threshold for the mask on RMS misclosure (in same unit as input files)
 1      #  range and azimuth downsampling (every n pixel)
 4      #  iterations to correct unwrapping errors (y:nb_of_iterations,n:0)
-2      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+1      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 0.2    #  Scaling value for weighting residuals (1/(res**2+value**2)) (in same unit as input files) (Must be approximately equal to standard deviation on measurement noise)
-2      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
-2.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
+0      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+4.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
 1      #  outliers elimination by the median (only if nsamp>1) ? (y=0,n=1)
 list_dates
 0      #  sort by date (0) ou by another variable (1) ?
@@ -331,7 +331,7 @@ list_pair
 %d      #  coherence file format (RMG : 0; R4 :1) (date1-date2.cor or date1-date2-CC.r4)
 1      #  minimal number of interferams using each image
 1      #  interferograms weighting so that the weight per image is the same (y=0;n=1)
-0.7    #  maximum fraction of discarded interferograms
+0.5    #  maximum fraction of discarded interferograms
 0      #  Would you like to restrict the area of inversion ?(y=1,n=0)
 1 735 1500 1585  #  Give four corners, lower, left, top, right in file pixel coord
 1      #  referencing of interferograms by bands (1) or corners (2) ? (More or less obsolete)
