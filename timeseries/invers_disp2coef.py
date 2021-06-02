@@ -521,7 +521,7 @@ cube = as_strided(cubei[:nlines*ncol*N])
 logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
-maps_temp = cube.reshape((nlines,ncol,N))
+maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
 
 # set at NaN zero values for all dates
 # kk = np.nonzero(maps_temp[:,:,-1]==0)
@@ -3212,9 +3212,11 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
-      # flata = (los - np.dot(G,pars)).reshape(new_lines,new_cols)
       flata = los.reshape(new_lines,new_cols) - ramp - topo
-
+      try:
+         del G; del los
+      except:
+         pass
       return ramp, flata, topo, rms
  
 def empirical_cor(l):
@@ -3627,10 +3629,12 @@ for ii in range(np.int(arguments["--niter"])):
 #######################################################
 
 # create new cube
-logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-fid = open('depl_cumule_flat', 'wb')
-maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
-fid.close()
+if flat>0:
+  del cubei
+  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
+  fid = open('depl_cumule_flat', 'wb')
+  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
+  fid.close()
 
 if arguments["--fulloutput"]=='yes':
     if (arguments["--seasonal"] =='yes'):
