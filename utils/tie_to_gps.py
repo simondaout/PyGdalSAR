@@ -14,8 +14,9 @@ import numpy as np
 import scipy as sp
 import scipy.optimize as opt
 import scipy.linalg as lst
-import gdal, pyproj
-gdal.UseExceptions()
+from osgeo import gdal
+import pyproj
+#gdal.UseExceptions()
 from sys import argv,exit,stdin,stdout
 import getopt
 from os import path
@@ -76,8 +77,13 @@ def load_gps(file):
     fl = open(file, "r").readlines()
     for line in fl:
         if not line.startswith(('#')):
-            # lon lat Ve Vn Vup Se Sn Sup C Name
-            lon, lat, Ve, Vn, Vup, dVe, dVn, dVup, Cen, sta = line.split()
+            # Name lon lat Ve Vn Vup Se Sn Sup C
+            try:
+              sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup = line.split()
+            except:
+              print("Fail reading GNSS data block. Please organise input file as follow:")
+              print("sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup")
+              print("Exit.")
             gps_gdf.loc[index, 'geometry'] = Point(float(lon), float(lat))
             gps_gdf.loc[index, 'station'] = sta[:4]
             gps_gdf.loc[index, 've'] = float(Ve)  # eastern velocity in mm/yr in fixed eurasia reference frame
@@ -85,8 +91,7 @@ def load_gps(file):
             gps_gdf.loc[index, 'vu'] = float(Vup)
             gps_gdf.loc[index, 'se'] = float(dVe)  # sigma ve
             gps_gdf.loc[index, 'sn'] = float(dVn)  # sigma vn
-            gps_gdf.loc[index, 'su'] = float(dVup)  # sigma vup
-            gps_gdf.loc[index, 'cen'] = float(Cen)  # correlation between east and northern velocities
+            gps_gdf.loc[index, 'su'] = float(dVup)  # sigma vup  
             index += 1
     return gps_gdf
 
