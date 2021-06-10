@@ -3625,16 +3625,89 @@ for ii in range(np.int(arguments["--niter"])):
     inaps = np.copy(aps)
 
 #######################################################
+# Save functions in binary file
+#######################################################
+
+if arguments["--geotiff"] is not None:
+    for l in range((Mbasis)):
+        outname = '{}_coeff.tif'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(basis[l].m)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+        outname = '{}_sigcoeff.tif'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(basis[l].sigmam)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+    for l in range((Mker)):
+        outname = '{}_coeff.tif'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(kernels[l].m)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+        outname = '{}_sigcoeff.tif'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(kernels[l].sigmam)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+else:
+    for l in range((Mbasis)):
+        outname = '{}_coeff.r4'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open(outname, 'wb')
+        basis[l].m.flatten().astype('float32').tofile(fid)
+        fid.close()
+        outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open(outname, 'wb')
+        basis[l].sigmam.flatten().astype('float32').tofile(fid)
+        fid.close()
+    for l in range((Mker)):
+        outname = '{}_coeff.r4'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
+        kernels[l].m.flatten().astype('float32').tofile(fid)
+        fid.close()
+        outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
+        kernels[l].sigmam.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+
+
+#######################################################
 # Save new cubes
 #######################################################
 
 # create new cube
-if flat>0:
-  del cubei
-  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-  fid = open('depl_cumule_flat', 'wb')
-  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
-  fid.close()
+#if flat>0:
+#  del cubei
+#  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
+#  fid = open('depl_cumule_flat', 'wb')
+#  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
+#  fid.close()
 
 if arguments["--fulloutput"]=='yes':
     if (arguments["--seasonal"] =='yes'):
@@ -3819,78 +3892,6 @@ plt.close('all')
 
 # clean memory
 del maps_ramp, maps_flata, maps_topo
-
-#######################################################
-# Save functions in binary file
-#######################################################
-
-if arguments["--geotiff"] is not None:
-    for l in range((Mbasis)):
-        outname = '{}_coeff.tif'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(basis[l].m)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-        outname = '{}_sigcoeff.tif'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(basis[l].sigmam)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-    for l in range((Mker)):
-        outname = '{}_coeff.tif'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(kernels[l].m)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-        outname = '{}_sigcoeff.tif'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(kernels[l].sigmam)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-else:
-    for l in range((Mbasis)):
-        outname = '{}_coeff.r4'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open(outname, 'wb')
-        basis[l].m.flatten().astype('float32').tofile(fid)
-        fid.close()
-        outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open(outname, 'wb')
-        basis[l].sigmam.flatten().astype('float32').tofile(fid)
-        fid.close()
-    for l in range((Mker)):
-        outname = '{}_coeff.r4'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].m.flatten().astype('float32').tofile(fid)
-        fid.close()
-        outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].sigmam.flatten().astype('float32').tofile(fid)
-        fid.close()
-
 
 #######################################################
 # Compute Amplitude and phase seasonal
