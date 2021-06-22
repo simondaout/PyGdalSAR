@@ -1026,7 +1026,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-          bounds=zip(mmin,mmax)
+          bounds=list(zip(mmin,mmax))
         
         else:
           minit=invSVD(A,b,cond)
