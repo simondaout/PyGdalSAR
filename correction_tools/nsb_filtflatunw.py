@@ -673,7 +673,12 @@ def filterSW(config, kk):
         do = checkoutfile(config,outfile)
         if do:
          try:
-            run("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
+            if config.filterstyle == "SWg":
+              width,length = computesize(config,infile)
+              run("SWfilter_grad "+str(infile)+" "+str(corfile)+" "+str(outfile)\
+                    +" "+str(config.SWwindowsize)+" "+str(width)+" "+str(length)+" "+str(config.SWamplim)+" 2 1 > log_filtSW.txt")
+            else:
+              run("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
                     +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle)+"> log_filtSW.txt")
             if path.exists(filtrsc) == False:
                 copyrsc(inrsc,filtrsc)
