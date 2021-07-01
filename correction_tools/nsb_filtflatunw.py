@@ -1319,7 +1319,8 @@ def unwrapping(config,kk):
             shutil.move(bridgefile,'bridge_save.in')
    
         if force: 
-            rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
+            #rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
+            rm(unwfiltROI); rm(unwSWrsc)
 
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
