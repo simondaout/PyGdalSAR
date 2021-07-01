@@ -210,7 +210,7 @@ if __name__ == "__main__":
   else:
     infile = arguments["--lectfile"]
 
-  ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
+  ncol, nlign = list(map(int, open(infile).readline().split(None, 2)[0:2]))
   nb,idates,dt,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
   N=len(dt)
   print('Number images: ', N)
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     crop = [0,nlign,0,ncol]
     docrop = 'no'
   else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
     docrop = 'yes'
   ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
   print('Compute ICA between ibeg:{} - iend:{} and jbeg:{} - jend:{} '.format(ibeg,iend,jbeg,jend))
