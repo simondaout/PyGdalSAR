@@ -41,18 +41,19 @@ Options:
 """
 
 
-
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+import os
+import matplotlib
+if os.environ["TERM"].startswith("screen"):
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import matplotlib
 from pylab import *
 import math
 import sys
 import matplotlib.dates as mdates
 import datetime
-import os
 
 ###############################################################
 # define basis functioGns for plot
@@ -118,11 +119,11 @@ if sinf is None and cosf is not None or cosf is None and sinf is not None:
 if arguments["--coseismic"] ==  None:
    cotimes = []
 else:
-   cotimes = map(float,arguments["--coseismic"].replace(',',' ').split())
+   cotimes = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
 if arguments["--postseismic"] ==  None:
    postimes = []
 else:
-   postimes = map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split())
+   postimes = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
 
 if len(postimes)>0 and len(cotimes) != len(postimes):
     raise Exception("coseimic and postseismic lists are not the same size")
@@ -142,20 +143,20 @@ else:
     imref = int(arguments["--imref"]) - 1
 
 if arguments["--bounds"] is not  None:
-    ylim = map(float,arguments["--bounds"].replace(',',' ').split())
+    ylim = list(map(float,arguments["--bounds"].replace(',',' ').split()))
 
 if arguments["--slowslip"] == None:
     sse=[]
 else:
-    sse = map(float,arguments["--slowslip"].replace(',',' ').split()) 
+    sse = list(map(float,arguments["--slowslip"].replace(',',' ').split())) 
 sse_time = sse[::2]
 sse_car = sse[1::2]  
 
 ###############################################################
 
 # create a list of pixels
-jpix = map(int,arguments["--cols"].replace(',',' ').split())
-ipix = map(int,arguments["--ligns"].replace(',',' ').split())
+jpix = list(map(int,arguments["--cols"].replace(',',' ').split()))
+ipix = list(map(int,arguments["--ligns"].replace(',',' ').split()))
 if len(jpix) != len(ipix):
     raise Exception("ncols and nligns lists are not the same size")
 # number of pixels
@@ -169,15 +170,21 @@ N = len(idates)
 base = base - base[imref]
 print('Number images: ', N)
 # read lect.in 
-ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
+ncol, nlign = list(map(int, open(infile).readline().split(None, 2)[0:2]))
 
 # lect cube
-maps = np.fromfile(cubef,dtype=np.float32)[:nlign*ncol*N].reshape((nlign,ncol,N))
+#maps = np.fromfile(cubef,dtype=np.float32)[:nlign*ncol*N].reshape((nlign,ncol,N))
+cube = np.fromfile(cubef,dtype=np.float32)[:nlign*ncol*N]
+# clean
+kk = np.flatnonzero(cube>9990)
+cube[kk] = float('NaN')
+maps = cube.reshape((nlign,ncol,N))
+del cube
 
 if arguments["--crop"] ==  None:
     crop = [0,nlign,0,ncol]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
     
 if slopef is not None:
@@ -231,7 +238,7 @@ if len(postimes) == 0:
     postimes = np.ones((M))*-1
 
 for i in range(M):
-  cofile = 'cos{}_coeff_clean.r4'.format(i)
+  cofile = 'cos{}_coeff.r4'.format(i)
   try:
     ds = gdal.Open(cofile, gdal.GA_ReadOnly)
     coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()
@@ -239,7 +246,7 @@ for i in range(M):
     coseismaps[i,:,:] = np.fromfile(cofile,dtype=np.float32).reshape((nlign,ncol))
 
 for i in range((M)):
-  postfile = 'post{}_coeff_clean.r4'.format(i)
+  postfile = 'post{}_coeff.r4'.format(i)
   if postimes[i] > 0:
     try:
       ds = gdal.Open(postfile, gdal.GA_ReadOnly)
@@ -255,10 +262,10 @@ L = len(sse_times)
 ssemaps=np.zeros((M,nlign,ncol))
 for i in range(L):
     try:
-      ds = gdal.Open('sse{}_coeff_clean.tif'.format(i), gdal.GA_ReadOnly)
+      ds = gdal.Open('sse{}_coeff.tif'.format(i), gdal.GA_ReadOnly)
       ssemaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()
     except:
-      ssemaps[i,:,:] = np.fromfile('sse{}_coeff_clean.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))
+      ssemaps[i,:,:] = np.fromfile('sse{}_coeff.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))
 
 
 ###############################################################
