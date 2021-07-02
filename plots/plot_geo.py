@@ -37,7 +37,8 @@ Options:
 """
 
 # gdal
-import gdal,osr
+from osgeo import gdal
+import osr
 gdal.UseExceptions()
 import os
 # numpy
@@ -191,10 +192,10 @@ if arguments["--dem"] is not None:
    hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
     vmax=255,vmin=1,zorder=3)
 else:
-   pass
-   #m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=0)
-   # hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
-   #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
+   #pass
+   m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=0)
+   hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
+   vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
      vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
