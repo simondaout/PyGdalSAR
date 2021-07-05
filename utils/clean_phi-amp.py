@@ -150,7 +150,7 @@ if demf ==  None:
         print('DEM file is not readible. Set elelvation to zeros.')
         dem_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 else:
-    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 
 if arguments["--slopefile"] is not None:
     slope_map = np.fromfile(arguments["--slopefile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
