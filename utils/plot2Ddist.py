@@ -217,7 +217,7 @@ def plot_AM_correlation(mcmodel, startvariances=None, variables=None,
 
     covlist.sort(key=lambda l: l[1], reverse=True)
     for l in covlist:
-        print("%50s: %.3g" % (l[0], l[1]*l[2])))))))))))))
+        print("%50s: %.3g" % (l[0], l[1]*l[2]))
     #pylab.legend(loc='upper left', bbox_to_anchor=(1.00,1.0,0.25,-1.0))
         pylab.legend(loc=(1.0,0.0))
     if plotcorrelation:
