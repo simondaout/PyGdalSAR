@@ -3438,7 +3438,6 @@ models = np.zeros((new_lines,new_cols,N))
 # prepare flatten maps
 maps_ramp = np.zeros((new_lines,new_cols,N))
 maps_topo = np.zeros((new_lines,new_cols,N))
-rms = np.zeros((N))
 
 for ii in range(np.int(arguments["--niter"])):
     print()
@@ -3450,6 +3449,7 @@ for ii in range(np.int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
+    rms = np.zeros((N))
     pix_az, pix_rg = np.indices((new_lines,new_cols))
     # if radar file just initialise figure
     if arguments["--topofile"] is not None:
@@ -3542,7 +3542,7 @@ for ii in range(np.int(arguments["--niter"])):
     plt.close('all')
 
     # save rms
-    if (apsf=='no' and ii==0):
+    if (apsf=='no' and (ii==0 or arguments["--spatialiter"]=='yes')):
         # aps from rms
         logger.info('Use RMS empirical estimation as uncertainties for time decomposition')
         inaps = np.copy(rms)
