@@ -135,7 +135,8 @@ if maskf != 'no':
     fid2 = open(maskf, 'r')
     mask = np.fromfile(fid2,dtype=float32)[:nlign*ncol].reshape((nlign,ncol))
     mask =  mask*scale_mask
-    kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
+    #kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
+    kk = np.nonzero(np.logical_or(mask==0, mask<seuil)) 
     mf[kk] = float('NaN')
 else:
     mask = np.zeros((nlign,ncol))
@@ -185,8 +186,7 @@ if ramp=='quad':
     _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
-
-    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3] 
     print('Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d))
 
@@ -218,8 +218,7 @@ elif ramp=='cub':
     _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
-
-    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
     print('Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f))
 
