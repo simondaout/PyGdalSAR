@@ -28,7 +28,7 @@ Options:
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from decimal import Decimal
-import gdal
+from osgeo import gdal
 
 import docopt
 arguments = docopt.docopt(__doc__)

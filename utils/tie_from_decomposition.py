@@ -19,7 +19,8 @@ import sys
 import numpy as np
 import scipy.optimize as opt
 import scipy.linalg as lst
-import gdal, pyproj
+from osgeo import gdal
+import pyproj
 gdal.UseExceptions()
 
 # plot
