@@ -14,7 +14,7 @@ compute_stack.py
 -------------
 Compute a stack from a list of interferograms
 
-Usage: compute_stack.py --homedir=<path> --int_path=<path> --int_list=<file> [--suffix=<value>] [--prefix=<value>] [--output=<file>] [--rlook=<value>] --radar_file=<file>
+Usage: compute_stack.py --homedir=<path> --int_path=<path> --int_list=<file> [--suffix=<value>] [--prefix=<value>] [--output=<file>] [--rlook=<value>] [--ref=<jstart,jend,istart,iend>] [--ramp=<yes/no>]  --radar_file=<file>
 compute_stack.py -h | --help
 
 Options:
@@ -26,15 +26,21 @@ Options:
 --prefix VALUE      Prefix interferograms [default: ""]
 --rlook VALUE       Look interferograms [default: 2]
 --radar_file FILE   Path to the radar.hgt file
+--ref=<jstart,jend,istart,iend> Set to zero displacements from jstart to jend
+--ramp<yes/no>      Correct the map from ramp in range and azimuth before stack computation
 --output
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 # gdal
-import gdal,os
+from osgeo import gdal
+import os
 gdal.UseExceptions()
 import docopt
+import scipy.optimize as opt
+import scipy.linalg as lst
 
 # read arguments
 arguments = docopt.docopt(__doc__)
@@ -60,6 +66,45 @@ if arguments["--output"] == None:
     output = stack.r4
 else:
     output=arguments["--output"]
+if arguments["--ref"] == None:
+    lin_start, lin_jend, col_start, col_jend = None,None,None,None
+else:
+    ref = list(map(int,arguments["--ref"].replace(',',' ').split()))
+    try:
+        lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
+    except:
+        lin_start,lin_end = ref[0], ref[1]
+        col_start, col_end = 0, ncol
+
+def remove_ramp(los,nlign,ncol):
+        index = np.nonzero(np.logical_and(np.logical_and(~np.isnan(los),los<np.percentile(los,80)),los>np.percentile(los,20)))
+        temp = np.array(index).T
+        mi = los[index].flatten()
+        az = temp[:,0]; rg = temp[:,1]
+
+        G=np.zeros((len(mi),5))
+        G[:,0] = rg**2
+        G[:,1] = az**2
+        G[:,2] = rg
+        G[:,3] = az
+        G[:,4] = 1
+
+        x0 = lst.lstsq(G,mi)[0]
+        _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+        _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
+        a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; f = pars[4]
+        print('Remove ramp %f x**2 +  %f y**2  +  %f x  + %f y + %f'%(a,b,c,d,f))
+
+        G=np.zeros((len(los.flatten()),5))
+        for i in range(nlign):
+           G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
+           G[i*ncol:(i+1)*ncol,1] = i**2
+           G[i*ncol:(i+1)*ncol,2] = np.arange((ncol))
+           G[i*ncol:(i+1)*ncol,3] = i
+        G[:,4] = 1
+        mf = (los.flatten() - np.dot(G,pars)).reshape(nlign,ncol)
+        return mf, index
 
 # list of dates
 date1,date2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')
@@ -88,25 +133,45 @@ for i in range((kmax)):
     print('Nlines:{}, Ncol:{}, int:{}-{}'.format(ds.RasterYSize, ds.RasterXSize,interf1,interf2))
 
     los_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
-    # cor_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
+    cor_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:nlines,:ncols]
+    
+    #fig = plt.figure(0,figsize=(16,6))
+    #ax = fig.add_subplot(1,3,1)
+    #cax = ax.imshow(los_map,cm.jet)
+    #los_temp = np.copy(los_map)  
+    
+    if arguments["--ramp"] == 'yes':
+      los_map,index2 = remove_ramp(los_map,ds.RasterYSize,ds.RasterXSize)
+    
+    if (arguments["--ref"] != None) :
+          los_ref = los_map[lin_start:lin_end,col_start:col_end].flatten()
+          cor_ref = cor_map[lin_start:lin_end,col_start:col_end].flatten()
+          index = np.nonzero(los_ref != 0)
+          amp_ref = cor_ref[index]
+          cst = np.nansum(los_ref[index]*amp_ref) / np.nansum(amp_ref)
+          print(cst)
+          los_map = los_map - cst
+
+    #ax = fig.add_subplot(1,3,2)
+    #cax = ax.imshow(los_map,cm.jet)
+    #los_temp[index2] = np.nan
+    #ax = fig.add_subplot(1,3,3)
+    #cax = ax.imshow(los_temp,cm.jet)
+    #plt.show()
 
     alllos[:,:,i] = los_map
-    # allcor[:,:,i] = cor_map
+    allcor[:,:,i] = cor_map
 
+alllos[alllos==0] = float('NaN')
+sumlos = np.nanmean(alllos,axis=2)
 
-sumlos=np.zeros((nlines,ncols))
-count=np.zeros((nlines,ncols))
-
-# maxcoh = np.nanmax(allcor[:,:,:])
-# allcor[:,:,:] = allcor[:,:,:]/maxcoh
-# allcor[np.isnan(allcor)] = 0.0
-
-for i in range(0,nlines,1):
-    for j in range(0,ncols,1):
-        k=np.flatnonzero(alllos[i,j,:])
-        if len(k) > 0:
-            sumlos[i,j]=np.sum(alllos[i,j,k[:]])/len(k)
-            # sumlos[i,j]=np.sum(alllos[i,j,k[:]]*allcor[i,j,k[:]])/np.sum(allcor[i,j,k[:]])
+#sumlos=np.zeros((nlines,ncols))
+#for i in range(0,nlines,1):
+#    for j in range(0,ncols,1):
+#        k=np.flatnonzero(alllos[i,j,:] != 0)
+#        if len(k) > 0:
+#            #sumlos[i,j]=np.sum(alllos[i,j,k[:]])/len(k)
+#            sumlos[i,j]=np.sum(alllos[i,j,k[:]]*allcor[i,j,k[:]])/np.sum(allcor[i,j,k[:]])
                
 sumlos.astype('float32').tofile(home + output)
 

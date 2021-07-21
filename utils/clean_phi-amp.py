@@ -315,15 +315,14 @@ if plotcorr == 'yes':
 
     # some cleaning for correlations
     kk = np.nonzero(
-        np.logical_and(lin>np.nanpercentile(lin,1),
-        np.logical_and(lin<np.nanpercentile(lin,99),
-        np.logical_and(phi>4.,
-        np.logical_and(slope<np.nanpercentile(slope,90),
-        np.logical_and(dem<np.nanpercentile(dem,95),
-        np.logical_and(slopelos>np.nanpercentile(slopelos,10), 
-        np.logical_and(slopelos<np.nanpercentile(slopelos,90), 
+        np.logical_and(lin>np.nanpercentile(lin,2),
+        np.logical_and(lin<np.nanpercentile(lin,98),
+        np.logical_and(slope<np.nanpercentile(slope,98),
+        np.logical_and(dem<np.nanpercentile(dem,98),
+        np.logical_and(slopelos>np.nanpercentile(slopelos,2), 
+        np.logical_and(slopelos<np.nanpercentile(slopelos,98), 
         np.logical_and(amp>5, amp <  maxamp
-        )))))))))
+        ))))))))
     phi,amp,lin,dem,slopelos,slope,aspect = phi[kk], amp[kk], lin[kk], dem[kk], slopelos[kk],slope[kk],aspect[kk]
 
     # compute correlations
