@@ -77,7 +77,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 
 
 # gdal
-import gdal
+from osgeo import gdal
 gdal.UseExceptions()
 
 # system

@@ -52,7 +52,7 @@ from scipy.stats import pearsonr
 import scipy.optimize as opt
 import scipy.linalg as lst
 
-import gdal
+from osgeo import gdal
 
 from shutil import copyfile
 from multiprocessing import Process, Pool

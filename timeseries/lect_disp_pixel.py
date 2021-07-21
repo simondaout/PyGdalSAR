@@ -53,7 +53,7 @@ import math,sys,getopt
 from os import path, environ
 import os, glob
 
-import gdal
+from osgeo import gdal
 
 # plot
 import matplotlib

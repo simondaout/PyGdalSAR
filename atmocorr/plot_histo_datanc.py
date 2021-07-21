@@ -9,8 +9,8 @@
 # Author        : Simon DAOUT (Oxford)
 ############################################
 
-
-import gdal,sys
+from osgeo import gdal
+import sys
 import pymc
 import numpy as np
 import matplotlib.pyplot as plt

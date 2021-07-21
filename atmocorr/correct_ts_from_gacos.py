@@ -46,7 +46,7 @@ Options:
 --lectfile=<path>    Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
 """
 
-import gdal
+from osgeo import gdal
 from osgeo import osr
 import sys,os
 import numpy as np

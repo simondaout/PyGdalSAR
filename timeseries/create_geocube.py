@@ -20,7 +20,7 @@ Options:
 
 
 # gdal
-import gdal
+from osgeo import gdal
 gdal.UseExceptions()
 import subprocess
 

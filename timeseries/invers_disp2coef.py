@@ -3542,7 +3542,7 @@ for ii in range(np.int(arguments["--niter"])):
     plt.close('all')
 
     # save rms
-    if (apsf=='no' and (ii==0 or arguments["--spatialiter"]=='yes')):
+    if (apsf=='no' and ii==0):
         # aps from rms
         logger.info('Use RMS empirical estimation as uncertainties for time decomposition')
         inaps = np.copy(rms)
@@ -3611,7 +3611,7 @@ for ii in range(np.int(arguments["--niter"])):
     # aps = np.sqrt(abs(aps/n_aps))
 
     # remove low aps to avoid over-fitting in next iter
-    minaps= np.nanpercentile(aps,2)
+    inaps= np.nanpercentile(aps,2)
     index = np.flatnonzero(aps<minaps)
     aps[index] = minaps
 

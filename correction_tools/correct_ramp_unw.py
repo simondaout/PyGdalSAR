@@ -57,7 +57,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 
 # gdal
-import gdal
+from osgeo import gdal
 gdal.UseExceptions()
 
 from nsbas import docopt

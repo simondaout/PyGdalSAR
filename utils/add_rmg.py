@@ -25,7 +25,7 @@ Options:
 --plot VALUE        Display [default:no]
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt

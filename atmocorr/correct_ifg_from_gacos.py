@@ -39,7 +39,7 @@ Options:
 --nproc=<values>            number of processor (default: 1)
 """
 
-import gdal
+from osgeo import gdal
 gdal.UseExceptions()
 
 import sys,os,logging

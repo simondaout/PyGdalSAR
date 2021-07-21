@@ -68,7 +68,7 @@ from matplotlib.colorbar import Colorbar
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 
-import gdal
+from osgeo import gdal
 gdal.UseExceptions()
 
 import warnings

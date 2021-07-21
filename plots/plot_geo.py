@@ -197,8 +197,10 @@ else:
    hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
    vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
+#cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
+#     vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
+     vmax=vmax,vmin=vmin, zorder=4)
 
 if arguments["--shapefile"] is not None and os.path.exists(arguments["--shapefile"]):
     sf = shp.Reader(arguments["--shapefile"])

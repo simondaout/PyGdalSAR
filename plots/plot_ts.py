@@ -44,7 +44,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
-import gdal
+from osgeo import gdal
 from datetime import datetime as datetimes
 import datetime
 import docopt

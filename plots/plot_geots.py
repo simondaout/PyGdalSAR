@@ -35,8 +35,8 @@ Options:
 --imref             Ref image for corrdem
 """
 
-
-import gdal,osr,os
+from osgeo import gdal
+import osr,os
 gdal.UseExceptions()
 
 # numpy

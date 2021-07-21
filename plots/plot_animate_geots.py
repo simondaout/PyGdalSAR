@@ -34,7 +34,8 @@ Options:
 """
 
 
-import gdal,osr,os
+from osgeo import gdal
+import osr, os
 gdal.UseExceptions()
 
 # numpy
