@@ -44,7 +44,7 @@ import math,sys,getopt
 from os import path, environ
 import os
 # gdal
-import gdal
+from osgeo import gdal
 # plot
 import matplotlib
 if environ["TERM"].startswith("screen"):

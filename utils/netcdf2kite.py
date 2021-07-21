@@ -21,7 +21,7 @@ Options:
 import sys,os
 import numpy as np
 
-import gdal
+from osgeo import gdal
 from kite import Scene
 
 # docopt (command line parser http://docopt.org)

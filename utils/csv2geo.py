@@ -24,7 +24,7 @@ Options:
 --ref_file=<file>   ref raster file
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import os, sys

@@ -48,7 +48,8 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import gdal, shutil
+from osgeo import gdal
+import shutil
 
 # scipy
 import scipy

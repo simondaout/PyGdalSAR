@@ -25,7 +25,7 @@ Options:
 --rlook=<value>     look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import warnings, sys

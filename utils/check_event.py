@@ -25,7 +25,7 @@ Options:
 --date_min=<value>   Date limit minimal in YYYYMMDD format
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import warnings, sys

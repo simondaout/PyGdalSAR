@@ -23,7 +23,7 @@ Options:
 
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np 
 import docopt
 import os, sys
@@ -43,9 +43,12 @@ if ds_extension == ".unw":
 	m = band.ReadAsArray(0, 0,
            ds.RasterXSize, ds.RasterYSize,
            ds.RasterXSize, ds.RasterYSize)
-if ds_extension == ".tif":
+if (ds_extension == ".tif") or ( ds_extension ==  ".tiff") :
 	band = ds.GetRasterBand(1)
 	m = band.ReadAsArray()
+
+# convert to float32
+m = np.float32(m)
 
 # save output
 outfile = ds_name + '.r4'

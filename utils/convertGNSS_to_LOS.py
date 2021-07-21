@@ -14,7 +14,8 @@ import numpy as np
 import scipy as sp
 import scipy.optimize as opt
 import scipy.linalg as lst
-import gdal, pyproj
+from osgeo import gdal
+import pyproj
 gdal.UseExceptions()
 from sys import argv,exit,stdin,stdout
 import getopt

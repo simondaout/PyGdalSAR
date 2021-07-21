@@ -24,7 +24,7 @@ Options:
 --lectfile= PATH     Path of the lect.in file for r4 format
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np 
 import docopt
 import os, sys

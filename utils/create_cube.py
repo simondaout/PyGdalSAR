@@ -3,7 +3,8 @@
 
 from os import environ
 import numpy as np
-import gdal, sys
+from osgeo import gdal
+import sys
 import matplotlib.pyplot as plt
 import subprocess
 

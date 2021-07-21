@@ -50,7 +50,8 @@ import scipy.stats as stat
 import scipy.optimize as opt
 import scipy.linalg as lst
 from scipy import ndimage
-import gdal, sys
+from osgeo import gdal
+import sys
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt

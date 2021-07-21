@@ -36,7 +36,7 @@ from pylab import *
 
 import os, sys
 
-import gdal
+from osgeo import gdal
 import time
 
 # docopt (command line parser)
