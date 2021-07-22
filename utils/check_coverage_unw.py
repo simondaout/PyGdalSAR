@@ -85,12 +85,16 @@ print('Save empty interferogram list:', ListInterfero)
 wf = open(ListInterfero, 'w')
 
 for j in range(Nifg):
+  try:
     los,name = check(j)
     size = np.shape(los)[0]* np.shape(los)[1]
     unw = np.count_nonzero(los==0)
     cov = 1 - (unw / size)
-    print("Unwrapping coverage {0}: {1} ".format(name,cov))
-    wf.write("%i  %i %f\n" % (date_1[j], date_2[j], cov))
+  except:
+    print("Cannot open {0}: !!!!".format(name))
+    cov = 0.0
+  print("Unwrapping coverage {0}: {1} ".format(name,cov))
+  wf.write("%i  %i %f\n" % (date_1[j], date_2[j], cov))
 wf.close()
 
 print('----------------------------------')
