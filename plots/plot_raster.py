@@ -197,7 +197,7 @@ if sformat == "ROI_PAC":
         cutamp = as_strided(amp[ibeg:iend,jbeg:jend])
 
         # Unwrapped inteferogram
-        hax = ax.imshow(cutamp, cm.Greys_r,vmax=np.percentile(cutamp, 90))
+        hax = ax.imshow(cutamp, cm.Greys_r,vmin=0, vmax=np.percentile(cutamp, 90))
         divider = make_axes_locatable(ax)
         c = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(hax, cax=c)
@@ -222,7 +222,7 @@ if sformat == "ROI_PAC":
             # Wrapped interferogram, display computed phase
             cutamp = np.absolute(cutphi)
             cutphi = np.angle(cutphi)
-            hax = ax.imshow(cutamp, cm.Greys_r, vmax=np.percentile(cutamp, 90))
+            hax = ax.imshow(cutamp, cm.Greys_r, vmin=0, vmax=np.percentile(cutamp, 90))
             divider = make_axes_locatable(ax)
             c = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(hax, cax=c)
@@ -266,8 +266,8 @@ else:
 cutphi[cutphi==0] = float('NaN')
 masked_array = np.ma.array(cutphi, mask=np.isnan(cutphi))
 
-#cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
-cax = ax.imshow(masked_array, cmap, interpolation='none',vmax=vmax,vmin=vmin)
+cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
+#cax = ax.imshow(masked_array, cmap, interpolation='none',vmax=vmax,vmin=vmin)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
