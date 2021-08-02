@@ -16,7 +16,7 @@ Clean a r4 file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
 [--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
-[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>]
+[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--reverse=<yes/no>]
 
 Options:
 -h --help           Show this screen.
@@ -24,6 +24,7 @@ Options:
 --outfile PATH      output file
 --mask PATH         r4 file used as mask
 --threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
+--reverse yes/no    if yes mask values above mask threshold (default: no)
 --scale VALUE       scale data [default:1]
 --scale_mask VALUE  scale the mask [default:1]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
@@ -102,6 +103,10 @@ elif arguments["--ramp"] == 'yes':
 else:
     print('ramp argument not recognized. Exit!')
     sys.exit()
+if arguments["--reverse"] == 'yes':
+   reverse = True
+else:
+   reverse = False
 
 # read lect.in 
 ncol, nlign = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
@@ -135,8 +140,10 @@ if maskf != 'no':
     fid2 = open(maskf, 'r')
     mask = np.fromfile(fid2,dtype=float32)[:nlign*ncol].reshape((nlign,ncol))
     mask =  mask*scale_mask
-    #kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
-    kk = np.nonzero(np.logical_or(mask==0, mask<seuil)) 
+    if reverse:
+      kk = np.nonzero(np.logical_or(mask==0, mask<seuil)) 
+    else:
+      kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
     mf[kk] = float('NaN')
 else:
     mask = np.zeros((nlign,ncol))
@@ -314,6 +321,7 @@ vmax = np.max([np.nanpercentile(mf,99),np.nanpercentile(m,99),np.nanpercentile(m
 vmin = -vmax
 
 if setzero == 'yes':
+    print('HELLO')
     # replace "NaN" to 0
     mf[np.isnan(mf)] = 0.
 
