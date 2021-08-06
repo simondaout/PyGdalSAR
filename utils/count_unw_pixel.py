@@ -160,7 +160,8 @@ fig.savefig('{}.eps'.format('count_pixels_{}'.format(bc)), format='EPS',dpi=150)
 plt.show()
 
 # save cube
-fid = open('count_pixel_cube', 'wb')
-count.flatten().astype('float32').tofile(fid)
+# fid = open('count_pixel_cube', 'wb')
+#print('Save cube count_pixel_cube')
+# count.flatten().astype('float32').tofile(fid)
 
 

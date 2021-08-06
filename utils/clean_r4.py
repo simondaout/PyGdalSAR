@@ -350,7 +350,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,3)
-cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=seuil)
+cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=np.nanpercentile(mask,99))
 ax.set_title('MASK')
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)

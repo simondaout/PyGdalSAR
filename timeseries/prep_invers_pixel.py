@@ -196,8 +196,10 @@ if sformat == 'ROI_PAC':
       if os.path.exists(infile):
         print('Create link:',infile )
         if os.path.exists(outint) is False:
-            os.symlink(infile,outint)
-            os.symlink(rscfile,outrsc)    
+            shutil.copyfile(infile,outint)
+            shutil.copyfile(rscfile,outrsc)
+            #os.symlink(infile,outint)
+            #os.symlink(rscfile,outrsc)    
       else:
         print('Can not find:', infile)
 	

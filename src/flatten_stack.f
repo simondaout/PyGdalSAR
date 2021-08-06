@@ -14,6 +14,7 @@ c nsumy : taille des zones en azimuth
 c nregx : nb de régions en range
 c Dstack : Range of stack values for cyclmax phase cycles
 c
+c      parameter(nx1=13000,nsumymax=1000,nregx=28,ny1=80000)
       parameter(nx1=13000,nsumymax=1000,nregx=28,ny1=80000)
       parameter(nregymax=600)
       parameter(nmedmax=800,nvar=3,nvar2=4,nvar3=5)
