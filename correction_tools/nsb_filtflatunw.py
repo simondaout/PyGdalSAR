@@ -35,7 +35,7 @@ Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat
 
 from __future__ import print_function
 import shutil, sys
-from os import path, environ, system, chdir, remove, getcwd, listdir, symlink
+from os import path, environ, system, chdir, remove, getcwd, listdir, symlink,unlink
 import matplotlib
 if environ["TERM"].startswith("screen"):
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
@@ -1168,7 +1168,7 @@ def flat_model(config,kk):
         copyrsc(inrsc,filtoutrsc)
 
         if force:
-            rm(outfile); rm(param); rm(newparam)
+            rm(outfile); rm(param); unlink(newparam)
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
