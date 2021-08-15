@@ -67,21 +67,21 @@ c seuil_cor : seuil sur coherence (0.08), depend du seuil sur l amplitude
 c prendre plus bas (0.05) si seuil sur amp a 0.17
 c test avec valeur plus cool: 0.04 
 c        seuil_cor=0.1
-        seuil_cor=0.01
-        print*, 'Harcoding threshold on coh windows:', seuil_cor
+        seuil_cor=0.04
+        print*, 'Hardcoding threshold on coh windows:', seuil_cor
         print*, 'Check coh in 6th column in ncycle_acp'
 c seuil variabilité du stack
-c        std_stack=3.
-        std_stack=.7
-        print*, 'Harcoding threshold variability stack:',std_stack
+        std_stack=3.
+c        std_stack=.7
+        print*, 'Hardcoding threshold variability stack:',std_stack
         print*, 'Check std in 11th column in ncycle_acp'
 c stack minimale
         seuil_stack=-200
-        print*, 'Harcoding minimum value stack:',seuil_stack
+        print*, 'Hardcoding minimum value stack:',seuil_stack
 c seuil sur le nb min de points valables dans chaque cellule
         c seuil_nb=10
         seuil_nb=5
-        print*, 'Harcoding minimum number of points windows:',seuil_nb
+        print*, 'Hardcoding minimum number of points windows:',seuil_nb
 c       
       stackmin=10000.
       stackmax=-10000.
