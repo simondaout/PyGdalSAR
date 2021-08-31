@@ -12,9 +12,9 @@ prep_invers_pixel.py
 This script prepares a work directory and input files for invers_pixel.
 
 Usage:
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] 
-        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>]  
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--link=<yes/no>] 
+        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>] [--link=<yes/no>]  
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>] [--link=<yes/no>]
 
 Options:
   --int_path=<dir>    Absolute path to interferograms directory 
@@ -30,6 +30,7 @@ Options:
   --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
   --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
   --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 0.5,100). Downweight small temporal baselines and large perpendicular baselines 
+  --link=<yes/no>     If no copy data in LN_DIR instead of doing links [default: yes]
   -h --help           Show this screen
 """
 
@@ -112,6 +113,11 @@ if arguments["--outputdir"] == None:
     tsdir = './ts/'
 else:
     tsdir = os.path.join(arguments["--outputdir"]) + '/'
+
+if arguments["--link"] == 'no':
+    link = False
+else:
+    link = True
 
 # Create output directories
 makedirs(tsdir)
@@ -196,10 +202,12 @@ if sformat == 'ROI_PAC':
       if os.path.exists(infile):
         print('Create link:',infile )
         if os.path.exists(outint) is False:
+          if link:
             shutil.copyfile(infile,outint)
             shutil.copyfile(rscfile,outrsc)
-            #os.symlink(infile,outint)
-            #os.symlink(rscfile,outrsc)    
+          else:
+            os.symlink(infile,outint)
+            os.symlink(rscfile,outrsc)    
       else:
         print('Can not find:', infile)
 	
@@ -319,7 +327,7 @@ if os.path.exists(name) is False:
 1.7    #  threshold for the mask on RMS misclosure (in same unit as input files)
 1      #  range and azimuth downsampling (every n pixel)
 4      #  iterations to correct unwrapping errors (y:nb_of_iterations,n:0)
-1      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+2      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 0.2    #  Scaling value for weighting residuals (1/(res**2+value**2)) (in same unit as input files) (Must be approximately equal to standard deviation on measurement noise)
 0      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 4.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
