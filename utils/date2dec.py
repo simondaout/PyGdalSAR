@@ -31,7 +31,7 @@ arguments = docopt.docopt(__doc__)
 if arguments["--dates"] is not  None:
   dates = list(map(int,arguments["--dates"].replace(',',' ').split()))
 elif arguments["--datefile"] is not None:
-  infile=file(arguments["--datefile"],'r')
+  infile=arguments["--datefile"]
   dates=np.loadtxt(infile,comments="#",dtype='str')
 else:
   print('No input dates')
