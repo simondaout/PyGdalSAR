@@ -1168,7 +1168,11 @@ def flat_model(config,kk):
         copyrsc(inrsc,filtoutrsc)
 
         if force:
-            rm(outfile); rm(param); unlink(newparam)
+            rm(outfile); rm(param)
+            try:
+              unlink(newparam)
+            except:
+              pass
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
@@ -1319,8 +1323,8 @@ def unwrapping(config,kk):
             shutil.move(bridgefile,'bridge_save.in')
    
         if force: 
-            #rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
-            rm(unwfiltROI); rm(unwSWrsc)
+            rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
+            #rm(unwfiltROI); rm(unwSWfile)
 
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
@@ -1791,7 +1795,7 @@ proc_defaults = {
     "nfit_az": "-1", # median
     "thresh_amp_az": "0.3", # threshold on coherence
     "nfit_topo": "-1", # median 
-    "thresh_amp_topo": "0.2",
+    "thresh_amp_atmo": "0.2",
     "ivar": "1", # fct of topography only
     "z_ref": "8000.", # reference
     "min_z": "0.", # min elevation
@@ -1837,14 +1841,14 @@ print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
     nfit_az: {8}, thresh_amp_az: {9}\n\
     filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
     FilterStrength : {13}, Filt_method : {14}\n\
-    nfit_topo: {15}, thresh_amp_topo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
+    nfit_topo: {15}, thresh_amp_atmo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
     seedx: {21}, seedy: {22}, threshold_unw: {23}, threshold_unfilt: {24}, unw_method: {25}, ref_top: {26}, ref_left: {27}, ref_width: {28}, ref_length: {29}'.format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
     proc["FilterStrength"],proc["Filt_method"],\
-    proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
+    proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
     proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"],\
     proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]
     ))
@@ -1911,7 +1915,7 @@ for p in jobs:
         proc["nfit_az"], proc["thresh_amp_az"],
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
         proc["FilterStrength"], proc["Filt_method"], 
-        proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
+        proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"],proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
         ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask, remove_bridges = remove_bridges,
