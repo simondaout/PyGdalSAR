@@ -153,7 +153,7 @@ for f in unw_files:
 if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None): 
     print(arguments["--sigma"])
     shutil.copy(int_list,os.path.join(tsdir, "list_pair"))
-    do_sig = int(0)
+    do_sig = int(1)
 elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
@@ -202,7 +202,7 @@ if sformat == 'ROI_PAC':
       if os.path.exists(infile):
         print('Create link:',infile )
         if os.path.exists(outint) is False:
-          if link:
+          if link is False:
             shutil.copyfile(infile,outint)
             shutil.copyfile(rscfile,outrsc)
           else:
@@ -327,7 +327,7 @@ if os.path.exists(name) is False:
 1.7    #  threshold for the mask on RMS misclosure (in same unit as input files)
 1      #  range and azimuth downsampling (every n pixel)
 4      #  iterations to correct unwrapping errors (y:nb_of_iterations,n:0)
-2      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+1      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 0.2    #  Scaling value for weighting residuals (1/(res**2+value**2)) (in same unit as input files) (Must be approximately equal to standard deviation on measurement noise)
 0      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 4.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
