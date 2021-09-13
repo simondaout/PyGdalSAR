@@ -12,9 +12,9 @@ prep_invers_pixel.py
 This script prepares a work directory and input files for invers_pixel.
 
 Usage:
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] 
-        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>]  
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--link=<yes/no>] 
+        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>] [--link=<yes/no>]  
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>] [--link=<yes/no>]
 
 Options:
   --int_path=<dir>    Absolute path to interferograms directory 
@@ -30,6 +30,7 @@ Options:
   --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
   --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
   --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 0.5,100). Downweight small temporal baselines and large perpendicular baselines 
+  --link=<yes/no>     If no copy data in LN_DIR instead of doing links [default: yes]
   -h --help           Show this screen
 """
 
@@ -113,6 +114,11 @@ if arguments["--outputdir"] == None:
 else:
     tsdir = os.path.join(arguments["--outputdir"]) + '/'
 
+if arguments["--link"] == 'no':
+    link = False
+else:
+    link = True
+
 # Create output directories
 makedirs(tsdir)
 
@@ -147,7 +153,7 @@ for f in unw_files:
 if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None): 
     print(arguments["--sigma"])
     shutil.copy(int_list,os.path.join(tsdir, "list_pair"))
-    do_sig = int(0)
+    do_sig = int(1)
 elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
@@ -196,10 +202,12 @@ if sformat == 'ROI_PAC':
       if os.path.exists(infile):
         print('Create link:',infile )
         if os.path.exists(outint) is False:
+          if link is False:
             shutil.copyfile(infile,outint)
             shutil.copyfile(rscfile,outrsc)
-            #os.symlink(infile,outint)
-            #os.symlink(rscfile,outrsc)    
+          else:
+            os.symlink(infile,outint)
+            os.symlink(rscfile,outrsc)    
       else:
         print('Can not find:', infile)
 	
