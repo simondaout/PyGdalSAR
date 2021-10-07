@@ -403,4 +403,3 @@ if __name__ == "__main__":
     #plot_gps_distribution(gps, poly)
     plot_gps_in_LOS(gps, poly)
     plt.show()
-
