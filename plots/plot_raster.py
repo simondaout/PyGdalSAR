@@ -257,6 +257,7 @@ elif (arguments["--vmax"] is not None) or (arguments["--vmin"] is not None):
         else:
           vmin = -vmax
 else:
+    #print(np.nanmax(cutphi),np.nanmin(cutphi))
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
 
