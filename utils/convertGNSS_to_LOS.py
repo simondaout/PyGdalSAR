@@ -175,10 +175,10 @@ def plot_gps_in_LOS(gps, poly):
       world.plot(ax=ax,facecolor='none',color='none', edgecolor='black',zorder=1)
 
     los = gps['los'].to_numpy()
-    vmin = np.nanpercentile(los, 8)
-    vmax = np.nanpercentile(los, 92)
-    #vmax = abs(np.max([lmin,lmax]))
-    #vmin = -vmax 
+    vmin=-4
+    vmax=4
+    #vmin = np.nanpercentile(los, 8)
+    #vmax = np.nanpercentile(los, 92)
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
     try:
         from matplotlib.colors import LinearSegmentedColormap
@@ -402,4 +402,12 @@ if __name__ == "__main__":
     # Plot frame and GPS
     #plot_gps_distribution(gps, poly)
     plot_gps_in_LOS(gps, poly)
+    
+    # save table
+    gps['lon2'] = None; gps['lat2'] = None
+    for index,g in gps.iterrows():
+      gps.loc[index,'lon2'] = g['geometry'].x
+      gps.loc[index,'lat2'] = g['geometry'].y
+    gps.to_csv(path_or_buf=track+'_gps_table.txt', sep=' ', index=False, header=None)    
+    gps.to_csv(path_or_buf=track+'_gps_table.txt', sep=' ', index=False, header='[geometry ,sta, Ve, dVe, Vn, dVn ,Vup, dVup, look, heading, los, siglos, lon, lat]')    
     plt.show()

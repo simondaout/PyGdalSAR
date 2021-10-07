@@ -335,10 +335,12 @@ if __name__ == "__main__":
     #east, north = x, y
 
     # invers G matrix
-    G = np.zeros((len(d),3))
-    G[:,0] = north
-    G[:,1] = east
-    G[:,2] = 1
+    G = np.zeros((len(d),5))
+    G[:,0] = np.array(north)**2
+    G[:,1] = np.array(east)**2
+    G[:,2] = north
+    G[:,3] = east
+    G[:,4] = 1
     
     # inversion
     x0 = lst.lstsq(G,d)[0]
@@ -356,10 +358,12 @@ if __name__ == "__main__":
     # Build G matrix for all insar points
     east, north = UTM(insar.lon.flatten(), insar.lat.flatten())
     #east, north = insar.lon.flatten(), insar.lat.flatten()
-    G = np.zeros((len(insar.data.flatten()),3))
-    G[:,0] = north
-    G[:,1] = east
-    G[:,2] = 1
+    G = np.zeros((len(insar.data.flatten()),5))
+    G[:,0] = np.array(north)**2
+    G[:,1] = np.array(east)**2
+    G[:,2] = north
+    G[:,3] = east
+    G[:,4] = 1
 
     ramp_array = np.dot(G, pars).reshape(insar.ysize, insar.xsize)
     model_array = ramp_array + insar.data
