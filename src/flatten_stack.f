@@ -15,7 +15,7 @@ c nregx : nb de régions en range
 c Dstack : Range of stack values for cyclmax phase cycles
 c
 c      parameter(nx1=13000,nsumymax=1000,nregx=28,ny1=80000)
-      parameter(nx1=13000,nsumymax=1000,nregx=28,ny1=80000)
+      parameter(nx1=13000,nsumymax=1000,nregx=14,ny1=80000)
       parameter(nregymax=600)
       parameter(nmedmax=800,nvar=3,nvar2=4,nvar3=5)
       real aslop(nregx*nregymax),qual(nregx*nregymax)
@@ -67,11 +67,11 @@ c seuil_cor : seuil sur coherence (0.08), depend du seuil sur l amplitude
 c prendre plus bas (0.05) si seuil sur amp a 0.17
 c test avec valeur plus cool: 0.04 
 c        seuil_cor=0.1
-        seuil_cor=0.04
+        seuil_cor=0.01
         print*, 'Hardcoding threshold on coh windows:', seuil_cor
         print*, 'Check coh in 6th column in ncycle_acp'
 c seuil variabilité du stack
-        std_stack=3.
+        std_stack=4.
 c        std_stack=.7
         print*, 'Hardcoding threshold variability stack:',std_stack
         print*, 'Check std in 11th column in ncycle_acp'

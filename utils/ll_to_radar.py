@@ -31,6 +31,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from decimal import Decimal
 from osgeo import gdal
+import sys
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -68,8 +69,8 @@ lon = lon_band.ReadAsArray(0, 0,
          ds.RasterXSize, ds.RasterYSize)
 nlines, ncol = ds.RasterYSize, ds.RasterXSize
 
-list_lat = map(float,arguments["--lats"].replace(',',' ').split())
-list_lon = map(float,arguments["--lons"].replace(',',' ').split())
+list_lat = list(map(float,arguments["--lats"].replace(',',' ').split()))
+list_lon = list(map(float,arguments["--lons"].replace(',',' ').split()))
 if len(list_lat) != len(list_lon):
    raise Exception("ncols and nligns lists are not the same size")
 
@@ -78,18 +79,32 @@ if len(list_lat) != len(list_lon):
 # sys.exit()
 
 ligns,cols = [], []
-epsi = 10**(-prec)
+lllat, lllon = [], []
+epsilon = 10**(-prec)
+loop = np.linspace(epsilon*0.1,epsilon,10)
 for llat,llon in zip(list_lat,list_lon):
+  for epsi in loop:
     kk = np.nonzero(np.logical_and(np.logical_and(lat>llat-epsi,lat<llat+epsi), \
         np.logical_and(lon>llon-epsi,lon<llon+epsi)))
-    # print(kk)
-    ligns.append(kk[0][0])
-    cols.append(kk[1][0])
+    if len(kk[0])>5:
+       print('Number of points is superior to 5. You may increase the precision')
+       sys.exit()
+    if len(kk[0])>0:
+      ligns.append(int(np.median(kk[0])))
+      cols.append(int(np.median(kk[1])))
+      lllat.append(llat)
+      lllon.append(llon)
+      break
+    if epsi == epsilon:
+       print('No point found for lat:{}, lon:{}. You may decrease the precision'.format(llat,llon))
+       sys.exit()
 
 ligns=np.array(ligns)
 cols=np.array(cols)
-print('ligns:',ligns)
+print('lines:',ligns)
 print('cols:',cols)
+print('lat:', lllat)
+print('lon:',lllon)
 
 if arguments["--outfile"] is not None:
   print('Saving in the output file', arguments["--outfile"])
