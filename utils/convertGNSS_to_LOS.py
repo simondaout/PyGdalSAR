@@ -149,8 +149,74 @@ def plot_gps_distribution(gps, poly):
     #plt.show()
     fig.savefig(track+'_gps_frame.png', format='PNG', dpi=150, bbox_inches='tight')
 
+def plot_gps(gps, poly):
+    figh=plt.figure(2,figsize = (9,8))
+    figv=plt.figure(3,figsize = (9,8))
+    axh = figh.add_subplot(1,1,1) # horizontal
+    axv = figv.add_subplot(1,1,1)
+    x,y = poly.exterior.xy
+    minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
+    axh.axis((minx,maxx,miny,maxy))
+    axv.axis((minx,maxx,miny,maxy))
+    # plot contextfile
+    try:
+      import contextily as ctx    
+      ctx.add_basemap(axh,crs=4326)        
+      ctx.add_basemap(axv,crs=4326)        
+    except:
+      print('Contextily package not installed. Skip backgroup topography plot')
+    
+    # plot world
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    if shapefile: 
+      bounds = gpd.read_file(shapefile)
+      bounds = bounds.to_crs(world.crs)
+      bounds.plot(ax=axv,facecolor='none', color='none',edgecolor='black',zorder=1)
+      bounds.plot(ax=axh,facecolor='none', color='none',edgecolor='black',zorder=1)
+    else:
+      world.plot(ax=axh,facecolor='none',color='none', edgecolor='black',zorder=1)
+      world.plot(ax=axv,facecolor='none',color='none', edgecolor='black',zorder=1)
+    
+    # gnss
+    axh.quiver(gps['lon2'].to_numpy(),gps['lat2'].to_numpy(),gps['ve'].to_numpy(),gps['vn'].to_numpy(),scale = 60, width = 0.005, color = 'blue', zorder=4)
+    axh.quiver(np.min(gps['lon2'].to_numpy())+1,np.min(gps['lat2'].to_numpy())+1,5,0,scale = 60, width = 0.005, color = 'blue', zorder=4)
+    axh.text(np.min(gps['lon2'].to_numpy())+0.5,np.min(gps['lat2'].to_numpy())+1,'5 mm/yr', color = 'blue', zorder=4)
+    
+    vu = gps['vu'].to_numpy()
+    vmin = np.nanpercentile(vu, 8)
+    vmax = np.nanpercentile(vu, 92)
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    try:
+        from matplotlib.colors import LinearSegmentedColormap
+        cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+        cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+        cmap = cmap.reversed()
+    except:
+        cmap=cm.rainbow   
+    m = cm.ScalarMappable(norm=norm, cmap=cmap)
+    faceu = m.to_rgba(vu) 
+    gps.plot(ax=axv, facecolor=faceu, zorder=3)
+    
+    axh.set_xticks(np.linspace(minx,maxx,3))
+    axh.set_yticks(np.linspace(miny,maxy,3))
+    axh.set_xlim([minx,maxx]) 
+    axh.set_ylim([miny,maxy])  
+    
+    axv.set_xticks(np.linspace(minx,maxx,3))
+    axv.set_yticks(np.linspace(miny,maxy,3))
+    axv.set_xlim([minx,maxx]) 
+    axv.set_ylim([miny,maxy])  
+
+    divider = make_axes_locatable(axv)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(m, cax=c)
+    cbar.set_label('Vertical Velocities (mm/yr)', rotation=270)
+
+    #fig.savefig(track+'_gps_field.png', format='PNG', dpi=150, bbox_inches='tight')
+
+
 def plot_gps_in_LOS(gps, poly):
-    fig = plt.figure(2,figsize=(10,8))
+    fig = plt.figure(4,figsize=(10,8))
     fig.subplots_adjust(wspace=0.001)
     ax = fig.add_subplot(1,1,1)
 
@@ -200,7 +266,7 @@ def plot_gps_in_LOS(gps, poly):
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(m, cax=c)
-    cbar.set_label('LOS Velocity (mm/yr)', rotation=270)
+    cbar.set_label('LOS Velocites (mm/yr)', rotation=270)
     ax.title.set_text('{}'.format(track))
     fig.savefig(track+'_gps_LOS.png', format='PNG', dpi=150, bbox_inches='tight')
     fig.savefig(track+'_gps_LOS.pdf', format='PDF', dpi=150)
@@ -397,11 +463,7 @@ if __name__ == "__main__":
 
     # remove NaNs
     gps = gps.dropna()
-    print(gps)
-
-    # Plot frame and GPS
-    #plot_gps_distribution(gps, poly)
-    plot_gps_in_LOS(gps, poly)
+    #print(gps)
     
     # save table
     gps['lon2'] = None; gps['lat2'] = None
@@ -410,4 +472,8 @@ if __name__ == "__main__":
       gps.loc[index,'lat2'] = g['geometry'].y
     gps.to_csv(path_or_buf=track+'_gps_table.txt', sep=' ', index=False, header=None)    
     gps.to_csv(path_or_buf=track+'_gps_table.txt', sep=' ', index=False, header='[geometry ,sta, Ve, dVe, Vn, dVn ,Vup, dVup, look, heading, los, siglos, lon, lat]')    
+    
+    # Plot frame and GPS
+    plot_gps(gps, poly)
+    plot_gps_in_LOS(gps, poly)
     plt.show()

@@ -242,6 +242,12 @@ if __name__ == "__main__":
     coords = [(LON_REF2-epsi, LAT_REF2-epsi), (LON_REF1-epsi,LAT_REF1-epsi), (LON_REF3-epsi,LAT_REF3-epsi), (LON_REF4-epsi,LAT_REF4-epsi)]
     poly = Polygon(coords)
 
+    # ramp
+    try:
+        quad
+    except NameError:
+        quad = False
+
     try:
         gps_file
     except NameError:
@@ -334,14 +340,22 @@ if __name__ == "__main__":
     east, north = UTM(x,y)
     #east, north = x, y
 
-    # invers G matrix
-    G = np.zeros((len(d),5))
-    G[:,0] = np.array(north)**2
-    G[:,1] = np.array(east)**2
-    G[:,2] = north
-    G[:,3] = east
-    G[:,4] = 1
-    
+    if quad == True:
+        # invers G matrix
+        G = np.zeros((len(d),5))
+        G[:,0] = np.array(north)**2
+        G[:,1] = np.array(east)**2
+        G[:,2] = north
+        G[:,3] = east
+        G[:,4] = 1
+   
+    else:
+        # invers G matrix
+        G = np.zeros((len(d),3))
+        G[:,0] = north
+        G[:,1] = east
+        G[:,2] = 1
+   
     # inversion
     x0 = lst.lstsq(G,d)[0]
     _func = lambda x: np.sum(((np.dot(G,x)-d)/sig)**2)
@@ -358,27 +372,32 @@ if __name__ == "__main__":
     # Build G matrix for all insar points
     east, north = UTM(insar.lon.flatten(), insar.lat.flatten())
     #east, north = insar.lon.flatten(), insar.lat.flatten()
-    G = np.zeros((len(insar.data.flatten()),5))
-    G[:,0] = np.array(north)**2
-    G[:,1] = np.array(east)**2
-    G[:,2] = north
-    G[:,3] = east
-    G[:,4] = 1
+
+    if quad == True:
+        G = np.zeros((len(insar.data.flatten()),5))
+        G[:,0] = np.array(north)**2
+        G[:,1] = np.array(east)**2
+        G[:,2] = north
+        G[:,3] = east
+        G[:,4] = 1
+    else:
+        G = np.zeros((len(insar.data.flatten()),3))
+        G[:,0] = north
+        G[:,1] = east
+        G[:,2] = 1
 
     ramp_array = np.dot(G, pars).reshape(insar.ysize, insar.xsize)
     model_array = ramp_array + insar.data
     
     # remove cst
-    cst = np.nanmean(model_array)
-    model_array = model_array - cst
+    #cst = np.nanmean(model_array)
+    #model_array = model_array - cst
 
     # Plot
     vmin = np.nanpercentile(insar.data, 2)
     vmax = np.nanpercentile(insar.data, 98)
     vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
     vmin_insar = -vmax_insar
-    vmin_insar = -10
-    vmax_insar = 10
 
     try:
         from matplotlib.colors import LinearSegmentedColormap
