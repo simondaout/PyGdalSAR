@@ -101,6 +101,8 @@ if (arguments["--cols"] is not None and arguments["--lines"] is not None):
       raise Exception("ncols and nlines lists are not the same size")
 
 ds_extension = os.path.splitext(infile)[1]
+ if (ds_extension == ".tif" or ds_extension ==".tiff"):
+     sformat = GTIFF
 
 if sformat == "ROI_PAC": 
     ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
