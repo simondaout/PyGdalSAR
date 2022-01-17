@@ -38,6 +38,9 @@ import matplotlib.dates as mdates
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.patches as patches
 
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
+
 ################################
 # CLASSES
 ################################
@@ -96,7 +99,7 @@ class network:
 
         band = ds.GetRasterBand(1)
         self.look = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        # self.look[np.isnan(self.los)] = np.float('NaN') 
+        # self.look[np.isnan(self.los)] = float('NaN') 
         band.FlushCache()
         del ds, band
 
@@ -104,7 +107,7 @@ class network:
             ds = gdal.Open(self.sigmaf,gdal.GA_ReadOnly)
             band = ds.GetRasterBand(1)
             self.sigma = self.scale_sig*band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-            # self.sigma[np.isnan(self.los)] = np.float('NaN') 
+            # self.sigma[np.isnan(self.los)] = float('NaN') 
             band.FlushCache()
             del ds, band
         else:
@@ -117,12 +120,12 @@ class network:
         ds = gdal.Open(self.headf,gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
         self.head = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        # self.head[np.isnan(self.los)] = np.float('NaN') 
+        # self.head[np.isnan(self.los)] = float('NaN') 
         band.FlushCache()
         del ds, band
 
         # convert head, look to angle phi, theta in rad
-        # theta: vertical angle between LOS and vertical
+        # theta: angle between LOS and horizontal
         self.theta = np.deg2rad(90.-self.look)
         # phi: horizontal angle between LOS and comp1
         self.phi = np.deg2rad(-90-self.head)
@@ -339,9 +342,9 @@ try:
     from matplotlib.colors import LinearSegmentedColormap
     cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
     cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
-    cmap_r = cmap.reversed()
 except:
     cmap=cm.rainbow
+cmap_r = cmap.reversed()
 
 fig=plt.figure(0, figsize=(14,12))
 
@@ -382,8 +385,8 @@ plt.show()
 ################################
 
 # Initialise output matrix
-disp = np.ones((nlines,ncols,3))*np.float('NaN')
-sdisp = np.ones((nlines,ncols,3))*np.float('NaN')
+disp = np.ones((nlines,ncols,3))*float('NaN')
+sdisp = np.ones((nlines,ncols,3))*float('NaN')
 
 print()
 logger.info('Inversion pixel by pixel....')
@@ -460,7 +463,7 @@ fig=plt.figure(1, figsize=(14,12))
 for n in range(N):
 
     data = disp[:,:,int(comp[n])]
-    data[data==0] = np.float('NaN')
+    data[data==0] = float('NaN')
 
     # plot comps
     vmax =  np.nanpercentile(data,98)
@@ -475,8 +478,8 @@ for n in range(N):
 
     # plot SIGMA LOS
     sigdata = sdisp[:,:,int(comp[n])]
-    # sigdata[sigdata==0] = np.float('NaN')
-    # sigdata[sigdata==1] = np.float('NaN')
+    # sigdata[sigdata==0] = float('NaN')
+    # sigdata[sigdata==1] = float('NaN')
 
     vmax=np.nanpercentile(sigdata,95)
     ax = fig.add_subplot(2,N,n+1+N)
