@@ -66,7 +66,10 @@ class network:
         self.path = wdir + name
         self.lookf = wdir + lookf
         self.headf = wdir + headf
-        self.sigmaf = wdir + sigmaf
+        if sigmaf is not None:
+          self.sigmaf = wdir + sigmaf
+        else:
+          self.sigmaf = None
         self.scale = scale
         self.scale_sig = scale_sig
         self.bounds = bounds
@@ -243,21 +246,20 @@ if 1==len(argv):
   logger.critical('No input file')
   exit()
 
+fname=argv[1]
+exec(open(path.abspath(fname)).read())
+
 if len(argv)>1:
-  try:
-    fname=argv[1]
-    logger.info('Read input file {0}'.format(fname))
-    try:
-      sys.path.append(path.dirname(path.abspath(fname)))
-      exec ("from "+path.basename(fname)+" import *")
-    except:
-      exec(open(path.abspath(fname)).read())
-  
-  except Exception as e: 
-    logger.critical('Problem in input file')
-    logger.critical(e)
-    print(network.__doc__)
-    exit()
+  #try:
+  fname=argv[1]
+  logger.info('Read input file {0}'.format(fname))
+  exec(open(path.abspath(fname)).read())
+
+  #except Exception as e: 
+  #  logger.critical('Problem in input file')
+  #  logger.critical(e)
+  #  print(network.__doc__)
+  #  exit()
 
 # rotation angle: angle between comp1 and East
 rot = np.deg2rad(-rotation)
