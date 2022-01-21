@@ -12,7 +12,7 @@ import copy
 
 import pylab
 import numpy
-import pymc
+import pymc3
 import matplotlib.patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.stats
