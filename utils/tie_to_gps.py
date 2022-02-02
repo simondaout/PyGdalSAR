@@ -158,6 +158,7 @@ class OpenTif(object):
         self.projection = self.ds.GetProjection()
         pix_lin, pix_col = np.indices((self.ds.RasterYSize,self.ds.RasterXSize))
         self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_col
+        print(self.ds.GetGeoTransform())        
 
         # convert 0 and 255 to NaN
         self.data[self.data==0.] = float('NaN')
@@ -256,8 +257,10 @@ if __name__ == "__main__":
     # load gnss
     all_gps = load_gps(gps_file)
 
-    # gps within poly
-    gps = all_gps[all_gps.within(poly)]
+    # gps within poly 
+    # import to do a copy to avoid SettingWithCopyWarning
+    gps = all_gps[all_gps.within(poly)].copy()
+
      # load insar
     # read format incidence heading angle
     # not same convention in GAMMA or ROIPAC
@@ -289,9 +292,7 @@ if __name__ == "__main__":
 
     # compute inc angle gps
     add_inc_head_los(gps, inc, heading)
-    #print(gps)
-    
-    
+      
     # if heading, then increase window size
     for n in range(4,200,2):
         #print(n)
