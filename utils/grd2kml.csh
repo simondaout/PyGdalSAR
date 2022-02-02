@@ -26,4 +26,4 @@ endif
 #   now make the kml and png
 #gmt psconvert $1.ps -W+k+t"$1" -E$DPI -TG -P -S -V -F$1.png
 gmt psconvert $1.ps -W+k+t"$1" -TG -P -S -V -F$1.png
-rm $1.ps grad.grd psconvert*
+rm $1.ps grad.grd 
