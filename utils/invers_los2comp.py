@@ -148,59 +148,14 @@ class network:
             format(np.nanmean(self.proj[0]*np.cos(self.theta)),np.nanmean(self.proj[1]*np.cos(self.theta)),np.nanmean(self.proj[2])))
 
         # compute proj Shortening
-        self.proj=[(np.cos(rot)*self.proj[0] + np.sin(rot)*self.proj[1])*np.cos(self.theta),
-               (-np.sin(rot)*self.proj[0] + np.cos(rot)*self.proj[1])*np.cos(self.theta),
+        self.proj=[(np.cos(rot)*self.proj[0] - np.sin(rot)*self.proj[1])*np.cos(self.theta),
+               (np.sin(rot)*self.proj[0] + np.cos(rot)*self.proj[1])*np.cos(self.theta),
                self.proj[2]
                ]
 
         logger.info('Average LOS projection to comp1, comp2, comp3: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
         print()
-
-
-################################
-#EXAMPLE INPUT FILE
-################################
-
-# # define output name
-# output = 'post09'
-
-# # define angle between north and new axis 
-# # e.g if axis = [east, north, up], rotation = 0
-# # e.g if axis = [N70W, N20E, Up], rotation = 20
-# rotation = 22
-
-# # define desired invert components
-# # e.g [east, north, up], comp = [1,2,3]
-# # e.g [north, up], comp = [2,3]
-# # e.g [east, up], comp = [1,3]
-# comp = [1,3]
-
-# # parameters inversion
-# # iter: number of least-square iterations (default:2000)
-# # acc: desired accuracy results of the sequential least-square
-# #iter = 2000
-# acc=1.e-9
-# iter = 1
-
-# # optional crop data
-# # define [line_beg, line_end, col_beg_col_end] (default: None)
-# # crop=[200,400,100,300]
-# crop= None
-
-# ref_zone=[y0,y1,x0,x1]
-# reference shift to zero for both LOS, figure pops up before inversion to check!
-
-# insar = [
-# network('T172_inter/T172_inter_LOSVelocity_nan_s90.xy-los_flat_crop09.grd','/home/cometraid14/daouts/work/tibet/qinghai/data/insar/',\
-#     'T172','T172_inter/T172_look_s90_crop09.tiff','T172_inter/T172_head_s90_crop09.tiff',\
-#     sigmaf='T172_inter/T172_LOS_sigVelocity.los_crop09.tiff',\
-#     scale=1,scale_sig=1000,format='GTiff',bounds=[-2,3]),
-# network('T004_inter/T004_inter_LOSVelocity_nan_mmyr_s90_crop09.grd','/home/cometraid14/daouts/work/tibet/qinghai/data/insar/',\
-#     'T004','T004_inter/T004_look_s90_crop09.tiff','T004_inter/T004_head_s90_crop09.tiff',\
-#     sigmaf='T004_inter/T004_LOS_sigVelocity.los_crop09.tiff',\
-#     scale=1,scale_sig=1000,format='GTiff',bounds=[-2,3])
-# ]
 
 
 ################################
@@ -258,7 +213,7 @@ if len(argv)>1:
     exit()
 
 # rotation angle: angle between comp1 and East
-rot = np.deg2rad(-rotation)
+rot = np.deg2rad(rotation)
 
 # Load data
 M = len(insar)
@@ -306,9 +261,9 @@ N = len(comp)
 comp_name = []
 for n in range(N):
     if int(comp[n]) == 0:
-        name = 'East + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
+        name = 'East + {} deg (clockwise)'.format(np.rad2deg(rot))
     elif int(comp[n]) == 1:
-        name = 'North + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
+        name = 'North + {} deg (clockwise)'.format(np.rad2deg(rot))
     elif int(comp[n]) == 2:
         name = 'Up '
     else:
@@ -446,10 +401,10 @@ for i in range(ibeg,iend):
 
             except:
                 pars = np.zeros((N))
-                print(i,j)
-                print('data:',data)
-                print('G:',G)
-                print()
+                #print(i,j)
+                #print('data:',data)
+                #print('G:',G)
+                #print()
 
 
 ################################
