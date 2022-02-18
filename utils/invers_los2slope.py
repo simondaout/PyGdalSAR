@@ -10,12 +10,6 @@
 # Date:       03/02/2022
 ############################################
 
-# import sys,os
-# from sys import argv,stdin,stdout
-# from os import environ,path
-# import logging
-# import getopt
-
 from sys import argv,exit,stdin,stdout
 import getopt
 import os, math
@@ -71,15 +65,34 @@ class network:
         self.path = wdir + name
         self.lookf = wdir + lookf
         self.headf = wdir + headf
-        self.sigmaf = wdir + sigmaf
+        if sigmaf is not None:
+            self.sigmaf = wdir + sigmaf
+        else:
+            self.sigmaf = None
         self.scale = scale
         self.scale_sig = scale_sig
         self.bounds = bounds
         self.ref_zone = ref_zone
  
     def load(self,rot,slope):
+
         self.rot = rot
         self.slope = slope
+
+        #self.rot = np.ones(np.shape(self.rot))*np.pi/2 
+        #self.slope = np.ones(np.shape(self.rot))*np.deg2rad(10)
+        #fig = plt.figure(4,figsize=(11,7))
+        #cmap = cm.terrain
+        ## Plot topo
+        #ax = fig.add_subplot(2,2,1)
+        #cax = ax.imshow(np.rad2deg(self.rot),cmap=cmap)
+        #ax.set_title('ROT',fontsize=6)
+        #fig.colorbar(cax, orientation='vertical')
+        #ax = fig.add_subplot(2,2,2)
+        #cax = ax.imshow(np.rad2deg(self.slope),cmap=cmap)
+        #ax.set_title('Slope',fontsize=6)
+        #fig.colorbar(cax, orientation='vertical')
+        #plt.show()
 
         logger.info('Read track: {}'.format(self.name))
         ds = gdal.Open(self.path,gdal.GA_ReadOnly)
@@ -108,8 +121,7 @@ class network:
 
         band = ds.GetRasterBand(1)
         self.look = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-        # self.look[np.isnan(self.los)] = float('NaN') 
-        band.FlushCache()
+        # self.look[np.isnan(self.los)] = float('NaN'))
         del ds, band
 
         if self.sigmaf is not None:
@@ -156,10 +168,10 @@ class network:
 
         self.proj=[
                 np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) - np.sin(self.slope)*np.sin(self.theta),
-                (np.sin(self.rot)*self.proj[0] + np.cos(self.rot)*self.proj[1])*np.cos(self.theta),
-                np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.rot)*np.sin(self.theta)
+                (np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi))*np.cos(self.theta),
+                np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
         ]
-       
+
         logger.info('Average LOS projection to comp1, comp2, comp3: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
         print()
@@ -223,22 +235,23 @@ if len(argv)>1:
     print(network.__doc__)
     exit()
 
-# Calcul rotation
-def calcul_angle_grde_pente(path):
+def compute_slope_aspect(path):
    
-   #### Charger DEM
+    #### LOAD DEM
     ds = gdal.Open(path,gdal.GA_ReadOnly)
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
-    filtrer = scipy.ndimage.filters.gaussian_filter(topo,4.)
+    filtrer = scipy.ndimage.filters.gaussian_filter(topo,2.)
     drv = gdal.GetDriverByName('GTiff')
 
     # Recuperation de la latitude moyenne
     data1 = ds.GetGeoTransform()   
     lats = data1[3] + (np.arange(nlines) * data1[5])
     lat_moy = np.mean(lats)
-     
+    ######## JUSTE POUR LE TEST A ENLEVER
+    lat_moy = 0
+
     # Verification si srtm 30m ou 90m (methode a ameliorer sans aucun doute)
     res = 0
     if 0.0001 < data1[1] < 0.0004:
@@ -246,14 +259,18 @@ def calcul_angle_grde_pente(path):
     elif 0.0007 < data1[1] < 0.001:
         res = 90
     else:
-        print("Erreur résulotion non prise en compte")
-        exit()  
+        logger.info("Cannot find spatial resolution in metadata. Set to 10")
+        ###### POUR LE TEST A ENLEVER
+        #exit()
+        res = 10  
     
     # Calcul gradient
     Py, Px = np.gradient(filtrer, res, res*np.cos(np.deg2rad(lat_moy)))
     
     # Pente
-    slope = np.sqrt(Py**2+Px**2)
+    slope = np.arctan(np.sqrt(Py**2+Px**2))
+    #print(np.mean(np.rad2deg(slope)))
+    #sys.exit()
     # smooth slope to avoid crazy values 
     slope[np.rad2deg(slope)>80]=0.
     slope[np.rad2deg(slope)<min_slope]=0.
@@ -271,29 +288,25 @@ def calcul_angle_grde_pente(path):
 
     #Plot du DEM, de Px, de Py et de l'angle de la plus grande pente
     fig = plt.figure(1,figsize=(11,7))
-    cmap = cm.rainbow
+    cmap = cm.terrain
     # Plot topo
     ax = fig.add_subplot(2,2,1)
-    # cax = ax.imshow(toposmooth[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(toposmooth,98),vmin=np.nanpercentile(toposmooth,2))
-    cax = ax.imshow(filtrer[0:450,50:650],cmap=cmap,vmax=np.nanpercentile(filtrer,98),vmin=np.nanpercentile(filtrer,2))
+    cax = ax.imshow(filtrer,cmap=cmap,vmax=np.nanpercentile(filtrer,98),vmin=np.nanpercentile(filtrer,2))
     ax.set_title('DEM',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,2)
-    # cax = ax.imshow(toposmooth[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(toposmooth,98),vmin=np.nanpercentile(toposmooth,2))
-    cax = ax.imshow(Px[0:450,50:650],cmap=cmap,vmax=np.nanpercentile(Px,98),vmin=np.nanpercentile(Px,2))
-    ax.set_title('Px',fontsize=6)
+    cax = ax.imshow(np.rad2deg(slope),cmap=cmap,vmax=np.nanpercentile(np.rad2deg(slope),98),vmin=np.nanpercentile(np.rad2deg(slope),2))
+    ax.set_title('Slope',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,3)
-    # cax = ax.imshow(toposmooth[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(toposmooth,98),vmin=np.nanpercentile(toposmooth,2))
-    cax = ax.imshow(Py[0:450,50:650],cmap=cmap,vmax=np.nanpercentile(Py,98),vmin=np.nanpercentile(Py,2))
+    cax = ax.imshow(Py,cmap=cmap,vmax=np.nanpercentile(Py,98),vmin=np.nanpercentile(Py,2))
     ax.set_title('Py',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,4)
-    # cax = ax.imshow(toposmooth[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(toposmooth,98),vmin=np.nanpercentile(toposmooth,2))
-    cax = ax.imshow(np.rad2deg(aspect[0:450,50:650]),cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
+    cax = ax.imshow(np.rad2deg(aspect),cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
     ax.set_title('aspect',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
     
@@ -303,11 +316,12 @@ def calcul_angle_grde_pente(path):
         plt.show()      
 
     return -aspect, slope
+    #return 0, np.deg2rad(10)
 
 #### compute rotations
 # rot: tourne l'axe N vers l'axe E. 
 # slope: tourne l'axe Up vers l'axe E. 
-min_slope = 5
+min_slope = 2
 
 comp_name = []
 rot, slope = 0, 0
@@ -315,8 +329,9 @@ rot, slope = 0, 0
 if 'DEM' in locals():
   if DEM is not None:
     logger.info('DEM is defined, compute aspect and slope for each pixel.')
-    rot, slope = calcul_angle_grde_pente(DEM)
-    comp = [0,2]
+    rot, slope = compute_slope_aspect(DEM)
+    comp = [0, 2]
+    #comp = [0]
     name1 = 'Line of Max Slope'
     comp_name.append(name1)
     logger.info('Invert components: {}'.format(name1))
@@ -326,6 +341,7 @@ if 'DEM' in locals():
 
 else:
     logger.info('DEM is not defined, read horizontale rotation in clockwise rotation in input file (default, rotation=0)')
+    #slope = np.deg2rad(30)
     rot = np.deg2rad(rotation)
     # define invert components
     comp = np.array(comp) - 1 
@@ -487,13 +503,14 @@ for i in range(ibeg,iend):
         data = data[index]
         rms = rms[index]
         G = G[index,:]
-
+     
         # Inversion
         if len(data)>1:
             try:
                 pars = lst.lstsq(G,data)[0]
+                #pars = np.dot(np.linalg.inv(G),data)
 
-                if iter>1:
+                if iter > 1:
                     _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
                     _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
                     pars = opt.fmin_slsqp(_func,pars,fprime=_fprime,iter=iter,full_output=True,iprint=0,acc=acc)[0]
@@ -504,14 +521,11 @@ for i in range(ibeg,iend):
                 Cd = np.diag(rms**2, k = 0)
                 try:
                     sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
-                    for n in range((N)): 
-                        sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
                 except:
-                    pass
-                    # print('data:',data)
-                    # print('G:',G)
-                    # print('rms:',rms)
-                    # print()
+                    sigmam = np.ones((G.shape[1]))*float('NaN')
+                
+                for n in range((N)): 
+                    sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
 
             except:
                 pars = np.zeros((N))
@@ -524,37 +538,44 @@ for i in range(ibeg,iend):
 # CLEAN RESULTS
 ################################
 
+mask = np.zeros(np.shape(disp))
 for n in range(N):
     # clean outlisers
-    index = np.logical_or(d>np.nanpercentile(s,99),d<np.nanpercentile(s,1))
-    d[index]= float('NaN')
-    s[index] = float('NaN')
-    d = as_strided(disp[:,:,int(comp[n])]) 
+    d = as_strided(disp[:,:,int(comp[n])])
     s = as_strided(sdisp[:,:,int(comp[n])])
-    d[s>np.nanpercentile(s,95)] = float('NaN')
-    s[s>np.nanpercentile(s,95)] = float('NaN')
+    m = as_strided(mask[:,:,int(comp[n])])
+    index = s/abs(d) > 1 
+    m[index]= 1
+    index = np.logical_or(d>np.percentile(d,98),d<np.percentile(d,2))
+    d[index]= float('NaN') 
+    #d[np.abs(d)>9999.]= float('NaN'); s[np.abs(d)>9999.] = float('NaN')
+    
+    #d = as_strided(disp[:,:,int(comp[n])]) 
+    #s = as_strided(sdisp[:,:,int(comp[n])])
+    #d[s>9999.] = float('NaN') 
+    #s[s>9999.] = float('NaN')
 
 if 'DEM' in locals():
     if DEM is not None:
         d = as_strided(disp[:,:,0])
         s = as_strided(sdisp[:,:,0])
-        d[np.rad2deg(slope)<min_slope] = float('NaN')
-        s[np.rad2deg(slope)<min_slope] = float('NaN')
+        d[np.rad2deg(slope)<min_slope] = float('NaN'); s[np.rad2deg(slope)<min_slope] = float('NaN')
 
 ################################
 # PLOT RESULTS
 ################################
 
-fig=plt.figure(1, figsize=(14,12))
+fig=plt.figure(3, figsize=(14,12))
 
 for n in range(N):
 
     data = disp[:,:,int(comp[n])]
+    m = mask[:,:,int(comp[n])]
     data[data==0] = float('NaN')
 
     # plot comps
     vmax =  np.nanpercentile(data,98)
-    ax = fig.add_subplot(2,N,n+1)
+    ax = fig.add_subplot(3,N,n+1)
     cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=-vmax,interpolation=None)
     ax.set_title('{}'.format(comp_name[n]))
 
@@ -568,9 +589,13 @@ for n in range(N):
     # sigdata[sigdata==1] = float('NaN')
 
     vmax=np.nanpercentile(sigdata,95)
-    ax = fig.add_subplot(2,N,n+1+N)
+    ax = fig.add_subplot(3,N,n+1+N)
     cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
     ax.set_title('SIGMA {}'.format(comp_name[n]))
+    
+    ax = fig.add_subplot(3,N,n+1+N*2)
+    cax = ax.imshow(m,cmap=cm.Greys,interpolation=None)
+    ax.set_title('MASK {}'.format(comp_name[n]))
 
     # Colorbar
     divider = make_axes_locatable(ax)
@@ -600,5 +625,4 @@ for n in range(N):
     ds.SetProjection(projref)
     band.FlushCache()
 
-if PLOT:
-  plt.show()
+plt.show()
