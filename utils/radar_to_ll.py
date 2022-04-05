@@ -48,8 +48,8 @@ lon = lon_band.ReadAsArray(0, 0,
          ds.RasterXSize, ds.RasterYSize)
 nlines, ncol = ds.RasterYSize, ds.RasterXSize
 
-list_cols = map(int,arguments["--cols"].replace(',',' ').split())
-list_lines = map(int,arguments["--ligns"].replace(',',' ').split())
+list_cols = list(map(int,arguments["--cols"].replace(',',' ').split()))
+list_lines = list(map(int,arguments["--ligns"].replace(',',' ').split()))
 if len(list_cols) != len(list_lines):
    raise Exception("cols and ligns lists are not the same size")
 
