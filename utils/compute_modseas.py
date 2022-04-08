@@ -50,7 +50,8 @@ import scipy.stats as stat
 import scipy.optimize as opt
 import scipy.linalg as lst
 from scipy import ndimage
-import gdal, sys
+from osgeo import gdal
+import sys
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -87,19 +88,19 @@ if arguments["--cube"] ==  None:
 if arguments["--minamp"] ==  None:
     minamp = 2.5
 else:
-    minamp = np.float(arguments["--minamp"])
+    minamp = float(arguments["--minamp"])
 if arguments["--maxamp"] ==  None:
     maxamp = 10
 else:
-    maxamp = np.float(arguments["--maxamp"])
+    maxamp = float(arguments["--maxamp"])
 if arguments["--maxslope"] ==  None:
     maxslope = 3
 else:
-    maxslope = np.float(arguments["--maxslope"])
+    maxslope = float(arguments["--maxslope"])
 if arguments["--minelev"] ==  None:
     minelev = -1
 else:
-    minelev = np.float(arguments["--minelev"])
+    minelev = float(arguments["--minelev"])
 if arguments["--topofile"] == None:
     demf = None
 else:
@@ -177,27 +178,27 @@ else:
 if arguments["--perc_sig"] ==  None:
     perc_sig = 100.
 else:
-    perc_sig = np.float(arguments["--perc_sig"])
+    perc_sig = float(arguments["--perc_sig"])
 
 # cleaning 
-phi_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
-amp_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
-lin_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
+phi_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = float('NaN')
+amp_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = float('NaN')
+lin_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = float('NaN')
 
-phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
-amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
-lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
+phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
+amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
+lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
 
 # conversion
 amp_map,sigamp_map,sigphi_map = amp_map*abs(rad2mm),sigamp_map*abs(rad2mm),sigphi_map*abs(rad2mm)
 lin_map, ref_map = lin_map*rad2mm, ref_map*rad2mm
 
-phi_map[amp_map<np.float(minamp)] = np.float('NaN')
-lin_map[amp_map<np.float(minamp)] = np.float('NaN')
+phi_map[amp_map<float(minamp)] = float('NaN')
+lin_map[amp_map<float(minamp)] = float('NaN')
 
-phi_map[dem_map<minelev] = np.float('NaN')
-amp_map[dem_map<minelev] = np.float('NaN')
-lin_map[dem_map<minelev] = np.float('NaN')
+phi_map[dem_map<minelev] = float('NaN')
+amp_map[dem_map<minelev] = float('NaN')
+lin_map[dem_map<minelev] = float('NaN')
 
 
 # convert phi between 0 and 2pi
@@ -291,14 +292,14 @@ for i in range(iend-ibeg):
     for j in range(jend-jbeg):
 
       if threshold == "Amp":  
-        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>np.float(maxamp)):
+        if (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]>float(maxamp)):
             temp_pos = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):
                 flat_disp_pos.append(temp_pos[t])
                 time_pos.append(dmodt[t])
                 amp_pos.append(amp_map[i,j])
-        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]<np.float(maxamp)):
+        elif (~np.isnan(amp_map[i,j]) and ~np.isnan(phi_map[i,j]) and amp_map[i,j]<float(maxamp)):
             temp_neg = (maps[i,j,:] - lin_map[i,j]*(dates[:]-dates[imref]) - ref_map[i,j] \
                 - bperp_map[i,j]*(base[:]-base[imref]))/amp_map[i,j]
             for t in range((N)):

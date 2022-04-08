@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -12,9 +12,9 @@ prep_invers_pixel.py
 This script prepares a work directory and input files for invers_pixel.
 
 Usage:
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] 
-        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>]  
-	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>]
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--link=<yes/no>] 
+        prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--sigma=<path>] [--link=<yes/no>]  
+	prep_invers_pixel.py --int_path=<path> [--outputdir=<path>] [--int_list=<path>] [--dates_list=<path>] [--format=<value>] [--prefix=<value>] [--suffix=<value>] [--do_coh=<yes/no>] [--prefix_coh=<value>] [--suffix_coh=<value>] [--coh_path=<value>] [--Bc=<values>] [--link=<yes/no>]
 
 Options:
   --int_path=<dir>    Absolute path to interferograms directory 
@@ -30,16 +30,16 @@ Options:
   --format=<value>    Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
   --sigma=<file>      Path to an uncertainty file for each interferograms (e.g rms_unwcor.txt created by invert_ramp_topo_unw.py) If not None, create a third column in list_pair file corresponding to int weight in the TS analysis  
   --Bc=<value>	      Critical temporal and perpendicular baselines for weigthing interferograms (eg. 0.5,100). Downweight small temporal baselines and large perpendicular baselines 
+  --link=<yes/no>     If no copy data in LN_DIR instead of doing links [default: yes]
   -h --help           Show this screen
 """
 
-from __future__ import print_function
 import glob, math, os, sys
 import dateutil.parser
 from osgeo import gdal
 import numpy as np
 import docopt
-import gamma as gm
+from parsers import gamma as gm
 import gdal
 gdal.UseExceptions()
 import shutil
@@ -114,6 +114,11 @@ if arguments["--outputdir"] == None:
 else:
     tsdir = os.path.join(arguments["--outputdir"]) + '/'
 
+if arguments["--link"] == 'no':
+    link = False
+else:
+    link = True
+
 # Create output directories
 makedirs(tsdir)
 
@@ -124,15 +129,14 @@ date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')
 kmax=len(date_1)
 print("number of interferogram: ",kmax)
 # open baseline.rsc
-source2=file(baseline,'r')
-im,bp,bt,imd=np.loadtxt(source2,comments="#",usecols=(0,1,2,4),unpack=True,dtype='i,f,f,f')
+im,bp,bt,imd=np.loadtxt(baseline,comments="#",usecols=(0,1,2,4),unpack=True,dtype='i,f,f,f')
 print("image list=",baseline)
 nmax=len(imd)
 print("number of image: ",nmax)
 
 # Now, write list_pair
 wf = open(os.path.join(tsdir, "list_dates"), "w")
-for i in xrange((nmax)):
+for i in range((nmax)):
     wf.write("%i %.6f %.6f %.6f\n" % (im[i], imd[i], bt[i], bp[i]))
 wf.close()
 
@@ -149,7 +153,7 @@ for f in unw_files:
 if (arguments["--sigma"] == None) &  (arguments["--Bc"] == None): 
     print(arguments["--sigma"])
     shutil.copy(int_list,os.path.join(tsdir, "list_pair"))
-    do_sig = int(0)
+    do_sig = int(1)
 elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     bid,bid2,sigma = np.loadtxt(sigmaf,comments="#",unpack=True, dtype='i,i,f')
     # weight = 1./(sigma+0.001)
@@ -159,8 +163,8 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
     # print (sigma, weight)
     if len(sigma) != kmax:
       w2 = []
-      for j in xrange((kmax)):
-        for i in xrange(len(sigma)):
+      for j in range((kmax)):
+        for i in range(len(sigma)):
           if (bid[i]==date_1[j]) and  (bid2[i]==date_2[j]):
               w2.append(weight[i])
       if len(w2) != kmax:
@@ -168,26 +172,26 @@ elif (arguments["--sigma"] != None) & (arguments["--Bc"] == None):
          sys.exit()
       weigth = np.array(w2)
     wf = open(os.path.join(tsdir, "list_pair"), "w")
-    for i in xrange((kmax)):
+    for i in range((kmax)):
         wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
     wf.close()
 elif (arguments["--sigma"] == None) &  (arguments["--Bc"] != None):
      print('Weigth interferograms based on their baselines with Btc:{} and Bpc:{}'.format(btc,bpc))
      do_sig = int(2)
      weight=np.zeros((kmax))
-     for i in xrange((kmax)):
-     	deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
-     	deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
-        weight[i] = (np.float(np.exp(-deltap)) + np.float(np.exp(-deltat)))/2
+     for i in range((kmax)):
+        deltat = btc/(abs(bt[im==date_1[i]] - bt[im==date_2[i]]))
+        deltap = (abs(bp[im==date_1[i]] - bt[im==date_2[i]]))/bpc
+        weight[i] = (float(np.exp(-deltap)) + float(np.exp(-deltat)))/2
      wf = open(os.path.join(tsdir, "list_pair"), "w")
-     for i in xrange((kmax)):
+     for i in range((kmax)):
           wf.write("%i %i %.6f\n" % (date_1[i], date_2[i], weight[i]))
      wf.close()
 
 cohformat = int(0)
 if sformat == 'ROI_PAC':
   iformat = int(0)
-  for kk in xrange((kmax)):
+  for kk in range((kmax)):
       date1, date2 = date_1[kk], date_2[kk]
       idate = str(date1) + '-' + str(date2)
       folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
@@ -198,7 +202,11 @@ if sformat == 'ROI_PAC':
       if os.path.exists(infile):
         print('Create link:',infile )
         if os.path.exists(outint) is False:
-	    os.symlink(infile,outint)
+          if link is False:
+            shutil.copyfile(infile,outint)
+            shutil.copyfile(rscfile,outrsc)
+          else:
+            os.symlink(infile,outint)
             os.symlink(rscfile,outrsc)    
       else:
         print('Can not find:', infile)
@@ -213,15 +221,14 @@ if sformat == 'ROI_PAC':
           if os.path.exists(cohfile):
             print('Create link:',cohfile)
             if os.path.exists(outcoh) is False:
-	        os.symlink(cohfile,outcoh)
+                os.symlink(cohfile,outcoh)
                 os.symlink(cohrsc,outrsc)    
           else:
             print('Can not find:', cohfile)
           
-
 else:
   iformat = int(1)
-  for kk in xrange((kmax)):
+  for kk in range((kmax)):
       date1, date2 = date_1[kk], date_2[kk]
       idate = str(date1) + '_' + str(date2)
       if sformat == 'GTIFF':
@@ -244,14 +251,14 @@ else:
         infile = os.path.abspath(int_path + '/' + prefix + str(date1) + '_' + str(date2) + suffix + '.unw')
 
         los = gm.readgamma(infile)
-        los = np.float32(los)
+        los = float32(los)
         lines,cols = gm.readpar()
 
         if do_coh == 0:
             cohformat = int(1)
             cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc')
             coh = gm.readgamma(cohfile)
-            coh = np.float32(coh)
+            coh = float32(coh)
 
       # save output
       outfile =  str(date1) + '-' + str(date2) + '.r4'
@@ -320,10 +327,10 @@ if os.path.exists(name) is False:
 1.7    #  threshold for the mask on RMS misclosure (in same unit as input files)
 1      #  range and azimuth downsampling (every n pixel)
 4      #  iterations to correct unwrapping errors (y:nb_of_iterations,n:0)
-2      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+1      #  iterations to weight pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
 0.2    #  Scaling value for weighting residuals (1/(res**2+value**2)) (in same unit as input files) (Must be approximately equal to standard deviation on measurement noise)
-2      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
-2.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
+0      #  iterations to mask (tiny weight) pixels of interferograms with large residual? (y:nb_of_iterations,n:0)
+4.     #  threshold on residual, defining clearly wrong values (in same unit as input files)
 1      #  outliers elimination by the median (only if nsamp>1) ? (y=0,n=1)
 list_dates
 0      #  sort by date (0) ou by another variable (1) ?
@@ -334,7 +341,7 @@ list_pair
 %d      #  coherence file format (RMG : 0; R4 :1) (date1-date2.cor or date1-date2-CC.r4)
 1      #  minimal number of interferams using each image
 1      #  interferograms weighting so that the weight per image is the same (y=0;n=1)
-0.7    #  maximum fraction of discarded interferograms
+0.5    #  maximum fraction of discarded interferograms
 0      #  Would you like to restrict the area of inversion ?(y=1,n=0)
 1 735 1500 1585  #  Give four corners, lower, left, top, right in file pixel coord
 1      #  referencing of interferograms by bands (1) or corners (2) ? (More or less obsolete)

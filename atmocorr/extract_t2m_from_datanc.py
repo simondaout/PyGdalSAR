@@ -1,4 +1,5 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
 import datetime, sys
 import numpy as np
@@ -10,8 +11,8 @@ import matplotlib.ticker as ticker
 
 # open .nc and select temp
 ds = gdal.Open("NETCDF:"+sys.argv[1]+":t2m", gdal.GA_ReadOnly)
-print 'Coordinates:', ds.GetGeoTransform()
-print 'Grid:', ds.RasterYSize,ds.RasterXSize
+print('Coordinates:', ds.GetGeoTransform())
+print('Grid:', ds.RasterYSize,ds.RasterXSize)
 
 # convert dates
 date_ref = datetime.datetime(1900, 01, 01)
@@ -22,19 +23,19 @@ dates,time,mode=[],[],[]
 for b in range(1, ds.RasterCount+1):
     band = ds.GetRasterBand(b)
     bandmd = band.GetMetadata()
-    # print bandmd
+    # print(bandmd)
     
     # extract time
     netcdf_time = int(bandmd["NETCDF_DIM_time"])
     print(bandmd)
-    # print netcdf_time
-    # print netcdf_time/24, netcdf_time%24
+    # print(netcdf_time)
+    # print(netcdf_time/24, netcdf_time%24)
     date = date_ref + datetime.timedelta(netcdf_time/24, netcdf_time%24)
     dates.append(date)
     # convert date to dec
     dec = float(date.strftime('%j'))/365.1
     year = float(date.strftime('%Y'))
-    print date,dec,year
+    print(date,dec,year)
     mode.append(dec)
     time.append(year+dec)
     
@@ -43,7 +44,7 @@ for b in range(1, ds.RasterCount+1):
     offset = float(bandmd["add_offset"])
     data = band.ReadAsArray()*scale + offset
     
-    #print date, " -> ", np.mean(data), "m"
+    #print(date, " -> ", np.mean(data), "m")
     #temp.append(data[-1,-1]) 
     # K to C
     temp[:,:,b-1] = data-273.15    
@@ -136,9 +137,9 @@ def plot(dates,time,mode,temp):
     ax2.set_ylim([-30,30])
     fig2.savefig('Modtemperatures_{}_{}.pdf'.format(lat,lon), format='PDF')
 
-for i in xrange(ds.RasterYSize):
+for i in range(ds.RasterYSize):
     lat = ds.GetGeoTransform()[3]-0.125 + ds.GetGeoTransform()[5]*i
-    for j in xrange(ds.RasterXSize):
+    for j in range(ds.RasterXSize):
         lon = ds.GetGeoTransform()[0]+0.125 + ds.GetGeoTransform()[1]*j
         print('lon: {}, lat: {}'.format(lon,lat))
         t = temp[i,j,:]

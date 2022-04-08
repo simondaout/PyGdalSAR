@@ -67,7 +67,7 @@ kmax=len(dates)
 # cleanif 
 if os.path.exists(outputdir):
   # print ('{0}/{1}*{2}{3}.jpeg'.format(outputdir, prefix, suffix, rlook))
-  jpeg_files = glob.glob('{0}/*_coreg*.jpeg'.format(outputdir))
+  jpeg_files = glob.glob('{0}/*.jpeg'.format(outputdir))
   for f in jpeg_files:
     os.remove(f)
 else:
@@ -90,14 +90,14 @@ def poolcontext(*arg, **kargs):
 
 def dolook(kk):
   date = dates[kk]
-  infile = str(date) + '/'+ str(date)+ '_coreg_'+str(look)+'rlks.slc'
+  infile = str(date) + '/'+ str(date)+ '_'+str(look)+'rlks.slc'
 
   if os.path.exists(infile):
     pass
   else:
-    temp = str(date) + '/'+str(date)+ '_coreg.slc'
+    temp = str(date) + '/'+str(date)+ '.slc'
     r= run("length.pl "+str(temp))
-    r= run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
+    run("look.pl "+str(temp)+" "+str(alook)+" "+str(look)+" > log_look.txt")
 
 if look>1:
     work = [(kk) for kk in range(kmax)]
@@ -113,16 +113,17 @@ def preview(kk):
     successf = open(os.path.join(outputdir, "dates_success.txt"), "a")
     failf =  open(os.path.join(outputdir, "dates_problems.txt"), "a")
     date = dates[kk]
+
     try:
       if look>1:
-          infile = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.slc'
-          jpeg = str(date) + '/'+ str(date)+ '_coreg_'+str(alook)+'rlks.jpeg'
-	  r= run("length.pl "+str(infile))
+          infile = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.slc'
+          r= run("length.pl "+str(infile))
+          jpeg = str(date) + '/'+ str(date)+ '_'+str(alook)+'rlks.jpeg'
           r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg))
       else:
-          infile = str(date) + '/'+ str(date)+ '_coreg'+'.slc'
-	  r= run("length.pl "+str(infile))
-          jpeg = str(date) + '/'+ str(date)+ '_coreg'+'.jpeg'
+          infile = str(date) + '/'+ str(date)+ '.slc'
+          r= run("length.pl "+str(infile))
+          jpeg = str(date) + '/'+ str(date)+ '.jpeg'
           r = run("nsb_preview_slc "+str(infile)+" "+str(jpeg)+" -l 20 -p 0.25")
       if r != 0:
             raise Exception("nsb_preview_slc failed for date: ", infile)
@@ -140,7 +141,7 @@ with poolcontext(processes=nproc) as pool:
     results = pool.map(preview, work)
 
 # print ('{0}/int_*/{1}*{2}{3}.jpeg'.format(int_path, prefix, suffix, rlook))
-jpeg_files = glob.glob('*/*_coreg*.jpeg')
+jpeg_files = glob.glob('*/*.jpeg')
 print()
 print ('Move files into:', outputdir)
 for f in jpeg_files:

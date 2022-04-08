@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 
@@ -53,7 +53,7 @@ import math,sys,getopt
 from os import path, environ
 import os, glob
 
-import gdal
+from osgeo import gdal
 
 # plot
 import matplotlib
@@ -144,7 +144,7 @@ else:
 if arguments["--imref"] ==  None:
     imref = 0
 elif arguments["--imref"] < 1:
-    print '--imref must be between 1 and Nimages'
+    print('--imref must be between 1 and Nimages')
 else:
     imref = int(arguments["--imref"]) - 1
 
@@ -191,7 +191,7 @@ else:
 # lect cube
 cube = np.fromfile(cubef,dtype=np.float32)*rad2mm
 maps = cube.reshape((nlign,ncol,N))
-print 'Reshape cube: ', maps.shape
+print('Reshape cube: ', maps.shape)
 listplot = [maps[:,:,-1]] 
 titles = ['Depl. Cumul.']
 
@@ -248,7 +248,7 @@ postmaps=np.zeros((M,nlign,ncol))
 if len(postimes) == 0:
     postimes = np.ones((M))*-1
 
-for i in xrange(M):
+for i in range(M):
   cofile = glob.glob('cos{}_coeff.*'.format(i))
   for f in cofile:
     extension = os.path.splitext(f)[1]
@@ -260,7 +260,7 @@ for i in xrange(M):
     listplot.append(coseismaps[i,:,:])
     titles.append('Coseism.{}'.format(i))
 
-for i in xrange((M)):
+for i in range((M)):
   postfile = glob.glob('post{}_coeff.*'.format(i))
   if postimes[i] > 0:
     for f in postfile:
@@ -280,7 +280,7 @@ sse_car = sse[1::2]
 
 L = len(sse_times)
 ssemaps=np.zeros((M,nlign,ncol))
-for i in xrange(L):
+for i in range(L):
     try:
       ds = gdal.Open('sse{}_coeff.tif'.format(i), gdal.GA_ReadOnly)
       ssemaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()*rad2mm
@@ -293,7 +293,7 @@ for i in xrange(L):
 fig = plt.figure(0,figsize=(10,8))
 # fig.subplots_adjust(hspace=.001,wspace=0.001)
 
-for l in xrange(len(listplot)):
+for l in range(len(listplot)):
   ax = fig.add_subplot(2,int(len(listplot)/2)+1,l+1)
   if arguments["--bounds"] is not  None:
       vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
@@ -305,7 +305,7 @@ for l in xrange(len(listplot)):
   ax.scatter(ipix-istart,jpix-jstart,marker='x',color='black',s=15.)
   if iref is not None and jref is not None:
     ax.scatter(iref-istart,jref-jstart,marker='x',color='red',s=20.)
-  for i in xrange((Npix)):
+  for i in range((Npix)):
       ax.text(ipix[i]-istart,jpix[i]-jstart,i)
   ax.set_title(titles[l],fontsize=6)
   setp(ax.get_xticklabels(), visible=False)
@@ -344,7 +344,7 @@ def slowslip(time,to,tcar):
 fig = plt.figure(1,figsize=(12,8))
 
 
-for k in xrange(len(ipix)):
+for k in range(len(ipix)):
     i, j = ipix[k], jpix[k]
 
     ax = fig.add_subplot(Npix,1,k+1)
@@ -399,7 +399,7 @@ for k in xrange(len(ipix)):
     else:
         ref = refmap[j,i]
 
-    for l in xrange(len(cotimes)):
+    for l in range(len(cotimes)):
         if iref is not None:
             steps[l] = coseismaps[l,j,i] - coseismaps[l,jref,iref] 
             trans[l] =postmaps[l,j,i] - postmaps[l,jref,iref] 
@@ -407,7 +407,7 @@ for k in xrange(len(ipix)):
             steps[l] = coseismaps[l,j,i]
             trans[l] = postmaps[l,j,i]
    
-    for l in xrange(len(sse_times)):
+    for l in range(len(sse_times)):
       if iref is not None:
           sse[l] = ssemaps[l,j,i] - ssemaps[l,jref,iref] 
       else:
@@ -416,21 +416,21 @@ for k in xrange(len(ipix)):
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
     tdec = np.array([float(date.strftime('%Y')) + float(date.strftime('%j'))/365.1 for date in t])
    
-    # print
-    # print i,j 
-    # print  ref, lin, steps, trans
+    # print()
+    # print(i,j) 
+    # print(ref, lin, steps, trans)
 
     model = ref + linear(tdec,lin) + seasonal(tdec, a, b) 
-    for l in xrange((M)):
+    for l in range((M)):
         model = model + coseismic(tdec, cotimes[l], steps[l]) + \
         postseismic(tdec,cotimes[l],postimes[l],trans[l])
-    for l in xrange((L)):
+    for l in range((L)):
         model = model + sse[l]*slowslip(tdec,sse_times[l],sse_car[l])
 
-    # print i,j
-    # print coseismic(dates, cotimes[0], steps[0])
-    # print postseismic(dates, cotimes[0],postimes[0],trans[0])
-    # print 
+    # print(i,j)
+    # print(coseismic(dates, cotimes[0], steps[0]))
+    # print(postseismic(dates, cotimes[0],postimes[0],trans[0]))
+    # print() 
     if np.std(model) > 0:
         plt.plot(t,model,'-r')
 

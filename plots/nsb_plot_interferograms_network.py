@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 ##########################################################################
 #
 #   This file is part of NSBAS.
@@ -31,7 +31,7 @@ Options:
 
 """
 
-from __future__ import print_function
+
 
 import string, os
 from datetime import datetime
@@ -43,31 +43,38 @@ import matplotlib as mpl
 #else:
 #    mpl.use('pdf')
 
+from nsbas import docopt
+arguments = docopt.docopt(__doc__)
+if arguments["-o"]:
+   mpl.use('pdf')
+
 import matplotlib.pyplot as plt
 from matplotlib import dates
 from matplotlib.dates import date2num, num2date
 
-from nsbas import docopt, pydot
+try:
+    import pydot
+except ModuleNotFoundError as e:
+    from nsbas import pydot
 
-arguments = docopt.docopt(__doc__)
-
-fig = plt.figure()
+fig = plt.figure(figsize=(13,6))
 ax = fig.add_subplot(111)
 
 # Load graph from <pair_file> and <baseline_file>
 graph = pydot.Dot("interferogram_network", graph_type="digraph")
 for line in open(arguments["<baseline_file>"], "r"):
-    date, pbaseline, rest = string.split(line, None, 2)
+    lines = line.split()
+    date, pbaseline, rest = lines[0], lines[1], lines[2]
     graph.add_node(pydot.Node(date.strip(), label=date.strip(), bperp=float(pbaseline)))
 for line in open(arguments["<pair_file>"], "r"):
-    date1, date2 = string.split(line, None, 1)
+    date1, date2 = line.split()[0], line.split()[1]
     graph.add_edge(pydot.Edge(date1.strip(), date2.strip()))
 # Draw nodes
 x, y = [], []
 for n in graph.get_nodes():
     x.append(date2num(datetime.strptime(n.get_label(), "%Y%m%d")))
     y.append(float(n.get_attributes()["bperp"]))
-ax.plot(x, y, "bo", picker=5)
+ax.plot(x, y, "o", color='dodgerblue', mec='black', markersize=4, picker=5)
 # Draw arrows
 for edge in graph.get_edges():
     master = graph.get_node(edge.get_source())[0]
@@ -76,7 +83,7 @@ for edge in graph.get_edges():
     y = float(master.get_attributes()["bperp"])
     dx = date2num(datetime.strptime(slave.get_label(), "%Y%m%d")) - x
     dy = float(slave.get_attributes()["bperp"]) - y
-    ax.arrow(x, y, dx, dy)
+    ax.arrow(x, y, dx, dy, linewidth=.5, color='black', alpha=.5)
 # Register click usage to display date of nearest point
 def onpick(event):
     global ax, an
@@ -105,8 +112,8 @@ fig.canvas.mpl_connect("pick_event", onpick)
 fig.canvas.set_window_title("Interferogram network")
 fig.suptitle("Interferogram network")
 fig.autofmt_xdate()
-ax.set_xlabel("time")
-ax.set_ylabel("perpendicular baseline")
+ax.set_xlabel("Acquisition Date")
+ax.set_ylabel("Perpendicular Baseline (m)")
 ax.xaxis.set_major_formatter(dates.DateFormatter("%Y/%m/%d"))
 #plt.margins(0.1, 0.1)
 if arguments["-o"]:

@@ -46,7 +46,7 @@ Options:
 --lectfile=<path>    Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
 """
 
-import gdal
+from osgeo import gdal
 from osgeo import osr
 import sys,os
 import numpy as np
@@ -187,7 +187,7 @@ if arguments["--los"] ==  None:
     if arguments["--meanlos"] ==  None:
         look = 0
     else:
-        look = np.ones((nlines,ncol))*np.float(arguments["--meanlos"])
+        look = np.ones((nlines,ncol))*float(arguments["--meanlos"])
 else:
     losf = arguments["--los"]
     extension = os.path.splitext(losf)[1]
@@ -278,10 +278,10 @@ if load == 'no':
         # read .rsc
         nncol = np.int(open(rsc).readlines()[0].split(None, 2)[1])
         nnlines = np.int(open(rsc).readlines()[1].split(None, 2)[1])
-        xfirst = np.float(open(rsc).readlines()[6].split(None, 2)[1])
-        yfirst = np.float(open(rsc).readlines()[7].split(None, 2)[1])
-        xstep = np.float(open(rsc).readlines()[8].split(None, 2)[1])
-        ystep = np.float(open(rsc).readlines()[9].split(None, 2)[1])
+        xfirst = float(open(rsc).readlines()[6].split(None, 2)[1])
+        yfirst = float(open(rsc).readlines()[7].split(None, 2)[1])
+        xstep = float(open(rsc).readlines()[8].split(None, 2)[1])
+        ystep = float(open(rsc).readlines()[9].split(None, 2)[1])
         geotransform = (xfirst, xstep, 0, yfirst, 0, ystep)
         logger.info('Read .rsc and set Geotransform: {}'.format(geotransform))
         ztd_ = np.fromfile(infile, dtype='float32').reshape(nnlines,nncol)
@@ -402,7 +402,7 @@ for l in range((N)):
   else:
 
     _los_map = np.copy(data)
-    _los_map[np.logical_or(data==0,data>=9990)] = np.float('NaN')
+    _los_map[np.logical_or(data==0,data>=9990)] = float('NaN')
     losmin,losmax = np.nanpercentile(_los_map,2.),np.nanpercentile(_los_map,98.)
     gacosmin,gacosmax = np.nanpercentile(model,2),np.nanpercentile(model,98)
     del _los_map
@@ -413,7 +413,7 @@ for l in range((N)):
         maxtopo,mintopo = 1e8, -1e8
 
     # index = np.nonzero(data>2)
-    # data[index] = np.float('NaN')
+    # data[index] = float('NaN')
     # plt.imshow(data)
     # plt.show()
     # sys.exit()
@@ -537,7 +537,7 @@ for l in range((N)):
 
         remove_ramp = np.ones((nlines,ncol))*cst
         remove_ramp[model==0.] = 0.
-        remove_ramp[np.isnan(data)] = np.float('NaN')
+        remove_ramp[np.isnan(data)] = float('NaN')
         
         # data = gacos + cst
         remove = remove_ramp + model
@@ -582,7 +582,7 @@ for l in range((N)):
         # compute ramp
         remove_ramp = np.dot(G,pars).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
-        remove_ramp[np.isnan(data)] = np.float('NaN')
+        remove_ramp[np.isnan(data)] = float('NaN')
         
         # data = gacos + (a*rg + b*az + cst) 
         remove = model + remove_ramp
@@ -619,13 +619,13 @@ for l in range((N)):
         # data = a*gacos + ramp
         remove = np.dot(G,pars).reshape(nlines,ncol)
         remove[model==0.] = 0.
-        remove[np.isnan(data)] = np.float('NaN')
+        remove[np.isnan(data)] = float('NaN')
 
         # ramp only
         remove_ramp = np.ones((nlines,ncol))*a
         remove_ramp = np.dot(G[:,:-1],pars[:-1]).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
-        remove_ramp[np.isnan(data)] = np.float('NaN')
+        remove_ramp[np.isnan(data)] = float('NaN')
    
       elif arguments["--ramp"] == "lin": 
         # invers both clean data and ref frame together
@@ -666,20 +666,20 @@ for l in range((N)):
         # data = a*gacos + ramp
         remove = np.dot(G,pars).reshape(nlines,ncol)
         remove[model==0.] = 0.
-        remove[np.isnan(data)] = np.float('NaN')
+        remove[np.isnan(data)] = float('NaN')
 
         # ramp only
         remove_ramp = np.dot(G[:,:-1],pars[:-1]).reshape(nlines,ncol)
         remove_ramp[model==0.] = 0.
-        remove_ramp[np.isnan(data)] = np.float('NaN')
+        remove_ramp[np.isnan(data)] = float('NaN')
    
     ###################
     ### Aply correction
 
     # data_flat = data - (coef_model*model + remove_ramp)    
     data_flat[:,:] = data - remove
-    data_flat[np.isnan(data)] = np.float('NaN')
-    data_flat[data_flat>999.]= np.float('NaN')
+    data_flat[np.isnan(data)] = float('NaN')
+    data_flat[data_flat>999.]= float('NaN')
     # model_flat = coef_model*model + remove_ramp
     model_flat[:,:,l] = coef_model*gacos[:,:,l] + remove_ramp
  
@@ -692,8 +692,8 @@ for l in range((N)):
         logger.info('Ref area set to zero: lines: {0}-{1}, cols: {2}-{3}'.format(refline_beg,refline_end,refcol_beg,refcol_end))
         logger.info('Average phase within ref area: {0}'.format(cst))
         data_flat = data_flat - cst
-        data_flat[np.isnan(data)] = np.float('NaN')
-        data_flat[data_flat>999.]= np.float('NaN')
+        data_flat[np.isnan(data)] = float('NaN')
+        data_flat[data_flat>999.]= float('NaN')
     
     # compute variance flatten data
     # var[l] = np.sqrt(np.nanmean(data_flat**2))

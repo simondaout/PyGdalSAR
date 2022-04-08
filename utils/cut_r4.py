@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -72,9 +72,9 @@ else:
 # Program
 fid = open(infile, 'r')
 m = np.fromfile(fid,dtype=np.float32)   
-print len(m)/ncol
+print(len(m)/ncol)
 map = m[:nlign*ncol].reshape((nlign,ncol)) 
-print ibeg,iend,jbeg,jend
+print(ibeg,iend,jbeg,jend)
 cutmap = as_strided(map[ibeg:iend,jbeg:jend])
 
 # save output
@@ -85,7 +85,7 @@ cutmap.flatten().astype('float32').tofile(fid2)
 kk = flatnonzero(m==0)
 m[kk] = float('NaN')
 
-#print np.mean(m), np.percentile(abs(m),98)
+#print(np.mean(m), np.percentile(abs(m),98))
 #vmax=1
 #vmin=0
 vmax = np.nanmean(cutmap) + 2*np.nanstd(cutmap)

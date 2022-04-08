@@ -6,15 +6,15 @@
 # written in Python-Gdal
 #
 ############################################
-# Author        : Simon DAOUT (Oxford)
+# Author        : Simon DAOUT 
 ############################################
 
 """\
-cut_unw.py
+cut_int.py
 -------------
-Cut unw file 
+Cut int file 
 
-Usage: cut_unw.py --infile=<path> --outfile=<path> --plot=<yes/no> [<ibeg>] [<iend>] [<jbeg>] [<jend>]
+Usage: cut_int.py --infile=<path> --outfile=<path> --plot=<yes/no> [<ibeg>] [<iend>] [<jbeg>] [<jend>]
 
 Options:
 -h --help           Show this screen.
@@ -48,41 +48,35 @@ import docopt
 arguments = docopt.docopt(__doc__)
 infile = arguments["--infile"]
 outfile = arguments["--outfile"]
-plot = arguments["--plot"]
+if arguments["--plot"] ==  None:
+    plot = 'no'
+else:
+    plot = arguments["--plot"]
 
 gdal.UseExceptions()
-# Open dataset (image)
+# Open phiset (image)
 ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 
 # Ok, assume this is a roipac image, so we can rely on the file extension
-# to know how to display the data (in the real world, we would probably write
+# to know how to display the phi (in the real world, we would probably write
 # different programs)
 ds_extension = os.path.splitext(infile)[1]
 
-# Get the band that have the data we want
+# Get the band that have the phi we want
 ds_band1 = ds.GetRasterBand(1)
-ds_band2 = ds.GetRasterBand(2)
 
 # Attributes
 print("> Driver:   ", ds.GetDriver().ShortName)
 print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
-print("> Datatype: ", gdal.GetDataTypeName(ds_band2.DataType))
+print("> Datatype: ", gdal.GetDataTypeName(ds_band1.DataType))
 
-# Read data in numpy array, resampled by a factor of 4
+# Read phi in numpy array, resampled by a factor of 4
 #   Resampling is nearest neighbour with that function: hardly acceptable,
 #   but easy for a simple demo!
-amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-data = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+pha = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+amp = np.absolute(pha)
+phi = np.angle(pha)
 nlign,ncol = ds.RasterYSize, ds.RasterXSize
-
-# Close dataset (if this was a new image, it would be written at this moment)
-# This will free memory for the display stuff
-try:
-    del ds
-    print('... waiting ...')
-    time.sleep(0.5)
-except:
-    sys.exit(1)
 
 if arguments["<ibeg>"] ==  None:
     ibeg = 0
@@ -103,57 +97,46 @@ else:
 
 # cut
 cutamp = np.copy(amp)
-cutamp[0:ibeg] = 0
-cutamp[iend:nlign] = 0
-cutamp[0:jbeg] = 0
-cutamp[jend:ncol] = 0
+cutamp[0:ibeg,:] = 0.
+cutamp[iend:nlign,:] = 0.
+cutamp[:,0:jbeg] = 0.
+cutamp[:,jend:ncol] = 0.
     
-cutdata = np.copy(data)
-cutdata[0:ibeg] = 0
-cutdata[iend:nlign] = 0
-cutdata[0:jbeg] = 0
-cutdata[jend:ncol] = 0
-
 # create new GDAL imaga
-# recupérer driver ROI_PAC
 drv = gdal.GetDriverByName("roi_pac")
-# Creer l'image, avec le chemin, largeur, hauteur
-dst_ds = drv.Create(outfile, ncol, nlign, 2, gdal.GDT_Float32)
-# Sortir les 2 bandes (float)
+dst_ds = drv.CreateCopy(outfile, ds)
 dst_band1 = dst_ds.GetRasterBand(1)
-dst_band2 = dst_ds.GetRasterBand(2)
 
 # write in the output file 
-# dst_band2.WriteArray(array2, 0, y) pour ajouter une ligne
-# dst_band1.WriteArray(data, 0, 0) pour ajouter un tableau 2d
-dst_band1.WriteArray(cutamp,0,0)
-dst_band2.WriteArray(cutdata,0,0)
+cutout = cutamp * exp(1j*phi)
+dst_band1.WriteArray(cutout,0,0)
 
 # close image
 del dst_ds
-
-# save output
-#fid2 = open(outfile,'wb')
-#cutdata.flatten().astype('f4').tofile(fid2)
+del ds
 
 if plot=="yes":
-    #ax.imshow(data, cm.gist_rainbow, vmax=np.percentile(data, 98))
-    vmax = np.percentile(data, 98)
     # Plot
     fig = plt.figure(0,figsize=(8,9))
     ax = fig.add_subplot(1,2,1)
-    cax = ax.imshow(data,cmap=cm.gist_rainbow,vmax=vmax)
-    ax.set_title(infile)
-    setp( ax.get_xticklabels(), visible=False)
+    hax = ax.imshow(amp,cmap=cm.Greys_r,vmin=0, vmax=1)
+    
+    # mask for plot 
+    phi[phi==0] = float('NaN')
+    masked_array = np.ma.array(phi, mask=np.isnan(phi))
+    cax = ax.imshow(masked_array,cmap=cm.gist_rainbow,alpha=.8,interpolation='nearest')
+    ax.set_title('In Phase')
 
     ax = fig.add_subplot(1,2,2)
-    cax = ax.imshow(cutdata,cmap=cm.gist_rainbow,vmax=vmax)
-    ax.set_title(outfile)
-    setp( ax.get_xticklabels(), visible=False)
+    hax = ax.imshow(np.absolute(cutout),cmap=cm.Greys_r,vmin=0, vmax=1)
+    phi = np.angle(cutout)
+    phi[cutamp==0] = float('NaN')
+    masked_array = np.ma.array(phi, mask=np.isnan(phi))
+    cax = ax.imshow(masked_array,cmap=cm.gist_rainbow,alpha=.8,interpolation='nearest')
+    ax.set_title('Cut Phase')
 
-    cbar = fig.colorbar(cax, orientation='vertical',aspect=5)
+    #cbar = fig.colorbar(cax, orientation='vertical',aspect=5)
 
-
-    # Display the data
+    # Display the phi
     fig.canvas.set_window_title(sys.argv[1])
     plt.show()

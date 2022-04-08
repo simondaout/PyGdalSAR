@@ -14,16 +14,18 @@ check_event.py
 -------------
 Check for event date in YYYYMMDD format in a list of ifgs
 
-Usage: check_event.py --int_list=<file> --date=<value> --out_list=<file> 
+Usage: check_event.py --int_list=<file> --date=<value> --out_list=<file> [--date_max=<value>] [--date_min=<value>] 
 
 Options:
 -h --help           Show this screen.
 --int_list=<file>   Text file containing list of interferograms dates in two colums, $data1 $date2
 --date=<value>      Event date in YYYYMMDD format
 --out_list=<file>    Output list name containing event 
+--date_max=<value>   Date limit maximal in YYYYMMDD format
+--date_min=<value>   Date limit minimal in YYYYMMDD format
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import warnings, sys
@@ -52,6 +54,14 @@ def date2dec(dates):
 
 # convert event date to dec
 event=date2dec(date)
+if arguments["--date_max"] !=  None:
+    date_max =  date2dec(arguments["--date_max"])
+else:
+    date_max = [1.e9] 
+if arguments["--date_min"] !=  None:
+    date_min =  date2dec(arguments["--date_min"])
+else:
+    date_min = [1.]
 
 print('----------------------------------')
 print('Check interferograms list:', int_list)
@@ -66,7 +76,7 @@ wf = open(ListInterfero, 'w')
 for j in range(Nifg):
         date1 = date2dec(date_1[j])
         date2 = date2dec(date_2[j])
-        if (event>date1) and (event<date2):
+        if (((event>date1) and (event<date2)) and (date2<date_max)) and (date1>date_min):
             print(date_1[j], date_2[j])
             wf.write("%i  %i\n" % (date_1[j], date_2[j]))
 wf.close()

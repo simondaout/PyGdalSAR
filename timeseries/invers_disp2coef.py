@@ -521,7 +521,7 @@ cube = as_strided(cubei[:nlines*ncol*N])
 logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
 kk = np.flatnonzero(cube>9990)
 cube[kk] = float('NaN')
-maps_temp = cube.reshape((nlines,ncol,N))
+maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
 
 # set at NaN zero values for all dates
 # kk = np.nonzero(maps_temp[:,:,-1]==0)
@@ -530,7 +530,7 @@ for l in range((N)):
     maps_temp[:,:,l] = maps_temp[:,:,l] - cst
     if l != imref:
         index = np.nonzero(maps_temp[:,:,l]==0.0)
-        maps_temp[:,:,l][index] = np.float('NaN')
+        maps_temp[:,:,l][index] = float('NaN')
 
 N=len(dates)
 maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
@@ -567,11 +567,11 @@ if arguments["--mask"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--mask"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      maski = band.ReadAsArray().flatten()*np.float(arguments["--scale_mask"])
+      maski = band.ReadAsArray().flatten()*float(arguments["--scale_mask"])
       del ds
     else:
       fid = open(arguments["--mask"],'r')
-      maski = np.fromfile(fid,dtype=np.float32)*np.float(arguments["--scale_mask"])
+      maski = np.fromfile(fid,dtype=np.float32)*float(arguments["--scale_mask"])
       fid.close()
     mask = maski.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     maski = mask.flatten()
@@ -697,7 +697,7 @@ if arguments["--mask"] is not None:
         logger.info('Flatten mask...')
         temp = [(i,j) for i in range(iend_emp-ibeg_emp) for j in range(jend_emp-jbeg_emp) \
         if np.logical_and((math.isnan(los_temp[i*(jend_emp-jbeg_emp)+j]) is False), \
-            (los_temp[i*(jend_emp-jbeg_emp)+j]>np.float(arguments["--threshold_mask"])))]
+            (los_temp[i*(jend_emp-jbeg_emp)+j]>float(arguments["--threshold_mask"])))]
 
         temp2 = np.array(temp)
         x = temp2[:,0]; y = temp2[:,1]
@@ -734,19 +734,19 @@ if arguments["--mask"] is not None:
     del maski
 
     # check seuil
-    kk = np.flatnonzero(mask_flat<np.float(arguments["--threshold_mask"]))
+    kk = np.flatnonzero(mask_flat<float(arguments["--threshold_mask"]))
     mask_flat_clean=np.copy(mask_flat.flatten())
     mask_flat_clean[kk]=float('NaN')
     mask_flat_clean = mask_flat_clean.reshape(new_lines,new_cols)
 
     # mask maps if necessary for temporal inversion
     if arguments["--tempmask"]=='yes':
-        kk = np.nonzero(np.logical_or(mask_flat<np.float(arguments["--threshold_mask"]),
+        kk = np.nonzero(np.logical_or(mask_flat<float(arguments["--threshold_mask"]),
           np.isnan(mask_flat)))
         for l in range((N)):
             # clean only selected area
             d = as_strided(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,l])
-            d[kk] = np.float('NaN')
+            d[kk] = float('NaN')
 
     # plots
     nfigure+=1
@@ -948,11 +948,11 @@ for i in range((Mker)):
 
 # initialize matrix model to NaN
 for l in range((Mbasis)):
-    basis[l].m = np.ones((new_lines,new_cols))*np.float('NaN')
-    basis[l].sigmam = np.ones((new_lines,new_cols))*np.float('NaN')
+    basis[l].m = np.ones((new_lines,new_cols))*float('NaN')
+    basis[l].sigmam = np.ones((new_lines,new_cols))*float('NaN')
 for l in range((Mker)):
-    kernels[l].m = np.ones((new_lines,new_cols))*np.float('NaN')
-    kernels[l].sigmam = np.ones((new_lines,new_cols))*np.float('NaN')
+    kernels[l].m = np.ones((new_lines,new_cols))*float('NaN')
+    kernels[l].sigmam = np.ones((new_lines,new_cols))*float('NaN')
 
 # initialize qual
 if apsf=='no':
@@ -1026,7 +1026,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-          bounds=zip(mmin,mmax)
+          bounds=list(zip(mmin,mmax))
         
         else:
           minit=invSVD(A,b,cond)
@@ -3212,9 +3212,11 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
-      # flata = (los - np.dot(G,pars)).reshape(new_lines,new_cols)
       flata = los.reshape(new_lines,new_cols) - ramp - topo
-
+      try:
+         del G; del los
+      except:
+         pass
       return ramp, flata, topo, rms
  
 def empirical_cor(l):
@@ -3233,7 +3235,7 @@ def empirical_cor(l):
     maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
     logger.debug('Set Max-Min LOS for empirical estimation: {0}-{1}'.format(maxlos,minlos))
     kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-    maps_temp[kk] = np.float('NaN')
+    maps_temp[kk] = float('NaN')
 
     itemp = ibeg_emp
     for lign in range(ibeg_emp,iend_emp,10):
@@ -3253,7 +3255,7 @@ def empirical_cor(l):
     # selection pixels
     index = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
-            np.logical_and(mask_flat>np.float(arguments["--threshold_mask"]),
+            np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
             np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
@@ -3284,7 +3286,7 @@ def empirical_cor(l):
     if len(los_clean) < 1:
       logger.critical('No points left for empirical estimation. Exit!')
       logger.critical('threshold RMS: {0}, threshold Mask: {1}, Min-Max LOS: {2}-{3}, Min-Max topo: {4}-{5}, lines: {6}-{7}, \
-        cols: {8}- {9}'.format(float(arguments["--threshold_rms"]),np.float(arguments["--threshold_mask"]),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
+        cols: {8}- {9}'.format(float(arguments["--threshold_rms"]),float(arguments["--threshold_mask"]),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
       sys.exit()
 
     # print itemp, iend_emp
@@ -3313,7 +3315,7 @@ def empirical_cor(l):
       # try:
         indexref = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
-            np.logical_and(mask_flat>np.float(arguments["--threshold_mask"]),
+            np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
             np.logical_and(~np.isnan(maps_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
@@ -3328,6 +3330,10 @@ def empirical_cor(l):
                 ))))))))))))
                 ))
         
+        if len(indexref[0]) == 0:
+             logger.warning('Ref zone is empty! Re-define --ref_zone argument. Exit!')
+             sys.exit()
+
         ## Set data minus temporal model to zero in the ref area
         zone = as_strided(map_flata[:,:] - models[:,:,l])
         los_ref2 = zone[indexref].flatten()
@@ -3432,7 +3438,6 @@ models = np.zeros((new_lines,new_cols,N))
 # prepare flatten maps
 maps_ramp = np.zeros((new_lines,new_cols,N))
 maps_topo = np.zeros((new_lines,new_cols,N))
-rms = np.zeros((N))
 
 for ii in range(np.int(arguments["--niter"])):
     print()
@@ -3444,6 +3449,7 @@ for ii in range(np.int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
+    rms = np.zeros((N))
     pix_az, pix_rg = np.indices((new_lines,new_cols))
     # if radar file just initialise figure
     if arguments["--topofile"] is not None:
@@ -3605,7 +3611,7 @@ for ii in range(np.int(arguments["--niter"])):
     # aps = np.sqrt(abs(aps/n_aps))
 
     # remove low aps to avoid over-fitting in next iter
-    minaps= np.nanpercentile(aps,2)
+    inaps= np.nanpercentile(aps,2)
     index = np.flatnonzero(aps<minaps)
     aps[index] = minaps
 
@@ -3619,14 +3625,89 @@ for ii in range(np.int(arguments["--niter"])):
     inaps = np.copy(aps)
 
 #######################################################
+# Save functions in binary file
+#######################################################
+
+if arguments["--geotiff"] is not None:
+    for l in range((Mbasis)):
+        outname = '{}_coeff.tif'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(basis[l].m)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+        outname = '{}_sigcoeff.tif'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(basis[l].sigmam)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+    for l in range((Mker)):
+        outname = '{}_coeff.tif'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(kernels[l].m)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+        outname = '{}_sigcoeff.tif'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(kernels[l].sigmam)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+else:
+    for l in range((Mbasis)):
+        outname = '{}_coeff.r4'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open(outname, 'wb')
+        basis[l].m.flatten().astype('float32').tofile(fid)
+        fid.close()
+        outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open(outname, 'wb')
+        basis[l].sigmam.flatten().astype('float32').tofile(fid)
+        fid.close()
+    for l in range((Mker)):
+        outname = '{}_coeff.r4'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
+        kernels[l].m.flatten().astype('float32').tofile(fid)
+        fid.close()
+        outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
+        logger.info('Save: {}'.format(outname))
+        fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
+        kernels[l].sigmam.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+
+
+#######################################################
 # Save new cubes
 #######################################################
 
 # create new cube
-logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-fid = open('depl_cumule_flat', 'wb')
-maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
-fid.close()
+#if flat>0:
+#  del cubei
+#  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
+#  fid = open('depl_cumule_flat', 'wb')
+#  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
+#  fid.close()
 
 if arguments["--fulloutput"]=='yes':
     if (arguments["--seasonal"] =='yes'):
@@ -3811,78 +3892,6 @@ plt.close('all')
 
 # clean memory
 del maps_ramp, maps_flata, maps_topo
-
-#######################################################
-# Save functions in binary file
-#######################################################
-
-if arguments["--geotiff"] is not None:
-    for l in range((Mbasis)):
-        outname = '{}_coeff.tif'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(basis[l].m)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-        outname = '{}_sigcoeff.tif'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(basis[l].sigmam)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-    for l in range((Mker)):
-        outname = '{}_coeff.tif'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(kernels[l].m)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-        outname = '{}_sigcoeff.tif'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        ds = driver.Create(outname, new_cols, new_lines, 1, gdal.GDT_Float32)
-        band = ds.GetRasterBand(1)
-        band.WriteArray(kernels[l].sigmam)
-        ds.SetGeoTransform(gt)
-        ds.SetProjection(proj)
-        band.FlushCache()
-        del ds
-
-else:
-    for l in range((Mbasis)):
-        outname = '{}_coeff.r4'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open(outname, 'wb')
-        basis[l].m.flatten().astype('float32').tofile(fid)
-        fid.close()
-        outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open(outname, 'wb')
-        basis[l].sigmam.flatten().astype('float32').tofile(fid)
-        fid.close()
-    for l in range((Mker)):
-        outname = '{}_coeff.r4'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].m.flatten().astype('float32').tofile(fid)
-        fid.close()
-        outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
-        logger.info('Save: {}'.format(outname))
-        fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].sigmam.flatten().astype('float32').tofile(fid)
-        fid.close()
-
 
 #######################################################
 # Compute Amplitude and phase seasonal

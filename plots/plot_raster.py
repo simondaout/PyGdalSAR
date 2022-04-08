@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -41,11 +41,10 @@ Options:
 --tile=<value>        Title plot 
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
---ncols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
---nliness VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
+--cols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
+--lines VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
 """
 
-from __future__ import print_function
 import os, sys
 
 # docopt (command line parser)
@@ -93,18 +92,20 @@ else:
 if arguments["--rad2mm"] ==  None:
         rad2mm = 1
 else:
-        rad2mm = np.float(arguments["--rad2mm"])
+        rad2mm = float(arguments["--rad2mm"])
 
 if (arguments["--cols"] is not None and arguments["--lines"] is not None):
-    ipix = map(int,arguments["--cols"].replace(',',' ').split())
-    jpix = map(int,arguments["--lines"].replace(',',' ').split())
+    ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
+    jpix = list(map(int,arguments["--lines"].replace(',',' ').split()))
     if len(jpix) != len(ipix):
       raise Exception("ncols and nlines lists are not the same size")
 
 ds_extension = os.path.splitext(infile)[1]
+if (ds_extension == ".tif" or ds_extension ==".tiff"):
+     sformat = 'GTIFF'
 
 if sformat == "ROI_PAC": 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     if (ds_extension == ".unw" or ds_extension ==".hgt"):
         phase_band = ds.GetRasterBand(2)
         amp_band = ds.GetRasterBand(1)
@@ -115,7 +116,7 @@ if sformat == "ROI_PAC":
         nlines, ncols = ds.RasterYSize, ds.RasterXSize
     elif (ds_extension == ".r4" or ds_extension == ""):
         fid = open(infile, 'r')
-        ncols, nlines = map(int, open(lecfile).readline().split(None, 2)[0:2])
+        ncols, nlines = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
         phi = np.fromfile(fid,dtype=np.float32)[:nlines*ncols].reshape((nlines,ncols))
         print("> Driver:   REAL4  band file")
         print("> Size:     ", ncols,'x',nlines,'x')
@@ -138,7 +139,7 @@ elif sformat == "GTIFF":
     nlines, ncols = ds.RasterYSize, ds.RasterXSize
 
 elif sformat == 'GAMMA':
-    import gamma as gm
+    from parsers import gamma as gm
     if ds_extension == ".diff":
         if arguments["--parfile"] !=  None:
             par_file =  arguments["--parfile"]
@@ -177,7 +178,7 @@ if arguments["--crop"] ==  None:
         jend = int(arguments["<jend>"])
     crop = [0,jend,0,iend]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # Initialize a matplotlib figure
@@ -198,7 +199,7 @@ if sformat == "ROI_PAC":
         cutamp = as_strided(amp[ibeg:iend,jbeg:jend])
 
         # Unwrapped inteferogram
-        hax = ax.imshow(cutamp, cm.Greys,vmax=np.percentile(cutamp, 95))
+        hax = ax.imshow(cutamp, cm.Greys_r,vmin=0, vmax=np.percentile(cutamp, 90))
         divider = make_axes_locatable(ax)
         c = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(hax, cax=c)
@@ -223,7 +224,7 @@ if sformat == "ROI_PAC":
             # Wrapped interferogram, display computed phase
             cutamp = np.absolute(cutphi)
             cutphi = np.angle(cutphi)
-            hax = ax.imshow(cutamp, cm.Greys_r)
+            hax = ax.imshow(cutamp, cm.Greys_r, vmin=0, vmax=np.percentile(cutamp, 90))
             divider = make_axes_locatable(ax)
             c = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(hax, cax=c)
@@ -252,22 +253,24 @@ if arguments["--wrap"] is not None:
     vmin = -vmax
 elif (arguments["--vmax"] is not None) or (arguments["--vmin"] is not None):
     if arguments["--vmax"] is not  None:
-        vmax = np.float(arguments["--vmax"])
+        vmax = float(arguments["--vmax"])
         if arguments["--vmin"] is not  None:
-          vmin = np.float(arguments["--vmin"])
+          vmin = float(arguments["--vmin"])
         else:
           vmin = -vmax
 else:
+    #print(np.nanmax(cutphi),np.nanmin(cutphi))
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
 
 
 
 # replace 0 by nan
-cutphi[cutphi==0] = np.float('NaN')
+cutphi[cutphi==0] = float('NaN')
 masked_array = np.ma.array(cutphi, mask=np.isnan(cutphi))
 
 cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
+#cax = ax.imshow(masked_array, cmap, interpolation='none',vmax=vmax,vmin=vmin)
 divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)

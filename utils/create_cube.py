@@ -1,9 +1,10 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from os import environ
 import numpy as np
-import gdal, sys
+from osgeo import gdal
+import sys
 import matplotlib.pyplot as plt
 import subprocess
 
@@ -40,12 +41,12 @@ for d in idates:
     infile = '{}_mdel_{}rlks.unw'.format(d,inlook)
     run("look.pl "+str(infile)+" "+str(rlook))
     infile = '{}_mdel_{}rlks.unw'.format(d,outlook)
-    ds = gdal.Open(infile,gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile,allowed_drivers=["ROI_PAC"])
     band = ds.GetRasterBand(2)
     print("> Driver:   ", ds.GetDriver().ShortName)
     print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
     print("> Datatype: ", gdal.GetDataTypeName(band.DataType))
-    print
+    print()
     phi = band.ReadAsArray() 
     maps[:,:,i] = phi[:nlign,:ncol]
     plt.imshow(maps[:,:,i])

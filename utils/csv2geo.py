@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ############################################
@@ -24,7 +24,7 @@ Options:
 --ref_file=<file>   ref raster file
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import os, sys
@@ -101,7 +101,7 @@ for (lat,lon,i,j) in zip(lats.flatten(),lons.flatten(),pix_lin.flatten(),pix_col
          print('Processing line: {}'.format(i))
 
      # initialisation
-     m = np.float('NaN')
+     m = float('NaN')
      lat_min,lat_max = lat + ds_geo[5], lat
      lon_min,lon_max = lon, lon + ds_geo[1]
      #print(i,j) 

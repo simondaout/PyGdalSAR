@@ -37,7 +37,8 @@ Options:
 """
 
 # gdal
-import gdal,osr
+from osgeo import gdal
+import osr
 gdal.UseExceptions()
 import os
 # numpy
@@ -72,7 +73,7 @@ else:
 if arguments["--coeff"] is  None:
   vel2disp=1
 else:
-  vel2disp=np.float(arguments["--coeff"])
+  vel2disp=float(arguments["--coeff"])
 
 if arguments["--plot"] ==  None:
     plot = 'yes'
@@ -88,12 +89,12 @@ ds_extension = os.path.splitext(infile)[1]
 # print(ds_extension)  
 
 if ds_extension == ".unw":
-  ds = gdal.Open(infile, gdal.GA_ReadOnly)
+  ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
   ds_band1 = ds.GetRasterBand(1)
   ds_band2 = ds.GetRasterBand(2)
   los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm*vel2disp
   amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-  los[amp==0] = np.float('NaN')
+  los[amp==0] = float('NaN')
 
 if (ds_extension == ".tif") or (ds_extension == ".tiff"):
   ds = gdal.Open(infile, gdal.GA_ReadOnly)
@@ -107,7 +108,7 @@ print('Read infile:', infile)
 pix_az, pix_rg = np.indices((ds.RasterYSize,ds.RasterXSize))
 lat,lon = ds_geo[3]+ds_geo[5]*pix_az, ds_geo[0]+ds_geo[1]*pix_rg
 minx,maxx,maxy,miny = ds_geo[0], ds_geo[0]+ ds_geo[1]*ds.RasterXSize, ds_geo[3], ds_geo[3]+ds_geo[5]*ds.RasterYSize  
-print(minx,maxx,miny,maxy)
+print('Original coordinates:', miny,maxy,minx,maxx)
 # # print lat
 # sys.exit()
 
@@ -116,21 +117,21 @@ if arguments["--geocrop"] is not  None:
     latbeg,latend,lonbeg,lonend = float(geocrop[0]),float(geocrop[1]),float(geocrop[2]),float(geocrop[3])
 else:
     latbeg,latend,lonbeg,lonend = miny,maxy,minx,maxx
-print(latbeg,latend,lonbeg,lonend)
+print('Cooridnates plot:', latbeg,latend,lonbeg,lonend)
 
-los[los==0.]=np.float('NaN')
+los[los==0.]=float('NaN')
 kk = np.nonzero(np.logical_or(np.logical_or(~np.isnan(los), np.abs(los)<999.),los==0.0))
 mprim = los[kk]
 
 if arguments["--vmax"] ==  None:
   vmax = np.nanpercentile(mprim, 90)
 else:
-  vmax = np.float(arguments["--vmax"])
+  vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
   vmin = np.nanpercentile(mprim, 10)
 else:
-  vmin = np.float(arguments["--vmin"])
+  vmin = float(arguments["--vmin"])
 
 if arguments["--wrap"] is not None: 
   los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
@@ -175,7 +176,7 @@ m = Basemap(
 # m.drawmeridians(np.linspace(lonbeg,lonend,3),linewidth=0.25,zorder=1)
 # m.drawparallels(np.linspace(latbeg,latend,3),labels=[1,0,0,0],dashes=[6,900],zorder=1)
 # m.drawmeridians(np.linspace(lonbeg,lonend,3),labels=[0,0,0,1],dashes=[6,900],zorder=1)
-m.fillcontinents(color='white',lake_color='lightblue',zorder=2)
+#m.fillcontinents(color='white',lake_color='lightblue',zorder=2)
 
 if arguments["--dem"] is not None:
    ds2 = gdal.Open(arguments["--dem"], gdal.GA_ReadOnly)
@@ -191,22 +192,26 @@ if arguments["--dem"] is not None:
    hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
     vmax=255,vmin=1,zorder=3)
 else:
+   #pass
    m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=0)
-   # hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
-   #  vmax=4500,vmin=2000,alpha=1.,zorder=1)
+   hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
+   vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
+#cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
+#     vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4,interpolation='nearest')
+     vmax=vmax,vmin=vmin, zorder=4)
 
-if arguments["--shapefile"] is not None and os.exists(arguments["--shapefile"]):
+if arguments["--shapefile"] is not None and os.path.exists(arguments["--shapefile"]):
     sf = shp.Reader(arguments["--shapefile"])
     for shape in sf.shapeRecords():
         x = [i[0] for i in shape.shape.points[:]]
         y = [i[1] for i in shape.shape.points[:]]
-        ax.plot(x,y,color='black',alpha=0.5,zorder=3)
+        ax.plot(x,y,color='black',linewidth=2.,alpha=0.8,zorder=5)
 
-
-ax.set_title(basename,fontsize=6)
+ax.set_xlim([lonbeg,lonend])
+ax.set_ylim([latbeg,latend])
+#ax.set_title(basename,fontsize=6)
 ax.set_xticks(np.linspace(lonbeg,lonend,3))
 ax.set_yticks(np.linspace(latbeg,latend,3))
 
@@ -215,7 +220,7 @@ if arguments["--outfile"] ==  None:
 else:
     outfile = arguments["--outfile"]+'.pdf'
 del ds, ds_band1
-# fig.tight_layout()
+#fig.tight_layout()
 plt.suptitle(outfile)
 try:
   divider = make_axes_locatable(ax)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -16,7 +16,7 @@ Clean a r4 file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
 [--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
-[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>]
+[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--reverse=<yes/no>]
 
 Options:
 -h --help           Show this screen.
@@ -24,6 +24,7 @@ Options:
 --outfile PATH      output file
 --mask PATH         r4 file used as mask
 --threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
+--reverse yes/no    if yes mask values above mask threshold (default: no)
 --scale VALUE       scale data [default:1]
 --scale_mask VALUE  scale the mask [default:1]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
@@ -102,14 +103,18 @@ elif arguments["--ramp"] == 'yes':
 else:
     print('ramp argument not recognized. Exit!')
     sys.exit()
+if arguments["--reverse"] == 'yes':
+   reverse = True
+else:
+   reverse = False
 
 # read lect.in 
-ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
+ncol, nlign = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
 
 if arguments["--ref"] == None:
     lin_start, lin_jend, col_start, col_jend = None,None,None,None
 else:
-    ref = map(int,arguments["--ref"].replace(',',' ').split())
+    ref = list(map(int,arguments["--ref"].replace(',',' ').split()))
     try:
         lin_start,lin_end, col_start, col_end = ref[0], ref[1], ref[2], ref[3]
     except:
@@ -117,26 +122,29 @@ else:
         col_start, col_end = 0, ncol
 
 fid = open(infile, 'r')
-m = np.fromfile(fid,dtype=np.float32).reshape((nlign,ncol))
-m[m==0.0] = np.float('NaN')
+m = np.fromfile(fid,dtype=float32).reshape((nlign,ncol))
+m[m==0.0] = float('NaN')
 
 mf = np.copy(m)
 
 # clean for ramp
 maxlos,minlos=np.nanpercentile(m,90),np.nanpercentile(m,10)
-print 'Clean outliers for ramp estimation outside:', maxlos,minlos
+print('Clean outliers for ramp estimation outside:', maxlos,minlos)
 kk = np.nonzero(
     np.logical_or(m<minlos,m>maxlos))
 m_ramp = np.copy(m)
-m_ramp[kk] = np.float('NaN')
+m_ramp[kk] = float('NaN')
 
 # mask
-if maskf is not 'no':
+if maskf != 'no':
     fid2 = open(maskf, 'r')
-    mask = np.fromfile(fid2,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))
+    mask = np.fromfile(fid2,dtype=float32)[:nlign*ncol].reshape((nlign,ncol))
     mask =  mask*scale_mask
-    kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
-    mf[kk] = np.float('NaN')
+    if reverse:
+      kk = np.nonzero(np.logical_or(mask==0, mask<seuil)) 
+    else:
+      kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
+    mf[kk] = float('NaN')
 else:
     mask = np.zeros((nlign,ncol))
 
@@ -158,10 +166,10 @@ if ramp=='lin':
 
     #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]
-    print 'Remove ramp %f x  + %f y + %f'%(a,b,c)
+    print('Remove ramp %f x  + %f y + %f'%(a,b,c))
 
     G=np.zeros((len(mask.flatten()),3))
-    for i in xrange(nlign):
+    for i in range(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,1] = i
     G[:,2] = 1
@@ -185,13 +193,12 @@ if ramp=='quad':
     _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
-
-    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3] 
-    print 'Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d)
+    print('Remove ramp %f x**2 %f x  + %f y + %f'%(a,b,c,d))
 
     G=np.zeros((len(mask.flatten()),4))
-    for i in xrange(nlign):
+    for i in range(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,2] = i
@@ -218,13 +225,12 @@ elif ramp=='cub':
     _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
     _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
     pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
-
-    pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
     a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
-    print 'Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f)
+    print('Remove ramp %f x**2 + %f x  + %f y**3 + %f y**2 + %f y + %f'%(a,b,c,d,e,f))
 
     G=np.zeros((len(mask.flatten()),6))
-    for i in xrange(nlign):
+    for i in range(nlign):
         G[i*ncol:(i+1)*ncol,0] = np.arange((ncol))**2
         G[i*ncol:(i+1)*ncol,1] = np.arange((ncol))
         G[i*ncol:(i+1)*ncol,2] = i**3
@@ -238,7 +244,7 @@ elif ramp=='cub':
 else:
     mf_ramp= np.copy(mf)
 
-if (arguments["--ref"] is not None) :
+if (arguments["--ref"] != None) :
     cst = np.nanmean(mf[lin_start:lin_end,col_start:col_end])
     mf = mf - cst
     mf_ramp = mf_ramp - cst
@@ -247,7 +253,7 @@ if (arguments["--ref"] is not None) :
 if arguments["--crop"] ==  None:
     crop = [0,ncol,0,nlign]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 if iend>ncol:
     iend=ncol
@@ -268,34 +274,34 @@ if iend-ibeg<ncol or jend-jbeg<nlign:
 
     # top 
     if jend1 > 0:
-        for j in xrange(buf):
-          for i in xrange(ibeg,iend):
-                mf[jend1+j,i] = mf[jend1+j,i]*(np.float(j+1)/buf)
+        for j in range(buf):
+          for i in range(ibeg,iend):
+                mf[jend1+j,i] = mf[jend1+j,i]*(float(j+1)/buf)
     
     #bottom
     if jbeg2 < nlign:
-        for j in xrange(buf):
-          for i in xrange(ibeg,iend):
-            # print jbeg2-(buf-j)
-            mf[jbeg2-(buf-j),i] = mf[jbeg2-(buf-j),i] - mf[jbeg2-(buf-j),i]*(np.float(j+1)/buf)
+        for j in range(buf):
+          for i in range(ibeg,iend):
+            # print(jbeg2-(buf-j))
+            mf[jbeg2-(buf-j),i] = mf[jbeg2-(buf-j),i] - mf[jbeg2-(buf-j),i]*(float(j+1)/buf)
 
     # left
     if iend1 > 0:
-        for j in xrange(buf):
-          for i in xrange(jbeg,jend):   
-            mf[i,iend1+(buf-(j+1))] = mf[i,iend1+(buf-(j+1))] - mf[i,iend1+(buf-(j+1))]*(np.float(j+1)/buf)
+        for j in range(buf):
+          for i in range(jbeg,jend):   
+            mf[i,iend1+(buf-(j+1))] = mf[i,iend1+(buf-(j+1))] - mf[i,iend1+(buf-(j+1))]*(float(j+1)/buf)
         # sys.exit()
 
     # right
     if ibeg2 < ncol:
-        for j in xrange(buf):
-          for i in xrange(jbeg,jend):
-            mf[i,ibeg2-(buf-j)] = mf[i,ibeg2-(buf-j)] - mf[i,ibeg2-(buf-j)]*(np.float(j+1)/buf)
+        for j in range(buf):
+          for i in range(jbeg,jend):
+            mf[i,ibeg2-(buf-j)] = mf[i,ibeg2-(buf-j)] - mf[i,ibeg2-(buf-j)]*(float(j+1)/buf)
 
-    mf[jbeg1:jend1,:] = np.float('NaN')
-    mf[jbeg2:jend2,:] = np.float('NaN')
-    mf[:,ibeg1:iend1] = np.float('NaN')
-    mf[:,ibeg2:iend2] = np.float('NaN')
+    mf[jbeg1:jend1,:] = float('NaN')
+    mf[jbeg2:jend2,:] = float('NaN')
+    mf[:,ibeg1:iend1] = float('NaN')
+    mf[:,ibeg2:iend2] = float('NaN')
 #plt.imshow(mf)
 #plt.show()
 #sys.exit()
@@ -305,16 +311,17 @@ mf = scale*(mf - shift)
 
 # clean based on perc
 maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
-print 'Clean outliers outside:', maxlos,minlos
+print('Clean outliers outside:', maxlos,minlos)
 kk = np.nonzero(
     np.logical_or(mf<minlos,mf>maxlos))
-mf[kk] = np.float('NaN')
+mf[kk] = float('NaN')
 
 # Plot
 vmax = np.max([np.nanpercentile(mf,99),np.nanpercentile(m,99),np.nanpercentile(mf,1),np.nanpercentile(m,1)])
 vmin = -vmax
 
 if setzero == 'yes':
+    print('HELLO')
     # replace "NaN" to 0
     mf[np.isnan(mf)] = 0.
 
@@ -334,6 +341,15 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,2)
+cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=np.nanpercentile(mask,99))
+ax.set_title('MASK')
+setp( ax.get_xticklabels(), visible=False)
+#cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
+divider = make_axes_locatable(ax)
+c = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(cax, cax=c)
+
+ax = fig.add_subplot(1,4,3)
 cax = ax.imshow(mf_ramp, cm.RdBu, vmin=vmin, vmax=vmax)
 ax.set_title('DATA - RAMP')
 setp( ax.get_xticklabels(), visible=False)
@@ -342,14 +358,6 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
-ax = fig.add_subplot(1,4,3)
-cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=seuil)
-ax.set_title('MASK')
-setp( ax.get_xticklabels(), visible=False)
-#cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
-divider = make_axes_locatable(ax)
-c = divider.append_axes("right", size="5%", pad=0.05)
-plt.colorbar(cax, cax=c)
 
 #if iend-ibeg<ncol and jend-jbeg<nlign:
 #    ax = fig.add_subplot(1,4,4)

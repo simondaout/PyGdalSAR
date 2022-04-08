@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -35,8 +35,8 @@ Options:
 --imref             Ref image for corrdem
 """
 
-
-import gdal,osr,os
+from osgeo import gdal
+import osr,os
 gdal.UseExceptions()
 
 # numpy
@@ -80,15 +80,15 @@ else:
 if arguments["--imref"] ==  None:
     imref = 0
 elif arguments["--imref"] < 1:
-    print '--imref must be between 1 and Nimages'
+    print('--imref must be between 1 and Nimages')
 else:
     imref = int(arguments["--imref"]) - 1
 
 if arguments["--vmax"] is not  None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] is not  None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 
 # read lect.in 
 ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
@@ -107,13 +107,13 @@ if arguments["--clean_demerr"] ==  None:
     demf = 'no'
 else:
     demf = arguments["--clean_demerr"]
-    print demf
+    print(demf)
     extension = os.path.splitext(demf)[1]
     if extension == ".tif":
         ds = gdal.Open(demf, gdal.GA_ReadOnly)
         dem = ds.GetRasterBand(1).ReadAsArray()
     elif extension == ".unw":
-        ds = gdal.Open(demf, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(demf, allowed_drivers=["ROI_PAC"])
         dem = ds.GetRasterBand(2).ReadAsArray()*rad2mm
     else:
         dem = np.fromfile(demf,dtype=np.float32).reshape((nlign,ncol))
@@ -122,7 +122,7 @@ else:
 nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 # nb images
 N=len(dates)
-print 'Number images: ', N
+print('Number images: ', N)
 
 # plot diplacements maps
 # fig = plt.figure(1,figsize=(14,10))
@@ -132,19 +132,19 @@ fig.subplots_adjust(wspace=0.001)
 
 # LOOK for Nan on the last date
 infile = 'geo_'+str(idates[-1])+'_'+str(N-1)+'.unw'
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
+ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 ds_band2 = ds.GetRasterBand(2)
 los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
 index = np.nonzero(los==0)
 
-for l in xrange((N)):  
-#for l in xrange((1)): 
+for l in range((N)):  
+#for l in range((1)): 
 #    l=26
 
     infile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw'
     rscfile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw.rsc'
 
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
     ds_band1 = ds.GetRasterBand(1)
     ds_band2 = ds.GetRasterBand(2)
     los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)*rad2mm
@@ -153,7 +153,7 @@ for l in xrange((N)):
         los = los - dem*(base[l]-base[imref])
 
     amp = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    los[index] = np.float('NaN')
+    los[index] = float('NaN')
 
     if arguments["--wrap"] is not None:
         los = np.mod(los+float(arguments["--wrap"]),2*float(arguments["--wrap"]))-float(arguments["--wrap"])
@@ -161,7 +161,7 @@ for l in xrange((N)):
         vmin=-vmax
 
     ds_geo=ds.GetGeoTransform()
-    print 'Read infile:', infile
+    print('Read infile:', infile)
     pix_az, pix_rg = np.indices((ds.RasterYSize,ds.RasterXSize))
     lat,lon = ds_geo[3]+ds_geo[5]*pix_az, ds_geo[0]+ds_geo[1]*pix_rg
     minx,maxx,maxy,miny = ds_geo[0], ds_geo[0]+ ds_geo[1]*ds.RasterXSize, ds_geo[3], ds_geo[3]+ds_geo[5]*ds.RasterYSize  
@@ -199,11 +199,11 @@ for l in xrange((N)):
     if arguments["--dem"] is not None:
         ds2 = gdal.Open(arguments["--dem"], gdal.GA_ReadOnly)
         ds2_geo = ds2.GetGeoTransform()
-        # print ds2_geo
+        # print(ds2_geo)
         ds2_band = ds2.GetRasterBand(1)
         dem = ds2_band.ReadAsArray(0, 0, ds2.RasterXSize, ds2.RasterYSize)
         dminx,dmaxx,dmaxy,dminy = ds2_geo[0], ds2_geo[0]+ ds2_geo[1]*ds2.RasterXSize, ds2_geo[3], ds2_geo[3]+ds2_geo[5]*ds2.RasterYSize  
-        print dminx,dmaxx,dmaxy,dminy
+        print(dminx,dmaxx,dmaxy,dminy)
         hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
         vmax=np.nanpercentile(dem,98),vmin=np.nanpercentile(dem,2),zorder=1)
     else:

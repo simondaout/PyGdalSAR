@@ -12,7 +12,7 @@ import copy
 
 import pylab
 import numpy
-import pymc
+import pymc3
 import matplotlib.patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.stats
@@ -104,8 +104,8 @@ def createDeterministicTrace(mcmodel, deterministic,
     if chain_length is None:
         chain_length = mcmodel._cur_trace_index
     values = []
-    for i in xrange(chain_length):
-        print "%i of %i" % (i, chain_length)
+    for i in range(chain_length):
+        print("%i of %i" % (i, chain_length))
         mcmodel.remember(chain=chain, trace_index=i)
         values.append(deterministic.get_value())
     values = numpy.asarray(values)
@@ -125,9 +125,9 @@ def plot_AM_correlation(mcmodel, startvariances=None, variables=None,
     for key in mcmodel.db.trace_names[-1]:
         if key.startswith('AdaptiveMetropolis'):
             cname = key
-    #print cname
+    #print(cname)
     if cname is None:
-        print "Could not find an AdaptiveMetropolis trace."
+        print("Could not find an AdaptiveMetropolis trace.")
         return
     Ctrace = mcmodel.db.trace(cname)[trim::thin]
     indices = numpy.arange(trim, len(mcmodel.db.trace(cname)[:]), thin)
@@ -141,9 +141,9 @@ def plot_AM_correlation(mcmodel, startvariances=None, variables=None,
     while len(stochlist) > 0:
         icount += 1
         stoch = stochlist.pop()
-        print stoch
+        print(stoch)
         if cname.count(stoch.__name__) == 0:
-            print "Couldn't find %s in %s" % (stoch.__name__, cname)
+            print("Couldn't find %s in %s" % (stoch.__name__, cname))
             continue
         positions.append([stoch, cname.find('_' + stoch.__name__)])
 
@@ -152,7 +152,7 @@ def plot_AM_correlation(mcmodel, startvariances=None, variables=None,
     stochlist = [l[0] for l in positions]
     names = [s.__name__ for s in stochlist]
     title = " ".join(names)
-    print title
+    print(title)
     covlist = []
     fig1 = pylab.figure()
     fig1.subplots_adjust(right=0.7)
@@ -217,7 +217,7 @@ def plot_AM_correlation(mcmodel, startvariances=None, variables=None,
 
     covlist.sort(key=lambda l: l[1], reverse=True)
     for l in covlist:
-        print "%50s: %.3g" % (l[0], l[1]*l[2])
+        print("%50s: %.3g" % (l[0], l[1]*l[2]))
     #pylab.legend(loc='upper left', bbox_to_anchor=(1.00,1.0,0.25,-1.0))
         pylab.legend(loc=(1.0,0.0))
     if plotcorrelation:
@@ -250,7 +250,7 @@ def fracs_inside_contours(x, y, contours):
     for (icollection, collection) in enumerate(contours.collections):
         path = collection.get_paths()
         if len(path) == 0:
-            print "No paths found for contour."
+            print("No paths found for contour.")
             frac = 0
         else:
             path = path[0]
@@ -645,7 +645,7 @@ def plot2Ddist(variables, axeslist=None, truevalues=None, markvalues=None,
     if plotcontours or calcp:
         if contourKDEthin is None:
             contourKDEthin=1 + int(len(x)*(1.-max(contourFractions))/60)
-            #print "Using countourKDEthin = %i" % (contourKDEthin)
+            #print("Using countourKDEthin = %i" % (contourKDEthin)))
         xkde = numpy.ravel(variables[0][trim::contourKDEthin])
         ykde = numpy.ravel(variables[1][trim::contourKDEthin])
         style = {'linewidths':2.0, 'alpha':0.75, 'colors':'k',
@@ -791,7 +791,7 @@ def plot_tcorr_windows(variable, nwindows=7, label=None, axes=None,
     """
     if hasattr(variable, '__name__') and label is None:
         label = variable.__name__
-        print "the label is ", label
+        print("the label is ", label)
     if isinstance(variable, pymc.Variable):
         variable = variable.trace().flatten()
     if label is None:

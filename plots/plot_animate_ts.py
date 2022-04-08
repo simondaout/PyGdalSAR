@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 #!/usr/bin/env python2
@@ -33,7 +33,6 @@ Options:
 """
 
 
-from __future__ import print_function
 import sys
 import numpy as np
 from osgeo import gdal
@@ -51,7 +50,6 @@ else:
 
 # Open input dataset
 ds = gdal.Open(arguments["--cube"])
-#ds = gdal.Open(sys.argv[1])
 if not ds:
     exit(1)
 md = ds.GetMetadata()
@@ -69,10 +67,10 @@ vmax = np.nanpercentile(m[ibeg:iend,jbeg:jend], 95)
 vmin = np.nanpercentile(m[ibeg:iend,jbeg:jend], 5)
 
 if arguments["--vmax"] is not  None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] is not  None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
     
 if arguments["--wrap"] is not None:
     vmax=float(arguments["--wrap"])

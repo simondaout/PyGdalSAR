@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -41,18 +41,19 @@ Options:
 """
 
 
-
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+import os
+import matplotlib
+if os.environ["TERM"].startswith("screen"):
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import matplotlib
 from pylab import *
 import math
 import sys
 import matplotlib.dates as mdates
 import datetime
-import os
 
 ###############################################################
 # define basis functioGns for plot
@@ -118,11 +119,11 @@ if sinf is None and cosf is not None or cosf is None and sinf is not None:
 if arguments["--coseismic"] ==  None:
    cotimes = []
 else:
-   cotimes = map(float,arguments["--coseismic"].replace(',',' ').split())
+   cotimes = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
 if arguments["--postseismic"] ==  None:
    postimes = []
 else:
-   postimes = map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split())
+   postimes = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
 
 if len(postimes)>0 and len(cotimes) != len(postimes):
     raise Exception("coseimic and postseismic lists are not the same size")
@@ -137,25 +138,25 @@ else:
 if arguments["--imref"] ==  None:
     imref = 0
 elif arguments["--imref"] < 1:
-    print '--imref must be between 1 and Nimages'
+    print('--imref must be between 1 and Nimages')
 else:
     imref = int(arguments["--imref"]) - 1
 
 if arguments["--bounds"] is not  None:
-    ylim = map(float,arguments["--bounds"].replace(',',' ').split())
+    ylim = list(map(float,arguments["--bounds"].replace(',',' ').split()))
 
 if arguments["--slowslip"] == None:
     sse=[]
 else:
-    sse = map(float,arguments["--slowslip"].replace(',',' ').split()) 
+    sse = list(map(float,arguments["--slowslip"].replace(',',' ').split())) 
 sse_time = sse[::2]
 sse_car = sse[1::2]  
 
 ###############################################################
 
 # create a list of pixels
-jpix = map(int,arguments["--cols"].replace(',',' ').split())
-ipix = map(int,arguments["--ligns"].replace(',',' ').split())
+jpix = list(map(int,arguments["--cols"].replace(',',' ').split()))
+ipix = list(map(int,arguments["--ligns"].replace(',',' ').split()))
 if len(jpix) != len(ipix):
     raise Exception("ncols and nligns lists are not the same size")
 # number of pixels
@@ -167,17 +168,23 @@ nb,idates,tdec,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=T
 datemin, datemax = np.int(np.min(tdec)), np.int(np.max(tdec))+1
 N = len(idates)
 base = base - base[imref]
-print 'Number images: ', N
+print('Number images: ', N)
 # read lect.in 
-ncol, nlign = map(int, open(infile).readline().split(None, 2)[0:2])
+ncol, nlign = list(map(int, open(infile).readline().split(None, 2)[0:2]))
 
 # lect cube
-maps = np.fromfile(cubef,dtype=np.float32)[:nlign*ncol*N].reshape((nlign,ncol,N))
+#maps = np.fromfile(cubef,dtype=np.float32)[:nlign*ncol*N].reshape((nlign,ncol,N))
+cube = np.fromfile(cubef,dtype=np.float32)[:nlign*ncol*N]
+# clean
+kk = np.flatnonzero(cube>9990)
+cube[kk] = float('NaN')
+maps = cube.reshape((nlign,ncol,N))
+del cube
 
 if arguments["--crop"] ==  None:
     crop = [0,nlign,0,ncol]
 else:
-    crop = map(float,arguments["--crop"].replace(',',' ').split())
+    crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
     
 if slopef is not None:
@@ -230,16 +237,16 @@ postmaps=np.zeros((M,nlign,ncol))
 if len(postimes) == 0:
     postimes = np.ones((M))*-1
 
-for i in xrange(M):
-  cofile = 'cos{}_coeff_clean.r4'.format(i)
+for i in range(M):
+  cofile = 'cos{}_coeff.r4'.format(i)
   try:
     ds = gdal.Open(cofile, gdal.GA_ReadOnly)
     coseismaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()
   except:
     coseismaps[i,:,:] = np.fromfile(cofile,dtype=np.float32).reshape((nlign,ncol))
 
-for i in xrange((M)):
-  postfile = 'post{}_coeff_clean.r4'.format(i)
+for i in range((M)):
+  postfile = 'post{}_coeff.r4'.format(i)
   if postimes[i] > 0:
     try:
       ds = gdal.Open(postfile, gdal.GA_ReadOnly)
@@ -253,12 +260,12 @@ sse_times = sse[::2]
 sse_car = sse[1::2] 
 L = len(sse_times)
 ssemaps=np.zeros((M,nlign,ncol))
-for i in xrange(L):
+for i in range(L):
     try:
-      ds = gdal.Open('sse{}_coeff_clean.tif'.format(i), gdal.GA_ReadOnly)
+      ds = gdal.Open('sse{}_coeff.tif'.format(i), gdal.GA_ReadOnly)
       ssemaps[i,:,:] = ds.GetRasterBand(1).ReadAsArray()
     except:
-      ssemaps[i,:,:] = np.fromfile('sse{}_coeff_clean.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))
+      ssemaps[i,:,:] = np.fromfile('sse{}_coeff.r4'.format(i),dtype=np.float32).reshape((nlign,ncol))
 
 
 ###############################################################
@@ -277,13 +284,13 @@ demcor = np.zeros((nlign,ncol,N))
 
 # Ini Model to DEMCOR for the whole map
 # Remove ref Frame for the whole map
-for l in xrange((N)):
+for l in range((N)):
     demcor[:,:,l] = demmap*base[l]
     model[:,:,l] =  demcor[:,:,l] + refmap
 
 
-for i in xrange(ibeg,iend): # lines
-    for j in xrange(jbeg,jend): # cols
+for i in range(ibeg,iend): # lines
+    for j in range(jbeg,jend): # cols
 
         lin, a, b = 0, 0, 0
         steps, trans, sse = np.zeros(len(cotimes)), np.zeros(len(postimes)),np.zeros(len(sse_times))
@@ -291,17 +298,17 @@ for i in xrange(ibeg,iend): # lines
             lin = slopemap[i,j]
         if cosf is not None:
             a,b = cosmap[i,j], sinmap[i,j]
-        for l in xrange(len(cotimes)):
+        for l in range(len(cotimes)):
             steps[l] = coseismaps[l,i,j]
             trans[l] = postmaps[l,i,j]
-        for l in xrange(len(sse_times)):
+        for l in range(len(sse_times)):
             sse[l] = ssemaps[l,i,j]
         ###################################################
         model[i,j,:] = model[i,j,:] + linear(tdec,lin) + seasonal(tdec, a, b)
-        for l in xrange((M)):
+        for l in range((M)):
             model[i,j,:] = model[i,j,:] + coseismic(tdec, cotimes[l], steps[l]) + \
             postseismic(tdec,cotimes[l],postimes[l],trans[l])
-        for l in xrange((L)):
+        for l in range((L)):
             model[i,j,:] = model[i,j,:] + sse[l]*slowslip(tdec,sse_times[l],sse_car[l])
         ####################################################
         maps_clean[i,j,:] = maps[i,j,:] - model[i,j,:]
@@ -310,7 +317,7 @@ for i in xrange(ibeg,iend): # lines
         # plot TS
         if (i in ipix and j==jpix[ipix.index(i)]):
             ax = fig.add_subplot(Npix,1,k+1)
-            print 'plot TS: {0}-{1}'.format(i,j)
+            print('plot TS: {0}-{1}'.format(i,j))
             x = [date2num(datetime.datetime.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
 
             dmax = str(datemax) + '0101'
@@ -320,9 +327,9 @@ for i in xrange(ibeg,iend): # lines
             xlim=date2num(np.array([xmin,xmax]))
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
             # t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)]) 
-            # print coseismic(tdec, cotimes[0], steps[0])*rad2mm
-            # print postseismic(tdec,cotimes[0],postimes[0],trans[0])*rad2mm
-            # print
+            # print(coseismic(tdec, cotimes[0], steps[0])*rad2mm)
+            # print(postseismic(tdec,cotimes[0],postimes[0],trans[0])*rad2mm)
+            # print()
             ax.plot(x,(maps[i,j,:]-demcor[i,j])*rad2mm,'o',label='line: {}, col: {}'.format(i,j))
             if np.std(model[i,j,:]) > 0:
                 plt.plot(x,(model[i,j,:]-demcor[i,j])*rad2mm,'-r')
@@ -357,7 +364,7 @@ else:
     vmax = np.nanpercentile(maps_clean[:,:,-1],90)
     vmin = np.nanpercentile(maps_clean[:,:,-1],10)
 
-for l in xrange((N)):
+for l in range((N)):
     d = as_strided(maps_clean[ibeg:iend,jbeg:jend,l])
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     cmap = cm.jet
@@ -379,7 +386,7 @@ fig.savefig('maps_clean_models.eps', format='EPS',dpi=150)
 fig = plt.figure(3,figsize=(10,9))
 fig.subplots_adjust(wspace=0.001)
 
-for l in xrange((N)):
+for l in range((N)):
     d = as_strided(maps[ibeg:iend,jbeg:jend,l])
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     cmap = cm.jet

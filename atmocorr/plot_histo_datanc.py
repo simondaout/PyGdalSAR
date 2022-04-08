@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -9,8 +9,8 @@
 # Author        : Simon DAOUT (Oxford)
 ############################################
 
-
-import gdal,sys
+from osgeo import gdal
+import sys
 import pymc
 import numpy as np
 import matplotlib.pyplot as plt

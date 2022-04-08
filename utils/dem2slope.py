@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -34,7 +34,8 @@ Options:
 --incidence=<file>  Path to incidence file .unw 
 """
 
-import gdal, os
+from osgeo import gdal
+import os
 import scipy.ndimage
 import docopt
 import numpy as np
@@ -179,7 +180,7 @@ cax = ax.imshow(aspect,cmap=cm.hsv)
 ax.set_title('Aspect',fontsize=6)
 fig.colorbar(cax, orientation='vertical',aspect=10)
 
-#plt.show()
+plt.show()
 
 
 

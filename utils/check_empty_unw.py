@@ -25,7 +25,7 @@ Options:
 --rlook=<value>     look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import warnings, sys
@@ -64,7 +64,7 @@ def check(kk):
 
     if path.exists(infile) is not False:
         print("Open: {0} in {1}".format(name,folder))
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(infile,  allowed_drivers=["ROI_PAC"])
         los = ds.GetRasterBand(2).ReadAsArray()
         del ds
     else:

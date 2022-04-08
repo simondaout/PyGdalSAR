@@ -20,14 +20,14 @@ Requirements
 =============
 This project needs the following external components:
  * CMake
- * Python (2.7)
- * py27-gdal
- * py27-numPy
- * py27-sciPy
+ * Python 
+ * py-gdal
+ * py-numPy
+ * py-sciPy
  * Gdal (https://www.gdal.org)
  * docopt (Available on https://github.com/docopt/docopt or in ./python/).
- * py27-matplotlib
- * py27-datetime
+ * py-matplotlib
+ * py-datetime
  * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas
 
 
@@ -41,20 +41,22 @@ cmake --build bin
 Setting specific compilers is also done the usual CMake way, for example to
 use gcc, gfortran and python2.7 as C, Fortran, an python compilers, do:
 
+  $ cmake -DCMAKE\_C\_COMPILER=/home/daouts/.guix-profile/bin/gcc -DCMAKE\_Fortran\_COMPILER=/home/daouts/.guix-profile/bin/gfortran -S . -B bin
   $ cmake -DPYTHON\_EXECUTABLE=/opt/local/bin/python2.7 -DCMAKE\_C\_COMPILER=gcc -DCMAKE\_Fortran\_COMPILER=gfortran -S . -B bin
 
 
 Organisation
 =============
-This project contains the following folders:
+This project contains the following folders (add all those directories to your $PATH):
  * timeseries: programms for time series decomposition 
  * atmocorr: programms for atmospehric corrections.
  * plots: plotting programms for .tiff, .r4, time series or .unw files
  * utils: additional tools for cleaning .r4 or .unw formats, georeferenced formats (default: .tif), geocoding, conversion dates to decimal dates.
- * src: fortrtan programms, in progress
+ * corrections tools: insar processing tools.
  * tutorial: 
  	 * ReversibleDeformation: example GACOS corrections, empirical phase/topo corrections and extraction of reversible derformations with seasonal functions.
  	 * Vector: in progress
+ * contrib/python: additional python-package for parsing nsbas or gamma files, or colormaps for plots (add this dir to your $PYTHONPATH). 
 
 Developpers & Contact
 =============

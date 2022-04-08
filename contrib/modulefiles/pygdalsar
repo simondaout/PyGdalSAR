@@ -2,9 +2,11 @@
 set prefix ~/PyGdalSAR/
 set exec_prefix ${prefix}
 
-prepend-path PYTHONPATH  $prefix/parsers
-prepend-path PYTHONPATH  $prefix/python
+setenv PYGDALSAR           $prefix
 
+prepend-path PYTHONPATH      $prefix/contrib/python
+
+prepend-path PATH  $prefix/correction_tools
 prepend-path PATH  $prefix/timeseries
 prepend-path PATH  $prefix/utils
 prepend-path PATH  $prefix/atmocorr

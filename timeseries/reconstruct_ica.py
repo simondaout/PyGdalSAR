@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -45,7 +45,7 @@ if __name__ == "__main__":
      sys.exit(0)
 
   # if len(sys.argv) == 0:
-  #     print "no argument given!"
+  #     print("no argument given!")
   #     parser.print_help()
   #     sys.exit(1)
 

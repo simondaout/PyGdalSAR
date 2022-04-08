@@ -34,7 +34,7 @@ def date2dec(dates):
 
 int_list=arguments["--int_list"]
 out_list=arguments["--out_list"]
-bt = np.float(arguments["--Bt"])
+bt = float(arguments["--Bt"])
 
 # read int
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,dtype='i,i')

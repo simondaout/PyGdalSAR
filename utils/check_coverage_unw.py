@@ -25,7 +25,7 @@ Options:
 --rlook=<value>     look int. $prefix$date1-$date2$suffix_$rlookrlks.unw [default: 0]
 """
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import docopt
 import warnings, sys
@@ -64,7 +64,7 @@ def check(kk):
 
     if path.exists(infile) is not False:
         print("Open: {0} in {1}".format(name,folder))
-        ds = gdal.Open(infile, gdal.GA_ReadOnly)
+        ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
         los = ds.GetRasterBand(2).ReadAsArray()
         del ds
     else:
@@ -85,12 +85,16 @@ print('Save empty interferogram list:', ListInterfero)
 wf = open(ListInterfero, 'w')
 
 for j in range(Nifg):
+  try:
     los,name = check(j)
     size = np.shape(los)[0]* np.shape(los)[1]
     unw = np.count_nonzero(los==0)
     cov = 1 - (unw / size)
-    print("Unwrapping coverage {0}: {1} ".format(name,cov))
-    wf.write("%i  %i %f\n" % (date_1[j], date_2[j], cov))
+  except:
+    print("Cannot open {0}: !!!!".format(name))
+    cov = 0.0
+  print("Unwrapping coverage {0}: {1} ".format(name,cov))
+  wf.write("%i  %i %f\n" % (date_1[j], date_2[j], cov))
 wf.close()
 
 print('----------------------------------')

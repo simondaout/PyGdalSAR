@@ -12,7 +12,7 @@ nsb_filtflatunw.py
 
 usage:
   nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] [--look=<value>] \
-  [--model=<path>] [--cutfile=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>]  <proc_file> 
+  [--model=<path>] [--cutfile=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>] [--remove_bridges=yes/no]  <proc_file> 
   nsb_filtflatunw.py -h | --help
 
 options:
@@ -27,6 +27,7 @@ Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat
   --cutfile=<path>      Cut file for unwrappin [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
+  --remove_bridges      If Yes remove bridge.in file before running unwrapping
   -v                    Verbose mode. Show more information about the processing
   -f                    Force mode. Overwrite output files
   -h --help             Show this screen.
@@ -34,7 +35,7 @@ Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat
 
 from __future__ import print_function
 import shutil, sys
-from os import path, environ, system, chdir, remove, getcwd, listdir, symlink
+from os import path, environ, system, chdir, remove, getcwd, listdir, symlink,unlink
 import matplotlib
 if environ["TERM"].startswith("screen"):
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
@@ -47,8 +48,11 @@ import logging
 import multiprocessing
 from contextlib import contextmanager
 from functools import wraps, partial
-# from nsbas import docopt, gdal, procparser, subprocess
-import subprocess, gdal, procparser
+import subprocess 
+if "GDAL_SYS" in environ and environ["GDAL_SYS"] == 'True':
+    from osgeo import gdal
+else:
+    import nsbas.gdal as gdal
 gdal.UseExceptions()
 import filecmp
 from operator import methodcaller
@@ -57,6 +61,10 @@ try:
     from nsbas import docopt
 except:
     import docopt
+try:
+    from nsbas import procparser
+except:
+    from parsers import procparser
 
 ##################################################################################
 ###  Extras functions and context maganers
@@ -120,9 +128,9 @@ def checkoutfile(config,file):
     return do
 
 def force_link(src,dest):
-    try:
+    if path.exists(dest) is False:
         symlink(src,dest)
-    except:
+    else:
         rm(dest)
         symlink(src,dest)
 
@@ -338,10 +346,11 @@ class PileInt:
         ''' Return model file name 
         Assume model computed on the Rlooks_unw IFG...
         '''
-        if int(self.Rlooks_unw) > 1:
-          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.acp'
-        else:
-          _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
+        _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
+        #if int(self.Rlooks_unw) > 1:
+        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.acp'
+        #else:
+        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
         return _f
 
     def geterafiles(self,kk):
@@ -444,7 +453,7 @@ class FiltFlatUnw:
     cutfile: cut file fro unwrapping, decrease coh threshold for pixel with cut>0
     """
 
-    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None):
+    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None,remove_bridges=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir, self.EraDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -466,6 +475,7 @@ class FiltFlatUnw:
         self.model = model
         self.strat = False
         self.cutfile = cutfile
+        self.remove_bridges = remove_bridges
 
         # initilise radar file
         if int(self.Rlooks_int) > 1:
@@ -560,7 +570,7 @@ def computesize(config,file):
     try:
         dirname, filename = path.split(path.abspath(file))
         with Cd(dirname):
-            ds_int = gdal.Open(filename, gdal.GA_ReadOnly)
+            ds_int = gdal.OpenEx(filename, allowed_drivers=["ROI_PAC"])
             driver = ds_int.GetDriver()
             return ds_int.RasterXSize, ds_int.RasterYSize
     except OSError as err:
@@ -663,7 +673,12 @@ def filterSW(config, kk):
         do = checkoutfile(config,outfile)
         if do:
          try:
-            run("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
+            if config.filterstyle == "SWg":
+              width,length = computesize(config,infile)
+              run("SWfilter_grad "+str(infile)+" "+str(corfile)+" "+str(outfile)\
+                    +" "+str(config.SWwindowsize)+" "+str(width)+" "+str(length)+" "+str(config.SWamplim)+" 2 1 > log_filtSW.txt")
+            else:
+              run("nsb_SWfilter.pl "+str(inbase)+" "+str(filtbase)+" "+str(corbase)\
                     +" "+str(config.SWwindowsize)+" "+str(config.SWamplim)+" "+str(config.filterstyle)+"> log_filtSW.txt")
             if path.exists(filtrsc) == False:
                 copyrsc(inrsc,filtrsc)
@@ -903,8 +918,8 @@ def flat_atmo(config, kk):
         if int(config.ivar)>1 :
             logger.warning("ivar=2, no masking implemented !!!")
 
-        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),np.float(config.min_z),config.delta_z)       
-        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or np.float(config.min_z) > 0. or  np.float(config.delta_z) != 75.)  and int(config.ivar)<2 :
+        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),float(config.min_z),config.delta_z)       
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or float(config.min_z) > 0. or  float(config.delta_z) != 75.)  and int(config.ivar)<2 :
 
             import scipy.optimize as opt
             import scipy.linalg as lst
@@ -917,9 +932,9 @@ def flat_atmo(config, kk):
             # print(config.thresh_amp_atmo,config.min_z,config.delta_z)
 
             index = np.nonzero(
-            np.logical_and(coh>np.float(config.thresh_amp_atmo),
-            np.logical_and(z>np.float(config.min_z),
-            np.logical_and(deltaz>np.float(config.delta_z),
+            np.logical_and(coh>float(config.thresh_amp_atmo),
+            np.logical_and(z>float(config.min_z),
+            np.logical_and(deltaz>float(config.delta_z),
             np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
             np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
             )))))
@@ -1062,12 +1077,12 @@ def flat_atmo(config, kk):
         phi_select = dphi_select*z_select
 
         if int(config.ivar)<2:
-            fit = b1*(z_select - np.float(config.z_ref)) + (b2/2.)*((z_select)**2 -np.float(config.z_ref)**2) + \
-            (b3/3.)*((z_select)**3-np.float(config.z_ref)**3) + (b4/4.)*((z_select)**4 - np.float(config.z_ref)**4)
+            fit = b1*(z_select - float(config.z_ref)) + (b2/2.)*((z_select)**2 -float(config.z_ref)**2) + \
+            (b3/3.)*((z_select)**3-float(config.z_ref)**3) + (b4/4.)*((z_select)**4 - float(config.z_ref)**4)
         elif (config.nfit_atmo) == 3 :
-            fit = (b1+b2*az_select)/2.*(z_select-np.float(config.z_ref))**2 + (b3+b4*az_select)/3.*(z_select-np.float(config.z_ref))**3
+            fit = (b1+b2*az_select)/2.*(z_select-float(config.z_ref))**2 + (b3+b4*az_select)/3.*(z_select-float(config.z_ref))**3
         else:
-            fit = b1*(z_select-np.float(config.z_ref)) +(b2+b3*az_select)/2.*(z_select-np.float(config.z_ref))**2 + (b4+b5*az_select)/3.*(z_select-np.float(config.z_ref))**3
+            fit = b1*(z_select-float(config.z_ref)) +(b2+b3*az_select)/2.*(z_select-float(config.z_ref))**2 + (b4+b5*az_select)/3.*(z_select-float(config.z_ref))**3
 
         # compute crappy constant for the plot
         cst = np.nanmedian(fit-phi_select)
@@ -1153,13 +1168,19 @@ def flat_model(config,kk):
         copyrsc(inrsc,filtoutrsc)
 
         if force:
-            rm(outfile); rm(param); rm(newparam)
+            rm(outfile); rm(param)
+            try:
+              unlink(newparam)
+            except:
+              pass
         if config.model != None:
             do = checkoutfile(config,outfile)
             if do:
                 try:
                     run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
                     +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
+                    # move param file into a file name independent of prefix and suffix
+                    force_link(param,newparam)
                 except Exception as e:
                     logger.critical(e)
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
@@ -1170,8 +1191,6 @@ def flat_model(config,kk):
             logger.critical('Model file is not defined. Exit!')
             sys.exit()
 
-        # move param file into a file name independent of prefix and suffix
-        force_link(param,newparam)
 
     return config.getconfig(kk)
 
@@ -1300,9 +1319,12 @@ def unwrapping(config,kk):
         unwROIrsc = unwfiltROI + '.rsc'
 
         bridgefile = 'bridge.in'
-
+        if config.remove_bridges and path.exists(bridgefile):
+            shutil.move(bridgefile,'bridge_save.in')
+   
         if force: 
             rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
+            #rm(unwfiltROI); rm(unwSWfile)
 
         # Filter with colinearity
         if path.exists(filtROIfile) == False:
@@ -1335,9 +1357,11 @@ def unwrapping(config,kk):
                 else:
                     opt=1
 
-                # my_deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
-                run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
-                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
+                # my deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
+                #run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
+                #    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
+                run("deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
+                    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
 
             if config.unw_method == 'roi':
 
@@ -1742,6 +1766,11 @@ if arguments["--jend_mask"] == None:
 else:
     jend_mask = int(arguments["--jend_mask"])
 
+if arguments["--remove_bridges"] == "yes":
+     remove_bridges = True
+else:
+     remove_bridges = False
+
 if arguments["-f"]:
     force = True
 else:
@@ -1766,7 +1795,7 @@ proc_defaults = {
     "nfit_az": "-1", # median
     "thresh_amp_az": "0.3", # threshold on coherence
     "nfit_topo": "-1", # median 
-    "thresh_amp_topo": "0.2",
+    "thresh_amp_atmo": "0.2",
     "ivar": "1", # fct of topography only
     "z_ref": "8000.", # reference
     "min_z": "0.", # min elevation
@@ -1812,14 +1841,14 @@ print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
     nfit_az: {8}, thresh_amp_az: {9}\n\
     filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
     FilterStrength : {13}, Filt_method : {14}\n\
-    nfit_topo: {15}, thresh_amp_topo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
+    nfit_topo: {15}, thresh_amp_atmo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
     seedx: {21}, seedy: {22}, threshold_unw: {23}, threshold_unfilt: {24}, unw_method: {25}, ref_top: {26}, ref_left: {27}, ref_width: {28}, ref_length: {29}'.format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
     proc["FilterStrength"],proc["Filt_method"],\
-    proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
+    proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
     proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"],\
     proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]
     ))
@@ -1886,10 +1915,10 @@ for p in jobs:
         proc["nfit_az"], proc["thresh_amp_az"],
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
         proc["FilterStrength"], proc["Filt_method"], 
-        proc["nfit_topo"], proc["thresh_amp_topo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
+        proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"],proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
-        ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask,
+        ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask, remove_bridges = remove_bridges,
         ) 
 
     print()

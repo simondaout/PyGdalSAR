@@ -14,8 +14,9 @@ import numpy as np
 import scipy as sp
 import scipy.optimize as opt
 import scipy.linalg as lst
-import gdal, pyproj
-gdal.UseExceptions()
+from osgeo import gdal
+import pyproj
+#gdal.UseExceptions()
 from sys import argv,exit,stdin,stdout
 import getopt
 from os import path
@@ -32,7 +33,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
+#gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
 shapely.speedups.enable()
 
 ##################################
@@ -76,8 +77,13 @@ def load_gps(file):
     fl = open(file, "r").readlines()
     for line in fl:
         if not line.startswith(('#')):
-            # lon lat Ve Vn Vup Se Sn Sup C Name
-            lon, lat, Ve, Vn, Vup, dVe, dVn, dVup, Cen, sta = line.split()
+            # Name lon lat Ve Vn Vup Se Sn Sup C
+            try:
+              sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup = line.split()
+            except:
+              print("Fail reading GNSS data block. Please organise input file as follow:")
+              print("sta, lon, lat, Ve, dVe, Vn, dVn ,Vup, dVup")
+              print("Exit.")
             gps_gdf.loc[index, 'geometry'] = Point(float(lon), float(lat))
             gps_gdf.loc[index, 'station'] = sta[:4]
             gps_gdf.loc[index, 've'] = float(Ve)  # eastern velocity in mm/yr in fixed eurasia reference frame
@@ -85,8 +91,7 @@ def load_gps(file):
             gps_gdf.loc[index, 'vu'] = float(Vup)
             gps_gdf.loc[index, 'se'] = float(dVe)  # sigma ve
             gps_gdf.loc[index, 'sn'] = float(dVn)  # sigma vn
-            gps_gdf.loc[index, 'su'] = float(dVup)  # sigma vup
-            gps_gdf.loc[index, 'cen'] = float(Cen)  # correlation between east and northern velocities
+            gps_gdf.loc[index, 'su'] = float(dVup)  # sigma vup  
             index += 1
     return gps_gdf
 
@@ -153,10 +158,11 @@ class OpenTif(object):
         self.projection = self.ds.GetProjection()
         pix_lin, pix_col = np.indices((self.ds.RasterYSize,self.ds.RasterXSize))
         self.lat,self.lon = self.top + self.yres*pix_lin, self.left+self.xres*pix_col
+        print(self.ds.GetGeoTransform())        
 
         # convert 0 and 255 to NaN
-        self.data[self.data==0.] = np.float('NaN')
-        self.data[self.data==255] = np.float('NaN')
+        self.data[self.data==0.] = float('NaN')
+        self.data[self.data==255] = float('NaN')
         
         if sigfile is not None:
             self.dst = gdal.Open(sigfile)
@@ -182,13 +188,13 @@ class OpenTif(object):
             m = np.nansum(pixel_values[index] * pixel_sigma[index]) / np.nansum(pixel_sigma[index])
             std = np.nanstd(pixel_values)
         else:
-            m = np.float('NaN')
-            std = np.float('NaN')
+            m = float('NaN')
+            std = float('NaN')
         
         if m == 0:  #if only NaN nanmean is 0 
-            m = np.float('NaN')
+            m = float('NaN')
         if std == 0:
-            std = np.float('NaN')
+            std = float('NaN')
 
         return m, std
 
@@ -237,6 +243,12 @@ if __name__ == "__main__":
     coords = [(LON_REF2-epsi, LAT_REF2-epsi), (LON_REF1-epsi,LAT_REF1-epsi), (LON_REF3-epsi,LAT_REF3-epsi), (LON_REF4-epsi,LAT_REF4-epsi)]
     poly = Polygon(coords)
 
+    # ramp
+    try:
+        quad
+    except NameError:
+        quad = False
+
     try:
         gps_file
     except NameError:
@@ -245,8 +257,10 @@ if __name__ == "__main__":
     # load gnss
     all_gps = load_gps(gps_file)
 
-    # gps within poly
-    gps = all_gps[all_gps.within(poly)]
+    # gps within poly 
+    # import to do a copy to avoid SettingWithCopyWarning
+    gps = all_gps[all_gps.within(poly)].copy()
+
      # load insar
     # read format incidence heading angle
     # not same convention in GAMMA or ROIPAC
@@ -278,9 +292,7 @@ if __name__ == "__main__":
 
     # compute inc angle gps
     add_inc_head_los(gps, inc, heading)
-    #print(gps)
-    
-    
+      
     # if heading, then increase window size
     for n in range(4,200,2):
         #print(n)
@@ -329,12 +341,22 @@ if __name__ == "__main__":
     east, north = UTM(x,y)
     #east, north = x, y
 
-    # invers G matrix
-    G = np.zeros((len(d),3))
-    G[:,0] = north
-    G[:,1] = east
-    G[:,2] = 1
-    
+    if quad == True:
+        # invers G matrix
+        G = np.zeros((len(d),5))
+        G[:,0] = np.array(north)**2
+        G[:,1] = np.array(east)**2
+        G[:,2] = north
+        G[:,3] = east
+        G[:,4] = 1
+   
+    else:
+        # invers G matrix
+        G = np.zeros((len(d),3))
+        G[:,0] = north
+        G[:,1] = east
+        G[:,2] = 1
+   
     # inversion
     x0 = lst.lstsq(G,d)[0]
     _func = lambda x: np.sum(((np.dot(G,x)-d)/sig)**2)
@@ -351,25 +373,32 @@ if __name__ == "__main__":
     # Build G matrix for all insar points
     east, north = UTM(insar.lon.flatten(), insar.lat.flatten())
     #east, north = insar.lon.flatten(), insar.lat.flatten()
-    G = np.zeros((len(insar.data.flatten()),3))
-    G[:,0] = north
-    G[:,1] = east
-    G[:,2] = 1
+
+    if quad == True:
+        G = np.zeros((len(insar.data.flatten()),5))
+        G[:,0] = np.array(north)**2
+        G[:,1] = np.array(east)**2
+        G[:,2] = north
+        G[:,3] = east
+        G[:,4] = 1
+    else:
+        G = np.zeros((len(insar.data.flatten()),3))
+        G[:,0] = north
+        G[:,1] = east
+        G[:,2] = 1
 
     ramp_array = np.dot(G, pars).reshape(insar.ysize, insar.xsize)
     model_array = ramp_array + insar.data
     
     # remove cst
-    cst = np.nanmean(model_array)
-    model_array = model_array - cst
+    #cst = np.nanmean(model_array)
+    #model_array = model_array - cst
 
     # Plot
     vmin = np.nanpercentile(insar.data, 2)
     vmax = np.nanpercentile(insar.data, 98)
     vmax_insar = np.max([np.abs(vmin),np.abs(vmax)])
     vmin_insar = -vmax_insar
-    vmin_insar = -10
-    vmax_insar = 10
 
     try:
         from matplotlib.colors import LinearSegmentedColormap

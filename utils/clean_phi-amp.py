@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -43,7 +43,6 @@ Options:
 --crop=<values>       Crop data [default: 0,nlines,0,ncol]
 """
 
-from __future__ import print_function
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import matplotlib as mpl
@@ -151,7 +150,7 @@ if demf ==  None:
         print('DEM file is not readible. Set elelvation to zeros.')
         dem_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 else:
-    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)
+    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 
 if arguments["--slopefile"] is not None:
     slope_map = np.fromfile(arguments["--slopefile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
@@ -316,15 +315,14 @@ if plotcorr == 'yes':
 
     # some cleaning for correlations
     kk = np.nonzero(
-        np.logical_and(lin>np.nanpercentile(lin,1),
-        np.logical_and(lin<np.nanpercentile(lin,99),
-        np.logical_and(phi>4.,
-        np.logical_and(slope<np.nanpercentile(slope,90),
-        np.logical_and(dem<np.nanpercentile(dem,95),
-        np.logical_and(slopelos>np.nanpercentile(slopelos,10), 
-        np.logical_and(slopelos<np.nanpercentile(slopelos,90), 
+        np.logical_and(lin>np.nanpercentile(lin,2),
+        np.logical_and(lin<np.nanpercentile(lin,98),
+        np.logical_and(slope<np.nanpercentile(slope,98),
+        np.logical_and(dem<np.nanpercentile(dem,98),
+        np.logical_and(slopelos>np.nanpercentile(slopelos,2), 
+        np.logical_and(slopelos<np.nanpercentile(slopelos,98), 
         np.logical_and(amp>5, amp <  maxamp
-        )))))))))
+        ))))))))
     phi,amp,lin,dem,slopelos,slope,aspect = phi[kk], amp[kk], lin[kk], dem[kk], slopelos[kk],slope[kk],aspect[kk]
 
     # compute correlations

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -26,7 +26,6 @@ Options:
 
 
 # lib
-from __future__ import print_function
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 
@@ -37,7 +36,7 @@ from pylab import *
 
 import os, sys
 
-import gdal
+from osgeo import gdal
 import time
 
 # docopt (command line parser)
@@ -53,7 +52,7 @@ plot = arguments["--plot"]
 
 gdal.UseExceptions()
 # Open dataset (image)
-ds = gdal.Open(infile, gdal.GA_ReadOnly)
+ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 # Get the band that have the data we want
 ds_band1 = ds.GetRasterBand(1)
 ds_band2 = ds.GetRasterBand(2)
@@ -67,7 +66,7 @@ nlign,ncol = ds.RasterYSize, ds.RasterXSize
 del ds
 
 # Open mask
-ds2 = gdal.Open(maskfile, gdal.GA_ReadOnly)
+ds2 = gdal.OpenEx(maskfile, allowed_drivers=["ROI_PAC"])
 ds2_band1 = ds2.GetRasterBand(1)
 ds2_band2 = ds2.GetRasterBand(2)
 print("> Driver:   ", ds2.GetDriver().ShortName)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -29,15 +29,15 @@ import docopt
 arguments = docopt.docopt(__doc__)
 
 if arguments["--dates"] is not  None:
-  dates = map(int,arguments["--dates"].replace(',',' ').split())
+  dates = list(map(int,arguments["--dates"].replace(',',' ').split()))
 elif arguments["--datefile"] is not None:
-  infile=file(arguments["--datefile"],'r')
+  infile=arguments["--datefile"]
   dates=np.loadtxt(infile,comments="#",dtype='str')
 else:
-  print 'No input dates'
+  print('No input dates')
   sys.exit()
 
-print dates
+print(dates)
 # sys.exit(0)
 
 def date2dec(dates):
@@ -48,12 +48,12 @@ def date2dec(dates):
         #x = datetime.strptime('{}'.format(date),'%Y-%m-%dT%H:%M:%S.%fZ')
         dec = float(x.strftime('%j'))/365.1
         year = float(x.strftime('%Y'))
-        # print date,dec,year
+        # print(date,dec,year)
         times.append(year + dec)
     return times
 
 times = date2dec(dates)
-print times
+print(times)
 
 if arguments["--outfile"] is not None:
     np.savetxt(arguments["--outfile"], np.vstack(np.array(times).T),fmt=('%f'))

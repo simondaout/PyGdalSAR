@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -39,7 +39,7 @@ threshold = float(arguments["--threshold"])
 los = np.fromfile(infile,dtype=np.float32)
 coef = np.fromfile(coeffile,dtype=np.float32)
 if len(los) != len(coef):
-    print 'lenght {}: {} =! lenght {}:{}'.format(infile,len(los),coeffile,len(coef))
+    print('lenght {}: {} =! lenght {}:{}'.format(infile,len(los),coeffile,len(coef)))
     sys.exit()
 
 indexnan = np.flatnonzero(~np.isnan(los))

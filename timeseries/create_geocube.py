@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 ################################################################################
@@ -20,7 +20,7 @@ Options:
 
 
 # gdal
-import gdal
+from osgeo import gdal
 gdal.UseExceptions()
 import subprocess
 
@@ -41,7 +41,7 @@ else:
 nb,idates,dates,base=np.loadtxt(fimages, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
 # nb images
 N=len(dates)
-print 'Number images: ', N
+print('Number images: ', N)
 
 if arguments["--geotiff"] ==  None:
     geotiff = None
@@ -59,11 +59,11 @@ else:
 
 r = subprocess.call("rm -f "+outfile, shell=True)
 
-for l in xrange((N)):
+for l in range((N)):
     infile = 'geo_'+str(idates[l])+'_'+str(l)+'.unw'
-    print 'Read file:', infile  
+    print('Read file:', infile) 
     # read data
-    ds = gdal.Open(infile, gdal.GA_ReadOnly)
+    ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
 
     if l == 0:
         dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, N, gdal.GDT_Float32)
