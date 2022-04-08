@@ -78,7 +78,6 @@ class network:
 
         self.rot = rot
         self.slope = slope
-
         #self.rot = np.ones(np.shape(self.rot))*np.pi/2 
         #self.slope = np.ones(np.shape(self.rot))*np.deg2rad(10)
         #fig = plt.figure(4,figsize=(11,7))
@@ -242,51 +241,65 @@ def compute_slope_aspect(path):
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
-    filtrer = scipy.ndimage.filters.gaussian_filter(topo,2.)
+    #filtrer = scipy.ndimage.filters.gaussian_filter(topo,2.)
+    filtrer = scipy.ndimage.gaussian_filter(topo,2.)
+    gt = ds.GetGeoTransform()
+    projref = ds.GetProjectionRef()
     drv = gdal.GetDriverByName('GTiff')
 
-    # Recuperation de la latitude moyenne
+    # Get middle latitude
     data1 = ds.GetGeoTransform()   
     lats = data1[3] + (np.arange(nlines) * data1[5])
     lat_moy = np.mean(lats)
-    ######## JUSTE POUR LE TEST A ENLEVER
-    lat_moy = 0
-
-    # Verification si srtm 30m ou 90m (methode a ameliorer sans aucun doute)
-    res = 0
+    
+    # Get resolution depending on whether the 
+    res = 0.
     if 0.0001 < data1[1] < 0.0004:
-        res = 30
+        res = 30.
     elif 0.0007 < data1[1] < 0.001:
-        res = 90
+        res = 90.
     else:
-        logger.info("Cannot find spatial resolution in metadata. Set to 10")
-        ###### POUR LE TEST A ENLEVER
-        #exit()
-        res = 10  
+        logger.info("Cannot find spatial resolution in metadata. Exit")
+        #res = 10
+        exit()  
+        
     
     # Calcul gradient
     Py, Px = np.gradient(filtrer, res, res*np.cos(np.deg2rad(lat_moy)))
-    
-    # Pente
+    Px = Px.astype(float); Py = Py.astype(float)
+    # Slope
     slope = np.arctan(np.sqrt(Py**2+Px**2))
-    #print(np.mean(np.rad2deg(slope)))
-    #sys.exit()
     # smooth slope to avoid crazy values 
     slope[np.rad2deg(slope)>80]=0.
     slope[np.rad2deg(slope)<min_slope]=0.
-
-    # Angle de plus grande pente
+    # Line of max slope
     aspect = np.arctan2(Py,-Px)
     
-    # create aspect file
-    dst_ds = drv.CreateCopy('slope.tif',ds)
-    band = dst_ds.GetRasterBand(1)
-    band.WriteArray(np.rad2deg(slope))
-    dst_ds = drv.CreateCopy('aspect.tif',ds)
-    band = dst_ds.GetRasterBand(1)
-    band.WriteArray(np.rad2deg(aspect))
+    # Create aspect and slope files
+    #dst_ds = drv.CreateCopy('slope.tif',ds)
+    #band = dst_ds.GetRasterBand(1)
+    #band.WriteArray(np.rad2deg(slope))
+    #dst_ds = drv.CreateCopy('aspect.tif', ds)
+    #band = dst_ds.GetRasterBand(1)
+    #band.WriteArray(np.rad2deg(aspect))
 
-    #Plot du DEM, de Px, de Py et de l'angle de la plus grande pente
+    dst = drv.Create('slope.tif', nlines, ncols, 1, gdal.GDT_Float32)
+    bandt = dst.GetRasterBand(1)
+    bandt.WriteArray(np.rad2deg(slope))
+    dst.SetGeoTransform(gt)
+    dst.SetProjection(projref)
+    bandt.FlushCache()
+
+    dst = drv.Create('aspect.tif', nlines, ncols, 1, gdal.GDT_Float32)
+    bandt = dst.GetRasterBand(1)
+    bandt.WriteArray(np.rad2deg(aspect))
+    dst.SetGeoTransform(gt)
+    dst.SetProjection(projref)
+    bandt.FlushCache()
+
+    exit() 
+    
+    # Plot DEM, Slope, Py and aspect
     fig = plt.figure(1,figsize=(11,7))
     cmap = cm.terrain
     # Plot topo
@@ -507,7 +520,9 @@ for i in range(ibeg,iend):
         # Inversion
         if len(data)>1:
             try:
-                pars = lst.lstsq(G,data)[0]
+                Cd = np.diag(rms**2, k = 0)
+                pars = np.dot(np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G)),np.dot(np.dot(G.T,np.linalg.inv(Cd)),data))
+                #pars = lst.lstsq(G,data)[0]
                 #pars = np.dot(np.linalg.inv(G),data)
 
                 if iter > 1:
@@ -538,14 +553,15 @@ for i in range(ibeg,iend):
 # CLEAN RESULTS
 ################################
 
-mask = np.zeros(np.shape(disp))
+mask = np.ones((nlines,ncols,3)) 
+    #np.ones(np.shape(disp))
 for n in range(N):
     # clean outlisers
     d = as_strided(disp[:,:,int(comp[n])])
     s = as_strided(sdisp[:,:,int(comp[n])])
     m = as_strided(mask[:,:,int(comp[n])])
     index = s/abs(d) > 1 
-    m[index]= 1
+    m[index]= 0
     index = np.logical_or(d>np.percentile(d,98),d<np.percentile(d,2))
     d[index]= float('NaN') 
     #d[np.abs(d)>9999.]= float('NaN'); s[np.abs(d)>9999.] = float('NaN')
@@ -621,6 +637,13 @@ for n in range(N):
     ds = driver.Create('sig_U{}_{}.tif'.format(comp[n],output), ncols, nlines, 1, gdal.GDT_Float32)
     band = ds.GetRasterBand(1)
     band.WriteArray(sdisp[:,:,int(comp[n])])
+    ds.SetGeoTransform(gt)
+    ds.SetProjection(projref)
+    band.FlushCache()
+
+    ds = driver.Create('mask_U{}_{}.tif'.format(comp[n],output), ncols, nlines, 1, gdal.GDT_Float32)
+    band = ds.GetRasterBand(1)
+    band.WriteArray(mask[:,:,int(comp[n])])
     ds.SetGeoTransform(gt)
     ds.SetProjection(projref)
     band.FlushCache()
