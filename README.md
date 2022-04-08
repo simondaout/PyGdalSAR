@@ -61,8 +61,8 @@ This project contains the following folders (add all those directories to your $
 Developpers & Contact
 =============
 ```
-Simon Daout: simon.daout@earth.ox.ac.uk
-Postdoctoral Research Fellow, Department of Earth Sciences, University of Oxford
+Simon Daout: simon.daout@univ-lorraine.fr
+Associate Professor, CRPG, NANCY
 ```
 
 ```
