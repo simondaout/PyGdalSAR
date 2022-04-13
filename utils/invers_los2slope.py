@@ -241,7 +241,6 @@ def compute_slope_aspect(path):
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
-    #filtrer = scipy.ndimage.filters.gaussian_filter(topo,2.)
     filtrer = scipy.ndimage.gaussian_filter(topo,2.)
     gt = ds.GetGeoTransform()
     projref = ds.GetProjectionRef()
@@ -253,14 +252,10 @@ def compute_slope_aspect(path):
     lat_moy = np.mean(lats)
     
     # Get resolution depending on whether the 
-    res = 0.
-    if 0.0001 < data1[1] < 0.0004:
-        res = 30.
-    elif 0.0007 < data1[1] < 0.001:
-        res = 90.
-    else:
-        logger.info("Cannot find spatial resolution in metadata. Exit")
-        #res = 10
+    res = data1[1]*40075e3/360
+    logger.info("Spatial resolution in deg: {}, in meter: {}".format(data1[1],res))
+    if res<1 or res>500:
+        logger.info("Spatial resolution seems unrealistic. Exit!")
         exit()  
         
     
@@ -276,13 +271,6 @@ def compute_slope_aspect(path):
     aspect = np.arctan2(Py,-Px)
     
     # Create aspect and slope files
-    #dst_ds = drv.CreateCopy('slope.tif',ds)
-    #band = dst_ds.GetRasterBand(1)
-    #band.WriteArray(np.rad2deg(slope))
-    #dst_ds = drv.CreateCopy('aspect.tif', ds)
-    #band = dst_ds.GetRasterBand(1)
-    #band.WriteArray(np.rad2deg(aspect))
-
     dst = drv.Create('slope.tif', nlines, ncols, 1, gdal.GDT_Float32)
     bandt = dst.GetRasterBand(1)
     bandt.WriteArray(np.rad2deg(slope))
@@ -297,8 +285,6 @@ def compute_slope_aspect(path):
     dst.SetProjection(projref)
     bandt.FlushCache()
 
-    exit() 
-    
     # Plot DEM, Slope, Py and aspect
     fig = plt.figure(1,figsize=(11,7))
     cmap = cm.terrain
@@ -554,28 +540,35 @@ for i in range(ibeg,iend):
 ################################
 
 mask = np.ones((nlines,ncols,3)) 
-    #np.ones(np.shape(disp))
 for n in range(N):
     # clean outlisers
     d = as_strided(disp[:,:,int(comp[n])])
     s = as_strided(sdisp[:,:,int(comp[n])])
     m = as_strided(mask[:,:,int(comp[n])])
+    # clean based on uncertainties
     index = s/abs(d) > 1 
-    m[index]= 0
+    m[index] = float('NaN')
+    d[index] = float('NaN') 
+    # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,98),d<np.percentile(d,2))
     d[index]= float('NaN') 
-    #d[np.abs(d)>9999.]= float('NaN'); s[np.abs(d)>9999.] = float('NaN')
-    
-    #d = as_strided(disp[:,:,int(comp[n])]) 
-    #s = as_strided(sdisp[:,:,int(comp[n])])
-    #d[s>9999.] = float('NaN') 
-    #s[s>9999.] = float('NaN')
+    m[index] = float('NaN') 
 
 if 'DEM' in locals():
     if DEM is not None:
         d = as_strided(disp[:,:,0])
         s = as_strided(sdisp[:,:,0])
+        m = as_strided(mask[:,:,:])
+        # clean U0 for small slopes
         d[np.rad2deg(slope)<min_slope] = float('NaN'); s[np.rad2deg(slope)<min_slope] = float('NaN')
+        m[np.rad2deg(slope)<min_slope] = float('NaN'); m[np.rad2deg(slope)<min_slope] = float('NaN')
+
+        # clean based on aspect
+        indice = np.nonzero(np.logical_and(np.rad2deg(rot)>70,np.rad2deg(rot)<120))
+        m[indice,:] =  float('NaN')
+        indice = np.nonzero(np.logical_and(np.rad2deg(rot)-70,np.rad2deg(rot)>-120))
+        m[indice,:] =  float('NaN')
+
 
 ################################
 # PLOT RESULTS
