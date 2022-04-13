@@ -547,12 +547,20 @@ for n in range(N):
     m = as_strided(mask[:,:,int(comp[n])])
     # clean based on uncertainties
     index = s/abs(d) > 1 
-    m[index] = float('NaN')
+    m[index] = 0.
     d[index] = float('NaN') 
     # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,98),d<np.percentile(d,2))
     d[index]= float('NaN') 
-    m[index] = float('NaN') 
+    m[index] = 0. 
+    
+    if 'DEM' in locals():
+       if DEM is not None:
+         # clean based on aspect
+         indice = np.nonzero(np.logical_and(np.rad2deg(rot)>70,np.rad2deg(rot)<120))
+         m[indice] =  0.
+         indice = np.nonzero(np.logical_and(np.rad2deg(rot)-70,np.rad2deg(rot)>-120))
+         m[indice] =  0.
 
 if 'DEM' in locals():
     if DEM is not None:
@@ -563,13 +571,7 @@ if 'DEM' in locals():
         d[np.rad2deg(slope)<min_slope] = float('NaN'); s[np.rad2deg(slope)<min_slope] = float('NaN')
         m[np.rad2deg(slope)<min_slope] = float('NaN'); m[np.rad2deg(slope)<min_slope] = float('NaN')
 
-        # clean based on aspect
-        indice = np.nonzero(np.logical_and(np.rad2deg(rot)>70,np.rad2deg(rot)<120))
-        m[indice,:] =  float('NaN')
-        indice = np.nonzero(np.logical_and(np.rad2deg(rot)-70,np.rad2deg(rot)>-120))
-        m[indice,:] =  float('NaN')
-
-
+   
 ################################
 # PLOT RESULTS
 ################################
