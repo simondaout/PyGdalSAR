@@ -550,7 +550,7 @@ for n in range(N):
     m[index] = 0.
     d[index] = float('NaN') 
     # clean based on outiliers
-    index = np.logical_or(d>np.percentile(d,98),d<np.percentile(d,2))
+    index = np.logical_or(d>np.percentile(d,99),d<np.percentile(d,1))
     d[index]= float('NaN') 
     m[index] = 0. 
     
