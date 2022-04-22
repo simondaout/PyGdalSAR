@@ -21,7 +21,7 @@ weight for the next iteration.
 
 Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
-[--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--slowslip=<value,value>] \
+[--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
 [--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
 [--sampling=<value>] [--emp_sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
@@ -46,6 +46,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --vector=<path>         Path to the vector text files containing a value for each dates [default: None]
 --seasonal=<yes/no>       If yes, add seasonal terms in the decomposition [default: no]
 --semianual=<yes/no>      If yes, add semianual terms in the decomposition [default: no]
+--seasonal_increase PATH         If yes, add seasonal terms function of time in the inversion
 --bianual=<yes/no>       If yes, add bianual terms in the decomposition [default: no]
 --dem=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
 --ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
@@ -93,7 +94,7 @@ from numpy.lib.stride_tricks import as_strided
 import scipy as sp
 import scipy.optimize as opt
 import scipy.linalg as lst
-import gdal, osr
+from osgeo import gdal, osr
 import math,sys,getopt
 from os import path, environ, getcwd
 import os
@@ -181,6 +182,28 @@ class interseismic(pattern):
 
     def g(self,t):
         func=(t-self.to)
+        return func
+
+class sint(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in range(t.size):
+            func[i]=(t[i]-self.to)*math.sin(2*math.pi*(t[i]-self.to))
+        return func
+
+class cost(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func=np.zeros(t.size)
+        for i in range(t.size):
+            func[i]=(t[i]-self.to)*math.cos(2*math.pi*(t[i]-self.to))
         return func
 
 class sin2var(pattern):
@@ -358,6 +381,8 @@ if arguments["--linear"] ==  None:
     arguments["--linear"] = 'yes'
 if arguments["--seasonal"] ==  None:
     arguments["--seasonal"] = 'no'
+if arguments["--seasonal_increase"] ==  None:
+    arguments["--seasonal_increase"] = 'no'
 if arguments["--semianual"] ==  None:
     arguments["--semianual"] = 'no'
 if arguments["--bianual"] ==  None:
@@ -862,6 +887,13 @@ if arguments["--seasonal"] =='yes':
     basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
     basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
     index = index + 2
+
+if arguments["--seasonal_increase"] =='yes':
+   # 2
+   indexseast = index
+   basis.append(cost(name='cost',reduction='cost',date=datemin))
+   basis.append(sint(name='sint',reduction='sint',date=datemin))
+   index = index + 2
 
 if arguments["--semianual"]=='yes':
      indexsemi = index
@@ -3965,6 +3997,77 @@ if arguments["--seasonal"]  == 'yes':
 
         logger.info('Save: {}'.format('phiwt_sigcoeff.r4'))
         fid = open('phiwt_sigcoeff.r4', 'wb')
+        sigphi.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+if arguments["--seasonal_increase"]  == 'yes':
+    cosine = as_strided(basis[indexseast].m)
+    sine = as_strided(basis[indexseast+1].m)
+    amp = np.sqrt(cosine**2+sine**2)
+    phi = np.arctan2(sine,cosine)
+
+    sigcosine = as_strided(basis[indexseas].sigmam)
+    sigsine = as_strided(basis[indexseas+1].sigmam)
+    sigamp = np.sqrt(sigcosine**2+sigsine**2)
+    sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
+
+    if arguments["--geotiff"] is not None:
+        logger.info('Save: {}'.format(outname))
+        ds = driver.Create('ampwt_increase_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(amp)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+        logger.info('Save: {}'.format('ampwt_increase_sigcoeff.tif'))
+        ds = driver.Create('ampwt_increase_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(sigamp)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+    else:
+        logger.info('Save: {}'.format('ampwt_increase_coeff.r4'))
+        fid = open('ampwt_increase_coeff.r4', 'wb')
+        amp.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+        logger.info('Save: {}'.format('ampwt_increase_sigcoeff.r4'))
+        fid = open('ampwt_increase_sigcoeff.r4', 'wb')
+        sigamp.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+    if arguments["--geotiff"] is not None:
+        logger.info('Save: {}'.format('phiwt_increase_coeff.tif'))
+        ds = driver.Create('phiwt_increase_coeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(phi)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+        logger.info('Save: {}'.format('phiwt_increase_sigcoeff.tif'))
+        ds = driver.Create('phiwt_increase_sigcoeff.tif', new_cols, new_lines, 1, gdal.GDT_Float32)
+        band = ds.GetRasterBand(1)
+        band.WriteArray(sigphi)
+        ds.SetGeoTransform(gt)
+        ds.SetProjection(proj)
+        band.FlushCache()
+        del ds
+
+    else:
+        logger.info('Save: {}'.format('phiwt_increase_coeff.r4'))
+        fid = open('phiwt_increase_coeff.r4', 'wb')
+        phi.flatten().astype('float32').tofile(fid)
+        fid.close()
+
+        logger.info('Save: {}'.format('phiwt_increase_sigcoeff.r4'))
+        fid = open('phiwt_increase_sigcoeff.r4', 'wb')
         sigphi.flatten().astype('float32').tofile(fid)
         fid.close()
 
