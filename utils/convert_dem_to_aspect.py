@@ -89,7 +89,7 @@ def compute_slope_aspect(path):
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,4)
-    cax = ax.imshow(np.rad2deg(aspect),cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
+    cax = ax.imshow(aspect,cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
     ax.set_title('aspect',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
     
