@@ -486,7 +486,7 @@ if arguments["--dateslim"] is not  None:
     datemin = date2dec(dmin)
     datemax = date2dec(dmax)
 else:
-    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
     dmax = str(datemax) + '0101'
     dmin = str(datemin) + '0101'
 
@@ -709,7 +709,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -763,17 +763,24 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
           bounds=list(zip(mmin,mmax))
-        
+
         else:
           minit=invSVD(A,b,cond)
           print('SVD solution:', minit)
           bounds=None
+        
+        def eq_cond(x, *args):
+           return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
        
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-            iter=iter,full_output=True,iprint=0,acc=acc)  
+        if eguality:
+            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime,eqcons=[eq_cond], \
+                iter=iter,full_output=True,iprint=0,acc=acc)  
+        else:
+            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
+                iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
         print('Optimization:', fsoln)
 
@@ -883,7 +890,10 @@ for jj in range((Npix)):
             names.append(kernels[l].reduction)
 
         print('basis functions:', names)
-        mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq)
+        eguality = False
+        if seasonalt == 'yes' and seasonal == 'yes':
+            eguality = True
+        mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq, eguality=eguality)
 
         # rebuild full vectors
         if Mker>0:
@@ -932,6 +942,7 @@ for jj in range((Npix)):
 
             if phi<0: 
                phi = phi + 2*np.pi
+            print(phi)
 
     if seasonalt=='yes':
             G=np.zeros((kk,2))
@@ -948,6 +959,7 @@ for jj in range((Npix)):
             # convert between 0 and 2pi
             if phi<0: 
                 phi = phi + 2*np.pi
+            print(phi)
 
             a_rate = (amp_max - amp_min)/(datemax-datemin)
 

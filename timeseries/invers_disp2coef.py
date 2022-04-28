@@ -1019,7 +1019,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -1064,11 +1064,19 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12):
           minit=invSVD(A,b,cond)
           bounds=None
         
+        def eq_cond(x, *args):
+           return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
+ 
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-            iter=iter,full_output=True,iprint=0,acc=acc)  
+
+        if eguality:
+            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime,eqcons=[eq_cond], \
+                iter=iter,full_output=True,iprint=0,acc=acc)
+        else:
+            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
+                iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
   
     # tarantola:
@@ -3436,9 +3444,12 @@ def temporal_decomp(pix):
             G[:,l]=basis[l].g(tabx)
         for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
-
+        
+        eguality = False
+        if seasonalt == 'yes' and seasonal == 'yes':
+            eguality = True
         # inversion
-        m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"])
+        m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
