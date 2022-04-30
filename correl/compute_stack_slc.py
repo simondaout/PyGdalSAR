@@ -6,10 +6,10 @@
 ############################################
 
 """\
-compute_ps.py
+compute_stack_slc.py
 ----------------------
 usage:
-  compute_ps.py [-v] [-f] [--base_file=<path>] [--outfile=<path>] 
+  compute_stack_slc.py [-v] [-f] [--base_file=<path>] [--outfile=<path>] 
 options:
   --base_file=<path>                Baseline file containing the dates list in the first column [Default: baseline.rsc]
   --outfile=<path>                  Name of the output file [Default: stack_amp_da.unw]
