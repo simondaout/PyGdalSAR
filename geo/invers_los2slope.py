@@ -548,6 +548,7 @@ for n in range(N):
     # clean based on uncertainties
     index = s/abs(d) > 1 
     m[index] = 0.
+    index = s/abs(d) > 2. 
     d[index] = float('NaN') 
     # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,99),d<np.percentile(d,1))
