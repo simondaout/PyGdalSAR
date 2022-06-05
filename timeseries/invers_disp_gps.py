@@ -14,7 +14,7 @@ invers_disp_gps.py
 -------------
 Temporal inversions of the gps time series displacements
 
-Usage: invers_disp_gps.py --network=<path> --reduction=<path> [--dim=<value>] [--wdir=<path>] [--extension=<value>] [--coseismic=<value>][--postseismic=<value>] [--seasonal=<yes/no>] [--cond=<value>] [--ineq=<value>] [--proj=<value>] [--scale=<value>]
+Usage: invers_disp_gps.py --network=<path> --reduction=<path> [--dim=<value>] [--wdir=<path>] [--extension=<value>] [--coseismic=<value>][--postseismic=<value>] [--seasonal=<yes/no>] [--cond=<value>] [--ineq=<value>] [--proj=<value>] [--scale=<value>]  [--bianual=<yes/no>]
 invers_disp_gps.py -h | --help
 
 Options:
@@ -27,6 +27,7 @@ Options:
 --coseismic PATH    Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH  Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) 
 --seasonal PATH     If yes, add seasonal terms in the inversion
+--bianual=<yes/no>       If yes, add bianual terms in the decomposition [default: no]
 --cond VALUE        Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE        If yes, add inequqlity constrained in the inversion: use lself.east square result to iterate the inversion. Force postseismic to be the same sign than coseismic [default: no].  
 --proj VALUE        LOS projection [default for Envisat satellite: 0.38690,-0.09645,0.91706]
@@ -80,22 +81,24 @@ if arguments["--seasonal"] ==  None:
     seasonal = 'no'
 else:
     seasonal = arguments["--seasonal"]
+if arguments["--bianual"] ==  None:
+    arguments["--bianual"] = 'no'
 if arguments["--coseismic"] ==  None:
     cos = []
 else:
-    cos = map(float,arguments["--coseismic"].replace(',',' ').split())
+    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
 if arguments["--postseismic"] ==  None:
     pos = []
 else:
-    pos = map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split())
+    pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
 if arguments["--proj"] ==  None:
     proj = [0.318,-0.0827,0.9396]
 else:
-    proj = map(float,arguments["--proj"].replace(',',' ').split())
+    proj = list(map(float,arguments["--proj"].replace(',',' ').split()))
 if arguments["--scale"] ==  None:
     scale = [1.,1.,1.]
 else:
-    scale = map(float,arguments["--scale"].replace(',',' ').split())
+    scale = list(map(float,arguments["--scale"].replace(',',' ').split()))
 
 ### Define GPS class
 class point:
@@ -145,12 +148,10 @@ class gpstimeseries:
             print('Load GPS time series: ', fname)
             print() 
         
-        #f=file(fname,'r')
         # name, self.east(km), self.north(km)
         name,x,y=np.loadtxt(fname,comments='#',unpack=True,dtype='S4,f,f')
 
         self.name,self.x,self.y=np.atleast_1d(name,x,y)
-        # print(self.name)
 
         self.Npoints=len(self.name)
         self.N=0
@@ -158,7 +159,7 @@ class gpstimeseries:
         
         print('Load time series... ')
         for i in range(self.Npoints):
-            station=self.wdir+self.reduction+'/'+self.name[i].decode('utf-8')+self.extension 
+            station=self.wdir+self.reduction+'/'+self.name[i].decode('utf-8')+self.extension
             print(station)
             if not path.isfile(station):
                 raise ValueError("invalid file name: " + station)
@@ -167,35 +168,35 @@ class gpstimeseries:
                 self.points.append(gpspoint(self.x[i],self.y[i],self.name[i]))
 
             if 3==self.dim:
-                dated,east,north,down,esigma,nsigma,dsigma=\
+                dated,east,north,up,esigma,nsigma,upsigma=\
                 np.loadtxt(station,comments='#',usecols=(0,1,2,3,4,5,6), unpack=True,\
                     dtype='f,f,f,f,f,f,f')
-                
-                self.points[i].dated,self.points[i].east,self.points[i].north,self.points[i].down,\
-                self.points[i].esigma,self.points[i].nsigma,self.points[i].dsigma=\
-                np.atleast_1d(dated,east*self.scale[0],north*self.scale[1],\
-                    down*self.scale[2],esigma*self.sigmad,nsigma*self.sigmad,\
-                    dsigma*self.sigmad)
 
-                self.points[i].los=self.proj[0]*self.points[i].east+self.proj[1]*self.points[i].north+self.proj[2]*self.points[i].down
-                self.points[i].lossigma=self.proj[0]*self.points[i].esigma+self.proj[1]*self.points[i].nsigma+self.proj[2]*self.points[i].dsigma
+                self.points[i].dated,self.points[i].east,self.points[i].north,self.points[i].up,\
+                self.points[i].esigma,self.points[i].nsigma,self.points[i].upsigma=\
+                np.atleast_1d(dated,east,north,\
+                    up,esigma,nsigma,upsigma)
 
-                self.points[i].d=[self.points[i].east,self.points[i].north,self.points[i].down,self.points[i].los]
-                self.points[i].sigmad=[self.points[i].esigma,self.points[i].nsigma,self.points[i].dsigma,self.points[i].lossigma]
-                self.points[i].comp=['east','north','down','los']
+                self.points[i].d=[self.points[i].east*1000,self.points[i].north*1000,self.points[i].up*1000]
+                self.points[i].sigmad=[self.points[i].esigma*1000,self.points[i].nsigma*1000,self.points[i].upsigma*1000]
+                self.points[i].comp=['east','north','up']
                 self.points[i].t=np.atleast_1d(self.points[i].dated)
 
             if 2==self.dim:
                 dated,east,north,esigma,nsigma=\
-                np.loadtxt(station,comments='#',usecols=(0,1,2,3,4), unpack=True,dtype='f,f,f,f,f')
-                self.points[i].dated,self.points[i].east,self.points[i].north,self.points[i].esigma,self.points[i].nsigma=\
-                np.ateast_1d(dated,east*self.scale[0],north*self.scale[1],\
-                    esigma*self.sigmad,nsigma*self.sigmad)
-                
-                self.points[i].d=[self.points[i].east,self.points[i].north]
-                self.points[i].sigmad=[self.points[i].esigma,self.points[i].nsigma]
+                np.loadtxt(station,comments='#',usecols=(0,1,2,3,4), unpack=True,\
+                    dtype='f,f,f,f,f')
+
+                self.points[i].dated,self.points[i].east,self.points[i].north,\
+                self.points[i].esigma,self.points[i].nsigma,\
+                np.atleast_1d(dated,east,north,\
+                    esigma,nsigma)
+
+                self.points[i].d=[self.points[i].east*1000,self.points[i].north*1000,self.points[i].up*1000]
+                self.points[i].sigmad=[self.points[i].esigma*1000,self.points[i].nsigma*1000,self.points[i].upsigma*1000]
                 self.points[i].comp=['east','north']
                 self.points[i].t=np.atleast_1d(self.points[i].dated)
+
 
             self.points[i].tmin,self.points[i].tmax=min(self.points[i].dated),max(self.points[i].dated)
             if self.points[i].tmin < self.tmin:
@@ -400,8 +401,30 @@ class cosvar(pattern):
             func[i]=math.cos(2*math.pi*(t[i]-self.to))
         return func
 
-datemin, datemax = int(np.min(manifold.tmin)), int(np.max(manifold.tmax))+1 
-# datemin, datemax= 2003, 2011
+class sin5var(pattern):
+     def __init__(self,name,reduction,date):
+         pattern.__init__(self,name,reduction,date)
+         self.to=date
+
+     def g(self,t):
+         func=np.zeros(t.size)
+         for i in range(t.size):
+             func[i]=math.sin(math.pi*(t[i]-self.to))
+         return func
+
+class cos5var(pattern):
+     def __init__(self,name,reduction,date):
+         pattern.__init__(self,name,reduction,date)
+         self.to=date
+
+     def g(self,t):
+         func=np.zeros(t.size)
+         for i in range(t.size):
+             func[i]=math.cos(math.pi*(t[i]-self.to))
+         return func
+
+#datemin, datemax = int(np.min(manifold.tmin)), int(np.max(manifold.tmax))+1 
+datemin, datemax= 2015, 2022
 
 basis=[
       reference(name='reference',date=datemin,reduction='ref'),
@@ -413,6 +436,12 @@ if seasonal=='yes':
    basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
    basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
    index = index +2
+
+if arguments["--bianual"]=='yes':
+     indexbi = index
+     basis.append(cos5var(name='bi-anual var (cos)',reduction='cos5wt',date=datemin))
+     basis.append(sin5var(name='bi-anual var (sin)',reduction='sin5wt',date=datemin))
+     index = index + 2
 
 indexco = np.zeros(len(cos))
 for i in range(len(cos)):
@@ -427,7 +456,6 @@ for i in range(len(pos)):
       indexpo[i] = index
       index = index + 1
 
-
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 
@@ -437,35 +465,24 @@ print('Number of basis functions:', M)
 for i in range((M)):
     basis[i].info()
 
-
 # plot diplacements maps
 nfigure = 10
-fig = plt.figure(nfigure+1,figsize=(12,8))
-fig2 = plt.figure(nfigure+2,figsize=(12,8))
-
 
 colors = ['royalblue','darkgreen','darkorchid','firebrick']
 
 for jj in range((manifold.Npoints)):
+    fig = plt.figure(nfigure+1,figsize=(12,8))
     name, i, j = manifold.name[jj], manifold.x[jj], manifold.y[jj]
     print('station:', name,i,j)
+    fig.suptitle('{0} {1:.3f} {2:.3f}'.format(name.decode('utf-8'),i,j))
     pt = manifold.points[jj]
     
-    # plot date
-    i = 0
-    for disp, sigma, name in zip(pt.d, pt.sigmad, pt.comp):
-        ax = fig.add_subplot(len(pt.comp),1,i+1)
-        ax.plot(pt.t, disp, 'o', color=colors[i], ms=2)
-        ax.errorbar(pt.t,disp,yerr=sigma,ecolor=colors[i],fmt='none', alpha=0.1)
-        ax.set_ylabel('{} (m)'.format(name))
-        # ax.legend(loc='best',fontsize='small')
-        ax.grid(True)
-        i = i+1
-
     pt.md, pt.md_lin, pt.d_lin, md, md_lin = [], [], [], [], []
     # iter over all components
-    for i in range(len(pt.comp)):
-        print(pt.comp[i])
+    i = 0
+    for disp, sigma, name in zip(pt.d, pt.sigmad, pt.comp):
+        print(name)
+
         # inversion model
         mdisp=np.ones((pt.Nt))*float('NaN')
 
@@ -478,7 +495,7 @@ for jj in range((manifold.Npoints)):
 
         t = time.time()
         # inversion
-        m,sigmam = consInvert(G,pt.d[i],pt.sigmad[i],cond=rcond,ineq=ineq)
+        m,sigmam = consInvert(G,disp,sigma,cond=rcond,ineq=ineq)
         
         print() 
         print('computation time:', time.time() - t)
@@ -488,14 +505,6 @@ for jj in range((manifold.Npoints)):
         mdisp = np.dot(G,m)
         pt.md.append(mdisp)
         
-        dmisp_lin = np.zeros((pt.Nt))
-        G=np.zeros((pt.Nt,2))
-        for l in range((1)):
-            G[:,l+1]=basis[l+1].g(pt.t)
-        mdisp_lin = np.dot(G[:,:],m[0:2])
-        pt.md_lin.append(mdisp-mdisp_lin)
-        pt.d_lin.append(pt.d[i]-mdisp_lin)
-
         tdec = np.arange(datemin, datemax, 0.01)
         G=np.zeros((len(tdec),M))
         for l in range((M)):
@@ -503,41 +512,21 @@ for jj in range((manifold.Npoints)):
         model = np.dot(G[:,:M],m[:M])
         md.append(model)
 
-        G=np.zeros((len(tdec),2))
-        for l in range((1)):
-            G[:,l+1]=basis[l+1].g(tdec)
-        model_lin = np.dot(G[:,:],m[0:2])
-        md_lin.append(model-model_lin)
-
-        
-    # plot detrended model and data 
-    i = 0
-    for disp, sigma,model_lin, name in zip(pt.d_lin, pt.sigmad, md_lin, pt.comp):
-        ax = fig2.add_subplot(len(pt.comp),1,i+1)
-        ax.plot(pt.t, disp, 'o', color=colors[i], ms=2)
-        ax.errorbar(pt.t,disp,yerr=sigma, ecolor=colors[i], fmt='none', alpha=0.1)
-        ax.plot(tdec,model_lin,'-r')
-        ax.set_ylabel('{} (m)'.format(name))
-        # ax.legend(loc='best',fontsize='small')
-        ax.grid(True)
-        ax.set_xlim([datemin,datemax])
-        i = i+1
-    
-
-    # plot model
-    i = 0
-    for disp, model, name in zip(pt.md, md,pt.comp):
+        # plot date
         ax = fig.add_subplot(len(pt.comp),1,i+1)
+        ax.plot(pt.t, disp, 'o', color=colors[i], ms=2)
+        ax.errorbar(pt.t,disp,yerr=sigma,ecolor=colors[i],fmt='none', alpha=0.1)
         ax.plot(tdec,model,'-r')
-        # ax.plot(pt.t, disp, 'o',color='red',ms=2, alpha=0.1,label='detrended data')
+        ax.set_ylabel('{} (mm)'.format(name))
+        # ax.legend(loc='best',fontsize='small')
+        ax.set_ylim([np.nanpercentile(disp,.2),np.nanpercentile(disp,99.8)])
         ax.set_xlim([datemin,datemax])
+        ax.grid(True)
         i = i+1
 
-    fig.suptitle('Data')
-    fig2.suptitle('Detrended Data')
     ax.set_xlabel('Time (Year/month/day)')
     fig.savefig('Disp_{}.eps'.format(pt.name), format='EPS')
+    plt.show()
 
 # plt.legend(loc='best')
-plt.show()
 sys.exit()
