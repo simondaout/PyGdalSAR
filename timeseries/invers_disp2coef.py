@@ -499,7 +499,7 @@ if arguments["--dateslim"] is not  None:
     datemin = date2dec(dmin)
     datemax = date2dec(dmax)
 else:
-    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
     dmax = str(datemax) + '0101'
     dmin = str(datemin) + '0101'
 
@@ -3446,7 +3446,7 @@ def temporal_decomp(pix):
             G[:,Mbasis+l]=kernels[l].g(k)
         
         eguality = False
-        if seasonalt == 'yes' and seasonal == 'yes':
+        if  arguments["--seasonal"] == 'yes' and arguments["--seasonal_increase"] == 'yes':
             eguality = True
         # inversion
         m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
@@ -3482,7 +3482,7 @@ models = np.zeros((new_lines,new_cols,N))
 maps_ramp = np.zeros((new_lines,new_cols,N))
 maps_topo = np.zeros((new_lines,new_cols,N))
 
-for ii in range(np.int(arguments["--niter"])):
+for ii in range(int(arguments["--niter"])):
     print()
     print('---------------')
     print('iteration: {}'.format(ii+1))
@@ -3660,7 +3660,7 @@ for ii in range(np.int(arguments["--niter"])):
 
     print('Dates      APS     # of points')
     for l in range(N):
-        print (idates[l], aps[l], np.int(n_aps[l]))
+        print (idates[l], aps[l], int(n_aps[l]))
     np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
     # set apsf is yes for iteration
     apsf=='yes'
