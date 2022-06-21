@@ -26,6 +26,7 @@ Options:
   -h --help           Show this screen
 """
 
+from os import environ
 import glob, math, os, sys
 from osgeo import gdal
 import numpy as np
@@ -33,6 +34,9 @@ import docopt
 gdal.UseExceptions()
 import shutil
 from datetime import datetime
+import matplotlib
+if environ["TERM"].startswith("screen"):
+        matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -113,7 +117,8 @@ if run is True:
         if (im[n] == date_1[k] or date == date_2[k]) and (Bt >= bc):
                 # Open ifg
                 folder =  'int_'+ str(date_1[k]) + '_' + str(date_2[k]) + '/'
-                infile= intdir + folder + str(prefix) + str(date_1[k]) + '-' + str(date_2[k]) + str(suffix) + '.unw'
+                #infile= intdir + folder + str(prefix) + str(date_1[k]) + '-' + str(date_2[k]) + str(suffix) + '.unw'
+                infile= intdir + str(prefix) + str(date_1[k]) + '-' + str(date_2[k]) + str(suffix) + '.unw'
                 print('Open ifg {}'.format(str(prefix) + str(date_1[k]) + '-' + str(date_2[k]) + str(suffix) + '.unw'))
                 ds = gdal.OpenEx(infile, allowed_drivers=["ROI_PAC"])
                 ds_band2 = ds.GetRasterBand(2)
@@ -133,6 +138,10 @@ for n in range(nmax):
     index = np.nonzero(count[:,:,n])
     countf[index] += 1
 
+# save r4
+fid2 = open('count_pixel_all.r4','wb')
+countf.flatten().astype('float32').tofile(fid2)
+
 # plot results
 fig = plt.figure(0)
 ax = fig.add_subplot(1,1,1)
@@ -143,10 +152,6 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 fig.savefig('{}.eps'.format('count_pixels_all_{}'.format(bc)), format='EPS',dpi=150)
-
-# save r4
-fid2 = open('count_pixel_all.r4','wb')
-countf.flatten().astype('float32').tofile(fid2)
 
 fig = plt.figure(1,figsize=(14,10))
 fig.subplots_adjust(wspace=0.01)
