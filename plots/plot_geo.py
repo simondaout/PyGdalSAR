@@ -37,8 +37,7 @@ Options:
 """
 
 # gdal
-from osgeo import gdal
-import osr
+from osgeo import gdal, osr
 gdal.UseExceptions()
 import os
 # numpy
@@ -200,7 +199,7 @@ else:
 #cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
 #     vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4)
+     vmax=vmax,vmin=vmin, zorder=4,interpolation='nearest')
 
 if arguments["--shapefile"] is not None and os.path.exists(arguments["--shapefile"]):
     sf = shp.Reader(arguments["--shapefile"])

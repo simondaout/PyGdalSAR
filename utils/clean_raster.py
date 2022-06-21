@@ -10,9 +10,9 @@
 ############################################
 
 """\
-clean_r4.py
+clean_raster.py
 -------------
-Clean a r4 file given an other r4 file (mask) and a threshold on this mask
+Clean a raster file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
 [--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
@@ -380,8 +380,8 @@ kk = np.nonzero(
 mf[kk] = float('NaN')
 
 # Plot
-vmax = np.max([np.nanpercentile(mf,99),np.nanpercentile(m,99),np.nanpercentile(mf,1),np.nanpercentile(m,1)])
-vmin = -vmax
+vmax = np.nanpercentile(mf,98)
+vmin = np.nanpercentile(mf,2)
 
 if setzero == 'yes':
     print('HELLO')
@@ -402,9 +402,17 @@ else:
    dst_band2.FlushCache()
    del dst_ds
 
+try:
+  from matplotlib.colors import LinearSegmentedColormap
+  cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+  cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+  cmap = cmap.reversed()
+except:
+  cmap=cm.rainbow
+
 fig = plt.figure(0,figsize=(16,6))
 ax = fig.add_subplot(1,4,1)
-cax = ax.imshow(m, cm.RdBu,vmin=vmin, vmax=vmax)
+cax = ax.imshow(m, cmap,vmin=vmin, vmax=vmax, interpolation='nearest')
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -413,7 +421,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,2)
-cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=np.nanpercentile(mask,99))
+cax = ax.imshow(mask, cmap, vmin=0, vmax=np.nanpercentile(mask,99),interpolation='nearest')
 ax.set_title('MASK')
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -422,7 +430,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,3)
-cax = ax.imshow(mf_ramp, cm.RdBu, vmin=vmin, vmax=vmax)
+cax = ax.imshow(mf_ramp, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
 ax.set_title('DATA - RAMP')
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -431,7 +439,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,4)
-cax = ax.imshow(mf, cm.RdBu, vmin=vmin, vmax=vmax)
+cax = ax.imshow(mf, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
 setp( ax.get_xticklabels(), visible=False)
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
