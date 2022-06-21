@@ -98,6 +98,8 @@ elif arguments["--ramp"] == 'quad':
     ramp = 'quad'
 elif arguments["--ramp"] == 'cub':
     ramp = 'cub'
+elif arguments["--ramp"] == '4':
+    ramp = '4'
 elif arguments["--ramp"] == 'yes':
     print('ramp==yes is depricated. Use lin/quad/cub/no. Set ramp to lin')
     ramp = 'lin'
@@ -262,6 +264,46 @@ elif ramp=='cub':
     mf=temp.reshape(nlines,ncols)
     mf_ramp=temp.reshape(nlines,ncols)
 
+elif ramp=='4':
+    index = np.nonzero(~np.isnan(m_ramp))
+    temp = np.array(index).T
+    mi = m[index].flatten()
+    az = temp[:,0]; rg = temp[:,1]
+
+    G=np.zeros((len(mi),9))
+    G[:,0] = rg**3
+    G[:,1] = rg**2
+    G[:,2] = rg
+    G[:,3] = az**3
+    G[:,4] = az**2
+    G[:,5] = (az*rg)**2
+    G[:,6] = (az*rg)
+    G[:,7] = az
+    G[:,8] = 1
+
+    x0 = lst.lstsq(G,mi)[0]
+    _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+    _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]; i = pars[8] 
+    print('Remove ramp %f x**3 + %f x**2 + %f x  + %f y**3 + %f y**2 + %f xy**2 + %f xy + %f y + %f'%(a,b,c,d,e,f,g,h,i))
+
+    G=np.zeros((len(mask.flatten()),9))
+    for i in range(nlines):
+        G[i*ncols:(i+1)*ncols,0] = np.arange((ncols))**3
+        G[i*ncols:(i+1)*ncols,1] = np.arange((ncols))**2
+        G[i*ncols:(i+1)*ncols,2] = np.arange((ncols))
+        G[i*ncols:(i+1)*ncols,3] = i**3
+        G[i*ncols:(i+1)*ncols,4] = i**2
+        G[i*ncols:(i+1)*ncols,5] = (i*np.arange((ncols)))**2
+        G[i*ncols:(i+1)*ncols,6] = i*np.arange((ncols))
+        G[i*ncols:(i+1)*ncols,7] = i
+    G[:,8] = 1
+    temp = (mf.flatten() - np.dot(G,pars))
+    mf=temp.reshape(nlines,ncols)
+    mf_ramp=temp.reshape(nlines,ncols)
+
 else:
     mf_ramp= np.copy(mf)
 
@@ -352,7 +394,7 @@ if sformat == 'R4':
     mf.flatten().astype('float32').tofile(fid3)
     fid3.close()
 else:
-   dst_ds = driver.Create(outfile + '.tif', ncols, nlines, 1, gdal.GDT_Float32)
+   dst_ds = driver.Create(outfile, ncols, nlines, 1, gdal.GDT_Float32)
    dst_band2 = dst_ds.GetRasterBand(1)
    dst_band2.WriteArray(mf,0,0)
    dst_ds.SetGeoTransform(gt)
