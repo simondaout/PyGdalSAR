@@ -13,6 +13,7 @@ endif
 
 set DX = `gmt grdinfo $1.grd -C | cut -f8`
 set DPI = `gmt gmtmath -Q $DX INV RINT = `
+set DPI = 2000
 echo $DPI
 gmt gmtset COLOR_MODEL = hsv
 gmt gmtset PS_MEDIA = letter

@@ -546,12 +546,13 @@ for n in range(N):
     s = as_strided(sdisp[:,:,int(comp[n])])
     m = as_strided(mask[:,:,int(comp[n])])
     # clean based on uncertainties
+    #index = s/abs(d) > 4. 
+    index = s>np.nanpercentile(s,99)
+    d[index] = float('NaN') 
     index = s/abs(d) > 1 
     m[index] = 0.
-    index = s/abs(d) > 2. 
-    d[index] = float('NaN') 
     # clean based on outiliers
-    index = np.logical_or(d>np.percentile(d,99),d<np.percentile(d,1))
+    index = np.logical_or(d>np.percentile(d,99.8),d<np.percentile(d,.2))
     d[index]= float('NaN') 
     m[index] = 0. 
     
