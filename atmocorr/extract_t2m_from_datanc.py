@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-# -*- coding: utf-8 -*-
 import datetime, sys
 import numpy as np
 from osgeo import gdal
@@ -15,7 +14,7 @@ print('Coordinates:', ds.GetGeoTransform())
 print('Grid:', ds.RasterYSize,ds.RasterXSize)
 
 # convert dates
-date_ref = datetime.datetime(1900, 01, 01)
+date_ref = datetime.datetime(1900, 1, 1)
 
 temp = np.zeros((ds.RasterYSize,ds.RasterXSize,ds.RasterCount)) 
 dates,time,mode=[],[],[]
@@ -56,7 +55,7 @@ time,dates,mode = np.array(time), np.array(dates),np.array(mode)
 # Initialisation
 nfigure = 0
 phase,amplitude = np.zeros((ds.RasterYSize,ds.RasterXSize)),np.zeros((ds.RasterYSize,ds.RasterXSize))
-datemin, datemax= np.int(np.min(time)), np.int(np.max(time))+1
+datemin, datemax= int(np.min(time)), int(np.max(time))+1
 # print(datemin,datemax)
 # sys.exit()
 doplot='yes'
@@ -97,11 +96,11 @@ def plot(dates,time,mode,temp):
     ax = fig.add_subplot(1,1,1)
     # convert idates to num
     x = date2num(dates)
-    xmin,xmax=datetime.datetime(np.int(datemin), 01, 01),datetime.datetime(datemax, 01, 01)
+    xmin,xmax=datetime.datetime(int(datemin), 1, 1),datetime.datetime(datemax, 1, 1)
     xlim=date2num(np.array([xmin,xmax]))
     # format the ticks
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-    ax.plot(x,temp, '-bo',ms=.5,lw=.1,color='blue',label='ERAI point {}, {}'.format(lat,lon),rasterized=True)
+    ax.plot(x,temp, '-bo',ms=.5,lw=.1,label='ERAI point {}, {}'.format(lat,lon),rasterized=True)
     ax.plot(x,fit,'-r',lw=2.0,label='MAAT: {0:.2f}, v: {1:.2f} deg/yrs, dphi:{2:.2f} rad, Amp:{3:.2f} deg'.format(np.mean(temp),v,dphi,amp))
     ax.plot(xlim,[0,0],'--',c='black')
     fig.autofmt_xdate()
@@ -117,7 +116,7 @@ def plot(dates,time,mode,temp):
     fig2 = plt.figure(nfigure,figsize=(7,5))
     ax2 = fig2.add_subplot(1,1,1)
     ax2.set_xlim([0,1])
-    ax2.plot(mode,temp, '-bo',ms=.5,lw=.1,color='blue',label='ERAI point {}, {}'.format(lat,lon),rasterized=True)
+    ax2.plot(mode,temp, '-bo',ms=.5,lw=.1,label='ERAI point {}, {}'.format(lat,lon),rasterized=True)
     x = np.arange(0,1,0.01)
     fit = seasonal(x,v,a,b,c)
     ax2.plot(x,fit,'-r',lw=2.0,label='MAAT: {0:.2f}'.format(np.mean(temp)))
@@ -126,7 +125,7 @@ def plot(dates,time,mode,temp):
     idx = np.argwhere(np.diff(np.sign(fit))).flatten()
     for k in range(len(idx)):
         ax2.text(x[idx[k]],-25,'{:0.3f}'.format(x[idx[k]]))
-        ax2.text(x[idx[k]],-28,(datetime.datetime(np.int(datemin), 1, 1) + datetime.timedelta(x[idx[k]]*365.1 - 1)).strftime('%Y/%m/%d'))
+        ax2.text(x[idx[k]],-28,(datetime.datetime(int(datemin), 1, 1) + datetime.timedelta(x[idx[k]]*365.1 - 1)).strftime('%Y/%m/%d'))
         ax2.plot([x[idx[k]],x[idx[k]]],[-30,30],'--',c='black')
 
     ax2.set_xticks(np.arange(0, 1, 1./12))
@@ -152,7 +151,8 @@ for i in range(ds.RasterYSize):
 
         # save data
         fid=open('temperatures_{}_{}.txt'.format(lat,lon),'wb')
-        np.savetxt(fid,np.vstack([time,t]).T,fmt='%.6f',delimiter='\t',newline='\n')
+        #np.savetxt(fid,np.vstack([time,t]).T,fmt='%.6f',delimiter='\t',newline='\n')
+        np.savetxt(fid,np.vstack([dates,time,t]).T,fmt='%s',delimiter='\t',newline='\n')
 
 # create new GDAL NCDF
 drv = gdal.GetDriverByName("NETCDF")

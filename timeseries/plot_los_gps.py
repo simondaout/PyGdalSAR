@@ -53,9 +53,9 @@ if arguments["--extension"] ==  None:
 else:
     ext = arguments["--extension"]    
 if arguments["--outputdir"] ==  None:
-    out = 'ts_plots'
+    out = 'ts_plots/'
 else:
-    out = arguments["--outputdir"]    
+    out = arguments["--outputdir"] + '/'   
 
 dim = 3 # cannot proj without vertical 
 
@@ -268,8 +268,8 @@ class gpstimeseries:
                 
                 self.points[i].dated,self.points[i].east,self.points[i].north,self.points[i].up,\
                 self.points[i].esigma,self.points[i].nsigma,self.points[i].upsigma=\
-                np.atleast_1d(dated,east,north,\
-                    up,esigma,nsigma,upsigma)
+                np.atleast_1d(dated,east*1000,north*1000,\
+                    up*1000,esigma*1000,nsigma*1000,upsigma*1000)
                  
                 self.points[i].los=neu2los_roipac(self.points[i].north, self.points[i].east, self.points[i].up, self.look[i], self.heading[i])
                 self.points[i].lossigma=neu2los_roipac(self.points[i].nsigma, self.points[i].esigma, self.points[i].upsigma, self.look[i], self.heading[i])
@@ -305,7 +305,7 @@ manifold.load()
 manifold.info()
 
 #datemin, datemax = np.int(np.min(manifold.tmin)), np.int(np.max(manifold.tmax))+1 
-datemin, datemax= 2014, 2021
+datemin, datemax= 2015, 2022
 
 # plot diplacements maps
 nfigure = 0
@@ -328,8 +328,9 @@ for jj in range((manifold.Npoints)):
         ax = fig.add_subplot(len(pt.comp),1,i+1)
         ax.plot(pt.t, disp, 'o', color=colors[i], ms=2)
         ax.errorbar(pt.t,disp,yerr=sigma,ecolor=colors[i],fmt='none', alpha=0.1)
-        ax.set_ylabel('{} (m)'.format(name))
+        ax.set_ylabel('{} (mm)'.format(name))
         ax.set_xlim([datemin,datemax])
+        ax.set_ylim([np.nanpercentile(disp,.2),np.nanpercentile(disp,99.8)])
         #ax.legend(loc='best',fontsize='small')
         ax.grid(True)
         i = i+1
@@ -339,5 +340,5 @@ for jj in range((manifold.Npoints)):
     del fig
 
 # plt.legend(loc='best')
-plt.show()
+#plt.show()
 sys.exit()

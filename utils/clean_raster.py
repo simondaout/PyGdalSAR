@@ -10,9 +10,9 @@
 ############################################
 
 """\
-clean_r4.py
+clean_raster.py
 -------------
-Clean a r4 file given an other r4 file (mask) and a threshold on this mask
+Clean a raster file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
 [--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
@@ -98,6 +98,8 @@ elif arguments["--ramp"] == 'quad':
     ramp = 'quad'
 elif arguments["--ramp"] == 'cub':
     ramp = 'cub'
+elif arguments["--ramp"] == '4':
+    ramp = '4'
 elif arguments["--ramp"] == 'yes':
     print('ramp==yes is depricated. Use lin/quad/cub/no. Set ramp to lin')
     ramp = 'lin'
@@ -262,6 +264,46 @@ elif ramp=='cub':
     mf=temp.reshape(nlines,ncols)
     mf_ramp=temp.reshape(nlines,ncols)
 
+elif ramp=='4':
+    index = np.nonzero(~np.isnan(m_ramp))
+    temp = np.array(index).T
+    mi = m[index].flatten()
+    az = temp[:,0]; rg = temp[:,1]
+
+    G=np.zeros((len(mi),9))
+    G[:,0] = rg**3
+    G[:,1] = rg**2
+    G[:,2] = rg
+    G[:,3] = az**3
+    G[:,4] = az**2
+    G[:,5] = (az*rg)**2
+    G[:,6] = (az*rg)
+    G[:,7] = az
+    G[:,8] = 1
+
+    x0 = lst.lstsq(G,mi)[0]
+    _func = lambda x: np.sum(((np.dot(G,x)-mi))**2)
+    _fprime = lambda x: 2*np.dot(G.T, (np.dot(G,x)-mi))
+    pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]    
+    #pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),mi)
+    a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]; i = pars[8] 
+    print('Remove ramp %f x**3 + %f x**2 + %f x  + %f y**3 + %f y**2 + %f xy**2 + %f xy + %f y + %f'%(a,b,c,d,e,f,g,h,i))
+
+    G=np.zeros((len(mask.flatten()),9))
+    for i in range(nlines):
+        G[i*ncols:(i+1)*ncols,0] = np.arange((ncols))**3
+        G[i*ncols:(i+1)*ncols,1] = np.arange((ncols))**2
+        G[i*ncols:(i+1)*ncols,2] = np.arange((ncols))
+        G[i*ncols:(i+1)*ncols,3] = i**3
+        G[i*ncols:(i+1)*ncols,4] = i**2
+        G[i*ncols:(i+1)*ncols,5] = (i*np.arange((ncols)))**2
+        G[i*ncols:(i+1)*ncols,6] = i*np.arange((ncols))
+        G[i*ncols:(i+1)*ncols,7] = i
+    G[:,8] = 1
+    temp = (mf.flatten() - np.dot(G,pars))
+    mf=temp.reshape(nlines,ncols)
+    mf_ramp=temp.reshape(nlines,ncols)
+
 else:
     mf_ramp= np.copy(mf)
 
@@ -338,8 +380,8 @@ kk = np.nonzero(
 mf[kk] = float('NaN')
 
 # Plot
-vmax = np.max([np.nanpercentile(mf,99),np.nanpercentile(m,99),np.nanpercentile(mf,1),np.nanpercentile(m,1)])
-vmin = -vmax
+vmax = np.nanpercentile(mf,98)
+vmin = np.nanpercentile(mf,2)
 
 if setzero == 'yes':
     print('HELLO')
@@ -352,7 +394,7 @@ if sformat == 'R4':
     mf.flatten().astype('float32').tofile(fid3)
     fid3.close()
 else:
-   dst_ds = driver.Create(outfile + '.tif', ncols, nlines, 1, gdal.GDT_Float32)
+   dst_ds = driver.Create(outfile, ncols, nlines, 1, gdal.GDT_Float32)
    dst_band2 = dst_ds.GetRasterBand(1)
    dst_band2.WriteArray(mf,0,0)
    dst_ds.SetGeoTransform(gt)
@@ -360,9 +402,17 @@ else:
    dst_band2.FlushCache()
    del dst_ds
 
+try:
+  from matplotlib.colors import LinearSegmentedColormap
+  cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
+  cmap = LinearSegmentedColormap.from_list('roma', np.loadtxt(cm_locs+"roma.txt"))
+  cmap = cmap.reversed()
+except:
+  cmap=cm.rainbow
+
 fig = plt.figure(0,figsize=(16,6))
 ax = fig.add_subplot(1,4,1)
-cax = ax.imshow(m, cm.RdBu,vmin=vmin, vmax=vmax)
+cax = ax.imshow(m, cmap,vmin=vmin, vmax=vmax, interpolation='nearest')
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -371,7 +421,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,2)
-cax = ax.imshow(mask, cm.RdBu, vmin=0, vmax=np.nanpercentile(mask,99))
+cax = ax.imshow(mask, cmap, vmin=0, vmax=np.nanpercentile(mask,99),interpolation='nearest')
 ax.set_title('MASK')
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -380,7 +430,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,3)
-cax = ax.imshow(mf_ramp, cm.RdBu, vmin=vmin, vmax=vmax)
+cax = ax.imshow(mf_ramp, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
 ax.set_title('DATA - RAMP')
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -389,7 +439,7 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 ax = fig.add_subplot(1,4,4)
-cax = ax.imshow(mf, cm.RdBu, vmin=vmin, vmax=vmax)
+cax = ax.imshow(mf, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
 setp( ax.get_xticklabels(), visible=False)
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
