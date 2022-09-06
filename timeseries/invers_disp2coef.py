@@ -99,14 +99,9 @@ import math,sys,getopt
 from os import path, environ, getcwd
 import os
 import matplotlib
-if environ["TERM"].startswith("screen"):
-    matplotlib.use('Agg')
-#matplotlib.use('TkAgg') # Must be before importing matplotlib.pyplot or pylab!
-# from pylab import *
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
 from datetime import datetime as datetimes
-from pylab import date2num
 
 try:
     from nsbas import docopt
@@ -116,7 +111,7 @@ except:
 from contextlib import contextmanager
 from functools import wraps, partial
 # import multiprocessing
-import logging
+import logging, time
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -125,6 +120,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO,\
         format='line %(lineno)s -- %(levelname)s -- %(message)s')
 logger = logging.getLogger('invers_disp2coef.log')
+start_time = time.time()
 
 ################################
 # Create lib of wavelet functions
@@ -469,10 +465,12 @@ if arguments["--plot"] ==  'yes':
     if environ["TERM"].startswith("screen"):
         matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
+    from pylab import date2num
 else:
     plot = 'no'
     matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
+    from pylab import date2num
 if arguments["--imref"] ==  None:
     imref = 0
 elif int(arguments["--imref"]) < 1:
@@ -499,7 +497,7 @@ if arguments["--dateslim"] is not  None:
     datemin = date2dec(dmin)
     datemax = date2dec(dmax)
 else:
-    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
     dmax = str(datemax) + '0101'
     dmin = str(datemin) + '0101'
 
@@ -537,10 +535,8 @@ else:
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
     logger.warning('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-# print(ibeg,iend,jbeg,jend)
 
 # extract time series
-# cube = np.zeros((nlines,ncol,N)).flatten()
 cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
 logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
@@ -562,8 +558,6 @@ maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
 logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
 logger.info('Reshape cube: {}'.format(maps.shape))
 new_lines, new_cols = maps.shape[0], maps.shape[1]
-# print(new_cols, new_lines) 
-# sys.exit(0)
 
 if arguments["--crop_emp"] ==  None:
     crop_emp = [0,new_lines,0,new_cols]
@@ -571,18 +565,9 @@ else:
     crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
     logger.warning('Crop empirical estimation between lines {}-{} and cols {}-{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
 ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
-# print(ibeg_emp,iend_emp,jbeg_emp,jend_emp)
-# sys.exit(0)
 
 # clean
 del cube, cubei, maps_temp
-
-# fig = plt.figure(0)
-# plt.imshow(maps[ibeg_emp:iend_emp,jbeg_emp:jend_emp,-1],vmax=1,vmin=-1)
-# fig = plt.figure(1)
-# plt.imshow(maps[:,:,imref],vmax=1,vmin=-1)
-# plt.show()
-# sys.exit()
 
 nfigure=0
 # open mask file
@@ -620,17 +605,11 @@ if arguments["--topofile"] is not None:
       fid.close()
 
     elevi = elevi[:nlines*ncol]
-    # fig = plt.figure(10)
-    # plt.imshow(elevi.reshape(new_lines,new_cols)[ibeg:iend,jbeg:jend])
     elev = elevi.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     elev[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(elev)>9999.)
     elev[kk] = float('NaN')
     elevi = elev.flatten()
-    # fig = plt.figure(11)
-    # plt.imshow(elev[ibeg:iend,jbeg:jend])
-    # plt.show()
-    # sys.exit()
 
     # define max min topo for empirical relationship
     maxtopo,mintopo = np.nanpercentile(elev,float(arguments["--perc_topo"])),np.nanpercentile(elev,100-float(arguments["--perc_topo"]))
@@ -659,11 +638,6 @@ if arguments["--aspect"] is not None:
     kk = np.nonzero(abs(slope>9999.))
     slope[kk] = float('NaN')
     aspecti = slope.flatten()
-    # print slope[slope<0]
-    # fig = plt.figure(11)
-    # plt.imshow(elev[ibeg:iend,jbeg:jend])
-    # plt.show()
-    # sys.exit()
 else:
     slope = np.ones((new_lines,new_cols))
     aspecti = slope.flatten()
@@ -684,8 +658,6 @@ if arguments["--rmspixel"] is not None:
     plt.setp( ax.get_xticklabels(), visible=False)
     fig.colorbar(cax, orientation='vertical',aspect=10)
     del spacial_mask
-    # if plot=='yes':
-    #    plt.show()
 else:
     rmsmap = np.ones((new_lines,new_cols))
     spacial_mask = np.ones((new_lines,new_cols))
@@ -805,15 +777,10 @@ fig = plt.figure(nfigure,figsize=(14,10))
 fig.subplots_adjust(wspace=0.001)
 vmax = np.nanpercentile(maps[:,:,:],99.)
 vmin = np.nanpercentile(maps[:,:,:],1.)
-# vmax = np.abs([np.nanmedian(maps[:,:,-1]) + 1.*np.nanstd(maps[:,:,-1]),\
-#     np.nanmedian(maps[:,:,-1]) - 1.*np.nanstd(maps[:,:,-1])]).max()
-# vmin = -vmax
 
 for l in range((N)):
     d = as_strided(maps[:,:,l])
-    #ax = fig.add_subplot(1,N,l+1)
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    #cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)ftem
     cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
     ax.set_title(idates[l],fontsize=6)
     plt.setp( ax.get_xticklabels(), visible=False)
@@ -821,12 +788,11 @@ for l in range((N)):
 
 plt.suptitle('Time series maps')
 fig.colorbar(cax, orientation='vertical',aspect=10)
-#fig.tight_layout()
 fig.savefig('maps.eps', format='EPS',dpi=150)
 
 if plot=='yes':
         plt.show()
-
+del fig
 
 #######################################################
 # Save new lect.in file
@@ -1019,7 +985,8 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
+#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4,eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -3446,7 +3413,7 @@ def temporal_decomp(pix):
             G[:,Mbasis+l]=kernels[l].g(k)
         
         eguality = False
-        if seasonalt == 'yes' and seasonal == 'yes':
+        if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
             eguality = True
         # inversion
         m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
@@ -3457,10 +3424,12 @@ def temporal_decomp(pix):
         # compute aps for each dates
         # aps_tmp = pow((disp[k]-mdisp[k])/inaps[k],2)
         # dont weight by inaps to be consistent from one iteration to the other
+       
         aps_tmp[k] = abs((disp[k]-mdisp[k]))
-
-        # count number of pixels per dates
-        naps_tmp[k] = naps_tmp[k] + 1.0
+        for kk in k: 
+            # count number of pixels per dates
+            if  aps_tmp[kk] is not float('NaN'):
+                naps_tmp[k] = naps_tmp[k] + 1.0
 
         # Build seasonal and vect models
         if arguments["--fulloutput"]=='yes':
@@ -3482,7 +3451,7 @@ models = np.zeros((new_lines,new_cols,N))
 maps_ramp = np.zeros((new_lines,new_cols,N))
 maps_topo = np.zeros((new_lines,new_cols,N))
 
-for ii in range(np.int(arguments["--niter"])):
+for ii in range(int(arguments["--niter"])):
     print()
     print('---------------')
     print('iteration: {}'.format(ii+1))
@@ -3627,8 +3596,8 @@ for ii in range(np.int(arguments["--niter"])):
               j = pix  % (new_cols)
               i = int(pix/(new_cols))
 
-              if ((i % 50) == 0) and (j==0):
-                logger.info('Processing line: {}'.format(i))
+              if ((i % 10) == 0) and (j==0):
+                logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
               
               if arguments["--fulloutput"]=='yes':
                 m, sigmam, models[i,j,:], models_seas[i,j,:], models_vect[i,j,:], aps_pix, naps_pix = temporal_decomp(pix)
@@ -3660,7 +3629,7 @@ for ii in range(np.int(arguments["--niter"])):
 
     print('Dates      APS     # of points')
     for l in range(N):
-        print (idates[l], aps[l], np.int(n_aps[l]))
+        print (idates[l], aps[l], int(n_aps[l]))
     np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
     # set apsf is yes for iteration
     apsf=='yes'
