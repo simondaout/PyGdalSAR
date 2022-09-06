@@ -165,7 +165,7 @@ Npix = len(ipix)
 # load images_retenues file
 # load images_retenues file
 nb,idates,tdec,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-datemin, datemax = np.int(np.min(tdec)), np.int(np.max(tdec))+1
+datemin, datemax = int(np.min(tdec)), int(np.max(tdec))+1
 N = len(idates)
 base = base - base[imref]
 print('Number images: ', N)
