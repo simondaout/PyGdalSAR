@@ -16,12 +16,11 @@ plot\_raster.py
 Display and Cut image file (.unw/.int/.r4/.tiff)
 
 Usage: plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
-[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] 
+[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--band=<values>] 
        plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
-[--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--cols=<values>] [--lines=<values>]
+[--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--cols=<values>] [--lines=<values>] [--band=<values>]
        plot\_raster.py --infile=<path> [--cpt=<values>] [--crop=<values>] \
-[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] 
-
+[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--band=<values>] [--band=<values>] 
 
 
 Options:
@@ -43,6 +42,7 @@ Options:
 --vmin                Min colorscale [default: 2th percentile]
 --cols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
 --lines VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
+--band=<values>      Select band number [default: 1] 
 """
 
 import os, sys
@@ -90,9 +90,14 @@ else:
     lecfile = arguments["--lectfile"]
 
 if arguments["--rad2mm"] ==  None:
-        rad2mm = 1
+    rad2mm = 1
 else:
-        rad2mm = float(arguments["--rad2mm"])
+    rad2mm = float(arguments["--rad2mm"])
+
+if arguments["--band"] ==  None:
+    band = 1
+else:
+    band = int(arguments["--band"][0])
 
 if (arguments["--cols"] is not None and arguments["--lines"] is not None):
     ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
@@ -131,7 +136,7 @@ if sformat == "ROI_PAC":
 
 elif sformat == "GTIFF":
     ds = gdal.Open(infile, gdal.GA_ReadOnly)
-    phase_band = ds.GetRasterBand(1)
+    phase_band = ds.GetRasterBand(band)
     # Attributes
     print("> Driver:   ", ds.GetDriver().ShortName)
     print("> Size:     ", ds.RasterXSize,'x',ds.RasterYSize,'x',ds.RasterCount)
@@ -263,10 +268,11 @@ else:
     vmax = np.nanpercentile(cutphi,98)
     vmin = np.nanpercentile(cutphi,2)
 
-
-
 # replace 0 by nan
-cutphi[cutphi==0] = float('NaN')
+try:
+    cutphi[cutphi==0] = float('NaN')
+except:
+    pass
 masked_array = np.ma.array(cutphi, mask=np.isnan(cutphi))
 
 cax = ax.imshow(masked_array, cmap, interpolation='nearest',vmax=vmax,vmin=vmin)
