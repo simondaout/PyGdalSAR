@@ -709,7 +709,8 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=False):
+#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -942,7 +943,7 @@ for jj in range((Npix)):
 
             if phi<0: 
                phi = phi + 2*np.pi
-            print(phi)
+            #print(phi)
 
     if seasonalt=='yes':
             G=np.zeros((kk,2))
@@ -959,7 +960,7 @@ for jj in range((Npix)):
             # convert between 0 and 2pi
             if phi<0: 
                 phi = phi + 2*np.pi
-            print(phi)
+            #print(phi)
 
             a_rate = (amp_max - amp_min)/(datemax-datemin)
 

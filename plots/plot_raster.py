@@ -20,7 +20,7 @@ Usage: plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg
        plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
 [--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--cols=<values>] [--lines=<values>] [--band=<values>]
        plot\_raster.py --infile=<path> [--cpt=<values>] [--crop=<values>] \
-[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--band=<values>] [--band=<values>] 
+[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--band=<values>]  
 
 
 Options:
@@ -38,11 +38,11 @@ Options:
 --parfile=<file>      Path of the .par file of GAMMA
 --rad2mm=<value>      Convert data [default: 1]
 --tile=<value>        Title plot 
+--band=<values>      Select band number [default: 1] 
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
 --cols VALUE         Add crosses on pixel column numbers (eg. 200,400,450)
 --lines VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
---band=<values>      Select band number [default: 1] 
 """
 
 import os, sys
@@ -97,7 +97,7 @@ else:
 if arguments["--band"] ==  None:
     band = 1
 else:
-    band = int(arguments["--band"][0])
+    band = int(arguments["--band"])
 
 if (arguments["--cols"] is not None and arguments["--lines"] is not None):
     ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
