@@ -444,7 +444,7 @@ class PileInt:
 class FiltFlatUnw:
     """ Create a class FiltFlatUnw defining all the post-procesing functions 
     list of parameters defined in the proc file: ListInterfero, SARMasterDir, IntDir, Rlooks_int, Rlooks_unw, prefix, suffix ,
-    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle, SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref, min_z, detla_z,
+    nfit_range, hresh_amp_range, nfit_az, thresh_amp_az, filterstyle, SWwindowsize, SWamplim, FilterStrength, nfit_atmo,thresh_amp_atmo, ivar, z_ref, max_z, detla_z,
     seedx, seedy.threshold_unw, unw_method, ref_top, ref_left, ref_width, ref_length
     Additional parameters not in the proc file (yet?): ibeg_mask, iend_mask, jbeg_mask, jend_mask (default: 0.)
     defining the boundary of the mask zone for emprical estimations
@@ -460,7 +460,7 @@ class FiltFlatUnw:
         self.nfit_az, self.thresh_amp_az,
         self.filterstyle,self.SWwindowsize, self.SWamplim,
         self.FilterStrength,self.Filt_method,
-        self.nfit_atmo,self.thresh_amp_atmo,self.ivar,self.z_ref,self.min_z,self.delta_z,
+        self.nfit_atmo,self.thresh_amp_atmo,self.ivar,self.z_ref,self.max_z,self.delta_z,
         self.seedx, self.seedy,self.threshold_unw,self.threshold_unfilt,self.unw_method,self.ref_top,        self.ref_left,self.ref_width,self.ref_length
         ) = map(str, params)
 
@@ -829,7 +829,7 @@ def flata(config,kk):
 
 def flat_atmo(config, kk):
     ''' Function flatten atmosphere on wrapped phase  (See Doin et al., 2015)
-    Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo, min_z, delta_z
+    Requiered proc file parameters: nfit_atmo, ivar, z_ref, thresh_amp_atmo, max_z, delta_z
     Estimation done on filterSW file
     Plot phase/topo in *_phase-topo.png file
     '''
@@ -878,7 +878,7 @@ def flat_atmo(config, kk):
         else:
           config.dem = config.SARMasterDir + '/'+  'radar.hgt'
 
-    if (np.int(config.ivar) == 2) and int(config.nfit_atmo) < 1:
+    if (int(config.ivar) == 2) and int(config.nfit_atmo) < 1:
         logger.warning("ivar = 2, nfit must be > 0. Set nfit to 1")
         config.nfit_atmo = 1
 
@@ -911,34 +911,32 @@ def flat_atmo(config, kk):
         dphi = dphi*0.00020944
 
         # open parameters for plot 
-        b1, b2, b3, b4, b5 =  np.loadtxt(topfile,usecols=(0,1,2,3,4), unpack=True, dtype='f,f,f,f,f')
+        b1, b2, b3, b4, b5, std =  np.loadtxt(topfile,usecols=(0,1,2,3,4,5), unpack=True, dtype='f,f,f,f,f,f')
 
         # I dont understand ivar=0
         # ivar=2 needs to be implemented with mask
         if int(config.ivar)>1 :
             logger.warning("ivar=2, no masking implemented !!!")
 
-        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),float(config.min_z),config.delta_z)       
-        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or float(config.min_z) > 0. or  float(config.delta_z) != 75.)  and int(config.ivar)<2 :
+        # print(int(config.jend_mask),int(config.jbeg_mask),int(config.iend_mask),int(config.ibeg_mask),float(config.min_z),config.delta_z)  
+        if ((int(config.jend_mask) > int(config.jbeg_mask)) or (int(config.iend_mask) > int(config.ibeg_mask)) or float(config.max_z) < 8000. or  float(config.delta_z) != 75.)  and int(config.ivar)<2 :
 
+            #print(config.jend_mask, config.jbeg_mask,config.iend_mask,config.ibeg_mask,config.max_z,config.delta_z)
             import scipy.optimize as opt
             import scipy.linalg as lst
 
             b1, b2, b3, b4, b5 = 0, 0, 0, 0, 0
+            z_ref = float(config.z_ref)
             
-            #print(config.thresh_amp_atmo, config.min_z, config.delta_z)
-            # print(config.ibeg_mask,config.iend_mask)
-            # print(config.jbeg_mask,config.jend_mask)
-            # print(config.thresh_amp_atmo,config.min_z,config.delta_z)
-
             index = np.nonzero(
             np.logical_and(coh>float(config.thresh_amp_atmo),
-            np.logical_and(z>float(config.min_z),
+            np.logical_and(z<float(config.max_z),
             np.logical_and(deltaz>float(config.delta_z),
             np.logical_and(np.logical_or(i<int(config.ibeg_mask),i>int(config.iend_mask)),
             np.logical_or(j<int(config.jbeg_mask),j>int(config.jend_mask)),
             )))))
             # )))
+            #index =  np.nonzero(z<float(config.max_z))
 
             dphi_select = dphi[index]; z_select = z[index]; az_select = az[index]
             rms = 1./coh[index]
@@ -948,23 +946,28 @@ def flat_atmo(config, kk):
             rm(strattxt)
             if config.nfit_atmo == str(-1):
                 b1 = np.nanmedian(dphi_select)
+                std = 10.*np.nanstd(dphi_select-b1)
 
                 # save median phase/topo
-                wf = open(strattxt, "w")
-                wf.write("%16.8E" % (b1))
-                wf.close()
+                np.savetxt(strattxt, np.vstack([b1, b2, b3, b4, b5, std]).T, fmt=('%.8e','%.8e','%.8e','%.8e','%.8e','%.8e'))
+                #wf = open(strattxt, "w")
+                ##wf.write("%15.8E" % (b1))
+                #wf.write('{0:16.8e} {1:16.8e} {2:16.8e} {3:16.8e} {4:16.8e} {5:16.8e}'.format(b1, 0, 0, 0, 0, std))
+                #wf.close()
 
             elif config.nfit_atmo == str(0):
                 b1 = np.nanmean(dphi_select)
+                std = 10.*np.nanstd(dphi_select-b1)
 
                 # save mean phase/topo
-                wf = open(strattxt, "w")
-                wf.write("%16.8E" % (b1))
-                wf.close()
+                np.savetxt(strattxt, np.vstack([b1, b2, b3, b4, b5, std]).T, fmt=('%.8e','%.8e','%.8e','%.8e','%.8e','%.8e'))
+                #wf = open(strattxt, "w")
+                #wf.write('{0:16.8e} {1:16.8e} {2:16.8e} {3:16.8e} {4:16.8e} {5:16.8e}'.format(b1, 0, 0, 0, 0, std))
+                #wf.close()
 
             elif config.nfit_atmo == str(1):
                 G=np.zeros((len(z_select),2))
-                G[:,0] = z_select 
+                G[:,0] = z_select - z_ref
                 G[:,1] = 1
                 x0 = lst.lstsq(G,dphi_select)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-dphi_select)/rms)**2)
@@ -972,16 +975,18 @@ def flat_atmo(config, kk):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 b2 = pars[0]; b1 = pars[1]
                 # print(pars)
+                std = 10.*np.nanstd(dphi_select - np.dot(G,pars))
 
                 # save mean phase/topo
-                wf = open(strattxt, "w")
-                wf.write("%15.8E %15.8E" % (b1, b2))
-                wf.close()
+                np.savetxt(strattxt, np.vstack([b1, b2, b3, b4, b5, std]).T, fmt=('%.8e','%16.8e','%16.8e','%16.8e','%16.8e','%16.8e'))
+                #wf = open(strattxt, "w")
+                #wf.write('{0:16.8e} {1:16.8e} {2:16.8e} {3:16.8e} {4:16.8e} {5:16.8e}'.format(b1, b2, 0, 0, 0, std))
+                #wf.close()
 
             elif config.nfit_atmo == str(2):
                 G=np.zeros((len(z_select),3))
-                G[:,0] = z_select**2 
-                G[:,1] = z_select
+                G[:,0] = (z_select - z_ref )**2 
+                G[:,1] = z_select - z_ref
                 G[:,2] = 1
                 x0 = lst.lstsq(G,dphi_select)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-dphi_select)/rms)**2)
@@ -989,28 +994,32 @@ def flat_atmo(config, kk):
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 b3 = pars[0]; b2 = pars[1]; b1 = pars[2]
                 # print(pars)
+                std = 10.*np.nanstd(dphi_select - np.dot(G,pars))
 
                 # save mean phase/topo
-                wf = open(strattxt, "w")
-                wf.write("%15.8E %15.8E %15.8E" % (b1, b2, b3))
-                wf.close()
+                np.savetxt(strattxt, np.vstack([b1, b2, b3, b4, b5, std]).T, fmt=('%.8e','%16.8e','%16.8e','%16.8e','%16.8e','%16.8e'))
+                #wf = open(strattxt, "w")
+                #wf.write('{0:16.8e} {1:16.8e} {2:16.8e} {3:16.8e} {4:16.8e} {5:16.8e}'.format(b1, b2, b3, 0, 0, std))
+                #wf.close()
 
             elif config.nfit_atmo == str(3):
                 G=np.zeros((len(z_select),4))
-                G[:,0] = z_select**3 
-                G[:,1] = z_select**2 
-                G[:,2] = z_select
+                G[:,0] = (z_select - z_ref )**3 
+                G[:,1] = (z_select - z_ref )**2 
+                G[:,2] = (z_select - z_ref )
                 G[:,3] = 1
                 x0 = lst.lstsq(G,dphi_select)[0]
                 _func = lambda x: np.sum(((np.dot(G,x)-dphi_select)/rms)**2)
                 _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-dphi_select)/rms)
                 pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0)[0]
                 b4 = pars[0]; b3 = pars[1]; b2 = pars[2]; b1 = pars[3]
+                std = 10.*np.nanstd(dphi_select - np.dot(G,pars))
 
                 # save mean phase/topo
-                wf = open(strattxt, "w")
-                wf.write("%15.8E %15.8E %15.8E %15.8E" % (b1, b2, b3, b4))
-                wf.close()
+                np.savetxt(strattxt, np.vstack([b1, b2, b3, b4, b5, std]).T, fmt=('%16.8e','%16.8e','%16.8e','%16.8e','%16.8e','%16.8e'))
+                #wf = open(strattxt, "w")
+                #wf.write('{:16.8e} {:16.8e} {:16.8e} {:16.8e} {:16.8e} {:16.8e}'.format(b1, b2, b3, b4, 0, std))
+                #wf.close()
 
             # clean and prepare for write strat
             infileunw = path.splitext(infile)[0] + '.unw'
@@ -1070,11 +1079,11 @@ def flat_atmo(config, kk):
             z_select = np.copy(z); dphi_select = np.copy(dphi); az_select = np.copy(az)
 
         # lets not plot dphi but phi
-        phi = dphi*z
+        phi = dphi*(z)
         
         index = z_select.argsort()
         z_select = z_select[index]; dphi_select = dphi_select[index]; az_select = az_select[index]
-        phi_select = dphi_select*z_select
+        phi_select = dphi_select*(z_select)
 
         if int(config.ivar)<2:
             fit = b1*(z_select - float(config.z_ref)) + (b2/2.)*((z_select)**2 -float(config.z_ref)**2) + \
@@ -1798,7 +1807,7 @@ proc_defaults = {
     "thresh_amp_atmo": "0.2",
     "ivar": "1", # fct of topography only
     "z_ref": "8000.", # reference
-    "min_z": "0.", # min elevation
+    "max_z": "8000.", # min elevation
     "delta_z": "75", 
     "filterstyle": "SWc",
     "SWamplim": "0.05",
@@ -1841,14 +1850,14 @@ print('ListInterfero: {0}\n SARMasterDir: {1}\n IntDir: {2}\n  EraDir: {3}\n\
     nfit_az: {8}, thresh_amp_az: {9}\n\
     filterstyle : {10}, SWwindowsize: {11}, SWamplim: {12}\n\
     FilterStrength : {13}, Filt_method : {14}\n\
-    nfit_topo: {15}, thresh_amp_atmo: {16}, ivar: {17}, z_ref: {18}, min_z: {19}, delta_z: {20}\n\
+    nfit_topo: {15}, thresh_amp_atmo: {16}, ivar: {17}, z_ref: {18}, max_z: {19}, delta_z: {20}\n\
     seedx: {21}, seedy: {22}, threshold_unw: {23}, threshold_unfilt: {24}, unw_method: {25}, ref_top: {26}, ref_left: {27}, ref_width: {28}, ref_length: {29}'.format(ListInterfero,SARMasterDir,IntDir,EraDir,\
     proc["Rlooks_int"], proc["Rlooks_unw"],\
     proc["nfit_range"], proc["thresh_amp_range"],\
     proc["nfit_az"], proc["thresh_amp_az"],\
     proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],\
     proc["FilterStrength"],proc["Filt_method"],\
-    proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],\
+    proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["max_z"], proc["delta_z"],\
     proc["seedx"], proc["seedy"], proc["threshold_unw"],proc["threshold_unfilt"], proc["unw_method"],\
     proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]
     ))
@@ -1915,7 +1924,7 @@ for p in jobs:
         proc["nfit_az"], proc["thresh_amp_az"],
         proc["filterstyle"], proc["SWwindowsize"], proc["SWamplim"],
         proc["FilterStrength"], proc["Filt_method"], 
-        proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["min_z"], proc["delta_z"],
+        proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["max_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"],proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]], 
         prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
         ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask, remove_bridges = remove_bridges,
