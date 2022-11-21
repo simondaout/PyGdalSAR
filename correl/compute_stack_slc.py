@@ -123,7 +123,7 @@ for date in dates:
 
 # compute stack and sigma
 stack[weight>0] = stack[weight>0]/weight[weight>0]
-sigma[weight>0] = np.sqrt(sigma[weight>0]/weight[weight>0] - stack[weight>0]**2)
+sigma[weight>0] = np.sqrt(sigma[weight>0]/weight[weight>0] - (stack[weight>0]/weight[weight>0])**2)
 da = np.zeros((nlines,ncols))
 da[sigma>0] = 1./sigma[sigma>0]
 #print(np.nanmean(stack), np.mean(da))
