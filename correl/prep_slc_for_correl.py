@@ -10,15 +10,19 @@
 prep_slc_for_correl.py.py
 ----------------------
 usage:
-  prep_slc_for_correl.py.py [-v] [-f] [--base_file=<path>] [--crop=<jstart,jend,ibeg,iend>] 
+  prep_slc_for_correl.py.py [-v] [-f] [--base_file=<path>] [--maskf=<path>] [--threshold=<value>]  [--mask=<jstart,jend,ibeg,iend>]  [--crop=<jstart,jend,ibeg,iend>] 
 options:
   --base_file=<path>                Baseline file containing the dates list in the first column [Default: baseline.rsc]
+  --maskf PATH                      File used as mask
+  --threshold VALUE                 threshold value on mask file (Keep pixel with mask > threshold)
   --crop=<jstart,jend,ibeg,iend>    Crop windows between colunms jstart,jend and lines  istart,iend 
+  --mask=<jstart,jend,ibeg,iend>    Masked pixel outside windows between colunms jstart,jend and lines  istart,iend 
   -v                                Verbose mode. Show more information about the processing
   -h --help                         Show this screen.
 """
 
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 from math import *
 from osgeo import gdal
 import os
@@ -46,8 +50,7 @@ class Cd(object):
 
 def mask(filename, crop):
 
-    basename = os.path.splitext(filename)[0]; outfile = basename + 'amp_mask.tiff'
-
+    basename = os.path.splitext(filename)[0]; outfile = basename + 'crop.tiff'
     ds = gdal.OpenEx(filename, allowed_drivers=["ROI_PAC"])
     ds_band = ds.GetRasterBand(1) #extraction d'une bande
     proj = ds.GetProjectionRef()
@@ -60,29 +63,47 @@ def mask(filename, crop):
     amp = np.absolute(data)
     phi = np.angle(data)
 
-    # to do: crop options
-    if crop == None:
+    if maskf != 'no':
+        kk = np.nonzero(np.logical_or(maski==0, maski<seuil))
+        amp[kk] = 0        
+
+    if mask == None:
         pass
     else:
-        jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+        jbeg,jend,ibeg,iend = int(mask[0]),int(mask[1]),int(mask[2]),int(mask[3])
         amp[:ibeg,:]=0
         amp[iend:,:]=0
         amp[ibeg:iend,:jbeg]=0
         amp[ibeg:iend,jend:]=0
 
+    # to do: crop options
+    if crop == None:
+        pass
+    else:
+        jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+        amp2 = amp[ibeg:iend,jbeg:jend]
+        amp = np.copy(amp2)
+        del amp 2
+ 
     # take the log of the amplitude
     amp[amp>0] = np.log(amp[amp>0])
 
     # création du nouveau fichier
     drv = gdal.GetDriverByName('GTiff')
     # Carefull not to write in the input file, give different name for output ds and bands
-    dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_UInt16)
+    if crop != None:
+        (y, x)=np.shape(amp)
+        dst_ds = drv.Create(outfile, x, y, 1, gdal.GDT_UInt16)
+    else:
+        dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_UInt16)
     dst_band = dst_ds.GetRasterBand(1)
     dst_band.WriteArray(amp)
     dst_ds.SetGeoTransform(gt)
     dst_ds.SetProjection(proj)
+    
     dst_band.FlushCache()
-    del dst_ds, ds
+    ds_band.FlushCache()
+    del dst_ds, ds, amp
     
 ###########
 #   MAIN  # 
@@ -111,6 +132,26 @@ if arguments["--crop"]==None:
     crop = None
 else:   
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
+
+if arguments["--mask"]==None:
+    mask = None
+else:
+    mask = list(map(float,arguments["--mask"].replace(',',' ').split()))
+
+if arguments["--maskf"] ==  None:
+    maskf = None
+else:
+    maskf = arguments["--mask"]
+
+if arguments["--threshold"] ==  None:
+    seuil = -np.inf
+else:
+    seuil = float(arguments["--threshold"])
+
+# mask
+if maskf != None
+    fid2 = open(maskf, 'r')
+    maski = np.fromfile(fid2,dtype=float32)
 
 for date in dates:
     date = str(date)
