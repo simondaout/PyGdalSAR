@@ -3837,15 +3837,15 @@ if arguments["--fulloutput"]=='yes':
             # fid.close()
 
 
-fig.suptitle('Time series models')
-figres.suptitle('Time series residuals')
-# figall.suptitle('Time series inversion')
-fig.savefig('models.eps', format='EPS',dpi=150)
-figres.savefig('residuals.eps', format='EPS',dpi=150)
-# figall.savefig('timeseries.eps', format='EPS',dpi=150)
-if plot=='yes':
-    plt.show()
-plt.close('all')
+#fig.suptitle('Time series models')
+#figres.suptitle('Time series residuals')
+## figall.suptitle('Time series inversion')
+#fig.savefig('models.eps', format='EPS',dpi=150)
+#figres.savefig('residuals.eps', format='EPS',dpi=150)
+## figall.savefig('timeseries.eps', format='EPS',dpi=150)
+#if plot=='yes':
+#    plt.show()
+#plt.close('all')
 
 # clean memory
 del maps_ramp, maps_flata, maps_topo
