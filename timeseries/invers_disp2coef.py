@@ -710,7 +710,6 @@ if arguments["--mask"] is not None:
         kk = np.flatnonzero(np.logical_or(maski==0, maski==9999))
         #kk = np.flatnonzero(los==9999)
         maski[kk] = float('NaN')
-
         G=np.zeros((len(maski),4))
         for i in range(nlines):
             G[i*ncol:(i+1)*ncol,0] = (np.arange((ncol)) - jbeg_emp)**2
@@ -3277,10 +3276,6 @@ def empirical_cor(l):
                     ))))))))
                 ))))))
 
-    # print (elev[:5],maxtopo, mintopo)
-    # print (ibeg,iend,jbeg,jend)
-    # print (slope[:5])
-
     # extract coordinates for estimation
     temp = np.array(index).T
     x = temp[:,0]; y = temp[:,1]
@@ -3355,8 +3350,6 @@ def empirical_cor(l):
           cst = 0.
         map_ramp, map_flata = map_ramp + cst, map_flata - cst
         del zone
-      # except:
-      #   pass
       
   else:
     map_flata = np.copy(maps[:,:,l])
@@ -3369,6 +3362,7 @@ def empirical_cor(l):
   ramp[kk] = float('NaN')
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
+  del ramp, topo
   
   return map_ramp, map_flata, map_topo, rmsi 
 
@@ -3497,57 +3491,57 @@ for ii in range(int(arguments["--niter"])):
       #     del output
 
       # plot corrected ts
-      nfigure +=1
-      figd = plt.figure(nfigure,figsize=(14,10))
-      figd.subplots_adjust(hspace=0.001,wspace=0.001)
-      for l in range((N)):
-          axd = figd.add_subplot(4,int(N/4)+1,l+1)
-          caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-          axd.set_title(idates[l],fontsize=6)
-          plt.setp(axd.get_xticklabels(), visible=False)
-          plt.setp(axd.get_yticklabels(), visible=False)
-      plt.setp(axd.get_xticklabels(), visible=False)
-      plt.setp(axd.get_yticklabels(), visible=False)
-      figd.colorbar(caxd, orientation='vertical',aspect=10)
-      figd.suptitle('Corrected time series maps')
-      # fig.tight_layout()
-      figd.savefig('maps_flat.eps', format='EPS',dpi=150)
+      #nfigure +=1
+      #figd = plt.figure(nfigure,figsize=(14,10))
+      #figd.subplots_adjust(hspace=0.001,wspace=0.001)
+      #for l in range((N)):
+      #    axd = figd.add_subplot(4,int(N/4)+1,l+1)
+      #    caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+      #    axd.set_title(idates[l],fontsize=6)
+      #    plt.setp(axd.get_xticklabels(), visible=False)
+      #    plt.setp(axd.get_yticklabels(), visible=False)
+      #plt.setp(axd.get_xticklabels(), visible=False)
+      #plt.setp(axd.get_yticklabels(), visible=False)
+      #figd.colorbar(caxd, orientation='vertical',aspect=10)
+      #figd.suptitle('Corrected time series maps')
+      ## fig.tight_layout()
+      #figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
-      if arguments["--topofile"] is not None:
-          fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
-          nfigure +=1
-          figtopo = plt.figure(nfigure,figsize=(14,10))
-          figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-          for l in range((N)):
-              axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-              caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-              axtopo.set_title(idates[l],fontsize=6)
-              plt.setp(axtopo.get_xticklabels(), visible=False)
-              plt.setp(axtopo.get_yticklabels(), visible=False)
-              plt.setp(axtopo.get_xticklabels(), visible=False)
-              plt.setp(axtopo.get_yticklabels(), visible=False)
-          figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-          figtopo.suptitle('Time series RAMPS+TOPO')
-          # fig.tight_layout()
-          figtopo.savefig('tropo.eps', format='EPS',dpi=150)
-          
-      else:
-          # plot corrected ts
-          nfigure +=1
-          figref = plt.figure(nfigure,figsize=(14,10))
-          figref.subplots_adjust(hspace=0.001,wspace=0.001)
-          for l in range((N)):
-              axref = figref.add_subplot(4,int(N/4)+1,l+1)
-              caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-              axref.set_title(idates[l],fontsize=6)
-              plt.setp(axref.get_xticklabels(), visible=False)
-              plt.setp(axref.get_yticklabels(), visible=False)
-          plt.setp(axref.get_xticklabels(), visible=False)
-          plt.setp(axref.get_yticklabels(), visible=False)
-          figref.suptitle('Time series RAMPS')
-          figref.colorbar(caxref, orientation='vertical',aspect=10)
-          # fig.tight_layout()
-          figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
+      #if arguments["--topofile"] is not None:
+      #    fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
+      #    nfigure +=1
+      #    figtopo = plt.figure(nfigure,figsize=(14,10))
+      #    figtopo.subplots_adjust(hspace=.001,wspace=0.001)
+      #    for l in range((N)):
+      #        axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
+      #        caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+      #        axtopo.set_title(idates[l],fontsize=6)
+      #        plt.setp(axtopo.get_xticklabels(), visible=False)
+      #        plt.setp(axtopo.get_yticklabels(), visible=False)
+      #        plt.setp(axtopo.get_xticklabels(), visible=False)
+      #        plt.setp(axtopo.get_yticklabels(), visible=False)
+      #    figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
+      #    figtopo.suptitle('Time series RAMPS+TOPO')
+      #    # fig.tight_layout()
+      ##    figtopo.savefig('tropo.eps', format='EPS',dpi=150)
+      #    
+      #else:
+      #    # plot corrected ts
+      #    nfigure +=1
+      #    figref = plt.figure(nfigure,figsize=(14,10))
+      #    figref.subplots_adjust(hspace=0.001,wspace=0.001)
+      #    for l in range((N)):
+      #        axref = figref.add_subplot(4,int(N/4)+1,l+1)
+      #        caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+      #        axref.set_title(idates[l],fontsize=6)
+      #        plt.setp(axref.get_xticklabels(), visible=False)
+      #        plt.setp(axref.get_yticklabels(), visible=False)
+      #    plt.setp(axref.get_xticklabels(), visible=False)
+      #    plt.setp(axref.get_yticklabels(), visible=False)
+      #    figref.suptitle('Time series RAMPS')
+      #    figref.colorbar(caxref, orientation='vertical',aspect=10)
+      #    # fig.tight_layout()
+      #    figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
 
     if plot=='yes':
         plt.show()
@@ -3743,95 +3737,53 @@ if arguments["--fulloutput"]=='yes':
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-# plot displacements models and residuals
-nfigure +=1
-figres = plt.figure(nfigure,figsize=(14,10))
-figres.subplots_adjust(hspace=.001,wspace=0.001)
-
-nfigure +=1
-fig = plt.figure(nfigure,figsize=(14,10))
-fig.subplots_adjust(hspace=.001,wspace=0.01)
-
-# nfigure +=1
-# figall = plt.figure(nfigure,figsize=(20,9))
-# figall.subplots_adjust(hspace=0.00001,wspace=0.001)
-
-nfigure +=1
-figclr = plt.figure(nfigure)
-# plot color map
-ax = figclr.add_subplot(1,1,1)
-cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
-plt.setp( ax.get_xticklabels(), visible=False)
-cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
-figclr.savefig('colorscale.eps', format='EPS',dpi=150)
-
-for l in range((N)):
-    data = as_strided(maps[:,:,l])
-    if Mker>0:
-        data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
-        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
-    else:
-        data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
-        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
-
-    res = data_flat - model
-    ramp = as_strided(maps_ramp[:,:,l])
-    tropo = as_strided(maps_topo[:,:,l])
-
-    ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    axres = figres.add_subplot(4,int(N/4)+1,l+1)
-
-    # axall = figall.add_subplot(6,N,l+1)
-    # axall.imshow(data,cmap=cmap,vmax=vmax,vmin=vmin)
-    # axall.set_title(idates[l],fontsize=6)
-    # plt.setp(axall.get_xticklabels(), visible=False)
-    # plt.setp(axall.get_yticklabels(), visible=False)
-    # if l==0:
-    #     axall.set_ylabel('DATA')
-    # axall = figall.add_subplot(6,N,l+1+N)
-    # axall.imshow(ramp,cmap=cmap,vmax=vmax,vmin=vmin)
-    # plt.setp(axall.get_xticklabels(), visible=False)
-    # plt.setp(axall.get_yticklabels(), visible=False)
-    # if l==0:
-    #     axall.set_ylabel('RAMP')
-    # axall = figall.add_subplot(6,N,l+1+2*N)
-    # axall.imshow(tropo,cmap=cmap,vmax=vmax,vmin=vmin)
-    # plt.setp(axall.get_xticklabels(), visible=False)
-    # plt.setp(axall.get_yticklabels(), visible=False)
-    # if l==0:
-    #     axall.set_ylabel('TROP0')
-    # axall = figall.add_subplot(6,N,l+1+3*N)
-    # axall.imshow(data_flat,cmap=cmap,vmax=vmax,vmin=vmin)
-    # plt.setp(axall.get_xticklabels(), visible=False)
-    # plt.setp(axall.get_yticklabels(), visible=False)
-    # if l==0:
-    #     axall.set_ylabel('FLATTEN DATA')
-    # axall = figall.add_subplot(6,N,l+1+4*N)
-    # axall.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-    # plt.setp(axall.get_xticklabels(), visible=False)
-    # plt.setp(axall.get_yticklabels(), visible=False)
-    # if l==0:
-    #     axall.set_ylabel('MODEL')
-    # axall = figall.add_subplot(6,N,l+1+5*N)
-    # axall.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-    # plt.setp(axall.get_xticklabels(), visible=False)
-    # plt.setp(axall.get_yticklabels(), visible=False)
-    # if l==0:
-    #     axall.set_ylabel('RES')
-
-    cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-    caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-
-    ax.set_title(idates[l],fontsize=6)
-    axres.set_title(idates[l],fontsize=6)
-
-    plt.setp(ax.get_xticklabels(), visible=False)
-    plt.setp(ax.get_yticklabels(), visible=False)
-
-    plt.setp(axres.get_xticklabels(), visible=False)
-    plt.setp(axres.get_yticklabels(), visible=False)
-
-    # fig.tight_layout()
+## plot displacements models and residuals
+#nfigure +=1
+#figres = plt.figure(nfigure,figsize=(14,10))
+#figres.subplots_adjust(hspace=.001,wspace=0.001)
+#
+#nfigure +=1
+#fig = plt.figure(nfigure,figsize=(14,10))
+#fig.subplots_adjust(hspace=.001,wspace=0.01)
+#
+#nfigure +=1
+#figclr = plt.figure(nfigure)
+## plot color map
+#ax = figclr.add_subplot(1,1,1)
+#cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+#plt.setp( ax.get_xticklabels(), visible=False)
+#cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
+#figclr.savefig('colorscale.eps', format='EPS',dpi=150)
+#
+#for l in range((N)):
+#    data = as_strided(maps[:,:,l])
+#    if Mker>0:
+#        data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
+#        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
+#    else:
+#        data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
+#        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
+#
+#    res = data_flat - model
+#    ramp = as_strided(maps_ramp[:,:,l])
+#    tropo = as_strided(maps_topo[:,:,l])
+#
+#    ax = fig.add_subplot(4,int(N/4)+1,l+1)
+#    axres = figres.add_subplot(4,int(N/4)+1,l+1)
+#
+#    cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
+#    caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
+#
+#    ax.set_title(idates[l],fontsize=6)
+#    axres.set_title(idates[l],fontsize=6)
+#
+#    plt.setp(ax.get_xticklabels(), visible=False)
+#    plt.setp(ax.get_yticklabels(), visible=False)
+#
+#    plt.setp(axres.get_xticklabels(), visible=False)
+#    plt.setp(axres.get_yticklabels(), visible=False)
+#
+#    # fig.tight_layout()
 
     # ############
     # # SAVE .R4 #
@@ -3862,13 +3814,6 @@ for l in range((N)):
             ds.SetGeoTransform(gt)
             ds.SetProjection(proj)
             band.FlushCache()
-
-            # ds = driver.Create(outdir+'{}_res.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            # band = ds.GetRasterBand(1)
-            # band.WriteArray(res)
-            # ds.SetGeoTransform(gt)
-            # ds.SetProjection(proj)
-            # band.FlushCache()
 
         else:
 
