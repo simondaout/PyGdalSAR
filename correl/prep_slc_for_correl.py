@@ -3,7 +3,7 @@
 
 #__projet__ = "masque"
 #__nom_fichier__ = "fonctions"
-#__author__ = "Laure MANCEAU"
+#__author__ = "Laure MANCEAU; Simon DAOUT"
 #__date__ = "avril 2022"
 
 """\
@@ -16,7 +16,7 @@ options:
   --maskf PATH                      File used as mask
   --threshold VALUE                 threshold value on mask file (Keep pixel with mask > threshold)
   --crop=<jstart,jend,ibeg,iend>    Crop windows between colunms jstart,jend and lines  istart,iend 
-  --mask=<jstart,jend,ibeg,iend>    Masked pixel outside windows between colunms jstart,jend and lines  istart,iend 
+  --mask=<jstart,jend,ibeg,iend>    Masked pixel outside windows between lines jstart,jend and column istart,iend 
   -v                                Verbose mode. Show more information about the processing
   -h --help                         Show this screen.
 """
@@ -48,7 +48,7 @@ class Cd(object):
         logger.debug('Enter {0}'.format(self.curdir))
         os.chdir(self.curdir)
 
-def mask(filename, crop):
+def compute_mask(filename, crop, maski):
 
     basename = os.path.splitext(filename)[0]; outfile = basename + 'crop.tiff'
     ds = gdal.OpenEx(filename, allowed_drivers=["ROI_PAC"])
@@ -63,27 +63,26 @@ def mask(filename, crop):
     amp = np.absolute(data)
     phi = np.angle(data)
 
-    if maskf != 'no':
-        kk = np.nonzero(np.logical_or(maski==0, maski<seuil))
-        amp[kk] = 0        
+    if maskf is not None:
+        amp[maski<seuil] = 0        
 
     if mask == None:
         pass
     else:
         jbeg,jend,ibeg,iend = int(mask[0]),int(mask[1]),int(mask[2]),int(mask[3])
-        amp[:ibeg,:]=0
-        amp[iend:,:]=0
-        amp[ibeg:iend,:jbeg]=0
-        amp[ibeg:iend,jend:]=0
+        amp[:jbeg,:]=0
+        amp[jend:,:]=0
+        amp[jbeg:jend,:ibeg]=0
+        amp[jbeg:jend,iend:]=0
 
     # to do: crop options
     if crop == None:
         pass
     else:
         jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-        amp2 = amp[ibeg:iend,jbeg:jend]
+        amp2 = amp[jbeg:jend,ibeg:iend]
         amp = np.copy(amp2)
-        del amp 2
+        del amp2
  
     # take the log of the amplitude
     amp[amp>0] = np.log(amp[amp>0])
@@ -91,7 +90,7 @@ def mask(filename, crop):
     # création du nouveau fichier
     drv = gdal.GetDriverByName('GTiff')
     # Carefull not to write in the input file, give different name for output ds and bands
-    if crop != None:
+    if crop is not None:
         (y, x)=np.shape(amp)
         dst_ds = drv.Create(outfile, x, y, 1, gdal.GDT_UInt16)
     else:
@@ -141,7 +140,7 @@ else:
 if arguments["--maskf"] ==  None:
     maskf = None
 else:
-    maskf = arguments["--mask"]
+    maskf = arguments["--maskf"]
 
 if arguments["--threshold"] ==  None:
     seuil = -np.inf
@@ -149,9 +148,12 @@ else:
     seuil = float(arguments["--threshold"])
 
 # mask
-if maskf != None
-    fid2 = open(maskf, 'r')
-    maski = np.fromfile(fid2,dtype=float32)
+if maskf != None:
+    ds = gdal.OpenEx(maskf, allowed_drivers=["ROI_PAC"])
+    ds_band = ds.GetRasterBand(2) 
+    maski = ds_band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize) 
+else:
+    maski = None
 
 for date in dates:
     date = str(date)
@@ -160,5 +162,5 @@ for date in dates:
       rsc = filename + '.rsc'; checkinfile(rsc)
       
       logger.info(print('Run {} ....'.format(date)))
-      mask(filename, crop)
+      compute_mask(filename, crop, maski)
 
