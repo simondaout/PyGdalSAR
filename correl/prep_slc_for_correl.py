@@ -10,13 +10,14 @@
 prep_slc_for_correl.py.py
 ----------------------
 usage:
-  prep_slc_for_correl.py.py [-v] [-f] [--base_file=<path>] [--maskf=<path>] [--threshold=<value>]  [--mask=<jstart,jend,ibeg,iend>]  [--crop=<jstart,jend,ibeg,iend>] 
+  prep_slc_for_correl.py.py [-v] [-f] [--base_file=<path>] [--maskf=<path>] [--threshold=<value>]  [--mask=<jstart,jend,ibeg,iend>]  [--crop=<jstart,jend,ibeg,iend>] [--outformat=<value>] 
 options:
   --base_file=<path>                Baseline file containing the dates list in the first column [Default: baseline.rsc]
   --maskf PATH                      File used as mask
   --threshold VALUE                 threshold value on mask file (Keep pixel with mask > threshold)
   --crop=<jstart,jend,ibeg,iend>    Crop windows between colunms jstart,jend and lines  istart,iend 
   --mask=<jstart,jend,ibeg,iend>    Masked pixel outside windows between lines jstart,jend and column istart,iend 
+  --outformat=<format>              Format of the output files GTiff/Int SLC/Complex [default: 'GTiff']
   -v                                Verbose mode. Show more information about the processing
   -h --help                         Show this screen.
 """
@@ -50,7 +51,7 @@ class Cd(object):
 
 def compute_mask(filename, crop, maski):
 
-    basename = os.path.splitext(filename)[0]; outfile = basename + 'crop.tiff'
+    basename = os.path.splitext(filename)[0]
     ds = gdal.OpenEx(filename, allowed_drivers=["ROI_PAC"])
     ds_band = ds.GetRasterBand(1) #extraction d'une bande
     proj = ds.GetProjectionRef()
@@ -81,22 +82,45 @@ def compute_mask(filename, crop, maski):
     else:
         jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
         amp2 = amp[jbeg:jend,ibeg:iend]
+        phi2 = phi[jbeg:jend,ibeg:iend]
         amp = np.copy(amp2)
-        del amp2
+        phi = np.copy(phi2)
+        del amp2, phi2
  
     # take the log of the amplitude
     amp[amp>0] = np.log(amp[amp>0])
 
     # création du nouveau fichier
-    drv = gdal.GetDriverByName('GTiff')
-    # Carefull not to write in the input file, give different name for output ds and bands
-    if crop is not None:
-        (y, x)=np.shape(amp)
-        dst_ds = drv.Create(outfile, x, y, 1, gdal.GDT_UInt16)
+    if arguments["--outformat"] == 'GTiff':
+      outfile = basename + 'crop.tiff'
+      drv = gdal.GetDriverByName('GTiff')
+      # Carefull not to write in the input file, give different name for output ds and bands
+      if crop is not None:
+          (y, x)=np.shape(amp)
+          #dst_ds = drv.Create(outfile, x, y, 1, gdal.GDT_UInt16)
+          dst_ds = drv.Create(outfile, x, y, 1, gdal.GDT_Float32)
+      else:
+          dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_UInt16)
+      dst_band = dst_ds.GetRasterBand(1)
+      dst_band.WriteArray(amp)
+    
+    elif arguments["--outformat"] == 'SLC':
+      outfile = basename + 'crop.slc'
+      data = amp*np.exp(1j*phi)
+      drv = gdal.GetDriverByName('ROI_PAC')
+      # Carefull not to write in the input file, give different name for output ds and bands
+      if crop is not None:
+          (y, x)=np.shape(amp)
+          dst_ds = drv.Create(outfile, x, y, 1, gdal.GDT_CFloat32)
+      else:
+          dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_UInt16)
+      dst_band = dst_ds.GetRasterBand(1)
+      dst_band.WriteArray(data)
+
     else:
-        dst_ds = drv.Create(outfile, ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_UInt16)
-    dst_band = dst_ds.GetRasterBand(1)
-    dst_band.WriteArray(amp)
+      print('Output format not recognised. Exit')
+      exit()
+    
     dst_ds.SetGeoTransform(gt)
     dst_ds.SetProjection(proj)
     
