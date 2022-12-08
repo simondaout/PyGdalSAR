@@ -390,7 +390,7 @@ for i in range(ibeg,iend):
 
                 Cd = np.diag(rms**2, k = 0)
                 try:
-                    sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+                    sigmam = np.sqrt(np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G)))
                     for n in range((N)): 
                         sdisp[i,j,int(comp[n])] = np.abs(sigmam[n,n])
                 except:
