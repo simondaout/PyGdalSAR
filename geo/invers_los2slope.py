@@ -521,7 +521,7 @@ for i in range(ibeg,iend):
 
                 Cd = np.diag(rms**2, k = 0)
                 try:
-                    sigmam = np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G))
+                    sigmam = np.sqrt(np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G)))
                 except:
                     sigmam = np.ones((G.shape[1]))*float('NaN')
                 
