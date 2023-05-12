@@ -3476,72 +3476,59 @@ for ii in range(int(arguments["--niter"])):
       for l in range((N)):
           maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
 
-      # output = []
-      # with TimeIt():
-      #     work = range(N)
-      #     with poolcontext(processes=nproc) as pool:
-      #         results = pool.map(empirical_cor, work)
-      #         # maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = results[0][l]
-      #         # TypeError: cannot unpack non-iterable int object
-      #     output.append(results)
+      if N < 30:
+        # plot corrected ts
+        nfigure +=1
+        figd = plt.figure(nfigure,figsize=(14,10))
+        figd.subplots_adjust(hspace=0.001,wspace=0.001)
+        for l in range((N)):
+            axd = figd.add_subplot(4,int(N/4)+1,l+1)
+            caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+            axd.set_title(idates[l],fontsize=6)
+            plt.setp(axd.get_xticklabels(), visible=False)
+            plt.setp(axd.get_yticklabels(), visible=False)
+        plt.setp(axd.get_xticklabels(), visible=False)
+        plt.setp(axd.get_yticklabels(), visible=False)
+        figd.colorbar(caxd, orientation='vertical',aspect=10)
+        figd.suptitle('Corrected time series maps')
+        # fig.tight_layout()
+        figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
-      #     # fetch results
-      #     for l in range(N):
-      #         maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = output[0][l]
-      #     del output
-
-      # plot corrected ts
-      #nfigure +=1
-      #figd = plt.figure(nfigure,figsize=(14,10))
-      #figd.subplots_adjust(hspace=0.001,wspace=0.001)
-      #for l in range((N)):
-      #    axd = figd.add_subplot(4,int(N/4)+1,l+1)
-      #    caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-      #    axd.set_title(idates[l],fontsize=6)
-      #    plt.setp(axd.get_xticklabels(), visible=False)
-      #    plt.setp(axd.get_yticklabels(), visible=False)
-      #plt.setp(axd.get_xticklabels(), visible=False)
-      #plt.setp(axd.get_yticklabels(), visible=False)
-      #figd.colorbar(caxd, orientation='vertical',aspect=10)
-      #figd.suptitle('Corrected time series maps')
-      ## fig.tight_layout()
-      #figd.savefig('maps_flat.eps', format='EPS',dpi=150)
-
-      #if arguments["--topofile"] is not None:
-      #    fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
-      #    nfigure +=1
-      #    figtopo = plt.figure(nfigure,figsize=(14,10))
-      #    figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-      #    for l in range((N)):
-      #        axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-      #        caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-      #        axtopo.set_title(idates[l],fontsize=6)
-      #        plt.setp(axtopo.get_xticklabels(), visible=False)
-      #        plt.setp(axtopo.get_yticklabels(), visible=False)
-      #        plt.setp(axtopo.get_xticklabels(), visible=False)
-      #        plt.setp(axtopo.get_yticklabels(), visible=False)
-      #    figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-      #    figtopo.suptitle('Time series RAMPS+TOPO')
-      #    # fig.tight_layout()
-      ##    figtopo.savefig('tropo.eps', format='EPS',dpi=150)
-      #    
-      #else:
-      #    # plot corrected ts
-      #    nfigure +=1
-      #    figref = plt.figure(nfigure,figsize=(14,10))
-      #    figref.subplots_adjust(hspace=0.001,wspace=0.001)
-      #    for l in range((N)):
-      #        axref = figref.add_subplot(4,int(N/4)+1,l+1)
-      #        caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-      #        axref.set_title(idates[l],fontsize=6)
-      #        plt.setp(axref.get_xticklabels(), visible=False)
-      #        plt.setp(axref.get_yticklabels(), visible=False)
-      #    plt.setp(axref.get_xticklabels(), visible=False)
-      #    plt.setp(axref.get_yticklabels(), visible=False)
-      #    figref.suptitle('Time series RAMPS')
-      #    figref.colorbar(caxref, orientation='vertical',aspect=10)
-      #    # fig.tight_layout()
-      #    figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
+        if arguments["--topofile"] is not None:
+            fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
+            nfigure +=1
+            figtopo = plt.figure(nfigure,figsize=(14,10))
+            figtopo.subplots_adjust(hspace=.001,wspace=0.001)
+            for l in range((N)):
+                axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
+                caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+                axtopo.set_title(idates[l],fontsize=6)
+                plt.setp(axtopo.get_xticklabels(), visible=False)
+                plt.setp(axtopo.get_yticklabels(), visible=False)
+                plt.setp(axtopo.get_xticklabels(), visible=False)
+                plt.setp(axtopo.get_yticklabels(), visible=False)
+            figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
+            figtopo.suptitle('Time series RAMPS+TOPO')
+            # fig.tight_layout()
+            figtopo.savefig('tropo.eps', format='EPS',dpi=150)
+            
+        else:
+            # plot corrected ts
+            nfigure +=1
+            figref = plt.figure(nfigure,figsize=(14,10))
+            figref.subplots_adjust(hspace=0.001,wspace=0.001)
+            for l in range((N)):
+                axref = figref.add_subplot(4,int(N/4)+1,l+1)
+                caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+                axref.set_title(idates[l],fontsize=6)
+                plt.setp(axref.get_xticklabels(), visible=False)
+                plt.setp(axref.get_yticklabels(), visible=False)
+            plt.setp(axref.get_xticklabels(), visible=False)
+            plt.setp(axref.get_yticklabels(), visible=False)
+            figref.suptitle('Time series RAMPS')
+            figref.colorbar(caxref, orientation='vertical',aspect=10)
+            # fig.tight_layout()
+            figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
 
     if plot=='yes':
         plt.show()
@@ -3707,12 +3694,11 @@ else:
 #######################################################
 
 # create new cube
-#if flat>0:
-#  del cubei
-#  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-#  fid = open('depl_cumule_flat', 'wb')
-#  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
-#  fid.close()
+if flat>0:
+  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
+  fid = open('depl_cumule_flat', 'wb')
+  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
+  fid.close()
 
 if arguments["--fulloutput"]=='yes':
     if (arguments["--seasonal"] =='yes'):
@@ -3729,67 +3715,67 @@ if arguments["--fulloutput"]=='yes':
 
     del models_vect, models_seas
 
-# create MAPS directory to save .r4
-if arguments["--fulloutput"]=='yes':
+    # create MAPS directory to save .r4
     outdir = './MAPS/'
     logger.info('Save time series maps in: {}'.format(outdir))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-## plot displacements models and residuals
-#nfigure +=1
-#figres = plt.figure(nfigure,figsize=(14,10))
-#figres.subplots_adjust(hspace=.001,wspace=0.001)
-#
-#nfigure +=1
-#fig = plt.figure(nfigure,figsize=(14,10))
-#fig.subplots_adjust(hspace=.001,wspace=0.01)
-#
-#nfigure +=1
-#figclr = plt.figure(nfigure)
-## plot color map
-#ax = figclr.add_subplot(1,1,1)
-#cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
-#plt.setp( ax.get_xticklabels(), visible=False)
-#cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
-#figclr.savefig('colorscale.eps', format='EPS',dpi=150)
-#
-#for l in range((N)):
-#    data = as_strided(maps[:,:,l])
-#    if Mker>0:
-#        data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
-#        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
-#    else:
-#        data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
-#        model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
-#
-#    res = data_flat - model
-#    ramp = as_strided(maps_ramp[:,:,l])
-#    tropo = as_strided(maps_topo[:,:,l])
-#
-#    ax = fig.add_subplot(4,int(N/4)+1,l+1)
-#    axres = figres.add_subplot(4,int(N/4)+1,l+1)
-#
-#    cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-#    caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-#
-#    ax.set_title(idates[l],fontsize=6)
-#    axres.set_title(idates[l],fontsize=6)
-#
-#    plt.setp(ax.get_xticklabels(), visible=False)
-#    plt.setp(ax.get_yticklabels(), visible=False)
-#
-#    plt.setp(axres.get_xticklabels(), visible=False)
-#    plt.setp(axres.get_yticklabels(), visible=False)
-#
-#    # fig.tight_layout()
+if N < 30:
+  # plot displacements models and residuals
+  nfigure +=1
+  figres = plt.figure(nfigure,figsize=(14,10))
+  figres.subplots_adjust(hspace=.001,wspace=0.001)
+  
+  nfigure +=1
+  fig = plt.figure(nfigure,figsize=(14,10))
+  fig.subplots_adjust(hspace=.001,wspace=0.01)
+  
+  nfigure +=1
+  figclr = plt.figure(nfigure)
+  # plot color map
+  ax = figclr.add_subplot(1,1,1)
+  cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+  plt.setp( ax.get_xticklabels(), visible=False)
+  cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
+  figclr.savefig('colorscale.eps', format='EPS',dpi=150)
+  
+  for l in range((N)):
+      data = as_strided(maps[:,:,l])
+      if Mker>0:
+          data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
+          model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
+      else:
+          data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
+          model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
+  
+      res = data_flat - model
+      ramp = as_strided(maps_ramp[:,:,l])
+      tropo = as_strided(maps_topo[:,:,l])
+  
+      ax = fig.add_subplot(4,int(N/4)+1,l+1)
+      axres = figres.add_subplot(4,int(N/4)+1,l+1)
+  
+      cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
+      caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
+  
+      ax.set_title(idates[l],fontsize=6)
+      axres.set_title(idates[l],fontsize=6)
+  
+      plt.setp(ax.get_xticklabels(), visible=False)
+      plt.setp(ax.get_yticklabels(), visible=False)
+  
+      plt.setp(axres.get_xticklabels(), visible=False)
+      plt.setp(axres.get_yticklabels(), visible=False)
+  
+      # fig.tight_layout()
 
-    # ############
-    # # SAVE .R4 #
-    # ############
+      # ############
+      # # SAVE .R4 #
+      # ############
 
-    # save flatten maps
-    if arguments["--fulloutput"]=='yes':
+      # save flatten maps
+      if arguments["--fulloutput"]=='yes':
 
         if arguments["--geotiff"] is not None:
 
@@ -3835,16 +3821,15 @@ if arguments["--fulloutput"]=='yes':
             res.flatten().astype('float32').tofile(fid)
             # fid.close()
 
-
-#fig.suptitle('Time series models')
-#figres.suptitle('Time series residuals')
-## figall.suptitle('Time series inversion')
-#fig.savefig('models.eps', format='EPS',dpi=150)
-#figres.savefig('residuals.eps', format='EPS',dpi=150)
-## figall.savefig('timeseries.eps', format='EPS',dpi=150)
-#if plot=='yes':
-#    plt.show()
-#plt.close('all')
+  fig.suptitle('Time series models')
+  figres.suptitle('Time series residuals')
+  # figall.suptitle('Time series inversion')
+  fig.savefig('models.eps', format='EPS',dpi=150)
+  figres.savefig('residuals.eps', format='EPS',dpi=150)
+  # figall.savefig('timeseries.eps', format='EPS',dpi=150)
+  if plot=='yes':
+    plt.show()
+  plt.close('all')
 
 # clean memory
 del maps_ramp, maps_flata, maps_topo
