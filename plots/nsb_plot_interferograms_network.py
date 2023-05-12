@@ -109,7 +109,7 @@ an = ax.annotate("",
 an.set_visible(False)
 fig.canvas.mpl_connect("pick_event", onpick)
 # Show
-fig.canvas.set_window_title("Interferogram network")
+#fig.canvas.set_window_title("Interferogram network")
 fig.suptitle("Interferogram network")
 fig.autofmt_xdate()
 ax.set_xlabel("Acquisition Date")

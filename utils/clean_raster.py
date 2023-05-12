@@ -16,7 +16,7 @@ Clean a raster file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
 [--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
-[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--reverse=<yes/no>]
+[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--absolute=<yes/no>]  [--reverse=<yes/no>]
 
 Options:
 -h --help           Show this screen.
@@ -25,6 +25,7 @@ Options:
 --mask PATH         r4 file used as mask
 --threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
 --reverse yes/no    if yes mask values above mask threshold (default: no)
+--absolute yes/no    if yes, take the aboslute values of the mask (default: no)
 --scale VALUE       scale data [default:1]
 --scale_mask VALUE  scale the mask [default:1]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
@@ -110,6 +111,10 @@ if arguments["--reverse"] == 'yes':
    reverse = True
 else:
    reverse = False
+if arguments["--absolute"] == 'yes':
+   absolute = True
+else:
+   absolute = False
 
 ds_extension = os.path.splitext(infile)[1]
 if (ds_extension == ".tif" or ds_extension ==".tiff" or ds_extension ==".grd"):
@@ -161,6 +166,8 @@ if maskf != 'no':
     fid2 = open(maskf, 'r')
     mask = np.fromfile(fid2,dtype=float32)[:nlines*ncols].reshape((nlines,ncols))
     mask =  mask*scale_mask
+    if absolute:
+      mask = np.abs(mask)
     if reverse:
       kk = np.nonzero(np.logical_or(mask==0, mask<seuil)) 
     else:

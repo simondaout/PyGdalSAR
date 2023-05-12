@@ -616,7 +616,7 @@ if arguments["--topofile"] is not None:
     logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxtopo,mintopo))
 
 else:
-   elev = np.ones((new_lines,new_cols))
+   elev = np.ones((new_lines,new_cols),dtype=np.float32)
    elevi = elev.flatten()
    maxtopo,mintopo = 2, 0 
 
@@ -653,7 +653,7 @@ if arguments["--rmspixel"] is not None:
     fig = plt.figure(nfigure,figsize=(9,4))
     nfigure = nfigure + 1
     ax = fig.add_subplot(1,1,1)
-    cax = ax.imshow(spacial_mask,cmap=cmap)
+    cax = ax.imshow(spacial_mask,cmap=cmap,interpolation='nearest')
     ax.set_title('Mask on spatial estimation based on RMSpixel')
     plt.setp( ax.get_xticklabels(), visible=False)
     fig.colorbar(cax, orientation='vertical',aspect=10)
@@ -752,18 +752,18 @@ if arguments["--mask"] is not None:
     vmin = -vmax
 
     ax = fig.add_subplot(1,3,1)
-    cax = ax.imshow(mask,cmap=cmap,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(mask,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Original Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
 
     ax = fig.add_subplot(1,3,2)
-    cax = ax.imshow(mask_flat,cmap=cmap,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(mask_flat,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Flat Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,3,3)
-    cax = ax.imshow(mask_flat_clean,cmap=cmap,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(mask_flat_clean,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Final Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
     #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
@@ -780,7 +780,7 @@ vmin = np.nanpercentile(maps[:,:,:],1.)
 for l in range((N)):
     d = as_strided(maps[:,:,l])
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title(idates[l],fontsize=6)
     plt.setp( ax.get_xticklabels(), visible=False)
     plt.setp( ax.get_yticklabels(), visible=False)
@@ -3439,11 +3439,11 @@ def temporal_decomp(pix):
 
 # initialization
 maps_flata = np.copy(maps)
-models = np.zeros((new_lines,new_cols,N))
+models = np.zeros((new_lines,new_cols,N), dtype=np.float32)
 
 # prepare flatten maps
-maps_ramp = np.zeros((new_lines,new_cols,N))
-maps_topo = np.zeros((new_lines,new_cols,N))
+maps_ramp = np.zeros((new_lines,new_cols,N),dtype=np.float32)
+maps_topo = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
 for ii in range(int(arguments["--niter"])):
     print()
@@ -3455,7 +3455,7 @@ for ii in range(int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
-    rms = np.zeros((N))
+    rms = np.zeros((N),dtype=np.float32)
     pix_az, pix_rg = np.indices((new_lines,new_cols))
     # if radar file just initialise figure
     if arguments["--topofile"] is not None:
@@ -3580,10 +3580,10 @@ for ii in range(int(arguments["--niter"])):
     logger.debug('Input uncertainties: {}'.format(inaps))
 
     # reiinitialize maps models
-    models = np.zeros((new_lines,new_cols,N))
+    models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
     if arguments["--fulloutput"]=='yes':
-      models_seas = np.zeros((new_lines,new_cols,N))
-      models_vect = np.zeros((new_lines,new_cols,N))
+      models_seas = np.zeros((new_lines,new_cols,N),dtype=np.float32)
+      models_vect = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
     with TimeIt():
           for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
@@ -3700,7 +3700,6 @@ else:
         fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
         kernels[l].sigmam.flatten().astype('float32').tofile(fid)
         fid.close()
-
 
 
 #######################################################

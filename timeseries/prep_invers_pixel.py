@@ -40,7 +40,6 @@ from osgeo import gdal
 import numpy as np
 import docopt
 from parsers import gamma as gm
-import gdal
 gdal.UseExceptions()
 import shutil
 

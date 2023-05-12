@@ -87,7 +87,7 @@ def mask(filename, crop):
 ###########
 #   MAIN  # 
 ###########
-
+ gdal.GDT_UInt16
 # Parse arguments: read arguments with dococpt
 arguments = docopt.docopt(__doc__)
 

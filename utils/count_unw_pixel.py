@@ -9,7 +9,7 @@
 count_unw_pixel.py
 ========================
 
-This script count the number of unw ifgs for a given pixel for various temporal baselines thresholds 
+This script count the number of unw pixels for qll ifgs with a given temporal baselines thresholds 
 
 Usage:
         count_unw_pixel.py [--int_path=<path>] [--int_list=<path>] [--dates_list=<path>]  [--lectfile=<path>]  [--prefix=<value>] [--suffix=<value>]  [--Bc=<values>] [--count=<yes/no>] 

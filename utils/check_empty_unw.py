@@ -84,14 +84,20 @@ ListInterfero = "interf_pair_empty.rsc"
 print('Save empty interferogram list:', ListInterfero)
 wf = open(ListInterfero, 'w')
 
+ListInterfero2 = "interf_pair_success.rsc"
+print('Save not empty interferogram list:', ListInterfero)
+wf2 = open(ListInterfero2, 'w')
+
 for j in range(Nifg):
     los,name = check(j)
     occurences = np.count_nonzero(los != 0)
-    #if np.sum(los) == 0:
     if occurences < 500:
         print("File {0} empty!".format(name))
         wf.write("%i  %i\n" % (date_1[j], date_2[j]))
+    else:
+        wf2.write("%i  %i\n" % (date_1[j], date_2[j]))
 wf.close()
+wf2.close()
 
 print('----------------------------------')
 print()

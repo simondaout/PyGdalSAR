@@ -116,7 +116,7 @@ if arguments["--dateslim"] is not  None:
     datemin = date2dec(dmin)
     datemax = date2dec(dmax)
 else:
-    datemin, datemax = np.int(np.min(dates)), np.int(np.max(dates))+1
+    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
     dmax = str(datemax) + '0101'
     dmin = str(datemin) + '0101'
 

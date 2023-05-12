@@ -3,14 +3,14 @@
 
 #__projet__ = "masque"
 #__nom_fichier__ = "fonctions"
-#__author__ = "Laure MANCEAU"
+#__author__ = "Laure MANCEAU, Simon DAOUT"
 #__date__ = "avril 2022"
 
 """\
-correl.py.py
+gen_correl.py.py
 ----------------------
 usage:
-  correl.py.py [-v] [-f] [--pairs=<path>] [--suffix=<values>] [--prefix=<value>] 
+  gen_correl.py.py [-v] [-f] [--pairs=<path>] [--suffix=<values>] [--prefix=<value>] 
 options:
   --pairs=<path>                    File that contains the pairs of images that will be correlated in two columns [Default: interf_pair.rsc]
   --suffix=<values>                 Suffix name $prefix$date1-$date2$suffix.slc [default: '_coreg']
