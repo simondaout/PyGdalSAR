@@ -56,7 +56,6 @@ from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
 import scipy.ndimage
 
-np.warnings.filterwarnings('ignore')
 try:
     from nsbas import docopt
 except:
@@ -110,11 +109,11 @@ else:
 if arguments["--maxamp"] ==  None:
     maxamp = 3
 else:
-    maxamp = np.float(arguments["--maxamp"])
+    maxamp = float(arguments["--maxamp"])
 if arguments["--minelev"] ==  None:
     minelev = 0
 else:
-    minelev = np.float(arguments["--minelev"])
+    minelev = float(arguments["--minelev"])
 if arguments["--rad2mm"] ==  None:
     rad2mm = -4.4563
 else:
@@ -122,7 +121,7 @@ else:
 if arguments["--threshold_amp"] ==  None:
     threshold_amp = 1.5
 else:
-    threshold_amp = np.float(arguments["--threshold_amp"])
+    threshold_amp = float(arguments["--threshold_amp"])
 
 if arguments["--outfig"] ==  None:
     outfig = 'clean_phi-amp'
@@ -136,8 +135,8 @@ else:
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
-amp,phi,lin=np.fromfile(ampf,dtype=np.float32)[:nlines*ncols],np.fromfile(phif,dtype=np.float32)[:nlines*ncols],np.fromfile(linf,dtype=np.float32)[:nlines*ncols]
-sigamp,sigphi=np.fromfile(ampsigf,dtype=np.float32)[:nlines*ncols],np.fromfile(phisigf,dtype=np.float32)[:nlines*ncols]
+amp,phi,lin=np.fromfile(ampf,dtype=float32)[:nlines*ncols],np.fromfile(phif,dtype=float32)[:nlines*ncols],np.fromfile(linf,dtype=float32)[:nlines*ncols]
+sigamp,sigphi=np.fromfile(ampsigf,dtype=float32)[:nlines*ncols],np.fromfile(phisigf,dtype=float32)[:nlines*ncols]
 amp_map, phi_map, lin_map = amp.reshape(nlines,ncols)[ibeg:iend,jbeg:jend],phi.reshape(nlines,ncols)[ibeg:iend,jbeg:jend],lin.reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 sigamp_map, sigphi_map = sigamp.reshape(nlines,ncols)[ibeg:iend,jbeg:jend],sigphi.reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 del amp,phi,lin
@@ -145,29 +144,29 @@ del amp,phi,lin
 if demf ==  None:
     try:
         demf = 'dem'
-        dem_map = np.fromfile('dem',dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
+        dem_map = np.fromfile('dem',dtype=float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
     except:
         print('DEM file is not readible. Set elelvation to zeros.')
         dem_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 else:
-    dem_map = np.fromfile(demf,dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
+    dem_map = np.fromfile(demf,dtype=float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
 
 if arguments["--slopefile"] is not None:
-    slope_map = np.fromfile(arguments["--slopefile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
+    slope_map = np.fromfile(arguments["--slopefile"],dtype=float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
 else:
-    toposmooth = scipy.ndimage.filters.gaussian_filter(dem_map,3.)
+    toposmooth = scipy.ndimage.gaussian_filter(dem_map,3.)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
 
 if arguments["--slopelosfile"] is not None:
-    slopelos_map = np.fromfile(arguments["--slopelosfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
-    slopelos_map[slope_map<3.] = np.float('NaN') # mask aspect for small slope
+    slopelos_map = np.fromfile(arguments["--slopelosfile"],dtype=float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]*100
+    slopelos_map[slope_map<3.] = float('NaN') # mask aspect for small slope
 else:
     slopelos_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
 
 if arguments["--aspectfile"] is not None:
-    aspect_map = np.fromfile(arguments["--aspectfile"],dtype=np.float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
-    aspect_map[slope_map<3] = np.float('NaN') # mask aspect for small slope
+    aspect_map = np.fromfile(arguments["--aspectfile"],dtype=float32)[:nlines*ncols].reshape(nlines,ncols)[ibeg:iend,jbeg:jend]
+    aspect_map[slope_map<3] = float('NaN') # mask aspect for small slope
     aspect_map[aspect_map<0] = aspect_map[aspect_map<0] + 360
 else:
     aspect_map = np.zeros((nlines,ncols))[ibeg:iend,jbeg:jend]
@@ -176,24 +175,24 @@ else:
 if arguments["--perc_sig"] ==  None:
     perc_sig = 100
 else:
-    perc_sig = np.float(arguments["--perc_sig"])
+    perc_sig = float(arguments["--perc_sig"])
     
-phi_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
-amp_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
-lin_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = np.float('NaN')
+phi_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = float('NaN')
+amp_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = float('NaN')
+lin_map[sigamp_map>np.nanpercentile(sigamp_map,perc_sig)] = float('NaN')
 
-phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
-amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
-lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = np.float('NaN')
+phi_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
+amp_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
+lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
 
 # clean based on elev
-phi_map[dem_map<minelev] = np.float('NaN')
-amp_map[dem_map<minelev] = np.float('NaN')
-lin_map[dem_map<minelev] = np.float('NaN')
+phi_map[dem_map<minelev] = float('NaN')
+amp_map[dem_map<minelev] = float('NaN')
+lin_map[dem_map<minelev] = float('NaN')
 
-phi_map[amp_map<threshold_amp] = np.float('NaN')
-phi_map[amp_map>maxamp] = np.float('NaN')
-# lin_map[amp_map<threshold_amp] = np.float('NaN')
+phi_map[amp_map<threshold_amp] = float('NaN')
+phi_map[amp_map>maxamp] = float('NaN')
+# lin_map[amp_map<threshold_amp] = float('NaN')
 
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi

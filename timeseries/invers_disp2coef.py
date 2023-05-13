@@ -58,7 +58,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --imref=<value>         Reference image number [default: 1]
 --mask=<path>           Path to mask file in r4 or tif format for the empirical spatial estimations. Keep only values > threshold_mask for ramp estimation [default: no].
 --rampmask=<yes/no>     Remove a quadratic ramp in range and linear ramp in azimuth on the mask [default: no].
---threshold_mask=<value> Threshold on mask: take only > values (use scale factor for convenience) [default: 1].
+--threshold_mask=<value> Threshold on mask: take only < values (use scale factor for convenience) [default: 1].
 --scale_mask=<value>     Scale factor to apply on mask [default: 1]
 --tempmask=<yes/no>       If yes, also use the mask for the temporal decomposition [default: no]
 --topofile=<path>         Path to topographic file in r4 or tif format. If not None, add a phase-elevation relationship in the saptial estimation [default: None].
@@ -730,7 +730,7 @@ if arguments["--mask"] is not None:
     del maski
 
     # check seuil
-    kk = np.flatnonzero(mask_flat<float(arguments["--threshold_mask"]))
+    kk = np.flatnonzero(mask_flat>float(arguments["--threshold_mask"]))
     mask_flat_clean=np.copy(mask_flat.flatten())
     mask_flat_clean[kk]=float('NaN')
     mask_flat_clean = mask_flat_clean.reshape(new_lines,new_cols)
