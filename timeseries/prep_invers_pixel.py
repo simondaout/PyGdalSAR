@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-# Author        : Simon DAOUT 
+# Author        : Simon DAOUT (CRPG, Nancy) 
 ################################################################################
 
 """
@@ -33,6 +33,13 @@ Options:
   --link=<yes/no>     If no copy data in LN_DIR instead of doing links [default: yes]
   -h --help           Show this screen
 """
+
+print()
+print('Please cite:')
+print ('Daout, S., Doin, M. P., Peltzer, G., Socquet, A., & Lasserre, C. (2017). Large‐scale InSAR monitoring of permafrost freeze‐thaw cycles on the Tibetan Plateau. Geophysical Research Letters, 44(2), 901-909.')
+print('Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.')
+print()
+print()
 
 import glob, math, os, sys
 import dateutil.parser
