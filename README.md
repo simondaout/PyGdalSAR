@@ -75,6 +75,6 @@ Nicholas Dodds: nicholas.dodds@st-annes.ox.ac.uk
  References
 ============
 
-* [Daout, Simon, et al. "Strain Partitioning and Present‐Day Fault Kinematics in NW Tibet From Envisat SAR Interferometry." Journal of Geophysical Research: Solid Earth 123.3 (2018): 2462-2483](https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1002/2017JB015020)
+* [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)
 
 * [Daout, Simon, et al. "Large‐scale InSAR monitoring of permafrost freeze‐thaw cycles on the Tibetan Plateau." Geophysical Research Letters 44.2 (2017): 901-909](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1002/2016GL070781)
