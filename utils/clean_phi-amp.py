@@ -221,7 +221,7 @@ cmap = cm.rainbow
 cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
 # no point to take negatif amplitude
 im = ax.imshow(np.ma.array(amp_map, mask=np.isnan(amp_map)),cmap=cmap,vmin=threshold_amp,\
-    vmax=np.nanpercentile(amp_map,98), alpha=0.8, zorder=2)
+    vmax=np.nanpercentile(amp_map,98), alpha=0.8, zorder=2, interpolation='nearest')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -232,7 +232,7 @@ ax = fig_ampphi.add_subplot(2,3,2)
 cmap_phi = cm.PiYG_r
 # if arguments["--slopefile"] is not None:
 cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
-im = ax.imshow(np.ma.array(phi_map, mask=np.isnan(phi_map)),cmap=cmap_phi,vmin=0,vmax=2*np.pi,alpha=0.8,zorder=2)
+im = ax.imshow(np.ma.array(phi_map, mask=np.isnan(phi_map)),cmap=cmap_phi,vmin=0,vmax=2*np.pi,alpha=0.8,zorder=2, interpolation='nearest')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
@@ -240,10 +240,10 @@ ax.set_title('Timing (rad)',fontsize=12)
 
 ax = fig_ampphi.add_subplot(2,3,3)
 # if arguments["--slopefile"] is not None:
-cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1)
+cax = ax.imshow(slope_map,vmax=np.nanpercentile(slope_map,98),vmin=np.nanpercentile(slope_map,2),cmap=cm.Greys,zorder=1,interpolation='nearest')
 vmax = np.nanpercentile(lin_map,95)
 vmin = np.nanpercentile(lin_map,5)
-im = ax.imshow(np.ma.array(lin_map, mask=np.isnan(lin_map)),vmin=vmin,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2)
+im = ax.imshow(np.ma.array(lin_map, mask=np.isnan(lin_map)),vmin=vmin,vmax=vmax, cmap=cmap, alpha=0.8,zorder=2,interpolation='nearest')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)

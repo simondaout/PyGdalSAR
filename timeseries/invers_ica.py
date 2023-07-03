@@ -40,6 +40,12 @@ Options:
 
 """
 
+print()
+print()
+print('Please cite:')
+print('Maubant, L., Pathier, E., Daout, S., Radiguet, M., Doin, M. P., Kazachkina, E., ... & Walpersdorf, A. (2020). Independent component analysis and parametric approach for source separation in InSAR time series at regional scale: application to the 2017–2018 Slow Slip Event in Guerrero (Mexico). Journal of Geophysical Research: Solid Earth, 125(3), e2019JB018187.')
+print()
+print()
 
 from __future__ import division
 from sklearn.decomposition import FastICA, PCA

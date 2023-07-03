@@ -6,7 +6,7 @@
 # written in Python-Gdal
 #
 ############################################
-# Author        : Simon DAOUT (Oxford)
+# Author        : Simon DAOUT (CPRG, Nancy)
 ############################################
 
 """\
@@ -25,6 +25,13 @@ Options:
 --extension Value   Extention of the the GPS TS files [default: .neu]
 --outputdir PATH    Output directory for pdf plots [default: ts_plots]
 """
+
+print()
+print()
+print('Please cite:')
+print('Daout, S., Steinberg, A., Isken, M. P., Heimann, S., & Sudhaus, H. (2020). Illuminating the spatio-temporal evolution of the 2008–2009 Qaidam earthquake sequence with the joint use of InSAR time series and teleseismic data. Remote Sensing, 12(17), 2850.')
+print()
+print()
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
