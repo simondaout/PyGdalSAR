@@ -11,7 +11,6 @@ prepend-path PATH  $prefix/bin
 prepend-path PATH  $prefix/Timeseries
 prepend-path PATH  $prefix/GeoTools
 prepend-path PATH  $prefix/Pyrocko
-prepend-path PATH  $prefix/NSBAS-pixel_tracking
 prepend-path PATH  $prefix/Plots
 
 set nsbas /data/soft/PyGdalSAR/NSBAS-playground
@@ -19,4 +18,5 @@ set exec_prefix ${nsbas}
 prepend-path PATH  $nsbas/correction_tools
 prepend-path PATH  $nsbas/utils
 prepend-path PATH  $nsbas/plots
+prepend-path PATH  $nsbas/pixel-tracking
 
