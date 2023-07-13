@@ -14,8 +14,20 @@ invert\_ramp\_topo\_unw.py
 Removes atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coefficeints on unwrapped interferograms (Compatible with NSBAS/ GAMMA/ GTiff formats). Possibility to include cross-dependent polynomial functions of range, azimuth and topography, use masks based on additional file or amplide of the RMG interferogram. Reconstruction of the empirical phase correction by time series inversion and impose time series closure of all coefficients.
 
 ```
-Usage: invert_ramp_topo_unw.py
+Usage: invert_ramp_topo_unw.py -h | --help 
 ```
+
+The program has a lot of options that are detailed with the help command. For instance, you might want to correct your list of interferograms (interf_pair_success.txt) from a quadratic ramp in range, a linear ramp in azimuth (flat=5), from a quadratic relationship (nfit=1) with the topography and refer all your interferograms to zero between lines 3000 and 3400 and colunmns 0 and 1000 (ref_zone). In order to eliminate outliers for the estimations, you also might want to mask pixels with LOS above the 95% percentile (perc=95), pixels with slope (DEM gradient) bellow their 90% percentile (perc_slope=90) and with coherence bellow 0.2 (cohpixel=0.2). To do so, run:
+
+```
+Exemple: invert_ramp_topo_unw.py --ref_zone=3000,3400,0,1000 --int_list=../interf_pair_success.txt --prefix =filt_col_ --suffix=_sd --rlook=4 --cohpixel=yes --threshold_coh=0.2 --flat=5 --perc=95 -- perc_slope=90 --topofile=../20170222/radar_4rlks.hgt --nfit=1 --tsinv=yes
+```
+
+The program produces several output figures.
+– The first one corresponds to the phase-elevation plot (Fig. 20141016-20141109phase-topo.png) 
+– The second figure correspond is a comparison between the LOS data, the model and the residual LOS in map view
+– The third figure is very similar to the second one with the difference that the model is the one obtained after time series inversion of all independent parameters of the empirical function (time series inversion performed if tsinv=yes). This step is very important to impose the consistency of the correction within the network. Stronger weights are given for short baselines interferograms that are less likely to contains deformation (Fig. 20141016-20141109corrections.png)
+
 
 Reference:
 * [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)
