@@ -53,6 +53,7 @@ This project contains the following folders (add all those directories to your $
  * contrib/python: additional python-package for parsing nsbas or gamma files, or colormaps for plots (add this dir to your $PYTHONPATH). 
 
  * Pyrocko: Tools for Pyrocko (https://pyrocko.org/, https://git.pyrocko.org/pyrocko)
+
 Developpers & Contact
 =============
 ```
