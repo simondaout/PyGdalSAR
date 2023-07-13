@@ -20,14 +20,8 @@ Requirements
 =============
 This project needs the following external components:
  * CMake
- * Python 
- * py-gdal
- * py-numPy
- * py-sciPy
+ * Python-3* 
  * Gdal (https://www.gdal.org)
- * docopt (Available on https://github.com/docopt/docopt or in ./python/).
- * py-matplotlib
- * py-datetime
  * NSBAS (optional): http://efidir.poleterresolide.fr/index.php/effidir-tools/nsbas
 
 
@@ -48,16 +42,17 @@ use gcc, gfortran and python2.7 as C, Fortran, an python compilers, do:
 Organisation
 =============
 This project contains the following folders (add all those directories to your $PATH):
- * timeseries: programms for time series decomposition 
- * atmocorr: programms for atmospehric corrections.
- * plots: plotting programms for .tiff, .r4, time series or .unw files
- * utils: additional tools for cleaning .r4 or .unw formats, georeferenced formats (default: .tif), geocoding, conversion dates to decimal dates.
- * corrections tools: insar processing tools.
+ * TimeSeries: scripts for time series decomposition and analysis 
+ * AtmoCorr: scripts for atmospehric corrections.
+ * Plots: plotting programms for .tiff, .r4, time series or .unw files
+ * GeoTools: Tools for geographic corrections: tie InSAR to GPS,  decompse several LOS to horizontal/vertical directions 
+ * NSBAS-playground: Loads of scripts and Tools specific for NSBAS 
  * tutorial: 
  	 * ReversibleDeformation: example GACOS corrections, empirical phase/topo corrections and extraction of reversible derformations with seasonal functions.
  	 * Vector: in progress
  * contrib/python: additional python-package for parsing nsbas or gamma files, or colormaps for plots (add this dir to your $PYTHONPATH). 
 
+ * Pyrocko: Tools for Pyrocko (https://pyrocko.org/, https://git.pyrocko.org/pyrocko)
 Developpers & Contact
 =============
 ```
@@ -75,6 +70,13 @@ Nicholas Dodds: nicholas.dodds@st-annes.ox.ac.uk
  References
 ============
 
-* [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)
+The following package is free and openly available for everyone, but please cite us: 
 
 * [Daout, Simon, et al. "Large‐scale InSAR monitoring of permafrost freeze‐thaw cycles on the Tibetan Plateau." Geophysical Research Letters 44.2 (2017): 901-909](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1002/2016GL070781)
+
+* [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)
+
+
+* [Maubant, L., Pathier, E., Daout, S., Radiguet, M., Doin, M. P., Kazachkina, E., ... & Walpersdorf, A. (2020). Independent component analysis and parametric approach for source separation in InSAR time series at regional scale: application to the 2017–2018 Slow Slip Event in Guerrero (Mexico). Journal of Geophysical Research: Solid Earth, 125(3), e2019JB018187.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB018187)
+
+* [Dodds, N., Daout, S., Walker, R. T., Begenjev, G., Bezmenov, Y., Mirzin, R., & Parsons, B. (2022). Interseismic deformation and strain-partitioning along the Main Köpetdag Fault, Turkmenistan, with Sentinel-1 InSAR time-series. Geophysical Journal International, 230(3), 1612-1629.](https://academic.oup.com/gji/article/230/3/1612/6568902?login=true)
