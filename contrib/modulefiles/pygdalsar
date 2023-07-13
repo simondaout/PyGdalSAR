@@ -1,14 +1,22 @@
 #%Module
-set prefix ~/PyGdalSAR/
+set prefix /data/soft/PyGdalSAR/
 set exec_prefix ${prefix}
 
 setenv PYGDALSAR           $prefix
 
-prepend-path PYTHONPATH      $prefix/contrib/python
-
-prepend-path PATH  $prefix/correction_tools
-prepend-path PATH  $prefix/timeseries
-prepend-path PATH  $prefix/utils
-prepend-path PATH  $prefix/atmocorr
-prepend-path PATH  $prefix/plots
+prepend-path PYTHONPATH  $prefix/contrib/parsers
+prepend-path PYTHONPATH  $prefix/contrib/python
+prepend-path PATH  $prefix/AtmoCorr
 prepend-path PATH  $prefix/bin
+prepend-path PATH  $prefix/Timeseries
+prepend-path PATH  $prefix/GeoTools
+prepend-path PATH  $prefix/Pyrocko
+prepend-path PATH  $prefix/NSBAS-pixel_tracking
+prepend-path PATH  $prefix/Plots
+
+set nsbas /data/soft/PyGdalSAR/NSBAS-playground
+set exec_prefix ${nsbas}
+prepend-path PATH  $nsbas/correction_tools
+prepend-path PATH  $nsbas/utils
+prepend-path PATH  $nsbas/plots
+
