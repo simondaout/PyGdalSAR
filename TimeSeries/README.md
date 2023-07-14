@@ -72,7 +72,23 @@ Reference:
 clean\_phi-amp.py / compute\_modseas.py
 ============
 
-Seasonal analysis of the output file of invers\_disp2coef.py with seasonal=yes
+Seasonal analysis of the output file of invers\_disp2coef.py with seasonal=yes as done in:
+
+* [Daout, S., Dini, B., Haeberli, W., Doin, M. P., & Parsons, B. (2020). Ice loss in the Northeastern Tibetan Plateau permafrost as seen by 16 yr of ESA SAR missions. Earth and Planetary Science Letters, 545, 116404.] (https://www.sciencedirect.com/science/article/abs/pii/S0012821X20303484)
+
+For instance to clean all maps with low sesaonl amplitude displacements anc compute statistics from it:
+
+```
+clean_phi-amp.py --slopefile=Slope.r4 --threshold_amp=.8 --plotcorr=yes
+```
+
+where Slope.r4 is the DEM slope file. 
+
+You can then compute the mod of seasonal displacements in a crop area with:
+
+```
+compute_modseas.py --crop=500,1200,1000,2000 --minamp=3.5 --maxamp=40 --name=valley_flank 
+```
 
 clean\_ts.py
 ============
