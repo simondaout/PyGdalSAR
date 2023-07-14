@@ -4,8 +4,7 @@
 """
 remove_small_baselines.py
 ========================
-
-This script prepares a work directory and input files for invers_pixel.
+Remove small baselines ifgs from a pair list file
 
 Usage:
     remove_small_baselines.py --int_list=<path> --out_list=<path>  --Bt=<values>

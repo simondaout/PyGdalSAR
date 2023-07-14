@@ -5,7 +5,7 @@
 remove_from_list.py
 ========================
 
-This script prepares a work directory and input files for invers_pixel.
+remove ifgs from a list given another lise
 
 Usage:
     remove_from_list.py --int_list=<path> --out_list=<path>  --remove_list=<path>

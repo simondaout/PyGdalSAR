@@ -31,5 +31,8 @@ Reference:
 
 * [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)
 
+geo2r4.py
+============
+Convert geotiff or any raster made of 1 band into real4 format.
 
 

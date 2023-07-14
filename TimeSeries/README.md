@@ -125,6 +125,11 @@ where vmin, vmax defined the min and max of the colorscale and geocrop defines t
 plot_annimate_geots.py --cube=depl_cumule
 ```
 
+date2dec.py
+============
+convert dates in YYYYMMDD format to numerical format
+
+
  References
 ============
 
