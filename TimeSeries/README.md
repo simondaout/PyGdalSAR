@@ -92,6 +92,8 @@ You can then compute the mod of seasonal displacements in a crop area with:
 compute_modseas.py --crop=500,1200,1000,2000 --minamp=3.5 --maxamp=40 --name=valley_flank 
 ```
 
+![Alt text](clean_phi-amp_era_histo.png)
+
 clean\_ts.py
 ============
 Clean a time series file (cube in binary format) given an other real4 file (mask) and a threshold on this mask

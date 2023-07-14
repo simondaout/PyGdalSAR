@@ -6,7 +6,7 @@
 # written in Python-Gdal
 #
 ############################################
-# Author        : Simon Daout
+# Author        : Simon Daout (CRPG-ENSG)
 ############################################
 
 """\

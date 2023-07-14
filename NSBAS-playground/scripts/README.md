@@ -4,7 +4,11 @@ Scripts specific to the NSBAS processing chain and FLATSIM products (https://fla
 nsb\_unw\_ERAcorr\_stats.py / nsb\_unw\_GACOScorr\_stats.py
 ============
 
-Tools to correct interferograms from ERA5 or GACOS atmospheric models
+Reads in ERA or corrections in radar slant geometry. Following this apply
+correction to IFGs, using IFG=ERA+RAMP. Enforce closure in the
+ramp corrections, and save these resulting IFGs for timeseries
+analysis. In addition perform statistical analysis of corrections.
+Use gacos2nsbrdr.py to convert GACOS data into NSBAS format.
 
 Reference:
 * [Dodds, N., Daout, S., Walker, R. T., Begenjev, G., Bezmenov, Y., Mirzin, R., & Parsons, B. (2022). Interseismic deformation and strain-partitioning along the Main Köpetdag Fault, Turkmenistan, with Sentinel-1 InSAR time-series. Geophysical Journal International, 230(3), 1612-1629.](https://academic.oup.com/gji/article/230/3/1612/6568902)
