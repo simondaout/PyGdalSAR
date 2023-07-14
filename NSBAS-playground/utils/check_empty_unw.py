@@ -85,7 +85,7 @@ print('Save empty interferogram list:', ListInterfero)
 wf = open(ListInterfero, 'w')
 
 ListInterfero2 = "interf_pair_success.rsc"
-print('Save not empty interferogram list:', ListInterfero)
+print('Save not empty interferogram list:', ListInterfero222222222222)
 wf2 = open(ListInterfero2, 'w')
 
 for j in range(Nifg):
