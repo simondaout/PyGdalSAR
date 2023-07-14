@@ -1,3 +1,5 @@
+Scripts for InSAR atmospheric corrections 
+
 correct\_ts\_from\_gacos.py
 ============
 Correct InSAR Time Series data from Gacos atmospheric models (data to be download and cited on: ceg-research.ncl.ac.uk/v2/gacos/). 1) Convert .ztd files to .tif format, 2) crop, re-project and re-resample atmospheric models to data geometry 3) correct time series data.
