@@ -9,6 +9,8 @@ Tools to correct interferograms from ERA5 or GACOS atmospheric models
 Reference:
 * [Dodds, N., Daout, S., Walker, R. T., Begenjev, G., Bezmenov, Y., Mirzin, R., & Parsons, B. (2022). Interseismic deformation and strain-partitioning along the Main Köpetdag Fault, Turkmenistan, with Sentinel-1 InSAR time-series. Geophysical Journal International, 230(3), 1612-1629.](https://academic.oup.com/gji/article/230/3/1612/6568902)
 
+![Alt text](ERA-stats.png)
+
 nsb\_compute\_stack.py
 ============
 Compute a stack from a list of interferograms
@@ -153,8 +155,4 @@ nsb_filtflatunw.py --prefix=col_ --suffix=_sd_flatz_flata_flatz_nomodel --job=ad
 
 add\_flatr\_back: Add range ramp estimated on wrapped IFG back on unwrapped IFG. Required .flatr param- eter file containing polynomial fit produced by flatr. Assumed flattening estimated on Rlooks\_int file. add\_flata\_back: Add azimutal ramp estimated on wrapped IFG back on unwrapped IFG. Required .flata parameter file containing polynomial fit produced by flat\_az. !!! Assumed flattening estimated on Rlooks\_int file. add\_model\_back: Function adding model on unwrapped IFG previously removed on wrapped IFG. Required model file and parameter file .stack produced by flat\_model. add\_atmo\_back: Add back stratified model computed by flatten\_topo.
 
-
-make\_fit\_az.sh / correct\_rgaz\_unw.py / correct\_ramp\_unw.py
-============
-Old NSBAS Tools: will be removed 
 

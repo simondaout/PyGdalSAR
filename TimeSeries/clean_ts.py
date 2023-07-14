@@ -39,6 +39,12 @@ Options:
 --clean_demerr      Path to dem error file
 """
 
+print()
+print()
+print('Author: Simon Daout') 
+print()
+print()
+
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided

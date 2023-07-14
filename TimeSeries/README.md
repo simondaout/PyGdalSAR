@@ -42,6 +42,8 @@ This program also offers the possibility to decompose the time series into vario
 invers\_disp\_pixel.py --cube=depl\_cumule\_clean --cols=917,704,1076 --ligns=1108,1169,1131 --aps= inaps.txt --seasonal=yes --dem=yes
 ```
 
+![Alt text](exemple_ts_plot.png)
+
 lect\_disp\_pixel.py
 =============
 

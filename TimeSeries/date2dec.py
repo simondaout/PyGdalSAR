@@ -26,6 +26,12 @@ from datetime import datetime
 import numpy as np
 import docopt
 
+print()
+print()
+print('Author: Simon Daout')
+print()
+print()
+
 arguments = docopt.docopt(__doc__)
 
 if arguments["--dates"] is not  None:

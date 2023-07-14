@@ -32,7 +32,6 @@ Options:
 --output            Optinional saving as mp4
 """
 
-
 import sys
 import numpy as np
 from osgeo import gdal

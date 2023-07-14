@@ -35,6 +35,12 @@ Options:
 --imref             Ref image for corrdem
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print()
+print()
+
 from osgeo import gdal
 import osr,os
 gdal.UseExceptions()

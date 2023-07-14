@@ -51,6 +51,12 @@ import docopt
 arguments = docopt.docopt(__doc__)
 
 
+print()
+print()
+print('Author: Simon Daout') 
+print()
+print()
+
 def date2dec(dates):
     dates  = np.atleast_1d(dates)
     times = []

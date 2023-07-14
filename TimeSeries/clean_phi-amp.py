@@ -61,6 +61,15 @@ try:
 except:
     import docopt
 
+
+print()
+print()
+print('Author: Simon Daout')
+print('Please cite:') 
+print('Daout, S., Dini, B., Haeberli, W., Doin, M. P., & Parsons, B. (2020). Ice loss in the Northeastern Tibetan Plateau permafrost as seen by 16 yr of ESA SAR missions. Earth and Planetary Science Letters, 545, 116404')
+print()
+print()
+
 arguments = docopt.docopt(__doc__)
 if arguments["--ampfile"] ==  None:
     ampf = 'ampwt_coeff.r4'

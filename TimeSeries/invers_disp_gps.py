@@ -34,6 +34,11 @@ Options:
 --scale VALUE       Scale factor for the three components [default: 1,1,1]
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print()
+print()
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
