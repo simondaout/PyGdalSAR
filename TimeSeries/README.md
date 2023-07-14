@@ -32,14 +32,14 @@ invers\_disp\_pixel.py
 Temporal decomposition of the time series delay maps of selected pixels. 
 
 ```
-Usage: invers\_disp\_pixel.py  -h | --help 
-invers\_disp\_pixel.py --cube=depl\_cumule\_clean --cols=917,704,1076 --ligns=1108,1169,1131 --aps= inaps.txt
+Usage: invers_disp_pixel.py  -h | --help 
+invers_disp_pixel.py --cube=depl_cumule_clean --cols=917,704,1076 --ligns=1108,1169,1131 --aps= inaps.txt
 ```
 
 This program also offers the possibility to decompose the time series into various sources. For example if you want to decompose your time series into a linear and a seasonal function with an additional DEM error term proportional to the perpendicular baseline, run:
 
 ```
-invers\_disp\_pixel.py --cube=depl\_cumule\_clean --cols=917,704,1076 --ligns=1108,1169,1131 --aps= inaps.txt --seasonal=yes --dem=yes
+invers_disp_pixel.py --cube=depl_cumule_clean --cols=917,704,1076 --ligns=1108,1169,1131 --aps= inaps.txt --seasonal=yes --dem=yes
 ```
 
 ![Alt text](exemple_ts_plot.png)
@@ -50,7 +50,7 @@ lect\_disp\_pixel.py
 Plot time series results obtained with invers\_disp2coef.py for given pixels.
 
 ```
-Usage: lect\_cube\_pixel.py   -h | --help
+Usage: lect_cube_pixel.py   -h | --help
 ```
 
 invers\_disp\_gps.py
