@@ -67,11 +67,13 @@ def run(cmd):
 def correl(img1, img2):
     # asp command
 
-    session="-t pinhole --prefilter-mode 0 --alignment-method none --corr-sub-seed-percent 3 "
-    filtering="--rm-cleanup-passes 1 --filter-mode 2 --rm-threshold 1.5 --rm-min-matches 50 --rm-half-kernel 9 9 --edge-buffer-size -1 "
-    correl="--xcorr-threshold -1 --min-xcorr-level 1 --corr-search -4 4 -4 4 "
+    session="-t pinhole --prefilter-mode 2 --alignment-method none --prefilter-kernel-width 1.4 --nodata-value -9999"
+    filtering="--filter-mode 1 --median-filter-size 3 --texture-smooth-size 13 --texture-smooth-scale 0.13"
+    correl="--corr-kernel 7 7 --cost-mode 3 --stereo-algorithm asp_final_mgm --corr-tile-size 1024 --subpixel-mode 9 --subpixel-kernel 5 5 --corr-seed-mode 1 --processes 4 --xcorr-threshold 2 --min-xcorr-level 0 --sgm-collar-size 512"
+    black_left =os.environ["PYGDALSAR"] +"/contrib/ASP/black_left.tsai"
+    black_right=os.environ["PYGDALSAR"] + "/contrib/ASP/black_right.tsai"     
 
-    run("parallel_stereo "+ session +  str(img1) + " " + str(img2) + " black_left.tsai black_right.tsai corr --datum wgs84 --corr-timeout 500 --stereo-algorithm asp_mgm --corr-kernel 5 5 --force-reuse-match-files --cost-mode 3 --subpixel-mode 2 --subpixel-kernel 21 21 --threads-multiprocess 10 --processes 1 " + filtering + " " + correl)
+    run("parallel_stereo "+ session +  str(img1) + " " + str(img2) + " black_left.tsai black_right.tsai corr --datum wgs84 --corr-timeout 300"+ correl + " " + filtering)
 
 def makedirs(name):
     if os.path.exists(name):

@@ -8,7 +8,7 @@ prepend-path PYTHONPATH  $prefix/contrib/parsers
 prepend-path PYTHONPATH  $prefix/contrib/python
 prepend-path PATH  $prefix/AtmoCorr
 prepend-path PATH  $prefix/bin
-prepend-path PATH  $prefix/Timeseries
+prepend-path PATH  $prefix/TimeSeries
 prepend-path PATH  $prefix/GeoTools
 prepend-path PATH  $prefix/Pyrocko-playground
 prepend-path PATH  $prefix/Plots
