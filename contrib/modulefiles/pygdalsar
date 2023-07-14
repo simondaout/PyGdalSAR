@@ -13,9 +13,7 @@ prepend-path PATH  $prefix/GeoTools
 prepend-path PATH  $prefix/Pyrocko-playground
 prepend-path PATH  $prefix/Plots
 
-set nsbas /data/soft/PyGdalSAR/NSBAS-playground
-set exec_prefix ${nsbas}
-prepend-path PATH  $nsbas/utils
-prepend-path PATH  $nsbas/scripts
-prepend-path PATH  $nsbas/pixel-tracking
+prepend-path PATH  $prefix/NSBAS-playground/utils
+prepend-path PATH  $prefix/NSBAS-playground/scripts
+prepend-path PATH  $prefix/NSBAS-playground/pixel-tracking
 
