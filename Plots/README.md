@@ -7,7 +7,7 @@ Usage: plot_geo.py -h | --help
 
 ```
 
-![Example of earthquake interferogram](geo_20090130-20091211_4rlks.png)
+![Alt Example of earthquake interferogram](geo_20090130-20091211_4rlks.png)
 
 plot\_raster.py
 ============
