@@ -13,10 +13,9 @@ nsb\_compute\_stack.py
 ============
 Compute a stack from a list of interferograms
 
-convert\_DemFile\_to\_NSBAS.py
+nsb_convert\_DemFile\_to\_NSBAS.py
 ============
 Convert DEM for use in NSBAS
-
 
 nsb\_filtflatunw.py
 ============
