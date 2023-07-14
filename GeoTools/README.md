@@ -14,6 +14,7 @@ plot_los_gps.py --network=T117_gps_network.txt --reduction=time_series --extensi
 Reference:
 * [Daout, S., D'Agostino, N., Pathier, E., Socquet, A., Lavé, J., Doin, M. P., ... & Benedetti, L. Along-Strike Variation of the Strain Partitioning within the Apennines as Seen from Large-Scale Multi-Temporal Insar Analysis. Available at SSRN 4429391.] (https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4429391)
 
+![Alt text](T022_gps_LOS.png)
 
 tie\_from\_decomposition.py / tie\_to\_gps.py
 ============

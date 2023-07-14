@@ -38,6 +38,12 @@ Options:
 --cst               Add constante to map
 """
 
+print()
+print()
+print('Author: Simon DAOUT')
+print()
+print()
+
 # numpy
 import numpy as np
 from numpy.lib.stride_tricks import as_strided

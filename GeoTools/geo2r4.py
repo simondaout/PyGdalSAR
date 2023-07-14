@@ -23,6 +23,12 @@ Options:
 
 """
 
+print()
+print()
+print('Author: Simon DAOUT')
+print()
+print()
+
 from osgeo import gdal
 import numpy as np 
 import docopt

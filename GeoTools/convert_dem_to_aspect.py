@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+print()
+print()
+print('Author: Simon DAOUT')
+print()
+print()
+
 import numpy as np
 import scipy.ndimage
 import scipy.optimize as opt

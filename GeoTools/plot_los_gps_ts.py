@@ -28,8 +28,9 @@ Options:
 
 print()
 print()
+print('Author: Simon DAOUT')
 print('Please cite:')
-print('Daout, S., Steinberg, A., Isken, M. P., Heimann, S., & Sudhaus, H. (2020). Illuminating the spatio-temporal evolution of the 2008–2009 Qaidam earthquake sequence with the joint use of InSAR time series and teleseismic data. Remote Sensing, 12(17), 2850.')
+print('Daout, S., DAgostino, N., Pathier, E., Socquet, A., Lavé, J., Doin, M. P., ... & Benedetti, L. Along-Strike Variation of the Strain Partitioning within the Apennines as Seen from Large-Scale Multi-Temporal Insar Analysis. Available at SSRN 4429391.')
 print()
 print()
 

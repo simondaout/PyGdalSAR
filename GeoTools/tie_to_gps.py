@@ -10,6 +10,14 @@
 # Author        :   Qi Ou (Oxford)
 ############################################
 
+print()
+print()
+print('Author: Simon DAOUT, Qi Ou')
+print('Please cite:')
+print('Daout, S., DAgostino, N., Pathier, E., Socquet, A., Lavé, J., Doin, M. P., ... & Benedetti, L. Along-Strike Variation of the Strain Partitioning within the Apennines as Seen from Large-Scale Multi-Temporal Insar Analysis. Available at SSRN 4429391.')
+print()
+print()
+
 import numpy as np
 import scipy as sp
 import scipy.optimize as opt

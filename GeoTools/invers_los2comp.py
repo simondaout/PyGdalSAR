@@ -39,6 +39,14 @@ import matplotlib.patches as patches
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
+print()
+print()
+print('Author: Simon DAOUT')
+print('Please cite:')
+print('Daout, S., DAgostino, N., Pathier, E., Socquet, A., Lavé, J., Doin, M. P., ... & Benedetti, L. Along-Strike Variation of the Strain Partitioning within the Apennines as Seen from Large-Scale Multi-Temporal Insar Analysis. Available at SSRN 4429391.')
+print()
+print()
+
 ################################
 # CLASSES
 ################################
