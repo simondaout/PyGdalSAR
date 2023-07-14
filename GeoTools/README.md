@@ -35,4 +35,3 @@ geo2r4.py
 ============
 Convert geotiff or any raster made of 1 band into real4 format.
 
-
