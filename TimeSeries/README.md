@@ -60,6 +60,20 @@ Temporal decomposition of gps time series and projection into a LOS vector.
 Usage: invers_disp_gps.py  -h | --help 
 ``` 
 
+invers\_pca.py / invers\_ica.py / reconstruct\_ica.py
+============
+
+PCA/ICA time series decomposition 
+
+Reference:
+* [Maubant, L., Pathier, E., Daout, S., Radiguet, M., Doin, M. P., Kazachkina, E., ... & Walpersdorf, A. (2020). Independent component analysis and parametric approach for source separation in InSAR time series at regional scale: application to the 2017–2018 Slow Slip Event in Guerrero (Mexico). Journal of Geophysical Research: Solid Earth, 125(3), e2019JB018187.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB018187)
+
+
+clean\_phi-amp.py / compute\_modseas.py
+============
+
+Seasonal analysis of the output file of invers\_disp2coef.py with seasonal=yes
+
 clean\_ts.py
 ============
 Clean a time series file (cube in binary format) given an other real4 file (mask) and a threshold on this mask
@@ -68,9 +82,16 @@ Clean a time series file (cube in binary format) given an other real4 file (mask
 Usage: clean_ts.py -h | --help
 ```
 
+
+plot\_ts.py / plot\_annimate\_ts.py
+============
+
+Plot Time series or create a .mp4 animation of your time series cube. 
+ 
+
 geocode\_cube.py
 ============
-Geocode cube of cumulative deplacements: create date.unw, geo\_date.unw, and geo\_date.tiff for each dates. !!! Need geocode.pl from ROIi\_PAC
+Geocode cube of cumulative deplacements: create date.unw, geo\_date.unw, and geo\_date.tiff for each dates. !!! Need geocode.pl from ROI\_PAC
 
 ```
 Usage: geocode_cube.py -h | --help
@@ -85,7 +106,7 @@ plot_geots.py --vmax=30 --vmin=-30 --geocrop=37,38,95.5,97
 where vmin, vmax defined the min and max of the colorscale and geocrop defines the crop boundaries. You can also create an .mp4 animation of your time series with the command line:
 
 ```
-plot_annimate_ts.py --cube=depl_cumule
+plot_annimate_geots.py --cube=depl_cumule
 ```
 
  References
@@ -95,6 +116,5 @@ plot_annimate_ts.py --cube=depl_cumule
 
 * [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)
 
-* [Maubant, L., Pathier, E., Daout, S., Radiguet, M., Doin, M. P., Kazachkina, E., ... & Walpersdorf, A. (2020). Independent component analysis and parametric approach for source separation in InSAR time series at regional scale: application to the 2017–2018 Slow Slip Event in Guerrero (Mexico). Journal of Geophysical Research: Solid Earth, 125(3), e2019JB018187.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB018187)
 
 
