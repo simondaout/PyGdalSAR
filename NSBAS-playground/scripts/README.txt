@@ -142,7 +142,7 @@ The -f option forces the run of the jobs even if the output files are already av
 nsb\_filtflatunw.py --prefix=col\_ --suffix=\_sd\_flatz\_flata\_flatz\_nomodel --job=add\_flatr\_back/ add\_flata\_back/add\_atmo\_back/add\_model\_back nsbas.proc
 ```
 
-add\_flatr\_back: Add range ramp estimated on wrapped IFG back on unwrapped IFG. Required .flatr param- eter file containing polynomial fit produced by flatr. !!! Assumed flattening estimated on Rlooks\_int file. add\_flata\_back: Add azimutal ramp estimated on wrapped IFG back on unwrapped IFG. Required .flata pa- rameter file containing polynomial fit produced by flat\_az. !!! Assumed flattening estimated on Rlooks\_int file. add\_model\_back: Function adding model on unwrapped IFG previously removed on wrapped IFG. Required model file and parameter file .stack produced by flat\_model. add\_atmo\_back: Add back stratified model computed by flatten\_topo.
+add\_flatr\_back: Add range ramp estimated on wrapped IFG back on unwrapped IFG. Required .flatr param- eter file containing polynomial fit produced by flatr. Assumed flattening estimated on Rlooks\_int file. add\_flata\_back: Add azimutal ramp estimated on wrapped IFG back on unwrapped IFG. Required .flata pa- rameter file containing polynomial fit produced by flat\_az. !!! Assumed flattening estimated on Rlooks\_int file. add\_model\_back: Function adding model on unwrapped IFG previously removed on wrapped IFG. Required model file and parameter file .stack produced by flat\_model. add\_atmo\_back: Add back stratified model computed by flatten\_topo.
 
 
 make\_fit\_az.sh / correct\_rgaz\_unw.py / correct\_ramp\_unw.py
