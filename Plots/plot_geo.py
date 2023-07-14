@@ -36,6 +36,12 @@ Options:
 --shapefile         Plot shape file
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print()
+print()
+
 # gdal
 from osgeo import gdal, osr
 gdal.UseExceptions()

@@ -37,6 +37,12 @@ Options:
 --vmin                Min colorscale [default: 2th percentile]
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print()
+print()
+
 # os
 import math,sys,getopt
 from os import path

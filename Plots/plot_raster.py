@@ -45,6 +45,12 @@ Options:
 --lines VALUE        Add crosses on pixel lines numbers  (eg. 1200,1200,3000)
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print()
+print()
+
 import os, sys
 
 # docopt (command line parser)
