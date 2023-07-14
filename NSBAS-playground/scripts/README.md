@@ -25,6 +25,8 @@ Reference:
 
 Contrary to other processing chains, NSBAS provides various empirical corrections on the wrapped phase in order to reduce the variability of phase and thus enable unwrapping over large areas (Doin et al. (2015); Daout et al. (2017, 2018)). These corrections include (1) ramp corrections in range or azimuth to remove residual orbital errors, ionospheric delays, and effects of the satellite clock drift (Fig. processing.png), (2) empirical estimation of the phase delays due to differences in the stratified troposphere with a possible mask on deforming areas, (3) empirical removal of a fringe pattern (e.g co-seismic fringe pattern, seasonal ground deformation making the unwrapping difficult) (Fig. processing.png). All those corrections are estimated by searching on small moving sub-windows the proportionality between (1) phase and range, (2) phase and elevation, or (3) phase and the template that maximises the local phase coherence within the subwindows (Doin et al., 2011; Doin et al., 2015), respectively.
 
+![Alt text](processing.png)
+
 * The available jobs are check\_look, ecmwf, replace\_amp, filterSW, filterROI, flatr, flat\_az, flat\_atmo, flat\_model, colin, look\_int, unwrapping, add\_flatr\_back, add\_flata\_back, add\_model\_back, add\_atmo\_back. Bellow, some details about each of this processing step.
 
 * The first thing you may want to do is multilook all your wrapped interferograms in order to reduce the size of your raster files. For this set Rlooks\_int in your procfile to a factor of 2, and run:
