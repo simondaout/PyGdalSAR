@@ -27,9 +27,13 @@ Exemple: invert_ramp_topo_unw.py --ref_zone=3000,3400,0,1000 --int_list=../inter
 
 The program produces several output figures.
 – The first one corresponds to the phase-elevation plot (Fig. 20141016-20141109phase-topo.png) 
+
+![Alt text](20141016-20141109phase-topo.png)
+
 – The second figure correspond is a comparison between the LOS data, the model and the residual LOS in map view
 – The third figure is very similar to the second one with the difference that the model is the one obtained after time series inversion of all independent parameters of the empirical function (time series inversion performed if tsinv=yes). This step is very important to impose the consistency of the correction within the network. Stronger weights are given for short baselines interferograms that are less likely to contains deformation (Fig. 20141016-20141109corrections.png)
 
+![Alt text](20141016-20141109corrections.png)
 
 Reference:
 * [Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019JB017692)

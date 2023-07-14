@@ -46,6 +46,14 @@ Options:
 --lectfile=<path>    Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print('Please cite:') 
+print('Dini, B., Daout, S., Manconi, A., & Loew, S. (2019). Classification of slope processes based on multitemporal DInSAR analyses in the Himalaya of NW Bhutan. Remote Sensing of Environment, 233, 111408.')
+print()
+print()
+
 from osgeo import gdal
 from osgeo import osr
 import sys,os

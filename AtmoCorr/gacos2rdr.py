@@ -27,6 +27,15 @@ Usage:
 
 """
 
+print()
+print()
+print('Authors: Nicholas Dodds, Simon DAOUT')
+print('Please cite:')
+print('Dodds, N., Daout, S., Walker, R. T., Begenjev, G., Bezmenov, Y., Mirzin, R., & Parsons, B. (2022). Interseismic deformation and strain-partitioning along the Main Köpetdag Fault, Turkmenistan, with Sentinel-1 InSAR time-series. Geophysical Journal International, 230(3), 1612-1629.')
+print()
+print()
+
+
 import os, sys, logging, glob
 import numpy as np
 from scipy import ndimage, misc

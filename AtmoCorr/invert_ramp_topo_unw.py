@@ -75,6 +75,13 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --crop_emp VALUE    Define a region of interest for the spatial estimatiom (ramp+phase/topo) [default: 0,nlines,0,ncol]
 """
 
+print()
+print()
+print('Author: Simon Daout')
+print('Please cite:') 
+print('Daout, S., Sudhaus, H., Kausch, T., Steinberg, A., & Dini, B. (2019). Interseismic and postseismic shallow creep of the North Qaidam Thrust faults detected with a multitemporal InSAR analysis. Journal of Geophysical Research: Solid Earth, 124(7), 7259-7279.')
+print()
+print()
 
 # gdal
 from osgeo import gdal
