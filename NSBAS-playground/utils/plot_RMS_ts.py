@@ -20,7 +20,7 @@ Options:
 -h --help             Show this screen.
 --lectfile=<file>     Path of the lect.in file for r4 format [default:lect.in]
 --int_list=<file>     Text file containing list of interferograms dates in two colums, $data1 $date2 [default: interf_pair.rsc]
---dates_list=<file>   Path to text file containing date,bp,bt,doppler_frq,date_dec [default: baseline.rsc]
+--dates_list=<file>   Path to text file containing date,bp,bt,doppler_frq,date_dec [default: images_retenues]
   --outputdir=<dir>   Output directory [default: ./plots]
 --vmax                Max colorscale [default: 98th percentile]
 --vmin                Min colorscale [default: 2th percentile]
@@ -55,7 +55,7 @@ if arguments["--int_list"] == None:
 else:
     int_list=arguments["--int_list"]
 if arguments["--dates_list"] == None:
-    baseline = 'list_dates'
+    baseline = 'images_retenues'
 else:
     baseline=arguments["--dates_list"]
 
@@ -86,7 +86,7 @@ kmax=len(date_1)
 print("number of interferogram: ",kmax)
 
 # read dates
-im,imd,bt,bp =np.loadtxt(baseline,comments="#",usecols=(0,1,2,3),unpack=True,dtype='i,f,f,f')
+im,imd =np.loadtxt(baseline,comments="#",usecols=(1,3),unpack=True,dtype='i,f')
 print("image list=",baseline)
 nmax=len(imd)
 print("number of image: ",nmax)
