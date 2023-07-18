@@ -67,13 +67,13 @@ def run(cmd):
 def correl(img1, img2):
     # asp command
 
-    session="-t pinhole --prefilter-mode 2 --alignment-method none --prefilter-kernel-width 1.4 --nodata-value -9999"
-    filtering="--filter-mode 1 --median-filter-size 3 --texture-smooth-size 13 --texture-smooth-scale 0.13"
-    correl="--corr-kernel 7 7 --cost-mode 3 --stereo-algorithm asp_final_mgm --corr-tile-size 1024 --subpixel-mode 9 --subpixel-kernel 5 5 --corr-seed-mode 1 --processes 4 --xcorr-threshold 2 --min-xcorr-level 0 --sgm-collar-size 512"
+    session="-t pinhole --prefilter-mode 2 --alignment-method none --prefilter-kernel-width 1.4 --nodata-value 0 "
+    filtering="--filter-mode 2 --median-filter-size 3 --texture-smooth-size 13 --texture-smooth-scale 0.13  --rm-quantile-percentile 0.85 --rm-quantile-multiple 1 --rm-cleanup-passes 1 --rm-half-kernel 5 5 "
+    correl="--corr-kernel 15 35 --cost-mode 2 --stereo-algorithm asp_bm --corr-tile-size 1024 --subpixel-mode 1 --subpixel-kernel 15 35 --corr-seed-mode 1 --threads-multiprocess  4 --xcorr-threshold 2 --min-xcorr-level 0 --sgm-collar-size 512"
     black_left =os.environ["PYGDALSAR"] +"/contrib/ASP/black_left.tsai"
     black_right=os.environ["PYGDALSAR"] + "/contrib/ASP/black_right.tsai"     
 
-    run("parallel_stereo "+ session +  str(img1) + " " + str(img2) + " black_left.tsai black_right.tsai corr --datum wgs84 --corr-timeout 300"+ correl + " " + filtering)
+    run("parallel_stereo "+ session + " " +  str(img1) + " " + str(img2) + " " + black_left + " "  +  black_right + " corr --datum wgs84 --corr-timeout 300 "+ correl + " " + filtering)
 
 def makedirs(name):
     if os.path.exists(name):
@@ -139,9 +139,9 @@ for kk in range((kmax)):
         target2 = os.path.abspath('./' + str(date2) + suffix +  '.tiff')
         symlink(img1, target1)
         symlink(img2, target2)
-        symlink('/data/work/nepal/mathillo/processing/asp/black_left.tsai', 'black_left.tsai')
-        symlink('/data/work/nepal/mathillo/processing/asp/black_right.tsai', 'black_right.tsai')
-        symlink('/data/work/nepal/mathillo/processing/asp/stereo.default', 'stereo.default')
+        #symlink('/data/work/nepal/mathillo/processing/asp/black_left.tsai', 'black_left.tsai')
+        #symlink('/data/work/nepal/mathillo/processing/asp/black_right.tsai', 'black_right.tsai')
+        #symlink('/data/work/nepal/mathillo/processing/asp/stereo.default', 'stereo.default')
 
         #réalisation de la corrélation
         correl(target1, target2)
