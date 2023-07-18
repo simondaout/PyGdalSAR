@@ -26,7 +26,7 @@ Options:
 --mask PATH         r4 file used as mask [default: None]
 --flatten_mask PATH output r4 flatten mask [default: None]
 --rampmask VALUE    flatten mask [default: yes]
---threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold)
+--threshold VALUE   threshold value on mask file (Keep pixel with mask < threshold)
 --scale VALUE       scale the mask [default:1]
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --imref VALUE       Reference image number [default: 1]
@@ -197,8 +197,8 @@ else:
     maskflat = np.copy(mask)
 
 if maskf is not None:
-    vmax = np.nanpercentile(maskflat,99)
-    vmin= np.nanpercentile(maskflat,1)
+    vmax = np.nanpercentile(maskflat,92)
+    vmin= np.nanpercentile(maskflat,8)
 
     kk = np.nonzero(maskflat>seuil)
     spacial_mask = np.copy(maskflat)
@@ -206,7 +206,7 @@ if maskf is not None:
     nfigure=0
     fig = plt.figure(0,figsize=(11,4))
     ax = fig.add_subplot(1,3,1)
-    cax = ax.imshow(mask,cmap=cm.jet,vmax=vmax,vmin=0)
+    cax = ax.imshow(mask,cmap=cm.jet,vmax=vmax,vmin=0,interpolation='none')
     ax.set_title('RMSpixel')
     plt.setp( ax.get_xticklabels(), visible=False)
     divider = make_axes_locatable(ax)
@@ -214,7 +214,7 @@ if maskf is not None:
     plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,3,2)
-    cax = ax.imshow(maskflat,cmap=cm.jet,vmax=vmax,vmin=0)
+    cax = ax.imshow(maskflat,cmap=cm.jet,vmax=vmax,vmin=0,interpolation='none')
     ax.set_title('flat RMSpixel')
     plt.setp( ax.get_xticklabels(), visible=False)
     divider = make_axes_locatable(ax)
@@ -222,15 +222,15 @@ if maskf is not None:
     plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(1,3,3)
-    cax = ax.imshow(spacial_mask,cmap=cm.jet,vmax=vmax,vmin=0)
+    cax = ax.imshow(spacial_mask,cmap=cm.jet,vmax=vmax,vmin=0,interpolation='none')
     ax.set_title('Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
     divider = make_axes_locatable(ax)
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
     del spacial_mask, mask
-    # plt.show()
-    # sys.exit()
+    #plt.show()
+    #sys.exit()
 
 if arguments["--flatten_mask"] != None:
     # save clean ts
@@ -260,9 +260,8 @@ for l in range((N)):
     kk = np.nonzero(
     np.logical_or(d<minlos,
     np.logical_or(d>maxlos,
-    np.logical_or(maskflat>seuil,
-        np.isnan(maskflat), 
-        ))))
+        np.isnan(maskflat)
+        )))
     
     d[kk] = float('NaN')
     # carefull stupid unit 
@@ -311,7 +310,7 @@ for l in range((N)):
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     cmap = cm.jet
     cmap.set_bad('white')
-    cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin)
+    cax = ax.imshow(d,cmap=cm.jet,vmax=vmax,vmin=vmin,interpolation='none')
     ax.set_title(idates[l],fontsize=6)
     plt.setp( ax.get_xticklabels(), visible=False)
     plt.setp( ax.get_yticklabels(), visible=False)
