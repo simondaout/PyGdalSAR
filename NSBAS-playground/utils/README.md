@@ -10,6 +10,8 @@ bridge.py / plot_bridges.py
 Create bridge.in file given output form mdx written in a text file.To create the text file: right clic on the two points to bridge on mdx windows and copy past terminal in a text file
 Plot bridges   
 
+![Alt text](bridges.png)
+
 check\_coverage\_unw.py 
 ============
 Check coverage or empty unwrapped ifgs
