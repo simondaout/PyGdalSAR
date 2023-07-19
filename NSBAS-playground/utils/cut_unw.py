@@ -155,5 +155,5 @@ if plot=="yes":
 
 
     # Display the data
-    fig.canvas.set_window_title(sys.argv[1])
+    #fig.canvas.set_window_title(sys.argv[1])
     plt.show()

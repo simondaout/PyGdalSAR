@@ -1,13 +1,5 @@
 #!/bin/bash
 
-module load gdal/2.0
-
-## T119
-#home=/data/ATF/WATF/Envisat/T119
-#rsc=$home/interf_pair_300_3_700_09_r_ts2.rsc
-#jbeg=1500
-
-## T391
 #home=/data/ATF/WATF/Envisat/T391
 #rsc=$home/interf_pair_200_4_700_1_r_ts3.rsc
 #jbeg=2000
