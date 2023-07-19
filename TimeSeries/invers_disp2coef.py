@@ -3490,7 +3490,7 @@ for ii in range(int(arguments["--niter"])):
         figd.subplots_adjust(hspace=0.001,wspace=0.001)
         for l in range((N)):
             axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+            caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
             axd.set_title(idates[l],fontsize=6)
             plt.setp(axd.get_xticklabels(), visible=False)
             plt.setp(axd.get_yticklabels(), visible=False)
@@ -3526,7 +3526,7 @@ for ii in range(int(arguments["--niter"])):
             figref.subplots_adjust(hspace=0.001,wspace=0.001)
             for l in range((N)):
                 axref = figref.add_subplot(4,int(N/4)+1,l+1)
-                caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+                caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
                 axref.set_title(idates[l],fontsize=6)
                 plt.setp(axref.get_xticklabels(), visible=False)
                 plt.setp(axref.get_yticklabels(), visible=False)

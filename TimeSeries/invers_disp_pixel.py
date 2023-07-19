@@ -1119,19 +1119,19 @@ for jj in range((Npix)):
 
     fig.autofmt_xdate()
     ax.set_xlabel('Time (Year/month/day)')
-    ax.set_ylabel('Displacements (mm)')
+    ax.set_ylabel('Displacements')
     fig.savefig('Disp_{}.pdf'.format(output), format='PDF')
 
     if inter=='yes':    
         fig3.autofmt_xdate()
         ax3.set_xlabel('Time (Year/month/day)')
-        ax3.set_ylabel('Displacements (mm)')
+        ax3.set_ylabel('Displacements')
         fig3.savefig('Disp_{}_detrended.pdf'.format(output), format='PDF')
 
     if seasonal == 'yes' or semianual =='yes' or bianual =='yes':
         fig2.autofmt_xdate()
         ax2.set_xlabel('Time (Year/month/day)')
-        ax2.set_ylabel('Displacements (mm)')
+        ax2.set_ylabel('Displacements')
         fig2.savefig('Disp_{}_deseas.pdf'.format(output), format='PDF')
 
     if seasonal == 'yes':
