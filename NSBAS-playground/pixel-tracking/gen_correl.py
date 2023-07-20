@@ -139,11 +139,12 @@ for kk in range((kmax)):
         target2 = os.path.abspath('./' + str(date2) + suffix +  '.tiff')
         symlink(img1, target1)
         symlink(img2, target2)
-        #symlink('/data/work/nepal/mathillo/processing/asp/black_left.tsai', 'black_left.tsai')
-        #symlink('/data/work/nepal/mathillo/processing/asp/black_right.tsai', 'black_right.tsai')
-        #symlink('/data/work/nepal/mathillo/processing/asp/stereo.default', 'stereo.default')
 
         #réalisation de la corrélation
-        correl(target1, target2)
+        outfile = 'corr-F.tif'  
+        if os.path.exists(outfile):
+          pass
+        else: 
+            correl(target1, target2)
 
 
