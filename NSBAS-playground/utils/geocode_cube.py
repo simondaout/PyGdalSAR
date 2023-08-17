@@ -156,7 +156,7 @@ for l in range((N)):
     if r != 0:
         raise Exception("rmg2grd.py failed")
    
-    print("+rm -f "+geomagoutfile+" "+geomagoutfile)
+    print("+rm -f "+geomagoutfile+" "+geophsoutfile)
     r = subprocess.call("rm -f "+geomagoutfile+" "+geophsoutfile,shell=True)
  
     print("+gmt grdmath "+geolosoutfile+" 0 NAN -1000 MUL = "+mmoutfile)
@@ -171,14 +171,4 @@ for l in range((N)):
     #if r != 0:
     #    raise Exception("gdal_translate failed")
 
-    ds = gdal.Open(geooutfile, gdal.GA_ReadOnly)
-    ds_band2 = ds.GetRasterBand(2)
-    los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
-    print('Nlign:{}, Ncol:{}, geodate:{}:'.format(ds.RasterYSize, ds.RasterXSize, l))
-    nlign,ncol=ds.RasterYSize, ds.RasterXSize
-    
     del ds, ds_band2
-
-fid = open('lect_geo.in','w')
-np.savetxt(fid, (nlign,ncol,N),fmt='%6i',newline='\t')
-fid.close()
