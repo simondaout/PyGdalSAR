@@ -74,7 +74,7 @@ else:
    lecfile = arguments["--lectfile"]
 
 if arguments["--imref"] !=  None:
-    if arguments["--imref"] < 1:
+    if int(arguments["--imref"]) < 1:
         print('--imref must be between 1 and Nimages')
     else:
         imref = int(arguments["--imref"]) - 1
@@ -133,14 +133,7 @@ cube[kk] = float('NaN')
 cube[cube==0] = float('NaN')
 print('Number of line in the cube: ', cube.shape)
 maps = cube.reshape((nlines,ncol,N))
-print('Reshape cube: ', maps.shape)
-if arguments["--imref"] !=  None:
-    cst = np.copy(maps[:,:,imref])
-    for l in range((N)):
-        maps[:,:,l] = maps[:,:,l] - cst
-        if l != imref:
-            index = np.nonzero(maps[:,:,l]==0.0)
-            maps[:,:,l][index] = float('NaN')
+print('Reshape original cube: ', maps.shape)
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
@@ -148,7 +141,15 @@ nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 # new number of dates
 N = len(dates)
 maps = as_strided(maps[:,:,indexd])
-print('Reshape cube: ', maps.shape)
+print('Reshape cropped cube: ', maps.shape)
+
+if arguments["--imref"] !=  None:
+    cst = np.copy(maps[:,:,imref])
+    for l in range((N)):
+        maps[:,:,l] = maps[:,:,l] - cst
+        if l != imref:
+            index = np.nonzero(maps[:,:,l]==0.0)
+            maps[:,:,l][index] = float('NaN')
 
 if arguments["--vmax"] ==  None:
     vmax = np.nanpercentile(maps, 98)*4.4563
