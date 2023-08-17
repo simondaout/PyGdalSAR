@@ -12,7 +12,7 @@ Geocode cube of cumulative deplacements: create date.unw, geo_date.unw, and geo_
 !!! Need geocode.pl from ROI_PAC
 
 Usage: geocode_cube.py --cube=<path> --geomaptrans=<path> --amp=<path> \
-[--lectfile=<path>] [--rscfile=<path>] 
+[--lectfile=<path>] [--rscfile=<path>] [--smooth=<value>] [--imref=<value>] 
 
 Options:
 -h --help           Show this screen.
@@ -21,6 +21,8 @@ Options:
 --amp PATH          path to amplitude file  
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --rscfile PATH      Path to a rsc file [default: radar_4rlks.hgt.rsc]
+--smooth VALUE      If >0 smooth time series in time with the value the windows lenght [default: 0]
+--imref VALUE       Reference image number [default: 1]
 """
 
 print()
@@ -40,6 +42,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 
 import subprocess, shutil, sys, os
+from matplotlib import pyplot as plt
 
 import docopt
 arguments = docopt.docopt(__doc__)
@@ -54,6 +57,15 @@ if arguments["--rscfile"] ==  None:
    rscf = "radar_4rlks.hgt.rsc"
 else:
    rscf = arguments["--rscfile"]
+if arguments["--smooth"] ==  None:
+   smooth = 0
+else:
+   smooth = int(arguments["--smooth"])
+if arguments["--imref"] !=  None:
+    if int(arguments["--imref"]) < 1:
+        print('--imref must be between 1 and Nimages')
+    else:
+        imref = int(arguments["--imref"]) - 1
 
 # load images_retenues file
 fimages='images_retenues'
@@ -68,6 +80,9 @@ ncol, nlign = map(int, open(lecfile).readline().split(None, 2)[0:2])
 # lect cube
 cubei = np.fromfile(infile,dtype=np.float32)
 cube = as_strided(cubei[:nlign*ncol*N])
+kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
+cube[kk] = float('NaN')
+cube[cube==0] = float('NaN')
 maps = cube.reshape((nlign,ncol,N))
 
 del cubei, cube 
@@ -77,11 +92,27 @@ amp = np.zeros((nlign,ncol))
 fid = open(ampf, 'r')
 amp[:nlign,:ncol] = np.fromfile(fid,dtype=np.float32)[:nlign*ncol].reshape((nlign,ncol))
 
+if arguments["--imref"] !=  None:
+    cst = np.copy(maps[:,:,imref])
+    for l in range((N)):
+        maps[:,:,l] = maps[:,:,l] - cst
+        if l != imref:
+            index = np.nonzero(np.logical_and(maps[:,:,l]==0.0,maps[:,:,l]>999.))
+            maps[:,:,l][index] = float('NaN')
+
 for l in range((N)):
-# for l in range(3):
-    data = as_strided(maps[:,:,l])
-    drv = gdal.GetDriverByName("roi_pac")
+#for l in range(10):
     
+    if smooth > 0 :
+        beg = np.max([0, l - smooth]) 
+        end = np.min([l+smooth, N])
+        data = np.nanmean(as_strided(maps[:,:,beg:end]),axis=2)
+        #plt.imshow(data,vmin=-2,vmax=2)
+        #plt.show()
+    else: 
+        data = as_strided(maps[:,:,l])
+    
+    drv = gdal.GetDriverByName("roi_pac")
     outfile=str(idates[l])+'.unw'
     outrsc=str(idates[l])+'.unw.rsc'
     geooutfile='geo_'+outfile
@@ -104,11 +135,14 @@ for l in range((N)):
 del amp
 
 for l in range((N)):
-# for l in range(3):
+#for l in range(10):
     outfile=str(idates[l])+'.unw'
     outrsc=str(idates[l])+'.unw.rsc'
     geooutfile='geo_'+outfile
-    tiffoutfile='geo_'+str(idates[l])+'.tiff'
+    geolosoutfile='geo_'+str(idates[l])+'.los.grd'
+    geomagoutfile='geo_'+str(idates[l])+'.mag.grd'
+    geophsoutfile='geo_'+str(idates[l])+'.phs.grd'
+    mmoutfile='geo_'+str(idates[l])+'_LOSmm_nan.grd'
 
     print("+geocode.pl "+geomapf+" "+outfile+" "+geooutfile)
     r = subprocess.call("geocode.pl "+geomapf+" "+outfile+" "+geooutfile,
@@ -116,38 +150,35 @@ for l in range((N)):
     if r != 0:
         raise Exception("geocode.pl failed")
 
-    print("+gdal_translate -ot Float32 -b 2 -co COMPRESS=DEFLATE"+geooutfile+" "+tiffoutfile)
-    r = subprocess.call("gdal_translate -ot Float32 -b 2 -co COMPRESS=DEFLATE "+geooutfile+" "+tiffoutfile,
+    print("+rmg2grd.py "+geooutfile)
+    r = subprocess.call("rmg2grd.py "+geooutfile,
                         shell=True)
     if r != 0:
-        raise Exception("gdal_translate failed")
+        raise Exception("rmg2grd.py failed")
+   
+    print("+rm -f "+geomagoutfile+" "+geomagoutfile)
+    r = subprocess.call("rm -f "+geomagoutfile+" "+geophsoutfile,shell=True)
+ 
+    print("+gmt grdmath "+geolosoutfile+" 0 NAN -1000 MUL = "+mmoutfile)
+    r = subprocess.call("gmt grdmath "+geolosoutfile+" 0 NAN -1000 MUL = "+mmoutfile,
+                        shell=True)
+    if r != 0:
+        raise Exception("grdmath failed")
+    
+    #print("+gdal_translate -ot Float32 -b 2 -co COMPRESS=DEFLATE"+geooutfile+" "+tiffoutfile)
+    #r = subprocess.call("gdal_translate -ot Float32 -b 2 -co COMPRESS=DEFLATE "+geooutfile+" "+tiffoutfile,
+    #                    shell=True)
+    #if r != 0:
+    #    raise Exception("gdal_translate failed")
 
     ds = gdal.Open(geooutfile, gdal.GA_ReadOnly)
     ds_band2 = ds.GetRasterBand(2)
     los = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
     print('Nlign:{}, Ncol:{}, geodate:{}:'.format(ds.RasterYSize, ds.RasterXSize, l))
     nlign,ncol=ds.RasterYSize, ds.RasterXSize
-    # if l==0:
-    #     geomaps=np.zeros((nlign,ncol,N))
-    
-    # geomaps[:,:,l] = los
     
     del ds, ds_band2
 
 fid = open('lect_geo.in','w')
 np.savetxt(fid, (nlign,ncol,N),fmt='%6i',newline='\t')
 fid.close()
-
-
-
-# fid = open('geo_depl_cumule', 'wb')
-# geomaps.ravel().astype('float32').tofile(fid)
-
-# import matplotlib as mpl
-# from matplotlib import pyplot as plt
-# import matplotlib.cm as cm
-# from pylab import *
-# fig = plt.figure(0,figsize=(6,4))
-# ax = fig.add_subplot(1,1,1)
-# cax = ax.imshow(geomaps[:,:,2],cmap=cm.jet,vmax=10,vmin=-10)
-# plt.show()
