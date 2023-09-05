@@ -20,17 +20,13 @@ Usage: plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg
        plot\_raster.py --infile=<path> [--cpt=<values>] [<ibeg>] [<iend>] [<jbeg>] [<jend>] \
 [--format=<value>] [--parfile=<path>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--cols=<values>] [--lines=<values>] [--band=<values>]
        plot\_raster.py --infile=<path> [--cpt=<values>] [--crop=<values>] \
-[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--band=<values>]  
+[--format=<value>] [--lectfile=<value>] [--rad2mm=<value>] [--title=<value>] [--wrap=<values>] [--vmin=<value>] [--vmax=<value>] [--band=<values>] [--cols=<values>] [--lines=<values>] 
 
 
 Options:
 -h --help             Show this screen.
 --infile=<file>       Raster to be displayed 
---ibeg=<value>        Ligne numbers bounded the cutting zone [default: 0]
---iend=<value>        Ligne numbers bounded the cutting zone [default: nlines]
---jbeg=<value>        Column numbers bounded the cutting zone [default: 0]
---jend=<value>        Column numbers bounded the cutting zone [default: ncols]
---crop=<values>          Crop option with smoothing of boundaries (same as ibeg,iend..) [default: 0,ncols,0,nlines]
+--crop=<values>       Crop option with smoothing of boundaries [default: 0,ncols,0,nlines]
 --format=<value>      Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
 --cpt==<value>        Indicate colorscale for phase
 --wrap=<value>        Wrapped phase between value for unwrapped files 
@@ -171,23 +167,7 @@ elif sformat == 'GAMMA':
 
 # crop
 if arguments["--crop"] ==  None:
-    if arguments["<ibeg>"] ==  None:
-        ibeg = 0
-    else:
-        ibeg = int(arguments["<ibeg>"])
-    if arguments["<iend>"] ==  None:
-        iend = nlines
-    else:
-        iend = int(arguments["<iend>"])
-    if arguments["<jbeg>"] ==  None:
-        jbeg = 0
-    else:
-        jbeg = int(arguments["<jbeg>"])
-    if arguments["<jend>"] ==  None:
-        jend = ncols
-    else:
-        jend = int(arguments["<jend>"])
-    crop = [0,jend,0,iend]
+    crop = [0,ncols,0,nlines]
 else:
     crop = list(map(float,arguments["--crop"].replace(',',' ').split()))
 jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
