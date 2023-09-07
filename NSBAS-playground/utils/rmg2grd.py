@@ -57,6 +57,7 @@ except:
     print('Cannot read WAVELENGTH in rsc file. Set WAVELENGTH to 0.05546576')
     wavelength = 0.05546576
 phs_factor = float(wavelength) / (4*math.pi)
+print('RAD to m:', phs_factor)
 
 # Open phiset (image)
 ds = gdal.OpenEx(infile, nOpenFlags=gdal.GA_ReadOnly, allowed_drivers=["ROI_PAC"])
