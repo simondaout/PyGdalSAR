@@ -58,13 +58,13 @@ if arguments["--outfile"] is not  None:
 if arguments["--rad2mm"] ==  None:
         rad2mm = 1
 else:
-        rad2mm = np.float(arguments["--rad2mm"])
+        rad2mm = float(arguments["--rad2mm"])
 
 # read r4
-in1 = np.fromfile(infile1,dtype=np.float32) 
-in2 = np.fromfile(infile2,dtype=np.float32)
-in1[in1==0] = np.float('NaN')
-in2[in2==0] = np.float('NaN')
+in1 = np.fromfile(infile1,dtype=float32) 
+in2 = np.fromfile(infile2,dtype=float32)
+in1[in1==0] = float('NaN')
+in2[in2==0] = float('NaN')
 
 # center to 0
 #in1 = in1 - np.nanmean(in1)
@@ -92,11 +92,11 @@ in11, in22, out = in11*rad2mm, in22*rad2mm, out*rad2mm
 
 # plot maps
 if arguments["--vmax"] is not None:
-    vmax = np.float(arguments["--vmax"])
+    vmax = float(arguments["--vmax"])
 else:
     vmax = np.max( [np.nanpercentile(in11,95),np.abs(np.nanpercentile(in11,5))] )
 if arguments["--vmin"] is not None:
-    vmin = np.float(arguments["--vmin"])
+    vmin = float(arguments["--vmin"])
 else:
     vmin = -vmax
 
