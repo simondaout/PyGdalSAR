@@ -185,6 +185,7 @@ if maskf != 'no':
     fid2 = open(maskf, 'r')
     mask = np.fromfile(fid2,dtype=float32)[:nlines*ncols].reshape((nlines,ncols))
     mask =  mask*scale_mask
+    mask[np.isnan(mask)] = 0
 else:
     mask = np.zeros((nlines,ncols))
 
