@@ -376,7 +376,7 @@ if __name__ == "__main__":
     res = d - np.dot(G,pars).flatten()
     var = np.nanstd(res)
     print('Mean Residual:', np.mean(res))
-    print('Variance:', var)
+    print('std:', var)
     
     # Build G matrix for all insar points
     east, north = UTM(insar.lon.flatten(), insar.lat.flatten())
