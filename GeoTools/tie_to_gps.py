@@ -374,10 +374,10 @@ if __name__ == "__main__":
     
     # compute residual between data and model
     res = d - np.dot(G,pars).flatten()
-    var = np.nanstd(res)
     print('Mean Residual:', np.mean(res))
-    print('Variance:', var)
-    
+    rms = np.sqrt(np.nanmean(res**2))   
+    print('RMS:', rms)
+ 
     # Build G matrix for all insar points
     east, north = UTM(insar.lon.flatten(), insar.lat.flatten())
     #east, north = insar.lon.flatten(), insar.lat.flatten()
