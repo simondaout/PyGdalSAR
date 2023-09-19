@@ -42,7 +42,7 @@ import matplotlib.colors as mcolors
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
+#gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
 shapely.speedups.enable()
 
 ############################
@@ -222,28 +222,45 @@ def plot_gps(gps, poly):
 
     #fig.savefig(track+'_gps_field.png', format='PNG', dpi=150, bbox_inches='tight')
 
-
 def plot_gps_in_LOS(gps, poly):
     fig = plt.figure(4,figsize=(10,8))
     fig.subplots_adjust(wspace=0.001)
     ax = fig.add_subplot(1,1,1)
 
     x,y = poly.exterior.xy
-    minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
+    if utm_proj is not None:
+      import pyproj
+      UTM = pyproj.Proj("EPSG:{}".format(utm_proj))
+      x, y = UTM(x, y)
+      for index,g in gps.iterrows():
+        lon, lat = UTM(gps.loc[index, 'lon2'], gps.loc[index, 'lat2'])
+        gps.loc[index, 'geometry'] = Point(float(lon), float(lat))
+    
+    if 'xmin' is not None:
+        minx =xmin*1e3; maxx=xmax*1e3
+        miny = ymin*1e3; maxy = ymax*1e3 
+    else:
+        minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
     ax.axis((minx,maxx,miny,maxy))
 
     # plot contextfile
-    try:
-      import contextily as ctx    
-      ctx.add_basemap(ax,crs=4326)        
-    except:
-      print('Contextily package not installed. Skip backgroup topography plot')
+    #try:
+    import contextily as ctx    
+    if utm_proj is not None: 
+        ctx.add_basemap(ax,crs="EPSG:{}".format(utm_proj),source=ctx.providers.Esri.WorldShadedRelief)
+    else:
+        ctx.add_basemap(ax,crs=4326)        
+    #except:
+    #  print('Contextily package not installed. Skip backgroup topography plot')
 
     # plot world
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     if shapefile: 
       bounds = gpd.read_file(shapefile)
-      bounds = bounds.to_crs(world.crs)
+      if utm_proj is not None: 
+        bounds = bounds.to_crs("EPSG:{}".format(utm_proj))
+      else:
+        bounds = bounds.to_crs(world.crs)
       bounds.plot(ax=ax,facecolor='none', color='none',edgecolor='black',zorder=1)
     else:
       world.plot(ax=ax,facecolor='none',color='none', edgecolor='black',zorder=1)
@@ -263,7 +280,7 @@ def plot_gps_in_LOS(gps, poly):
         cmap=cm.rainbow   
     m = cm.ScalarMappable(norm=norm, cmap=cmap)
     facelos = m.to_rgba(los) 
-    gps.plot(ax=ax, facecolor=facelos, zorder=3)
+    gps.plot(ax=ax, markersize = 10,  marker='o',linewidths=.5, edgecolor='black',alpha=0.8 ,facecolor=facelos, zorder=3)
     
     ax.set_xticks(np.linspace(minx,maxx,3))
     ax.set_yticks(np.linspace(miny,maxy,3))
@@ -407,7 +424,17 @@ if __name__ == "__main__":
         sys.exit()
     coords = [(LON_REF2-epsi, LAT_REF2-epsi), (LON_REF1-epsi,LAT_REF1-epsi), (LON_REF3-epsi,LAT_REF3-epsi), (LON_REF4-epsi,LAT_REF4-epsi)]
     poly = Polygon(coords)
+   
+    try:
+        utm_proj
+    except NameError:
+        utm_proj = None
     
+    try:
+        xmin
+    except NameError:
+        xmin = None
+
     try:
         gps_file
     except NameError:
