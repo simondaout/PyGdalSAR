@@ -477,4 +477,10 @@ c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
 fig.tight_layout()
+
+try:
+    fig.savefig('{}_clean.pdf'.format(infile), format='PDF',dpi=180)
+except:
+    pass
+
 plt.show()

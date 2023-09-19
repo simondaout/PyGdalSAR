@@ -1350,7 +1350,7 @@ def empirical_cor(kk):
     np.logical_and(elev_map<maxelev,
     np.logical_and(elev_map>minelev,
     np.logical_and(slope_map>minslope,     
-    np.logical_and(los_map!=0, 
+    np.logical_and(los_map!=0., 
     np.logical_and(los_map>minlos,
     np.logical_and(los_map<maxlos,
     np.logical_and(rms_map>threshold_rms, 
@@ -1361,12 +1361,14 @@ def empirical_cor(kk):
     np.logical_and(mask>threshold_mask,
     np.logical_and(~np.isnan(los_map),
     np.logical_or(pix_az<ibeg_mask,pix_az>iend_mask)
-    ))))))))))))))
-    
+    )))))))))))))
+    )
+
+ 
     indexref = np.nonzero(
     np.logical_and(elev_map<maxelev,
     np.logical_and(elev_map>minelev,    
-    np.logical_and(los_map!=0, 
+    np.logical_and(los_map!=0., 
     np.logical_and(los_map>minlos,
     np.logical_and(los_map<maxlos,
     np.logical_and(rms_map>threshold_rms, 
@@ -1495,7 +1497,7 @@ def empirical_cor(kk):
     plt.colorbar(cax, cax=c)
 
     ax = fig.add_subplot(2,3,2)
-    cax = ax.imshow(spacial_mask,cmap=cmap,vmax=vmax,vmin=vmin,interpolation=None)
+    cax = ax.imshow(spacial_mask,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('LOS ESTIMATION')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
@@ -1504,7 +1506,7 @@ def empirical_cor(kk):
     plt.colorbar(cax, cax=c)
     
     ax = fig.add_subplot(2,3,3)
-    cax = ax.imshow(rms_map,cmap=cmap,interpolation=None)
+    cax = ax.imshow(rms_map,cmap=cmap,interpolation='nearest')
     ax.set_title('RMS')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
@@ -1842,15 +1844,18 @@ if arguments["--threshold_mask"] ==  None:
     threshold_mask = -1
 else:
     threshold_mask = float(arguments["--threshold_mask"])
-if arguments["--threshold_coh"] ==  None:
-    threshold_rms = -1
-else:
-    threshold_rms = float(arguments["--threshold_coh"])
 if arguments["--cohpixel"] ==  None:
     rmsf = 'no'
     threshold_rms = -1
 else:
     rmsf = arguments["--cohpixel"]
+    if arguments["--threshold_coh"] ==  None:
+        logger.critical('No threshold_coh defined. Exit!')
+        sys.exit()
+    else:
+        threshold_rms = float(arguments["--threshold_coh"])
+if rmsf == 'no':
+    threshold_rms = -1
 if arguments["--topofile"] ==  None or not os.path.exists(arguments["--topofile"]):
    radar = None
 else:

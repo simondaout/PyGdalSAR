@@ -27,7 +27,7 @@ import matplotlib.cm as cm
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.widgets as widgets
-import gdal
+from osgeo import gdal
 
 mpl.rc("axes", titlesize="medium")
 
