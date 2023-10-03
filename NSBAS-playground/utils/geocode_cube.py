@@ -171,4 +171,3 @@ for l in range((N)):
     #if r != 0:
     #    raise Exception("gdal_translate failed")
 
-    del ds, ds_band2
