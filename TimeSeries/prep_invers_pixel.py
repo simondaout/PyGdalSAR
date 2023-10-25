@@ -101,7 +101,7 @@ else:
 if (arguments["--Bc"] == None):
    weight = None
 else:
-   bc = map(float,arguments["--Bc"].replace(',',' ').split())
+   bc = list(map(float,arguments["--Bc"].replace(',',' ').split()))
    btc, bpc = bc[0], bc[1]
 
 # A more predictable makedirs
