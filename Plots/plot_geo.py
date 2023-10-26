@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ############################################
 #
@@ -51,13 +51,15 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 
 import matplotlib as mpl
-# mpl.rcParams['backend'] = 'TkAgg' 
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 from pylab import *
-from mpl_toolkits.basemap import Basemap
+import contextily as ctx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import shapefile as shp  # Requires the pyshp package
+from shapely.geometry import box
+import geopandas as gpd
+
 
 import docopt, os
 arguments = docopt.docopt(__doc__)
@@ -149,74 +151,36 @@ fig = plt.figure(1,figsize=(8,5))
 fig.subplots_adjust(wspace=0.001)
 ax = fig.add_subplot(1,1,1)
 basename = os.path.splitext(infile)[0]
-
 cdem = cm.Greys
 cdem.set_bad('white')
-
 # cmap.set_bad('white')
 masked_array = np.ma.array(los, mask=np.isnan(los))
 
-# check if proejected
-prj = ds.GetProjection()
-srs=osr.SpatialReference(wkt=prj)
-if srs.GetAttrValue('projcs') is not None:
-  # print(srs.GetAttrValue('projcs'))
-  projection = 'tmerc'
-else:
-  # print(srs.GetAttrValue('geogcs'))
-  projection = 'cyl'
+# définir la limite de la carte
+ax.axis((lonbeg,lonend,latbeg,latend))
 
-m = Basemap(
-    projection=projection,\
-    llcrnrlon=lonbeg, \
-    llcrnrlat=latbeg, \
-    urcrnrlon=lonend, \
-    urcrnrlat=latend, \
-    resolution='i',
-    ax=ax,
-    suppress_ticks = False,
-    )
-
-# m.drawparallels(np.linspace(latbeg,latend,3),linewidth=0.25,zorder=1)
-# m.drawmeridians(np.linspace(lonbeg,lonend,3),linewidth=0.25,zorder=1)
-# m.drawparallels(np.linspace(latbeg,latend,3),labels=[1,0,0,0],dashes=[6,900],zorder=1)
-# m.drawmeridians(np.linspace(lonbeg,lonend,3),labels=[0,0,0,1],dashes=[6,900],zorder=1)
-#m.fillcontinents(color='white',lake_color='lightblue',zorder=2)
+# Affichez la carte de fond
+ctx.add_basemap(ax,crs=4326 ,source=ctx.providers.Esri.WorldShadedRelief)
 
 if arguments["--dem"] is not None:
    ds2 = gdal.Open(arguments["--dem"], gdal.GA_ReadOnly)
    ds2_geo = ds2.GetGeoTransform()
-   # print ds2_geo
    ds2_band = ds2.GetRasterBand(1)
    dem = ds2_band.ReadAsArray(0, 0, ds2.RasterXSize, ds2.RasterYSize)
    dminx,dmaxx,dmaxy,dminy = ds2_geo[0], ds2_geo[0]+ ds2_geo[1]*ds2.RasterXSize, ds2_geo[3], ds2_geo[3]+ds2_geo[5]*ds2.RasterYSize  
-   print(dminx,dmaxx,dmaxy,dminy)
-   print(np.nanpercentile(dem,98), np.nanpercentile(dem,2))
-   # hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
-   #  vmax=np.nanpercentile(dem,98),vmin=np.nanpercentile(dem,2),zorder=1)
    hax = ax.imshow(dem, extent=(dminx,dmaxx,dminy,dmaxy), cmap=cdem,\
     vmax=255,vmin=1,zorder=3)
-else:
-   #pass
-   m.arcgisimage(service='World_Shaded_Relief', xpixels = 1000,zorder=0)
-   hax = ax.imshow(amp, extent=(minx,maxx,miny,maxy), cmap=cdem,\
-   vmax=4500,vmin=2000,alpha=1.,zorder=1)
 
-#cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-#     vmax=vmax,vmin=vmin, zorder=4,interpolation='none')
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, zorder=4,interpolation='nearest')
+     vmax=vmax,vmin=vmin, alpha=0.7, zorder=4,interpolation='nearest')
 
 if arguments["--shapefile"] is not None and os.path.exists(arguments["--shapefile"]):
-    sf = shp.Reader(arguments["--shapefile"])
-    for shape in sf.shapeRecords():
-        x = [i[0] for i in shape.shape.points[:]]
-        y = [i[1] for i in shape.shape.points[:]]
-        ax.plot(x,y,color='black',linewidth=2.,alpha=0.8,zorder=5)
-
+    shape = gpd.read_file(arguments["--shapefile"])
+    shape = shape.to_crs(4326)
+    shape.plot(ax=ax,facecolor='none', color='none',edgecolor='black',zorder=10)
+    
 ax.set_xlim([lonbeg,lonend])
 ax.set_ylim([latbeg,latend])
-#ax.set_title(basename,fontsize=6)
 ax.set_xticks(np.linspace(lonbeg,lonend,3))
 ax.set_yticks(np.linspace(latbeg,latend,3))
 
@@ -225,17 +189,13 @@ if arguments["--outfile"] ==  None:
 else:
     outfile = arguments["--outfile"]+'.pdf'
 del ds, ds_band1
-#fig.tight_layout()
 plt.suptitle(outfile)
 try:
   divider = make_axes_locatable(ax)
   c = divider.append_axes("right", size="5%", pad=0.05)
   plt.colorbar(cax, cax=c)
-  # fig.colorbar(cax, orientation='vertical',aspect=10)
 except:
   pass
-
-# fig.savefig(basename+'.tiff', format='tiff',dpi=180)
 fig.savefig(outfile, format='PDF',dpi=180)
 
 if plot == 'yes':
