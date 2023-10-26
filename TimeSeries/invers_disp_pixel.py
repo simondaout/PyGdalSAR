@@ -328,9 +328,7 @@ else:
     listim = arguments["--list_images"]
 
 if arguments["--ineq"] ==  None:
-    ineq = 'yes' 
-else:
-    ineq = arguments["--ineq"] 
+    arguments["--ineq"] = 'no' 
 if arguments["--cond"] ==  None:
     rcond = 1e-3
 else:
@@ -572,7 +570,7 @@ vmax = np.nanpercentile(maps[:,:,-1],90)
 vmin = np.nanpercentile(maps[:,:,-1],10)
 
 ax = fig.add_subplot(1,2,1)
-ax.imshow(maps[jstart:jend,istart:iend,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
+ax.imshow(maps[jstart:jend,istart:iend,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6, interpolation='none')
 for i in range(len(ipix)):
     ax.scatter(ipix[i]-istart,jpix[i]-jstart,marker=markers[i],color='black',s=10.)
 if iref is not None and jref is not None:
@@ -582,7 +580,7 @@ for i in range((Npix)):
 plt.suptitle('Black cross: pixels, red cross: reference point')
 
 ax = fig.add_subplot(1,2,2)
-im = ax.imshow(maps[:,:,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6)
+im = ax.imshow(maps[:,:,-1], cmap=cm.rainbow, vmax=vmax, vmin=vmin, alpha=0.6, interpolation='none')
 for i in range(len(ipix)):
     ax.scatter(ipix[i],jpix[i],marker=markers[i],color='black',s=10.)
 ax.scatter(iref,jref,marker='x',color='red',s=20.)
@@ -665,6 +663,7 @@ for i in range(len(pos)):
     indexpo.append(int(index))
     indexpofull.append(int(index))
     index = index + 1
+    arguments["--ineq"] = 'yes'
   else:
     indexpofull.append(0)
 indexpo = np.array(indexpo)
@@ -690,6 +689,11 @@ if vectf != None:
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
+
+eguality = False
+if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
+    eguality = True
+    arguments["--ineq"] = 'yes'
 
 # define size G matrix
 print()
@@ -718,8 +722,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=False):
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4, eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -743,16 +746,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4, eguality=Fa
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
-          try:
-              U,eignv,V = lst.svd(Ain, full_matrices=False)
-              s = np.diag(eignv) 
-              print('Eigenvalues:', eignv)
-              index = np.nonzero(s<cond)
-              inv = lst.inv(s)
-              inv[index] = 0.
-              mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-          except:
-              mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+          mtemp = invSVD(Ain,b,cond)
           print('SVD solution:', mtemp)
 
           # rebuild full vector
@@ -794,15 +788,10 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4, eguality=Fa
         fsoln = res[0]
         print('Optimization:', fsoln)
 
-    # tarantola:
-    # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
-    # sigma m **2 =  misfit**2 * diag([G.TG]-1)
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
-       # res2 = np.sum(pow((b-np.dot(A,fsoln))/sigmad,2))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
        scale = 1./(A.shape[0]-A.shape[1])
-       # scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
@@ -900,10 +889,7 @@ for jj in range((Npix)):
             names.append(kernels[l].reduction)
 
         print('basis functions:', names)
-        eguality = False
-        if seasonalt == 'yes' and seasonal == 'yes':
-            eguality = True
-        mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=ineq, eguality=eguality)
+        mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
 
         # rebuild full vectors
         if Mker>0:
