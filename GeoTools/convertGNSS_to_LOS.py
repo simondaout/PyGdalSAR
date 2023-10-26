@@ -42,47 +42,8 @@ import matplotlib.colors as mcolors
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-#gpd.io.file.fiona.drvsupport.supported_drivers['KML'] = 'rw'
 shapely.speedups.enable()
 
-############################
-# USAGE: convertGNSS_to_LOS.py input.py
-# EXAMPLE INPUT FILE: input.py
-###########################
-
-## define path to data
-#wdir = '/Users/symeone/work/italy/'
-
-# define track name
-#track = 'Ascending'
-
-## define gnss file
-#gps_file = wdir + 'gps/02_COMB_99UncSc_Filt_CLASS_ABC_Rout_100_Tsig_3.txt'
-
-## define format incidence and heading file
-## not same convention in GAMMA or ROIPAC format
-#iformat = 'ROIPAC'
-
-## InSAR data T004
-#heading_file= wdir + '/insar/T117_head_s90.tiff'
-#inc_file=wdir + '/insar/T117_look_s90.tiff'
-#av_heading = 76.71
-#av_inc = 32
-
-#plot optional shapefile
-#shapefile = '/gps/italian-maps-shapefiles/italy-with-regions/reg2011_g.shp'
-
-## define frame coordinates
-#LAT_REF1=38
-#LAT_REF2=38
-#LAT_REF3=46
-#LAT_REF4=46
-#LON_REF1=9.5
-#LON_REF2=17
-#LON_REF3=9.5
-#LON_REF4=17
-
-##########################
 def usage():
   print('convertGNSS_to_LOS.py infile.py [-v] [-h]')
   print('-v Verbose mode. Show more information about the processing')
@@ -125,8 +86,6 @@ def neu2los_roipac(vn, ve, vu, look, head):
     los = ve * np.cos(phi) * np.cos(theta) \
             + vn * np.sin(phi) * np.cos(theta) \
             + vu *np.sin(theta)
-    #print([np.cos(phi) * np.cos(theta),np.sin(phi) * np.cos(theta),np.sin(theta)])
-    #sys.exit()
     return los
 
 def add_inc_head_los(gps_df, look, heading):
@@ -169,8 +128,8 @@ def plot_gps(gps, poly):
     # plot contextfile
     try:
       import contextily as ctx    
-      ctx.add_basemap(axh,crs=4326)        
-      ctx.add_basemap(axv,crs=4326)        
+      ctx.add_basemap(axh,crs=4326,source=ctx.providers.Esri.WorldShadedRelief)        
+      ctx.add_basemap(axv,crs=4326,source=ctx.providers.Esri.WorldShadedRelief)        
     except:
       print('Contextily package not installed. Skip backgroup topography plot')
     
@@ -235,12 +194,13 @@ def plot_gps_in_LOS(gps, poly):
       for index,g in gps.iterrows():
         lon, lat = UTM(gps.loc[index, 'lon2'], gps.loc[index, 'lat2'])
         gps.loc[index, 'geometry'] = Point(float(lon), float(lat))
-    
-    if 'xmin' is not None:
+   
+    if xmin is None:
+        minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
+    else: 
         minx =xmin*1e3; maxx=xmax*1e3
         miny = ymin*1e3; maxy = ymax*1e3 
-    else:
-        minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
+    minx,maxx,miny,maxy = np.min(x),np.max(x),np.min(y),np.max(y)
     ax.axis((minx,maxx,miny,maxy))
 
     # plot contextfile
@@ -249,7 +209,7 @@ def plot_gps_in_LOS(gps, poly):
     if utm_proj is not None: 
         ctx.add_basemap(ax,crs="EPSG:{}".format(utm_proj),source=ctx.providers.Esri.WorldShadedRelief)
     else:
-        ctx.add_basemap(ax,crs=4326)        
+        ctx.add_basemap(ax,crs=4326,source=ctx.providers.Esri.WorldShadedRelief)        
     #except:
     #  print('Contextily package not installed. Skip backgroup topography plot')
 
@@ -280,7 +240,7 @@ def plot_gps_in_LOS(gps, poly):
         cmap=cm.rainbow   
     m = cm.ScalarMappable(norm=norm, cmap=cmap)
     facelos = m.to_rgba(los) 
-    gps.plot(ax=ax, markersize = 10,  marker='o',linewidths=.5, edgecolor='black',alpha=0.8 ,facecolor=facelos, zorder=3)
+    gps.plot(ax=ax, markersize = 15,  marker='o',linewidths=.5, edgecolor='black',alpha=0.8 ,facecolor=facelos, zorder=3)
     
     ax.set_xticks(np.linspace(minx,maxx,3))
     ax.set_yticks(np.linspace(miny,maxy,3))
@@ -434,7 +394,6 @@ if __name__ == "__main__":
         xmin
     except NameError:
         xmin = None
-
     try:
         gps_file
     except NameError:
