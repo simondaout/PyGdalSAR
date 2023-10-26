@@ -28,7 +28,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 [--mask=<path>] [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--tempmask=<yes/no>]\
 [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--crop=<value,value,value,value>] [--crop_emp=<value,value,value,value>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
-[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] 
+[--dateslim=<values_min,value_max>]   
 
 -h --help               Show this screen
 --cube=<path>           Path to time series displacements cube file [default: no]
@@ -73,7 +73,6 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --dateslim=<value,value>     Datemin,Datemax time series 
 --crop=<value,value,value,value>            Define a region of interest for the temporal decomposition 
 --crop_emp=<value,value,value,value>    Define a region of interest for the spatial estimatiom (ramp+phase/topo) 
---nproc=<nb_cores>        Use <nb_cores> local cores to create delay maps [Default: 4]
 """
 
 # 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
@@ -427,7 +426,7 @@ if arguments["--cond"] ==  None:
 if arguments["--rmspixel"] ==  None:
     arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
-    arguments["--ineq"] = 'yes'
+    arguments["--ineq"] = 'no'
 if arguments["--fulloutput"] ==  None:
     arguments["--fulloutput"] = 'no'
 if arguments["--geotiff"] is not None:
@@ -463,14 +462,8 @@ if arguments["--perc_topo"] ==  None:
     arguments["--perc_topo"] = 90.
 if arguments["--perc_los"] ==  None:
     arguments["--perc_los"] = 98.
-if arguments["--nproc"] ==  None:
-    nproc = 1
-else:
-    nproc = int(arguments["--nproc"])
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
-    logger.warning('plot is yes. Set nproc to 1')
-    nproc = 1
     if environ["TERM"].startswith("screen"):
         matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
@@ -896,6 +889,7 @@ for i in range(len(pos)):
     indexpo.append(int(index))
     indexpofull.append(int(index))
     index = index + 1
+    arguments["--ineq"] = 'yes'
   else:
     indexpofull.append(0)
 indexpo = np.array(indexpo)
@@ -936,6 +930,11 @@ if arguments["--vector"] != None:
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
+
+eguality = False
+if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
+    eguality = True
+    arguments["--ineq"] = 'yes'
 
 print()
 Mbasis=len(basis)
@@ -994,7 +993,7 @@ def invSVD(A,b,cond):
 
 ## inversion procedure 
 #def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4,eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -1016,6 +1015,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4,eguality=Fal
           # prior solution without postseismic 
           Ain = np.delete(A,indexpo,1)
           mtemp = invSVD(Ain,b,cond) 
+          
           # rebuild full vector
           for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
@@ -3391,7 +3391,7 @@ def temporal_decomp(pix):
     m = np.ones((M))*float('NaN')
     sigmam = np.ones((M))*float('NaN')
 
-    if kk > N/6:
+    if kk > N/10:
         G=np.zeros((kk,M))
         # Build G family of function k1(t),k2(t),...,kn(t): #
         #                                                   #
@@ -3407,9 +3407,6 @@ def temporal_decomp(pix):
         for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
         
-        eguality = False
-        if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
-            eguality = True
         # inversion
         m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
 
