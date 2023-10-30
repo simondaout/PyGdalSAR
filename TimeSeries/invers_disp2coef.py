@@ -425,7 +425,7 @@ if arguments["--cond"] ==  None:
 if arguments["--rmspixel"] ==  None:
     arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
-    arguments["--ineq"] = 'yes'
+    arguments["--ineq"] = 'no'
 if arguments["--fulloutput"] ==  None:
     arguments["--fulloutput"] = 'no'
 if arguments["--geotiff"] is not None:
@@ -894,6 +894,7 @@ for i in range(len(pos)):
     indexpo.append(int(index))
     indexpofull.append(int(index))
     index = index + 1
+    arguments["--ineq"] = 'yes'
   else:
     indexpofull.append(0)
 indexpo = np.array(indexpo)
@@ -934,6 +935,11 @@ if arguments["--vector"] != None:
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
+
+eguality = False
+if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
+    eguality = True
+    arguments["--ineq"] = 'yes'
 
 print()
 Mbasis=len(basis)
@@ -986,13 +992,12 @@ def invSVD(A,b,cond):
         fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
     except:
         fsoln = lst.lstsq(A,b)[0]
-        #fsoln = lst.lstsq(A,b,rcond=cond)[0]
     
     return fsoln
 
 ## inversion procedure 
 #def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4,eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -1008,7 +1013,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4,eguality=Fal
 
     if ineq == 'no':
         
-        fsoln = invSVD(A,b,cond)
+        fsoln = lst.lstsq(A,b)[0]
         
     else:
         if len(indexpo>0):
@@ -1052,25 +1057,28 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-4,eguality=Fal
                 iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
   
-    # tarantola:
-    # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
-    # sigma m **2 =  misfit**2 * diag([G.TG]-1)
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
-       # res2 = np.sum(pow((b-np.dot(A,fsoln))/sigmad,2))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
        scale = 1./(A.shape[0]-A.shape[1])
-       # scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
 
     return fsoln,sigmam
 
-def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
+def linear_inv(G, data, sigma):
+      'Iterative linear inversion'
 
-      # global new_lines, new_cols
-      # global ibeg_emp, iend_emp, jbeg_emp, jend_emp
+      x0 = lst.lstsq(G,data)[0]
+      _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
+      _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
+      pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+
+      return pars
+
+def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
+      'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
 
       # initialize topo
       topo = np.zeros((new_lines,new_cols))
@@ -1091,7 +1099,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
           losbins = []
           losstd = []
           azbins, rgbins = [], []
-          los_clean2, topo_clean2, az_clean2, rg_clean2, rms_clean2 = [], [], [], [], []
+          los_clean2, topo_clean2, az_clean2, rg_clean2, sigma_clean2 = [], [], [], [], []
           for j in range(len(bins)-1):
                   uu = np.flatnonzero(inds == j)
                   if len(uu)>200:
@@ -1111,8 +1119,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                       az_clean2.append(az[uu][indice])
                       rg_clean2.append(rg[uu][indice])
                       topo_clean2.append(topo_clean[uu][indice])
-                      # new rms is clean rms time the standard deviation of the los within the bin
-                      rms_clean2.append(rms[uu][indice]*np.nanstd(los_clean[uu][indice]))
+                      # new sigma is clean sigma time the standard deviation of the los within the bin
+                      sigma_clean2.append(sigma[uu][indice]*np.nanstd(los_clean[uu][indice]))
 
           topobins = np.array(topobins)
           rgbins, azbins = np.array(rgbins),np.array(azbins)
@@ -1121,12 +1129,12 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
           los_clean = np.concatenate(los_clean2)
           az, rg = np.concatenate(az_clean2), np.concatenate(rg_clean2)
           topo_clean = np.concatenate(topo_clean2)
-          rms = np.concatenate(rms_clean2)
-          del los_clean2, topo_clean2, az_clean2, rg_clean2, rms_clean2 
+          sigma = np.concatenate(sigma_clean2)
+          del los_clean2, topo_clean2, az_clean2, rg_clean2, sigma_clean2 
           
           if order == 0 and ivar == 0:
               data = np.array(losbins)
-              rms = np.array(losstd)
+              sigma = np.array(losstd)
 
           else:
               data = np.array(los_clean)
@@ -1141,9 +1149,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
             a = 0.
             ramp = np.zeros((new_lines,new_cols))
-            # rms = np.sqrt(np.nanmean((los)**2))
-            rms = np.nanstd(los)
-            logger.info('Flat=0: no corrections. RMS dates %i: %f'%(idates[l], rms))
+            res = los 
 
         else:
 
@@ -1153,10 +1159,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,1] = topobins
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]
                 logger.info('Remove ref frame %f + %f z for date: %i'%(a,b,idates[l]))
 
@@ -1174,10 +1177,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,1] = elevi
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
 
@@ -1188,10 +1187,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,2] = topobins**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print ('Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l]))
 
@@ -1210,10 +1206,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,2] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
             elif (ivar==1 and nfit==0):
@@ -1223,10 +1215,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,2] = az*topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l]))
 
@@ -1247,9 +1236,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
@@ -1261,10 +1247,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,acc=1.e-9,iprint=0)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1286,10 +1269,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
+                rms = np.sqrt(np.nanmean(res**2))
                 logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
       elif order==1: # Remove a range ramp ay+b for each maps (y = col)
@@ -1301,9 +1282,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]
             print ('Remove ramp %f r + %f for date: %i'%(a,b,idates[l]))
 
@@ -1314,10 +1293,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,1] = 1
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -1329,9 +1304,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
@@ -1351,10 +1324,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,2] = elevi
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -1367,10 +1336,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1391,10 +1357,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -1407,10 +1369,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1433,10 +1392,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -1450,10 +1405,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1476,10 +1428,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -1492,10 +1440,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,1] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]
             print ('Remove ramp %f az + %f for date: %i'%(a,b,idates[l]))
 
@@ -1507,10 +1452,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -1521,10 +1462,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,2] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
@@ -1545,10 +1483,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -1561,10 +1495,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1585,10 +1516,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -1601,10 +1528,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1627,10 +1551,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -1644,10 +1564,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1670,10 +1587,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -1686,12 +1599,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,2] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            # print x0
-            # x0 = np.zeros((3))
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]
             print ('Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l]))
 
@@ -1703,10 +1611,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,2] = 1
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -1718,11 +1622,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,3] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1744,10 +1644,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -1761,11 +1657,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:-1,4] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1787,10 +1679,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -1804,12 +1692,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                # print x0
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
-                # print pars - x0
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1833,10 +1716,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -1851,10 +1730,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
                 print ('Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -1878,10 +1754,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -1895,10 +1767,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,3] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print ('Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1911,10 +1780,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,3] = 1
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -1927,10 +1792,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
@@ -1954,10 +1816,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -1972,10 +1830,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
@@ -1999,10 +1854,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2017,10 +1868,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l]))
@@ -2046,10 +1894,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2065,10 +1909,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
@@ -2094,10 +1935,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,4] *=  (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -2112,10 +1949,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,3] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print ('Remove ramp %f r**2 + %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l]))
 
@@ -2129,10 +1963,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -2147,10 +1977,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2173,10 +2000,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -2191,10 +2014,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2218,9 +2038,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
 
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
@@ -2237,10 +2054,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2264,10 +2078,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2285,10 +2095,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2313,10 +2120,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,4] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -2333,10 +2136,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,3] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print ('Remove ramp %f az**2 + %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l]))
 
@@ -2350,10 +2150,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -2366,10 +2162,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,4] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2392,10 +2185,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -2410,10 +2199,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2436,10 +2222,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2454,10 +2236,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2482,10 +2261,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2502,10 +2277,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,7] = (topo_clean*az)**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h = pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2532,10 +2304,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,7] *= (i - ibeg_emp)**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -2551,10 +2319,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,4] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2569,10 +2334,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -2586,10 +2347,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2613,10 +2371,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -2633,9 +2387,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2659,10 +2411,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2678,10 +2426,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2707,10 +2452,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2727,10 +2468,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,7] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2756,10 +2494,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -2775,10 +2509,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,5] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
             print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2794,10 +2525,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -2811,11 +2538,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = 1
                 G[:,6] = topo_clean
 
-                # ramp inversion1
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                # ramp inversion
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2840,10 +2564,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -2859,11 +2579,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean
                 G[:,7] = topo_clean**2
 
-                # ramp inversion1
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                # ramp inversion
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2888,10 +2605,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,7] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2908,11 +2621,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean
                 G[:,7] = topo_clean*az
 
-                # ramp inversion1
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                # ramp inversion
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2939,10 +2649,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
 
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -2960,11 +2666,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,8] = topo_clean**2
                 G[:,9] = (topo_clean*az)**2
 
-                # ramp inversion1
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                # ramp inversion
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]; k=pars[9]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l]))
 
@@ -2993,10 +2696,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,9] *= (i - ibeg_emp)**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
@@ -3011,10 +2710,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,4] = 1
 
             # ramp inversion
-            x0 = lst.lstsq(G,data)[0]
-            _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-            _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-            pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+            pars = linear_inv(G, data, sigma)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print ('Remove ramp %f r + %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -3028,10 +2724,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
             G[:,4] = 1
 
             res = los - np.dot(G,pars)
-            #rms = np.sqrt(np.nanmean(res**2))
-            rms = np.nanstd(res)
-            logger.info('RMS dates %i: %f'%(idates[l], rms))
-
             ramp = np.dot(G,pars).reshape(new_lines,new_cols)
 
         else:
@@ -3045,10 +2737,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = topo_clean
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
@@ -3072,10 +2761,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,5] = elevi
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-1)],pars[:nparam-1]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-1):],pars[(nparam-1):]).reshape(new_lines,new_cols)
@@ -3091,10 +2776,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
@@ -3119,10 +2801,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = elevi**2
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -3138,10 +2816,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,6] = topo_clean*az
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
@@ -3167,10 +2842,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,6] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-2)],pars[:nparam-2]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-2):],pars[(nparam-2):]).reshape(new_lines,new_cols)
@@ -3187,10 +2858,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                 G[:,7] = topo_clean**2
 
                 # ramp inversion
-                x0 = lst.lstsq(G,data)[0]
-                _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
-                _fprime = lambda x: 2*np.dot(G.T/rms, (np.dot(G,x)-data)/rms)
-                pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+                pars = linear_inv(G, data, sigma)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
@@ -3217,21 +2885,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,5] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                #rms = np.sqrt(np.nanmean(res**2))
-                rms = np.nanstd(res)
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
-
                 nparam = G.shape[1]
                 ramp = np.dot(G[:,:(nparam-3)],pars[:nparam-3]).reshape(new_lines,new_cols)
                 topo = np.dot(G[:,(nparam-3):],pars[(nparam-3):]).reshape(new_lines,new_cols)
 
+      rms = np.sqrt(np.nanmean(res**2))
+      logger.info('RMS dates %i: %f'%(idates[l], rms))
       flata = los.reshape(new_lines,new_cols) - ramp - topo
+      
       try:
          del G; del los
       except:
          pass
       return ramp, flata, topo, rms
  
+
 def empirical_cor(l):
   """
   Function that preapare and run empirical estimaton for each interferogram kk
@@ -3321,7 +2989,6 @@ def empirical_cor(l):
       y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
 
     if (lin_start is not None) and (lin_end is not None):
-      # try:
         indexref = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
             np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
@@ -3378,27 +3045,23 @@ def temporal_decomp(pix):
     i = int(pix/(new_cols))
 
     # Initialisation
-    mdisp=np.ones((N))*float('NaN')
-    mlin=np.ones((N))*float('NaN')
-    mseas=np.ones((N))*float('NaN')
-    mvect=np.ones((N))*float('NaN')
+    mdisp=np.ones((N), dtype=np.float32)*float('NaN')
+    mlin=np.ones((N), dtype=np.float32)*float('NaN')
+    mseas=np.ones((N), dtype=np.float32)*float('NaN')
+    mvect=np.ones((N), dtype=np.float32)*float('NaN')
     disp = as_strided(maps_flata[i,j,:])
     k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
     # do not take into account NaN data
     kk = len(k)
     tabx = dates[k]
     taby = disp[k]
-    bp = base[k]
-
-    naps_tmp = np.zeros((N))
-    aps_tmp = np.zeros((N))
 
     # Inisilize m to zero
-    m = np.ones((M))*float('NaN')
-    sigmam = np.ones((M))*float('NaN')
+    m = np.ones((M), dtype=np.float32)*float('NaN')
+    sigmam = np.ones((M), dtype=np.float32)*float('NaN')
 
     if kk > N/6:
-        G=np.zeros((kk,M))
+        G=np.zeros((kk,M), dtype=np.float32)
         # Build G family of function k1(t),k2(t),...,kn(t): #
         #                                                   #
         #           |k1(0) .. kM(0)|                        #
@@ -3406,42 +3069,19 @@ def temporal_decomp(pix):
         #           |..    ..  ..  |                        #
         #           |k1(N) .. kM(N)|                        #
         #                                                   #
-
-        G=np.zeros((kk,M))
         for l in range((Mbasis)):
             G[:,l]=basis[l].g(tabx)
         for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
         
-        eguality = False
-        if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
-            eguality = True
         # inversion
         m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
 
-        # compute aps for each dates
-        # aps_tmp = pow((disp[k]-mdisp[k])/inaps[k],2)
-        # dont weight by inaps to be consistent from one iteration to the other
-       
-        aps_tmp[k] = abs((disp[k]-mdisp[k]))
-        for kk in k: 
-            # count number of pixels per dates
-            if  aps_tmp[kk] is not float('NaN'):
-                naps_tmp[k] = naps_tmp[k] + 1.0
-
         # Build seasonal and vect models
-        if arguments["--fulloutput"]=='yes':
-          if arguments["--seasonal"] =='yes':
-              mseas[k] = np.dot(G[:,indexseas:indexseas+2],m[indexseas:indexseas+2])
-          if arguments["--vector"] != None:
-              mvect[k] = np.dot(G[:,indexvect],m[indexvect])
-    if arguments["--fulloutput"]=='yes':
-      return m, sigmam, mdisp, mseas, mvect, aps_tmp, naps_tmp
-    else:
-      return m, sigmam, mdisp, aps_tmp, naps_tmp
+    return m, sigmam, mdisp 
     
 
 # initialization
@@ -3569,15 +3209,10 @@ for ii in range(int(arguments["--niter"])):
     print()
 
     # initialize aps for each images to 1
-    aps = np.ones((N))
-    n_aps = np.ones((N)).astype(int)
     logger.debug('Input uncertainties: {}'.format(inaps))
 
     # reiinitialize maps models
     models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
-    if arguments["--fulloutput"]=='yes':
-      models_seas = np.zeros((new_lines,new_cols,N),dtype=np.float32)
-      models_vect = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
     with TimeIt():
           for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
@@ -3587,14 +3222,8 @@ for ii in range(int(arguments["--niter"])):
               if ((i % 10) == 0) and (j==0):
                 logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
               
-              if arguments["--fulloutput"]=='yes':
-                m, sigmam, models[i,j,:], models_seas[i,j,:], models_vect[i,j,:], aps_pix, naps_pix = temporal_decomp(pix)
-              else:
-                m, sigmam, models[i,j,:], aps_pix, naps_pix = temporal_decomp(pix)
+              m, sigmam, models[i,j,:]  = temporal_decomp(pix)
             
-              aps = aps + aps_pix
-              n_aps = n_aps + naps_pix
-
               # save m
               for l in range((Mbasis)):
                   basis[l].m[i,j] = m[l]
@@ -3606,18 +3235,18 @@ for ii in range(int(arguments["--niter"])):
 
               del m, sigmam
 
-    # convert aps in rad
-    aps = aps/n_aps
-    # aps = np.sqrt(abs(aps/n_aps))
+    # compute RMSE
+    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
+    aps = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low aps to avoid over-fitting in next iter
     inaps= np.nanpercentile(aps,2)
     index = np.flatnonzero(aps<minaps)
     aps[index] = minaps
 
-    print('Dates      APS     # of points')
+    print('Dates      APS  ')
     for l in range(N):
-        print (idates[l], aps[l], int(n_aps[l]))
+        print (idates[l], aps[l])
     np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
     # set apsf is yes for iteration
     apsf=='yes'
@@ -3708,20 +3337,6 @@ if flat>0:
   fid.close()
 
 if arguments["--fulloutput"]=='yes':
-    if (arguments["--seasonal"] =='yes'):
-        logger.info('Save time series cube without seasonality: {}'.format('depl_cumule_dseas'))
-        fid = open('depl_cumule_dseas', 'wb')
-        (maps_flata - models_seas).flatten().astype('float32').tofile(fid)
-        fid.close()
-
-    if arguments["--vector"] != None:
-        fid = open('depl_cumule_dvect', 'wb')
-        logger.info('Save time series cube without vector component: {}'.format('depl_cumule_dvect'))
-        (maps_flata - models_vect).flatten().astype('float32').tofile(fid)
-        fid.close()
-
-    del models_vect, models_seas
-
     # create MAPS directory to save .r4
     outdir = './MAPS/'
     logger.info('Save time series maps in: {}'.format(outdir))
@@ -4185,3 +3800,4 @@ fig.savefig('inversion.eps', format='EPS',dpi=150)
 
 if plot=='yes':
     plt.show()
+
