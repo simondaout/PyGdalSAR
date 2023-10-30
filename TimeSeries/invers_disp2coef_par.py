@@ -1038,7 +1038,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
           bounds=list(zip(mmin,mmax))
         
         else:
-          minit=lst.invSVD(A,b)[0]
+          minit = invSVD(A,b)[0]
           bounds=None
         
         def eq_cond(x, *args):
