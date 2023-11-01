@@ -1017,7 +1017,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
         if len(indexpo>0):
           # prior solution without postseismic 
           Ain = np.delete(A,indexpo,1)
-          mtemp = invSVD(Ain,b,cond) 
+          #mtemp = invSVD(Ain,b,cond) 
+          mtemp = lst.lstsq(A,b)[0] 
           
           # rebuild full vector
           for z in range(len(indexpo)):
@@ -1038,7 +1039,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
           bounds=list(zip(mmin,mmax))
         
         else:
-          minit = invSVD(A,b)[0]
+          #minit = invSVD(A,b)[0]
+          minit = lst.lstsq(A,b)[0]
           bounds=None
         
         def eq_cond(x, *args):
@@ -3253,7 +3255,7 @@ for ii in range(int(arguments["--niter"])):
             kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
 
         del m, sigmam
-
+    del results
 
     # compute RMSE
     squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2

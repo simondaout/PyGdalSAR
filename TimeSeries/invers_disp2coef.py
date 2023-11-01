@@ -1020,6 +1020,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
           # prior solution without postseismic 
           Ain = np.delete(A,indexpo,1)
           mtemp = invSVD(Ain,b,cond) 
+          #mtemp = lst.lstsq(A,b)[0] 
           # rebuild full vector
           for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
@@ -1040,6 +1041,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
         
         else:
           minit=invSVD(A,b,cond)
+          #minit = lst.lstsq(A,b)[0]
           bounds=None
         
         def eq_cond(x, *args):

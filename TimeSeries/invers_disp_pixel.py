@@ -717,7 +717,6 @@ def invSVD(A,b,cond):
         fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
     except:
         fsoln = lst.lstsq(A,b)[0]
-        #fsoln = lst.lstsq(A,b,rcond=cond)[0]
     
     return fsoln
 
@@ -737,12 +736,13 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=Fa
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        print('ineq=no: SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
-        fsoln = invSVD(A,b,cond)
-        print('SVD solution:', fsoln)
+        print('ineq=no: Least-squared inversion')
+        fsoln = lst.lstsq(A,b)[0]
+        print('LSQT solution:', fsoln)
 
     else:
         print('ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.')
+        print('Prior obtained with SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)

@@ -14,7 +14,7 @@ invers_disp_gps.py
 -------------
 Temporal inversions of the gps time series displacements
 
-Usage: invers_disp_gps.py --network=<path> --reduction=<path> [--dim=<value>] [--wdir=<path>] [--extension=<value>] [--coseismic=<value>][--postseismic=<value>] [--seasonal=<yes/no>] [--cond=<value>] [--ineq=<value>] [--proj=<value>] [--scale=<value>]  [--bianual=<yes/no>]
+Usage: invers_disp_gps.py --network=<path> --reduction=<path> [--dim=<value>] [--wdir=<path>] [--extension=<value>] [--coseismic=<value>][--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--cond=<value>] [--ineq=<value>] [--proj=<value>] [--scale=<value>]  [--bianual=<yes/no>]
 invers_disp_gps.py -h | --help
 
 Options:
@@ -27,6 +27,7 @@ Options:
 --coseismic PATH    Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.)
 --postseismic PATH  Add logarithmic transients to each coseismic step, indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) 
 --seasonal PATH     If yes, add seasonal terms in the inversion
+--seasonal_increase PATH         If yes, add seasonal terms function of time in the inversion
 --bianual=<yes/no>       If yes, add bianual terms in the decomposition [default: no]
 --cond VALUE        Condition value for optimization: Singular value smaller than cond*largest_singular_value are considered zero [default: 1.0e-10]
 --ineq VALUE        If yes, add inequqlity constrained in the inversion: use lself.east square result to iterate the inversion. Force postseismic to be the same sign than coseismic [default: no].  
@@ -83,9 +84,9 @@ if arguments["--cond"] ==  None:
 else:
     rcond = float(arguments["--cond"])
 if arguments["--seasonal"] ==  None:
-    seasonal = 'no'
-else:
-    seasonal = arguments["--seasonal"]
+    arguments["--seasonal"] = 'no'
+if arguments["--seasonal_increase"] ==  None:
+    arguments["--seasonal_increase"] = 'no'
 if arguments["--bianual"] ==  None:
     arguments["--bianual"] = 'no'
 if arguments["--coseismic"] ==  None:
@@ -96,6 +97,7 @@ if arguments["--postseismic"] ==  None:
     pos = []
 else:
     pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
+    ineq = 'yes'
 if arguments["--proj"] ==  None:
     proj = [0.318,-0.0827,0.9396]
 else:
@@ -244,7 +246,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
     Minimize:
     
@@ -266,16 +268,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
-          try:
-              U,eignv,V = lst.svd(Ain, full_matrices=False)
-              s = np.diag(eignv) 
-              print('Eigenvalues:', eignv)
-              index = np.nonzero(s<cond)
-              inv = lst.inv(s)
-              inv[index] = 0.
-              mtemp = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-          except:
-              mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+          mtemp = invSVD(Ain,b,cond)
           print('SVD solution:', mtemp)
 
           # rebuild full vector
@@ -317,15 +310,10 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12, eguality=
         fsoln = res[0]
         print('Optimization:', fsoln)
 
-    # tarantola:
-    # Cm = (Gt.Cov.G)-1 --> si sigma=1 problems
-    # sigma m **2 =  misfit**2 * diag([G.TG]-1)
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
-       # res2 = np.sum(pow((b-np.dot(A,fsoln))/sigmad,2))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
        scale = 1./(A.shape[0]-A.shape[1])
-       # scale = 1./A.shape[0]
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
@@ -437,10 +425,17 @@ basis=[
       ]
 
 index = 2
-if seasonal=='yes':
+if arguments["--seasonal"] == 'yes':
    basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
    basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
    index = index +2
+
+if arguments["--seasonal_increase"] =='yes':
+   # 2
+   indexseast = index
+   basis.append(cost(name='cost',reduction='cost',date=datemin))
+   basis.append(sint(name='sint',reduction='sint',date=datemin))
+   index = index + 2
 
 if arguments["--bianual"]=='yes':
      indexbi = index
@@ -463,6 +458,11 @@ for i in range(len(pos)):
 
 indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
+
+eguality = False
+if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
+    eguality = True
+    arguments["--ineq"] = 'yes'
 
 print()
 M=len(basis)
