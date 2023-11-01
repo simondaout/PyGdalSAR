@@ -172,7 +172,7 @@ if arguments["--dem"] is not None:
     vmax=255,vmin=1,zorder=3)
 
 cax = ax.imshow(masked_array,extent=(minx,maxx,miny,maxy),cmap=cmap,\
-     vmax=vmax,vmin=vmin, alpha=0.7, zorder=4,interpolation='nearest')
+     vmax=vmax,vmin=vmin, alpha=0.7, zorder=4,interpolation='none')
 
 if arguments["--shapefile"] is not None and os.path.exists(arguments["--shapefile"]):
     shape = gpd.read_file(arguments["--shapefile"])

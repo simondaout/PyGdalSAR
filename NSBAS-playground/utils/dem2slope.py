@@ -41,7 +41,6 @@ import docopt
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
-np.warnings.filterwarnings('ignore')
 
 # read arguments
 arguments = docopt.docopt(__doc__)
