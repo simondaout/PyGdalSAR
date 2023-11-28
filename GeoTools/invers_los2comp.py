@@ -109,7 +109,7 @@ class network:
         band.FlushCache()
         self.nlines,self.ncols = ds.RasterYSize, ds.RasterXSize
         logger.info('Number of pixel: {}'.format(len(self.los.flatten())))
-        logger.info('Nlines: {}, Ncols: {}'.format(self.nlines,self.ncols))
+        logger.info('LOS, Nlines: {}, Ncols: {}'.format(self.nlines,self.ncols))
         del ds, band
        
         # compute losmax,losmin
@@ -128,12 +128,20 @@ class network:
 
         band = ds.GetRasterBand(1)
         self.look = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        logger.info('Look, Nlines: {}, Ncols: {}'.format(ds.RasterYSize,ds.RasterXSize))
+        if ds.RasterYSize != self.nlines or ds.RasterXSize != self.ncols:
+            logger.critical('Look file has different size. Exit!')
+            exit()
         # self.look[np.isnan(self.los)] = float('NaN'))
         del ds, band
 
         if self.sigmaf is not None:
             ds = gdal.Open(self.sigmaf,gdal.GA_ReadOnly)
             band = ds.GetRasterBand(1)
+            logger.info('SIGMA, Nlines: {}, Ncols: {}'.format(ds.RasterYSize,ds.RasterXSize)) 
+            if ds.RasterYSize != self.nlines or ds.RasterXSize != self.ncols:
+                logger.critical('Sigma file has different size. Exit!')
+                exit()
             self.sigma = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
             self.sigma[self.sigma==255] = float('NaN'); self.sigma = self.scale*self.sigma 
             band.FlushCache()
@@ -148,6 +156,10 @@ class network:
         ds = gdal.Open(self.headf,gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
         self.head = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
+        logger.info('Heading, Nlines: {}, Ncols: {}'.format(ds.RasterYSize,ds.RasterXSize))
+        if ds.RasterYSize != self.nlines or ds.RasterXSize != self.ncols:
+            logger.critical('Look file has different size. Exit!')
+            exit()
         # self.head[np.isnan(self.los)] = float('NaN') 
         band.FlushCache()
         del ds, band
@@ -317,7 +329,7 @@ def compute_slope_aspect(path):
     ax.set_title('aspect',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
     
-    fig.savefig('dem_slope_aspect.png',format='PNG',dpi=300)
+    fig.savefig('dem_slope_aspect.pdf',format='PDF',dpi=300)
 
     if PLOT:
         plt.show()      
@@ -420,7 +432,6 @@ if 'crop' in locals():
         ibeg,iend,jbeg,jend = 0,nlines,0,ncols
 else:
     ibeg,iend,jbeg,jend = 0,nlines,0,ncols
-
 ################################
 # plot DATA
 ################################
@@ -435,7 +446,7 @@ except:
     cmap=cm.rainbow
 cmap_r = cmap.reversed()
 
-fig=plt.figure(0, figsize=(14,12))
+fig=plt.figure(0, figsize=(11,7))
 
 for i in range(M):
     d = insar[i]
@@ -466,7 +477,7 @@ for i in range(M):
     plt.colorbar(cax, cax=c)
 
 # fig.tight_layout()
-fig.savefig('data_decomposition_{}.png'.format(output),format='PNG',dpi=300)
+fig.savefig('data_decomposition_{}.pdf'.format(output),format='PDF',dpi=300)
 if PLOT:
     plt.show()
 
@@ -485,7 +496,7 @@ logger.info('Size invers matrix: {}x{}'.format(M,N))
 # lcomp1-square 2 views 
 # loop over each line and cols
 for i in range(ibeg,iend):
-    if i % 50 == 0:
+    if i % 200 == 0:
         print('Processing line: {}'.format(i)) 
     for j in range(jbeg,jend):
 
@@ -586,7 +597,7 @@ if 'DEM' in locals():
 # PLOT RESULTS
 ################################
 
-fig=plt.figure(3, figsize=(14,12))
+fig=plt.figure(3, figsize=(11,7))
 
 for n in range(N):
 
@@ -595,9 +606,10 @@ for n in range(N):
     data[data==0] = float('NaN')
 
     # plot comps
-    vmax =  np.nanpercentile(data,98)
+    vmax =  np.nanpercentile(data,90)
+    vmin = np.nanpercentile(data,10) 
     ax = fig.add_subplot(3,N,n+1)
-    cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=-vmax,interpolation=None)
+    cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('{}'.format(comp_name[n]))
 
     divider = make_axes_locatable(ax)
@@ -609,10 +621,14 @@ for n in range(N):
     # sigdata[sigdata==0] = float('NaN')
     # sigdata[sigdata==1] = float('NaN')
 
-    vmax=np.nanpercentile(sigdata,95)
+    vmax=np.nanpercentile(sigdata,99)
     ax = fig.add_subplot(3,N,n+1+N)
     cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
     ax.set_title('SIGMA {}'.format(comp_name[n]))
+    
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c)
     
     ax = fig.add_subplot(3,N,n+1+N*2)
     cax = ax.imshow(m,cmap=cm.Greys,interpolation=None)
@@ -624,7 +640,7 @@ for n in range(N):
     plt.colorbar(cax, cax=c)
 
 # fig.tight_layout()
-fig.savefig('decomposition_{}.png'.format(output), format='PNG',dpi=300)
+fig.savefig('decomposition_{}.pdf'.format(output), format='PDF',dpi=300)
 
 ################################
 # SAVE RESULTS
