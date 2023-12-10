@@ -14,9 +14,8 @@ clean_raster.py
 -------------
 Clean a raster file given an other r4 file (mask) and a threshold on this mask
 
-Usage: clean_r4.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
-[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>]\
-[--ramp=<lin/quad/cub/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--absolute=<yes/no>]  [--reverse=<yes/no>]
+Usage: clean_raster.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
+[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>] [--ramp=<lin/quad/cub/4/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--absolute=<yes/no>]  [--reverse=<yes/no>] [--filter=<HP/LP>]
 
 Options:
 -h --help           Show this screen.
@@ -36,6 +35,7 @@ Options:
 --ref=<jstart,jend,istart,iend> Set to zero displacements from jstart to jend
 --removeNAN         replace NaN by 0
 --cst               Add constante to map
+--filter=<HP/LP> Apply a high pass (HP) or a low pass (LP) filter to the image
 """
 
 print()
@@ -49,6 +49,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import scipy.optimize as opt
 import scipy.linalg as lst
+from scipy import ndimage
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -66,7 +67,7 @@ if arguments["--mask"] ==  None:
 else:
     maskf = arguments["--mask"]
 if arguments["--threshold"] ==  None:
-    seuil = -np.inf
+    seuil = 1e10
 else:
     seuil = float(arguments["--threshold"])
 if arguments["--lectfile"] ==  None:
@@ -88,7 +89,7 @@ else:
    setzero = arguments["--removeNAN"]
 
 if arguments["--perc"] ==  None:
-    perc = 99.9
+    perc = 100
 else:
     perc = float(arguments["--perc"])
 
@@ -108,7 +109,7 @@ elif arguments["--ramp"] == 'cub':
 elif arguments["--ramp"] == '4':
     ramp = '4'
 elif arguments["--ramp"] == 'yes':
-    print('ramp==yes is depricated. Use lin/quad/cub/no. Set ramp to lin')
+    print('ramp==yes is depricated. Use lin/quad/cub/4/no. Set ramp to lin')
     ramp = 'lin'
 else:
     print('ramp argument not recognized. Exit!')
@@ -157,16 +158,6 @@ else:
         lin_start,lin_end = ref[0], ref[1]
         col_start, col_end = 0, ncols
 
-mf = np.copy(m)
-
-# clean for ramp
-maxlos,minlos=np.nanpercentile(m,98),np.nanpercentile(m,2)
-print('Clean outliers for ramp estimation outside:', maxlos,minlos)
-kk = np.nonzero(
-    np.logical_or(m<minlos,m>maxlos))
-m_ramp = np.copy(m)
-m_ramp[kk] = float('NaN')
-
 # mask
 if maskf != 'no':
   ds_extension = os.path.splitext(maskf)[1]
@@ -187,16 +178,38 @@ if maskf != 'no':
     mask =  mask*scale_mask
     mask[np.isnan(mask)] = 0
 else:
-    mask = np.zeros((nlines,ncols))
+    mask = np.zeros((nlines,ncols))*float('nan')
 
+mf = np.copy(m)
+# apply mask
 if absolute:
       mask = np.abs(mask)
-
 if reverse:
       kk = np.nonzero(np.logical_or(mask==0, mask<seuil)) 
 else:
       kk = np.nonzero(np.logical_or(mask==0, mask>seuil)) 
 mf[kk] = float('NaN')
+
+# apply  scale and manual cst
+mf = scale*(mf - shift)
+
+# apply high pass filter
+if arguments["--filter"] == 'HP':
+    m_filter = np.copy(mf)
+    m_filter[np.isnan(mf)] = 0.
+    mf = mf - ndimage.gaussian_filter(m_filter, 7)
+
+elif arguments["--filter"] == 'LP':
+    mf = ndimage.gaussian_filter(mf, 3)
+
+if ramp != 'no':
+    # clean for ramp
+    maxlos,minlos=np.nanpercentile(m,98),np.nanpercentile(m,2)
+    print('Clean outliers for ramp estimation outside:', maxlos,minlos)
+    kk = np.nonzero(
+        np.logical_or(m<minlos,m>maxlos))
+    m_ramp = np.copy(mf)
+    m_ramp[kk] = float('NaN')
 
 if ramp=='lin':
     index = np.nonzero(~np.isnan(m_ramp))
@@ -223,9 +236,12 @@ if ramp=='lin':
         G[i*ncols:(i+1)*ncols,0] = np.arange((ncols))
         G[i*ncols:(i+1)*ncols,1] = i
     G[:,2] = 1
-    temp = (mf.flatten() - np.dot(G,pars))
-    mf=temp.reshape(nlines,ncols)
-    mf_ramp=temp.reshape(nlines,ncols)
+
+    # apply ramp correction
+    temp = np.dot(G,pars)
+    ramp=temp.reshape(nlines,ncols)
+    mf = mf - ramp
+    del temp
 
 if ramp=='quad':
     index = np.nonzero(~np.isnan(m_ramp))
@@ -253,9 +269,11 @@ if ramp=='quad':
         G[i*ncols:(i+1)*ncols,1] = np.arange((ncols))
         G[i*ncols:(i+1)*ncols,2] = i
     G[:,3] = 1
-    temp = (mf.flatten() - np.dot(G,pars))
-    mf=temp.reshape(nlines,ncols)
-    mf_ramp=temp.reshape(nlines,ncols)
+    # apply ramp correction
+    temp = np.dot(G,pars)
+    ramp=temp.reshape(nlines,ncols)
+    mf = mf - ramp
+    del temp
 
 elif ramp=='cub':
     index = np.nonzero(~np.isnan(m_ramp))
@@ -289,9 +307,11 @@ elif ramp=='cub':
         G[i*ncols:(i+1)*ncols,4] = i**2
         G[i*ncols:(i+1)*ncols,5] = i
     G[:,6] = 1
-    temp = (mf.flatten() - np.dot(G,pars))
-    mf=temp.reshape(nlines,ncols)
-    mf_ramp=temp.reshape(nlines,ncols)
+    # apply ramp correction
+    temp = np.dot(G,pars)
+    ramp=temp.reshape(nlines,ncols)
+    mf = mf - ramp
+    del temp
 
 elif ramp=='4':
     index = np.nonzero(~np.isnan(m_ramp))
@@ -329,17 +349,19 @@ elif ramp=='4':
         G[i*ncols:(i+1)*ncols,6] = i*np.arange((ncols))
         G[i*ncols:(i+1)*ncols,7] = i
     G[:,8] = 1
-    temp = (mf.flatten() - np.dot(G,pars))
-    mf=temp.reshape(nlines,ncols)
-    mf_ramp=temp.reshape(nlines,ncols)
+    # apply ramp correction
+    temp = np.dot(G,pars)
+    ramp=temp.reshape(nlines,ncols)
+    mf = mf - ramp
+    del temp
 
 else:
-    mf_ramp= np.copy(mf)
+    ramp= np.zeros(np.shape(m))
 
 if (arguments["--ref"] != None) :
     cst = np.nanmean(mf[lin_start:lin_end,col_start:col_end])
     mf = mf - cst
-    mf_ramp = mf_ramp - cst
+    ramp = ramp - cst
 
 # crop
 if arguments["--crop"] ==  None:
@@ -394,16 +416,10 @@ if iend-ibeg<ncols or jend-jbeg<nlines:
     mf[jbeg2:jend2,:] = float('NaN')
     mf[:,ibeg1:iend1] = float('NaN')
     mf[:,ibeg2:iend2] = float('NaN')
-#plt.imshow(mf)
-#plt.show()
-#sys.exit()
-
-# apply  scale and manual cst
-mf = scale*(mf - shift)
 
 # clean based on perc
 maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
-print('Clean outliers outside:', maxlos,minlos)
+print('Clean outliers outside {}-{} with perc:{}:'.format(maxlos,minlos,perc))
 kk = np.nonzero(
     np.logical_or(mf<minlos,mf>maxlos))
 mf[kk] = float('NaN')
@@ -439,8 +455,8 @@ try:
 except:
   cmap=cm.rainbow
 
-fig = plt.figure(0,figsize=(16,6))
-ax = fig.add_subplot(1,4,1)
+fig = plt.figure(0,figsize=(12,6))
+ax = fig.add_subplot(2,2,1)
 cax = ax.imshow(m, cmap,vmin=vmin, vmax=vmax, interpolation='nearest')
 ax.set_title(infile)
 setp( ax.get_xticklabels(), visible=False)
@@ -449,7 +465,7 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
-ax = fig.add_subplot(1,4,2)
+ax = fig.add_subplot(2,2,2)
 cax = ax.imshow(mask, cmap, vmin=0, vmax=np.nanpercentile(mask,99),interpolation='nearest')
 ax.set_title('MASK')
 setp( ax.get_xticklabels(), visible=False)
@@ -458,8 +474,8 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
-ax = fig.add_subplot(1,4,3)
-cax = ax.imshow(mf_ramp, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
+ax = fig.add_subplot(2,2,3)
+cax = ax.imshow(ramp, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
 ax.set_title('DATA - RAMP')
 setp( ax.get_xticklabels(), visible=False)
 #cbar = fig.colorbar(cax, orientation='vertical',aspect=9)
@@ -467,7 +483,7 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
-ax = fig.add_subplot(1,4,4)
+ax = fig.add_subplot(2,2,4)
 cax = ax.imshow(mf, cmap, vmin=vmin, vmax=vmax,interpolation='nearest')
 setp( ax.get_xticklabels(), visible=False)
 setp( ax.get_xticklabels(), visible=False)
