@@ -197,7 +197,7 @@ mf = scale*(mf - shift)
 if arguments["--filter"] == 'HP':
     m_filter = np.copy(mf)
     m_filter[np.isnan(mf)] = 0.
-    mf = mf - ndimage.gaussian_filter(m_filter, 7)
+    mf = mf - ndimage.gaussian_filter(m_filter, 16)
 
 elif arguments["--filter"] == 'LP':
     mf = ndimage.gaussian_filter(mf, 3)
