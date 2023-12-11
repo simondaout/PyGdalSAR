@@ -13,8 +13,7 @@
 print()
 print()
 print('Author: Simon DAOUT, Qi Ou')
-print('Please cite:')
-print('Daout, S., DAgostino, N., Pathier, E., Socquet, A., Lavé, J., Doin, M. P., ... & Benedetti, L. Along-Strike Variation of the Strain Partitioning within the Apennines as Seen from Large-Scale Multi-Temporal Insar Analysis. Available at SSRN 4429391.')
+print('Please cite: Ou, Q., Daout, S., Weiss, J. R., Shen, L., Lazecky, M., Wright, T. J., & Parsons, B. E. (2022). Large-scale interseismic strain mapping of the NE Tibetan plateau from Sentinel-1 interferometry. Journal of Geophysical Research: Solid Earth, 127(6).')
 print()
 print()
 
