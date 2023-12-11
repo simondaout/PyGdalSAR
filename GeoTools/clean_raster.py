@@ -200,7 +200,11 @@ if arguments["--filter"] == 'HP':
     mf = mf - ndimage.gaussian_filter(m_filter, 16)
 
 elif arguments["--filter"] == 'LP':
-    mf = ndimage.gaussian_filter(mf, 3)
+    m_filter = np.copy(mf)
+    index = np.isnan(mf)
+    m_filter[index] = 0.
+    mf = ndimage.gaussian_filter(m_filter, 16)
+    mf[index] = float('nan')
 
 if ramp != 'no':
     # clean for ramp
