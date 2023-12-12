@@ -15,7 +15,7 @@ clean_raster.py
 Clean a raster file given an other r4 file (mask) and a threshold on this mask
 
 Usage: clean_raster.py --infile=<path> --outfile=<path>  [--mask=<path>] [--threshold=<value>] \
-[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>] [--ramp=<lin/quad/cub/4/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--absolute=<yes/no>]  [--reverse=<yes/no>] [--filter=<HP/LP>]
+[--perc=<value>] [--crop=<values>] [--buff=<value>] [--lectfile=<path>] [--scale=<value>] [--scale_mask=<value>] [--ramp=<lin/quad/cub/4/no>] [--ref=<jstart,jend,istart,iend>] [--removeNAN=<yes/no>] [--cst=<value>] [--absolute=<yes/no>]  [--reverse=<yes/no>] [--filter=<HP/LP>] [--fwindsize=<value>]
 
 Options:
 -h --help           Show this screen.
@@ -35,7 +35,8 @@ Options:
 --ref=<jstart,jend,istart,iend> Set to zero displacements from jstart to jend
 --removeNAN         replace NaN by 0
 --cst               Add constante to map
---filter=<HP/LP> Apply a high pass (HP) or a low pass (LP) filter to the image
+--filter=<HP/LP> Apply a high pass (HP) or a low pass (LP) gaussian filter to the image
+--fwindsize=<value> Filter window size (default: 16)
 """
 
 print()
@@ -123,6 +124,9 @@ if arguments["--absolute"] == 'yes':
 else:
    absolute = False
 
+if arguments["--fwindsize"] == None:
+    arguments["--fwindsize"] == 16
+
 ds_extension = os.path.splitext(infile)[1]
 if (ds_extension == ".tif" or ds_extension ==".tiff" or ds_extension ==".grd"):
     from osgeo import gdal
@@ -197,13 +201,13 @@ mf = scale*(mf - shift)
 if arguments["--filter"] == 'HP':
     m_filter = np.copy(mf)
     m_filter[np.isnan(mf)] = 0.
-    mf = mf - ndimage.gaussian_filter(m_filter, 16)
+    mf = mf - ndimage.gaussian_filter(m_filter, int(arguments["--fwindsize"]))
 
 elif arguments["--filter"] == 'LP':
     m_filter = np.copy(mf)
     index = np.isnan(mf)
     m_filter[index] = 0.
-    mf = ndimage.gaussian_filter(m_filter, 16)
+    mf = ndimage.gaussian_filter(m_filter, int(arguments["--fwindsize"]))
     mf[index] = float('nan')
 
 if ramp != 'no':
