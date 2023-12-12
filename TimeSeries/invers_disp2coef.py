@@ -1040,8 +1040,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
           bounds=list(zip(mmin,mmax))
         
         else:
-          minit=invSVD(A,b,cond)
-          #minit = lst.lstsq(A,b)[0]
+          #minit=invSVD(A,b,cond)
+          minit = lst.lstsq(A,b)[0]
           bounds=None
         
         def eq_cond(x, *args):
@@ -3238,6 +3238,9 @@ for ii in range(int(arguments["--niter"])):
               del m, sigmam
 
     # compute RMSE
+    # remove outiliers
+    index = np.logical_or(models>9999., models<-9999)
+    models[index] = 0.
     squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
     aps = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
