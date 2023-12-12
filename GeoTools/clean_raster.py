@@ -125,7 +125,7 @@ else:
    absolute = False
 
 if arguments["--fwindsize"] == None:
-    arguments["--fwindsize"] == 16
+    arguments["--fwindsize"] = 16
 
 ds_extension = os.path.splitext(infile)[1]
 if (ds_extension == ".tif" or ds_extension ==".tiff" or ds_extension ==".grd"):
