@@ -504,9 +504,9 @@ if arguments["--dateslim"] is not  None:
     datemin = date2dec(dmin)
     datemax = date2dec(dmax)
 else:
-    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
-    dmax = str(datemax) + '0101'
-    dmin = str(datemin) + '0101'
+    datemin, datemax = np.min(dates), np.max(dates)
+    dmin = str(int(np.min(dates))) + '0101'
+    dmax = str(int(np.max(dates))+1) + '0101'
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))

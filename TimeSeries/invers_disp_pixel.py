@@ -493,10 +493,12 @@ if arguments["--dateslim"] is not  None:
     datemin = date2dec(dmin)
     datemax = date2dec(dmax)
 else:
-    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
-    dmax = str(datemax) + '0101'
-    dmin = str(datemin) + '0101'
+    datemin, datemax = np.min(dates), np.max(dates)
+    dmin = str(int(np.min(dates))) + '0101'
+    dmax = str(int(np.max(dates))+1) + '0101'
 
+if arguments["--plot_dateslim"] is not  None:
+    dmin,dmax = arguments["--plot_dateslim"].replace(',',' ').split()
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
@@ -769,8 +771,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=Fa
           bounds=list(zip(mmin,mmax))
 
         else:
-          minit=invSVD(A,b,cond)
-          print('SVD solution:', minit)
+          minit = lst.lstsq(A,b)[0]
           bounds=None
         
         def eq_cond(x, *args):
@@ -833,15 +834,8 @@ for jj in range((Npix)):
     print() 
 
     x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-    if arguments["--dateslim"] is not  None:
-        dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
-    elif arguments["--plot_dateslim"] is not  None:
+    if arguments["--plot_dateslim"] is not  None:
         dmin,dmax = arguments["--plot_dateslim"].replace(',',' ').split()
-    else:
-        dmax = str(datemax) + '0101'
-        dmin = str(datemin) + '0101'
-    # dmin,dmax = 20030101,20110101
-    # dmin,dmax = 20140101,20200101
     xmin = datetimes.strptime('{}'.format(dmin),'%Y%m%d')
     xmax = datetimes.strptime('{}'.format(dmax),'%Y%m%d')
     xlim=date2num(np.array([xmin,xmax]))
@@ -947,49 +941,13 @@ for jj in range((Npix)):
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
             disp_seast[k] = disp_seast[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
 
-            amp_min = 0
-            amp_max = np.sqrt(m[indexseast]**2+m[indexseast+1]**2)*(datemax-datemin)
-
-            phi = np.arctan2(m[indexseast+1],m[indexseast])
+            phit = np.arctan2(m[indexseast+1],m[indexseast])
+            ampt = np.sqrt(m[indexseast]**2+m[indexseast+1]**2)
             
             # convert between 0 and 2pi
-            if phi<0: 
-                phi = phi + 2*np.pi
-            #print(phi)
+            if phit<0: 
+                phit = phit + 2*np.pi
 
-            a_rate = (amp_max - amp_min)/(datemax-datemin)
-
-            if phi<0: 
-               phi = phi + 2*np.pi
-
-    if seasonalt=='yes' and seasonal=='yes':
-        a1_min, a2_min = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),0
-        a1_max, a2_max = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),np.sqrt(m[indexseast]**2+m[indexseast+1]**2)*(datemax-datemin)
-
-        phi1, phi2 = np.arctan2(m[indexseas+1],m[indexseas]), np.arctan2(m[indexseast+1],m[indexseast])
-        
-        if phi1<0: 
-            phi1 = phi1 + 2*np.pi
-
-        if phi2<0: 
-            phi2 = phi2 + 2*np.pi
-
-        amp_min = a1_min
-        phi_min = phi1
-        # convert between 0 and 2pi
-        if phi_min<0: 
-            phi_min = phi_min + 2*np.pi
-
-        amp_max = np.sqrt( (a1_max*np.cos(phi1) + a2_max*np.cos(phi2))**2 +
-            (a1_max*np.sin(phi1) + a2_max*np.sin(phi2))**2)
-
-        phi_max = np.arctan2(a1_max*np.sin(phi1)+a2_max*np.sin(phi2),a1_max*np.cos(phi1)+a2_max*np.cos(phi2)) 
-
-        if phi_max<0: 
-            phi_max = phi_max + 2*np.pi
-
-        a_rate = (amp_max - amp_min)/(datemax-datemin)
-        
     if semianual=='yes':
             G=np.zeros((kk,2))
             for l in range((2)):
@@ -1005,9 +963,9 @@ for jj in range((Npix)):
     # plot data and model minus dem error
     if infof is not None:
       # print(infof, infm)
-      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lign:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
+      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lines:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
     else:
-      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lign:{}, column:{}'.format(jj,i,i,j,j))
+      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lines:{}, column:{}'.format(jj,i,j))
     
     ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
     
@@ -1072,10 +1030,10 @@ for jj in range((Npix)):
             ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],amp,phi))
             ax3.plot(t,model-model_lin-model_dem,'-r')
         elif seasonal=='yes' and seasonalt=='yes':
-            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp_beg: {:.2f}, Phi1: {:.2f}, Amp_end: {:.2f}, Phi2: {:.2f}, Rate_Amp: {:.2f}'.format(m[indexinter],amp_min,phi1,amp_max,phi2,a_rate))
+            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],ampt,phit,amp,phi))
             ax3.plot(t,model-model_lin-model_dem,'-r')
         elif seasonal=='no' and seasonalt=='yes':
-            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp_beg: {:.2f}, Amp_end: {:.2f}, Phi: {:.2f}, Rate_Amp: {:.2f}'.format(m[indexinter],amp_min,amp_max,phi,a_rate))
+            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}'.format(m[indexinter],ampt,phit))
             ax3.plot(t,model-model_lin-model_dem,'-r')
         else:
             ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}'.format(m[indexinter]))
