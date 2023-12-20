@@ -618,15 +618,15 @@ if degreeday=='yes':
 if seasonal=='yes':
    # 2
    indexseas = index
-   basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
-   basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
+   basis.append(cosvar(name='seas. var (cos)',reduction='cos',date=datemin))
+   basis.append(sinvar(name='seas. var (sin)',reduction='sin',date=datemin))
    index = index + 2
 
 if seasonalt=='yes':
    # 2
    indexseast = index
-   basis.append(cost(name='cost',reduction='cost',date=datemin))
-   basis.append(sint(name='sint',reduction='sint',date=datemin))
+   basis.append(cost(name='increased seas. var (cos)',reduction='cost',date=datemin))
+   basis.append(sint(name='increased seas. var (sin)',reduction='sint',date=datemin))
    index = index + 2
 
 if semianual=='yes':
@@ -718,12 +718,12 @@ def invSVD(A,b,cond):
         inv[index] = 0.
         fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
     except:
-        fsoln = lst.lstsq(A,b)[0]
+        fsoln = lst.lstsq(A,b,rcond=cond)[0]
     
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -739,16 +739,16 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=Fa
 
     if ineq == 'no':
         print('ineq=no: Least-squared inversion')
-        fsoln = lst.lstsq(A,b)[0]
+        fsoln = lst.lstsq(A,b,rcond=cond)[0]
         print('LSQT solution:', fsoln)
 
     else:
-        print('ineq=yes: Iterative least-square decomposition. Prior obtained with SVD.')
-        print('Prior obtained with SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
+        print('ineq=yes: Iterative least-square decomposition.')
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
           mtemp = invSVD(Ain,b,cond)
+          print('Prior obtained with SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
           print('SVD solution:', mtemp)
 
           # rebuild full vector
@@ -760,7 +760,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=Fa
 
           # We here define bounds for postseismic to be the same sign than coseismic
           # and coseismic inferior or egual to the coseimic initial 
-          print('ineq=yes: Impose postseismic to be the same sign than coseismic')
+          print('Impose postseismic to be the same sign than coseismic')
           for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
@@ -771,7 +771,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6, eguality=Fa
           bounds=list(zip(mmin,mmax))
 
         else:
-          minit = lst.lstsq(A,b)[0]
+          minit = lst.lstsq(A,b,rcond=cond)[0]
           bounds=None
         
         def eq_cond(x, *args):
@@ -841,16 +841,26 @@ for jj in range((Npix)):
     xlim=date2num(np.array([xmin,xmax]))
 
     # extract data
-    wind = as_strided(maps[j-w:j+w+1,i-w:i+w+1,:])
-    if infof is not None:
-      infm = np.nanmedian(info[j-w:j+w+1,i-w:i+w+1])
-    if iref is not None:
-        windref = as_strided(maps[jref-wref:jref+wref+1,iref-wref:iref+wref+1,:])
-        dispref = np.nanmedian(windref,axis=(0,1))
+    if w>0:
+      wind = np.nanmedian(as_strided(maps[j-w:j+w+1,i-w:i+w+1,:]),axis=(0,1))
+      if infof is not None:
+        infm = np.nanmedian(info[j-w:j+w+1,i-w:i+w+1])
+      if iref is not None:
+          windref = as_strided(maps[jref-wref:jref+wref+1,iref-wref:iref+wref+1,:])
+          dispref = np.nanmedian(windref,axis=(0,1))
+      else:
+          dispref = np.zeros((N))
     else:
+      wind = as_strided(maps[j,i,:]) 
+      if infof is not None:    
+        infm = info[j,i]
+      if iref is not None:
+        dispref = maps[jref,iref,:]
+      else:
         dispref = np.zeros((N))
 
-    disp = np.nanmedian(wind,axis=(0,1)) - dispref
+    disp = wind - dispref
+    #disp = np.nanmedian(wind,axis=(0,1)) - dispref
     #aps = np.nanstd(wind,axis=(0,1))
 
     # inversion model
@@ -883,14 +893,7 @@ for jj in range((Npix)):
             names.append(kernels[l].reduction)
 
         print('basis functions:', names)
-        mt,sigmamt = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
-
-        # rebuild full vectors
-        if Mker>0:
-            m[Mbasis:],sigmam[Mbasis:] = mt[-Mker:],sigmamt[-Mker:]
-            m[:mt.shape[0]-Mker],sigmam[:mt.shape[0]-Mker] = mt[:-Mker],sigmamt[:-Mker]
-        else:
-            m [:mt.shape[0]] = mt  
+        m,sigmam = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)

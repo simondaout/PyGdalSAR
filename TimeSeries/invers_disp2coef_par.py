@@ -100,7 +100,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import scipy as sp
 import scipy.optimize as opt
-import scipy.linalg as lst
+import numpy.linalg as lst
 import scipy.sparse.linalg as spla
 from scipy.sparse import lil_matrix
 from osgeo import gdal, osr
@@ -855,15 +855,15 @@ if arguments["--linear"]=='yes':
 
 if arguments["--seasonal"] =='yes':
     indexseas = index
-    basis.append(cosvar(name='seas. var (cos)',reduction='coswt',date=datemin))
-    basis.append(sinvar(name='seas. var (sin)',reduction='sinwt',date=datemin))
+    basis.append(cosvar(name='seas. var (cos)',reduction='cos',date=datemin))
+    basis.append(sinvar(name='seas. var (sin)',reduction='sin',date=datemin))
     index = index + 2
 
 if arguments["--seasonal_increase"] =='yes':
    # 2
    indexseast = index
-   basis.append(cost(name='cost',reduction='cost',date=datemin))
-   basis.append(sint(name='sint',reduction='sint',date=datemin))
+   basis.append(cost(name='increased seas. var (cos)',reduction='cost',date=datemin))
+   basis.append(sint(name='increased seas. var (sin)',reduction='sint',date=datemin))
    index = index + 2
 
 if arguments["--semianual"]=='yes':
@@ -990,7 +990,7 @@ def invSVD(A,b,cond):
         inv[index] = 0.
         fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
     except:
-        fsoln = lst.lstsq(A,b)[0]
+        fsoln = lst.lstsq(A,b,rcond=cond)[0]
     return fsoln
 
 ## inversion procedure 
@@ -1010,15 +1010,13 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        #fsoln = spla.lsqr(A, b)[0]
-        fsoln = lst.lstsq(A,b)[0]
+        fsoln = lst.lstsq(A,b,rcond=cond)[0]
         
     else:
         if len(indexpo>0):
           # prior solution without postseismic 
           Ain = np.delete(A,indexpo,1)
-          #mtemp = invSVD(Ain,b,cond) 
-          mtemp = lst.lstsq(A,b)[0] 
+          mtemp = invSVD(Ain,b,cond) 
           
           # rebuild full vector
           for z in range(len(indexpo)):
@@ -1039,8 +1037,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
           bounds=list(zip(mmin,mmax))
         
         else:
-          #minit = invSVD(A,b)[0]
-          minit = lst.lstsq(A,b)[0]
+          minit = lst.lstsq(A,b,rcond=cond)[0]
           bounds=None
         
         def eq_cond(x, *args):
