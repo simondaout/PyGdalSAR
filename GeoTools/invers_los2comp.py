@@ -19,7 +19,7 @@ import logging
 import numpy as np
 import scipy.ndimage
 import scipy.optimize as opt
-import scipy.linalg as lst
+import numpy.linalg as lst
 from osgeo import gdal
 gdal.UseExceptions()
 from math import sin, cos
