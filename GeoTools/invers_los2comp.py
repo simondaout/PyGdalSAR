@@ -578,9 +578,9 @@ for n in range(N):
     if 'DEM' in locals():
        if DEM is not None:
          # clean based on aspect
-         indice = np.nonzero(np.logical_and(np.rad2deg(rot)>70,np.rad2deg(rot)<120))
+         indice = np.nonzero(np.logical_and(np.rad2deg(rot)>60,np.rad2deg(rot)<120))
          m[indice] =  0.
-         indice = np.nonzero(np.logical_and(np.rad2deg(rot)<-70,np.rad2deg(rot)>-120))
+         indice = np.nonzero(np.logical_and(np.rad2deg(rot)<-60,np.rad2deg(rot)>-120))
          m[indice] =  0.
 
 if 'DEM' in locals():
