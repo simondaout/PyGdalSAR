@@ -340,7 +340,7 @@ def compute_slope_aspect(path):
 #### compute rotations
 # rot: tourne l'axe N vers l'axe E. 
 # slope: tourne l'axe Up vers l'axe E. 
-min_slope = 2
+min_slope = 1
 
 comp_name = []
 rot, slope = 0, 0
@@ -566,7 +566,7 @@ for n in range(N):
     m = as_strided(mask[:,:,int(comp[n])])
     # clean based on uncertainties
     #index = s/abs(d) > 4. 
-    index = s>np.nanpercentile(s,99)
+    index = s>np.nanpercentile(s,98.)
     d[index] = float('NaN') 
     index = s/abs(d) > 1 
     m[index] = 0.
@@ -580,7 +580,7 @@ for n in range(N):
          # clean based on aspect
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)>70,np.rad2deg(rot)<120))
          m[indice] =  0.
-         indice = np.nonzero(np.logical_and(np.rad2deg(rot)-70,np.rad2deg(rot)>-120))
+         indice = np.nonzero(np.logical_and(np.rad2deg(rot)<-70,np.rad2deg(rot)>-120))
          m[indice] =  0.
 
 if 'DEM' in locals():
