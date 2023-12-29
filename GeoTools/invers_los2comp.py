@@ -340,7 +340,7 @@ def compute_slope_aspect(path):
 #### compute rotations
 # rot: tourne l'axe N vers l'axe E. 
 # slope: tourne l'axe Up vers l'axe E. 
-min_slope = 1
+min_slope = 2
 
 comp_name = []
 rot, slope = 0, 0
@@ -565,32 +565,26 @@ for n in range(N):
     s = as_strided(sdisp[:,:,int(comp[n])])
     m = as_strided(mask[:,:,int(comp[n])])
     # clean based on uncertainties
-    #index = s/abs(d) > 4. 
     index = s>np.nanpercentile(s,98.)
     d[index] = float('NaN') 
-    index = s/abs(d) > 1 
-    m[index] = 0.
+    index = s/abs(d) > 2. 
+    #m[index] = 0.
     # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,99.8),d<np.percentile(d,.2))
     d[index]= float('NaN') 
-    m[index] = 0. 
     
     if 'DEM' in locals():
        if DEM is not None:
-         # clean based on aspect
+         # mask based on aspect
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)>60,np.rad2deg(rot)<120))
          m[indice] =  0.
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)<-60,np.rad2deg(rot)>-120))
          m[indice] =  0.
 
-if 'DEM' in locals():
-    if DEM is not None:
-        d = as_strided(disp[:,:,0])
-        s = as_strided(sdisp[:,:,0])
-        m = as_strided(mask[:,:,:])
-        # clean U0 for small slopes
-        d[np.rad2deg(slope)<min_slope] = float('NaN'); s[np.rad2deg(slope)<min_slope] = float('NaN')
-        m[np.rad2deg(slope)<min_slope] = float('NaN'); m[np.rad2deg(slope)<min_slope] = float('NaN')
+         # clean flat regions: inversion invalid
+         #d[np.rad2deg(slope)<min_slope] = float('NaN')
+         #s[np.rad2deg(slope)<min_slope] = float('NaN')
+         m[np.rad2deg(slope)<min_slope] = float('NaN') 
 
    
 ################################
