@@ -509,7 +509,7 @@ else:
     dmax = str(int(np.max(dates))+1) + '0101'
 
 # clean dates
-indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
+indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
 nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
@@ -547,7 +547,7 @@ ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
 cube = as_strided(cubei[:nlines*ncol*N])
 logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
-kk = np.flatnonzero(cube>9990)
+kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
 maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
 
@@ -900,7 +900,6 @@ for i in range(len(pos)):
 indexpo = np.array(indexpo)
 indexpofull = np.array(indexpofull)
 
-
 indexsse = np.zeros(len(sse_time))
 for i in range(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
@@ -909,7 +908,6 @@ for i in range(len(sse_time)):
     iteration=True
 
 kernels=[]
-
 if arguments["--dem"]=='yes':
    kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=baseref,bp=base))
    indexdem = index
@@ -971,15 +969,12 @@ else:
     fimages=apsf
     inaps=np.loadtxt(fimages, comments='#', dtype='f')
     logger.info('Input uncertainties: {}'.format(inaps))
-    logger.info('Scale input uncertainties between 0 and 1 and set very low values to the 2 \
-      percentile to avoid overweighting...')
-    # maxinaps = np.nanmax(inaps)
-    # inaps= inaps/maxinaps
+    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
     minaps= np.nanpercentile(inaps,2)
     index = np.flatnonzero(inaps<minaps)
     inaps[index] = minaps
+    inaps = inaps[indexd]
     logger.info('Output uncertainties for first iteration: {}'.format(inaps))
-    print
 
 # SVD inversion with cut-off eigenvalues
 def invSVD(A,b,cond):
@@ -996,8 +991,8 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=False):
+#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=False): # default values
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12,eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -1016,48 +1011,46 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=Fal
         
     else:
         if len(indexpo>0):
-          # prior solution without postseismic 
+          # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
-          mtemp = invSVD(Ain,b,cond) 
+          mtemp = invSVD(Ain,b,cond)
+
           # rebuild full vector
           for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
           minit = np.copy(mtemp)
           # # initialize bounds
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf 
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
 
           # We here define bounds for postseismic to be the same sign than coseismic
-          # and coseismic inferior or egual to the coseimic initial 
+          # and coseismic inferior or egual to the coseimic initial
           for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
+                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf
+                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])]
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
           bounds=list(zip(mmin,mmax))
-        
+
         else:
           minit = lst.lstsq(A,b,rcond=None)[0]
-          #mmin,mmax=-np.ones(len(minit))*1e3, np.ones(len(minit))*1e3
-          #bounds=list(zip(mmin,mmax))
           bounds=None
-        
+
         def eq_cond(x, *args):
            return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
- 
+
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-
         if eguality:
             res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime,eqcons=[eq_cond], \
                 iter=iter,full_output=True,iprint=0,acc=acc)
         else:
             res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-                iter=iter,full_output=True,iprint=0,acc=acc)  
+                iter=iter,full_output=True,iprint=0,acc=acc)
         fsoln = res[0]
-  
+ 
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
@@ -1065,7 +1058,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=Fal
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
-
+    #print('Optimization:', fsoln)
+    #sys.exit()
     return fsoln,sigmam
 
 def linear_inv(G, data, sigma):
@@ -3044,6 +3038,7 @@ def empirical_cor(l):
 def temporal_decomp(pix):
     j = pix  % (new_cols)
     i = int(pix/(new_cols))
+    #i,j=220,279 
 
     # Initialisation
     mdisp=np.ones((N), dtype=np.float32)*float('NaN')
@@ -3077,13 +3072,21 @@ def temporal_decomp(pix):
         
         # inversion
         m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
+        #if np.max(m)>40:
+        #  print('line:',i,'col:',j)
+        #  print(len(k), N)
+        #  print(G[:6,:6])
+        #  print(taby)
+        #  print(inaps[k])
+        #  print(m)
+        #  print(sigmam)
+        #  sys.exit()
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
 
         # Build seasonal and vect models
     return m, sigmam, mdisp 
-    
 
 # initialization
 maps_flata = np.copy(maps)
@@ -3244,7 +3247,7 @@ for ii in range(int(arguments["--niter"])):
     aps = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low aps to avoid over-fitting in next iter
-    inaps= np.nanpercentile(aps,2)
+    minaps= np.nanpercentile(aps,2)
     index = np.flatnonzero(aps<minaps)
     aps[index] = minaps
 

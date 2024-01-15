@@ -319,9 +319,6 @@ def date2dec(dates):
 # read arguments
 arguments = docopt.docopt(__doc__)
 
-# initialise iteration with interseismic alone
-iteration=False
-
 if arguments["--list_images"] ==  None:
     listim = "images_retenues"
 else:
@@ -501,7 +498,7 @@ if arguments["--plot_dateslim"] is not  None:
     dmin,dmax = arguments["--plot_dateslim"].replace(',',' ').split()
 
 # clean dates
-indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
+indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
 nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
@@ -510,15 +507,16 @@ cube = as_strided(cubei[:nlign*ncol*N])
 print('Number of line in the cube: ', cube.shape)
 kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
 cube[kk] = float('NaN')
-# ATTENTION: here i convert rad to mm
 cube = cube*scale
 maps = cube.reshape((nlign,ncol,N))
 
 # set to NaN lakes and ocean, new image ref.
 cst = np.copy(maps[:,:,imref])
 for l in range((N)):
-    d = as_strided(maps[:,:,l])
     maps[:,:,l] = maps[:,:,l] - cst
+    if l != imref:
+        index = np.nonzero(maps[:,:,l]==0.0)
+        maps[:,:,l][index] = float('NaN')
 
 # new number of dates
 N = len(dates)
@@ -532,16 +530,10 @@ if apsf is not None:
     inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*abs(scale)
     print('Input uncertainties:', inaps)
     print('Set very low values to the 2 percentile to avoid overweighting...')
-    # maxinaps = np.nanmax(inaps) 
-    # inaps= inaps/maxinaps
-
     minaps= np.nanpercentile(inaps,2)
-    index = flatnonzero(inaps<minaps)
+    index = np.flatnonzero(inaps<minaps)
     inaps[index] = minaps
-    try:
-        inaps = inaps[indexd]
-    except:
-        pass
+    inaps = inaps[indexd]
     print('Output uncertainties for first iteration:', inaps)
 
 if vectf is not None:
@@ -649,14 +641,12 @@ for i in range(len(cos)):
    indexco[i] = int(index)
    basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
    index = index + 1
-   iteration=True
 
 indexsse = np.zeros(len(sse_time))
 for i in range(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
     indexsse[i] = int(index)
     index = index + 1
-    iteration=True
 
 indexpo,indexpofull = [],[]
 for i in range(len(pos)):
@@ -723,7 +713,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -739,11 +729,11 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
 
     if ineq == 'no':
         print('ineq=no: Least-squared inversion')
-        fsoln = lst.lstsq(A,b,rcond=cond)[0]
+        fsoln = lst.lstsq(A,b,rcond=None)[0]
         print('LSQT solution:', fsoln)
 
     else:
-        print('ineq=yes: Iterative least-square decomposition.')
+        print('ineq=yes: Iterative least-square inversion.')
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
@@ -771,9 +761,9 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
           bounds=list(zip(mmin,mmax))
 
         else:
-          minit = lst.lstsq(A,b,rcond=cond)[0]
+          minit = lst.lstsq(A,b,rcond=None)[0]
           bounds=None
-        
+       
         def eq_cond(x, *args):
            return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
        
@@ -788,7 +778,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
                 iter=iter,full_output=True,iprint=0,acc=acc)  
         fsoln = res[0]
         print('Optimization:', fsoln)
-
+ 
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
@@ -797,7 +787,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
     print('model errors:', sigmam)
-
     return fsoln,sigmam
 
 # plot diplacements maps
@@ -819,7 +808,6 @@ if seasonal == 'yes' or semianual == 'yes' or bianual == 'yes' or seasonalt == '
 
 
 for jj in range((Npix)):
-    # initialize aps before iterations   
     if apsf is None:
         aps = np.ones((N))
     else:
@@ -860,11 +848,9 @@ for jj in range((Npix)):
         dispref = np.zeros((N))
 
     disp = wind - dispref
-    #disp = np.nanmedian(wind,axis=(0,1)) - dispref
-    #aps = np.nanstd(wind,axis=(0,1))
 
     # inversion model
-    mdisp= np.ones((N))*float('NaN')
+    mdisp= np.ones((N), dtype=np.float32)*float('NaN')
     demerr = np.zeros((N))
     lin = np.zeros((N))
     k = np.flatnonzero(~np.isnan(disp))
@@ -878,7 +864,8 @@ for jj in range((Npix)):
 
     # Inisilize 
     G=np.zeros((kk,M))
-    m,sigmam = np.zeros((M)),np.zeros((M))
+    m = np.ones((M), dtype=np.float32)*float('NaN')
+    sigmam = np.ones((M), dtype=np.float32)*float('NaN')
     # do only this if more than N/2 points left
     if kk > N/6:
         # inversion
@@ -891,10 +878,14 @@ for jj in range((Npix)):
         for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
             names.append(kernels[l].reduction)
-
-        print('basis functions:', names)
+        
+        #print('basis functions:', names)
+        #print(len(k), N)
+        #print(G[:6,:6])
+        #print(taby)
+        #print(sigmad[k])
         m,sigmam = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
-
+        
         # forward model in original order
         mdisp[k] = np.dot(G,m)
         if dem=='yes':
