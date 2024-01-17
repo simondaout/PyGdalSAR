@@ -990,13 +990,12 @@ def invSVD(A,b,cond):
     
     return fsoln
 
-## inversion procedure 
-#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=False): # default values
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12,eguality=False):
+## inversion procedure
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
-    
+
     ||Ax-b||^2
 
     Subject to:
@@ -1008,7 +1007,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12,eguality=Fal
 
     if ineq == 'no':
         fsoln = lst.lstsq(A,b,rcond=None)[0]
-        
+
     else:
         if len(indexpo>0):
           # invert first without post-seismic
@@ -1031,14 +1030,16 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12,eguality=Fal
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-          bounds=list(zip(mmin,mmax))
 
         else:
           minit = lst.lstsq(A,b,rcond=None)[0]
-          bounds=None
+          #print(minit)
+          #minit = np.zeros(np.shape(A)[1])
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
 
+        bounds=list(zip(mmin,mmax))
         def eq_cond(x, *args):
-           return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
+           return (x[indexseast+1]/x[indexseast]) - (x[indexseas+1]/x[indexseas])
 
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
@@ -1050,7 +1051,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12,eguality=Fal
             res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
                 iter=iter,full_output=True,iprint=0,acc=acc)
         fsoln = res[0]
- 
+        #print('Optimization:', fsoln)
+
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
@@ -1058,8 +1060,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12,eguality=Fal
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
-    #print('Optimization:', fsoln)
-    #sys.exit()
     return fsoln,sigmam
 
 def linear_inv(G, data, sigma):
@@ -3038,7 +3038,7 @@ def empirical_cor(l):
 def temporal_decomp(pix):
     j = pix  % (new_cols)
     i = int(pix/(new_cols))
-    #i,j=220,279 
+    #i,j=221,318 
 
     # Initialisation
     mdisp=np.ones((N), dtype=np.float32)*float('NaN')
@@ -3544,8 +3544,8 @@ if arguments["--seasonal_increase"]  == 'yes':
     amp = np.sqrt(cosine**2+sine**2)
     phi = np.arctan2(sine,cosine)
 
-    sigcosine = as_strided(basis[indexseas].sigmam)
-    sigsine = as_strided(basis[indexseas+1].sigmam)
+    sigcosine = as_strided(basis[indexseast].sigmam)
+    sigsine = as_strided(basis[indexseast+1].sigmam)
     sigamp = np.sqrt(sigcosine**2+sigsine**2)
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 

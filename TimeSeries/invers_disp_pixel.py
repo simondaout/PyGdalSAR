@@ -713,7 +713,7 @@ def invSVD(A,b,cond):
     return fsoln
 
 ## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12, eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -758,14 +758,15 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=20,acc=1e-12, eguality=Fa
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-          bounds=list(zip(mmin,mmax))
 
         else:
           minit = lst.lstsq(A,b,rcond=None)[0]
-          bounds=None
-       
+          #minit = np.zeros(np.shape(A)[1])
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
+
+        bounds=list(zip(mmin,mmax))
         def eq_cond(x, *args):
-           return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
+           return (x[indexseast+1]/x[indexseast]) - (x[indexseas+1]/x[indexseas])
        
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
@@ -879,13 +880,14 @@ for jj in range((Npix)):
             G[:,Mbasis+l]=kernels[l].g(k)
             names.append(kernels[l].reduction)
         
-        #print('basis functions:', names)
-        #print(len(k), N)
-        #print(G[:6,:6])
-        #print(taby)
-        #print(sigmad[k])
+        print('basis functions:', names)
+        print(len(k), N)
+        print(G[:6,:6])
+        print(taby)
+        print(sigmad[k])
         m,sigmam = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
-        
+        sys.exit()   
+     
         # forward model in original order
         mdisp[k] = np.dot(G,m)
         if dem=='yes':
