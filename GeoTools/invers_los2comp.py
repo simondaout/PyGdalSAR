@@ -256,13 +256,20 @@ if len(argv)>1:
 
 def compute_slope_aspect(path):
    
+    global filter, Px, Py, slope, aspect
+    
     #### LOAD DEM
     ds = gdal.Open(path,gdal.GA_ReadOnly)
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
-    filtrer = scipy.ndimage.gaussian_filter(topo,fwindsize)
-    #filtrer = scipy.ndimage.gaussian_filter(topo,2.)
+
+    if 'fwindsize' in locals():
+        logger.info('filter DEM with a windowsize of {}'.format(fwindsize))
+    else:
+        fwindsize = 2.
+    filter = scipy.ndimage.gaussian_filter(topo,fwindsize)
+    #filter = scipy.ndimage.gaussian_filter(topo,2.)
     gt = ds.GetGeoTransform()
     projref = ds.GetProjectionRef()
     drv = gdal.GetDriverByName('GTiff')
@@ -278,10 +285,9 @@ def compute_slope_aspect(path):
     if res<1 or res>500:
         logger.info("Spatial resolution seems unrealistic. Exit!")
         exit()  
-        
     
     # Calcul gradient
-    Py, Px = np.gradient(filtrer, res, res*np.cos(np.deg2rad(lat_moy)))
+    Py, Px = np.gradient(filter, res, res*np.cos(np.deg2rad(lat_moy)))
     Px = Px.astype(float); Py = Py.astype(float)
     # Slope
     slope = np.arctan(np.sqrt(Py**2+Px**2))
@@ -305,13 +311,19 @@ def compute_slope_aspect(path):
     dst.SetGeoTransform(gt)
     dst.SetProjection(projref)
     bandt.FlushCache()
+    
+    return -aspect, slope
+    #return 0, np.deg2rad(10)
 
+def plot_slope_aspect():
+  
+ 
     # Plot DEM, Slope, Py and aspect
     fig = plt.figure(1,figsize=(11,7))
     cmap = cm.terrain
     # Plot topo
     ax = fig.add_subplot(2,2,1)
-    cax = ax.imshow(filtrer[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(filtrer,98),vmin=np.nanpercentile(filtrer,2))
+    cax = ax.imshow(filter[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(filter,98),vmin=np.nanpercentile(filter,2))
     ax.set_title('DEM',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
@@ -335,18 +347,6 @@ def compute_slope_aspect(path):
     if PLOT:
         plt.show()      
 
-    return -aspect, slope
-    #return 0, np.deg2rad(10)
-
-# crop options
-if 'crop' in locals():
-    if crop is not None:
-        logger.info('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
-        ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-    else:
-        ibeg,iend,jbeg,jend = 0,nlines,0,ncols
-else:
-    ibeg,iend,jbeg,jend = 0,nlines,0,ncols
 
 #### compute rotations
 # rot: tourne l'axe N vers l'axe E. 
@@ -368,12 +368,7 @@ if 'DEM' in locals():
     name3 = 'Normal to line of Max Slope'
     logger.info('Invert components: {}'.format(name3))
     comp_name.append(name3)
-  if 'fwindsize' in locals():
-    logger.info('filter DEM with a windowsize of {}'.format(fwindsize))
   else:
-    fwindsize = 2.
-
-else:
     logger.info('DEM is not defined, read horizontale rotation in clockwise rotation in input file (default, rotation=0)')
     #slope = np.deg2rad(30)
     rot = np.deg2rad(rotation)
@@ -438,12 +433,26 @@ for i in range(M):
     else:
       pass
 
+# crop options
+if 'crop' in locals():
+    if crop is not None:
+        logger.info('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
+        ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+    else:
+        ibeg,iend,jbeg,jend = 0,nlines,0,ncols
+else:
+    ibeg,iend,jbeg,jend = 0,nlines,0,ncols
+
 ################################
 # plot DATA
 ################################
 
-print()
 logger.info('Plot DATA ....') 
+print()
+if 'DEM' in locals():
+  if DEM is not None:
+    rot, slope = plot_slope_aspect()
+
 try:
     from matplotlib.colors import LinearSegmentedColormap
     cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
