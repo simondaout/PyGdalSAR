@@ -261,7 +261,8 @@ def compute_slope_aspect(path):
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
-    filtrer = scipy.ndimage.gaussian_filter(topo,2.)
+    filtrer = scipy.ndimage.gaussian_filter(topo,fwindsize)
+    #filtrer = scipy.ndimage.gaussian_filter(topo,2.)
     gt = ds.GetGeoTransform()
     projref = ds.GetProjectionRef()
     drv = gdal.GetDriverByName('GTiff')
@@ -310,22 +311,22 @@ def compute_slope_aspect(path):
     cmap = cm.terrain
     # Plot topo
     ax = fig.add_subplot(2,2,1)
-    cax = ax.imshow(filtrer,cmap=cmap,vmax=np.nanpercentile(filtrer,98),vmin=np.nanpercentile(filtrer,2))
+    cax = ax.imshow(filtrer[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(filtrer,98),vmin=np.nanpercentile(filtrer,2))
     ax.set_title('DEM',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,2)
-    cax = ax.imshow(np.rad2deg(slope),cmap=cmap,vmax=np.nanpercentile(np.rad2deg(slope),98),vmin=np.nanpercentile(np.rad2deg(slope),2))
+    cax = ax.imshow(np.rad2deg(slope[ibeg:iend,jbeg:jend]),cmap=cmap,vmax=np.nanpercentile(np.rad2deg(slope),98),vmin=np.nanpercentile(np.rad2deg(slope),2))
     ax.set_title('Slope',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,3)
-    cax = ax.imshow(Py,cmap=cmap,vmax=np.nanpercentile(Py,98),vmin=np.nanpercentile(Py,2))
+    cax = ax.imshow(Py[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(Py,98),vmin=np.nanpercentile(Py,2))
     ax.set_title('Py',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,4)
-    cax = ax.imshow(aspect,cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
+    cax = ax.imshow(aspect[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
     ax.set_title('aspect',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
     
@@ -336,6 +337,16 @@ def compute_slope_aspect(path):
 
     return -aspect, slope
     #return 0, np.deg2rad(10)
+
+# crop options
+if 'crop' in locals():
+    if crop is not None:
+        logger.info('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
+        ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
+    else:
+        ibeg,iend,jbeg,jend = 0,nlines,0,ncols
+else:
+    ibeg,iend,jbeg,jend = 0,nlines,0,ncols
 
 #### compute rotations
 # rot: tourne l'axe N vers l'axe E. 
@@ -357,6 +368,10 @@ if 'DEM' in locals():
     name3 = 'Normal to line of Max Slope'
     logger.info('Invert components: {}'.format(name3))
     comp_name.append(name3)
+  if 'fwindsize' in locals():
+    logger.info('filter DEM with a windowsize of {}'.format(fwindsize))
+  else:
+    fwindsize = 2.
 
 else:
     logger.info('DEM is not defined, read horizontale rotation in clockwise rotation in input file (default, rotation=0)')
@@ -423,15 +438,6 @@ for i in range(M):
     else:
       pass
 
-# crop options
-if 'crop' in locals():
-    if crop is not None:
-        logger.info('Crop time series data between lines {}-{} and cols {}-{}'.format(int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])))
-        ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
-    else:
-        ibeg,iend,jbeg,jend = 0,nlines,0,ncols
-else:
-    ibeg,iend,jbeg,jend = 0,nlines,0,ncols
 ################################
 # plot DATA
 ################################
@@ -452,7 +458,7 @@ for i in range(M):
     d = insar[i]
     # plot LOS
     ax = fig.add_subplot(2,M,i+1)
-    cax = ax.imshow(d.los,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+    cax = ax.imshow(d.los[ibeg:iend,jbeg:jend],cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('{}'.format(d.reduction))
     # Add the patch to the Axes
     if d.ref_zone is not None:
@@ -465,7 +471,7 @@ for i in range(M):
 
     # plot SIGMA LOS
     ax = fig.add_subplot(2,M,i+1+M)
-    cax = ax.imshow(d.sigma,cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
+    cax = ax.imshow(d.sigma[ibeg:iend,jbeg:jend],cmap=cmap_r,vmax=sigmax,vmin=sigmin,interpolation=None)
     ax.set_title('SIGMA {}'.format(d.reduction))
     # Add the patch to the Axes
     if d.ref_zone is not None:
@@ -595,13 +601,13 @@ fig=plt.figure(3, figsize=(11,7))
 
 for n in range(N):
 
-    data = disp[:,:,int(comp[n])]
-    m = mask[:,:,int(comp[n])]
+    data = disp[ibeg:iend,jbeg:jend,int(comp[n])]
+    m = mask[ibeg:iend,jbeg:jend,int(comp[n])]
     data[data==0] = float('NaN')
 
     # plot comps
-    vmax =  np.nanpercentile(data,90)
-    vmin = np.nanpercentile(data,10) 
+    vmax =  np.nanpercentile(data,98)
+    vmin = np.nanpercentile(data,2) 
     ax = fig.add_subplot(3,N,n+1)
     cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
     ax.set_title('{}'.format(comp_name[n]))
@@ -611,7 +617,7 @@ for n in range(N):
     plt.colorbar(cax, cax=c)
 
     # plot SIGMA LOS
-    sigdata = sdisp[:,:,int(comp[n])]
+    sigdata = sdisp[ibeg:iend,jbeg:jend,int(comp[n])]
     # sigdata[sigdata==0] = float('NaN')
     # sigdata[sigdata==1] = float('NaN')
 
