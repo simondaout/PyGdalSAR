@@ -317,7 +317,6 @@ def compute_slope_aspect(path):
 
 def plot_slope_aspect():
   
- 
     # Plot DEM, Slope, Py and aspect
     fig = plt.figure(1,figsize=(11,7))
     cmap = cm.terrain
@@ -451,7 +450,7 @@ logger.info('Plot DATA ....')
 print()
 if 'DEM' in locals():
   if DEM is not None:
-    rot, slope = plot_slope_aspect()
+    plot_slope_aspect()
 
 try:
     from matplotlib.colors import LinearSegmentedColormap
