@@ -980,22 +980,8 @@ else:
     logger.info('Output uncertainties for first iteration: {}'.format(inaps))
     print
 
-# SVD inversion with cut-off eigenvalues
-def invSVD(A,b,cond):
-    try:
-        U,eignv,V = lst.svd(A, full_matrices=False)
-        s = np.diag(eignv)
-        index = np.nonzero(s<cond)
-        inv = lst.inv(s)
-        inv[index] = 0.
-        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-    except:
-        fsoln = lst.lstsq(A,b,rcond=cond)[0]
-    return fsoln
-
 ## inversion procedure 
-#def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=2000,acc=1e-12,eguality=False):
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=False):
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
@@ -1010,14 +996,15 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        fsoln = lst.lstsq(A,b,rcond=cond)[0]
-        
+        Cd = np.diag(sigmad**2, k = 0)
+        fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))       
+ 
     else:
         if len(indexpo>0):
           # prior solution without postseismic 
           Ain = np.delete(A,indexpo,1)
-          mtemp = invSVD(Ain,b,cond) 
-          
+          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+     
           # rebuild full vector
           for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
@@ -1037,11 +1024,11 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=200,acc=1e-6,eguality=Fal
           bounds=list(zip(mmin,mmax))
         
         else:
-          minit = lst.lstsq(A,b,rcond=cond)[0]
-          bounds=None
-        
+          minit = lst.lstsq(A,b,rcond=None)[0]
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf       
+ 
         def eq_cond(x, *args):
-           return math.atan2(x[indexseast+1],x[[indexseast]]) - math.atan2(x[indexseas+1],x[[indexseas]])
+           return (x[indexseast+1],x[[indexseast]]) - (x[indexseas+1],x[[indexseas]])
  
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)

@@ -11,7 +11,7 @@ invers_disp_pixel.py
 Temporal decomposition of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
 Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
-[--linear=<value>] [--coseismic=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
+[--linear=<value>] [--steps=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--scale=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] [--plot_dateslim=<values>] [--color=<value>] [--fillstyle=<value>] 
 
@@ -28,8 +28,8 @@ Options:
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
 --linear PATH     Add a linear function to the inversion
---coseismic PATH        Add heaviside functions to the inversion .Indicate coseismic time (e.g 2004.,2006.)
---postseismic PATH      Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a given coseismic step, put None (e.g None,1.) 
+--steps PATH        Add heaviside functions to the inversion .Indicate steps time (e.g 2004.,2006.)
+--postseismic PATH      Add logarithmic transients to each steps step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than steps (e.g 1.,1.). To not associate postseismic function to a given steps step, put None (e.g None,1.) 
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
 --seasonal PATH         If yes, add seasonal terms in the inversion
 --seasonal_increase PATH         If yes, add seasonal terms function of time in the inversion 
@@ -41,7 +41,7 @@ Options:
 --dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1.e-3]
---ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than coseismic [default: no].       
+--ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than steps [default: no].       
 --name Value            Name output figures [default: None] 
 --scale                Scaling value between input data and desired output [default: 1]
 --plot                  Display results [default: yes]            
@@ -117,7 +117,7 @@ def Heaviside(t):
         h[t>=0]=1.0
         return h
 
-class coseismic(pattern):
+class steps(pattern):
       def __init__(self,name,reduction,date):
           pattern.__init__(self,name,reduction,date)
           self.to=date
@@ -379,10 +379,10 @@ if arguments["--dem"] ==  None:
     dem = 'no'
 else:
     dem = arguments["--dem"]
-if arguments["--coseismic"] ==  None:
+if arguments["--steps"] ==  None:
     cos = []
 else:
-    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
+    cos = list(map(float,arguments["--steps"].replace(',',' ').split()))
 if arguments["--postseismic"] ==  None:
     pos = np.zeros(len(cos))
 else:
@@ -639,7 +639,7 @@ indexco = np.zeros(len(cos))
 for i in range(len(cos)):
    # 6
    indexco[i] = int(index)
-   basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
+   basis.append(steps(name='steps {}'.format(i),reduction='step{}'.format(i),date=cos[i])),
    index = index + 1
 
 indexsse = np.zeros(len(sse_time))
@@ -651,7 +651,7 @@ for i in range(len(sse_time)):
 indexpo,indexpofull = [],[]
 for i in range(len(pos)):
   if pos[i] > 0. :
-    basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
+    basis.append(postseismic(name='postseismic {}'.format(i),reduction='log{}'.format(i),date=cos[i],tcar=pos[i])),
     indexpo.append(int(index))
     indexpofull.append(int(index))
     index = index + 1
@@ -698,19 +698,19 @@ for i in range((Mbasis)):
     basis[i].info()
 
 # SVD inversion with cut-off eigenvalues
-def invSVD(A,b,cond):
-    try:
-        U,eignv,V = lst.svd(A, full_matrices=False)
-        s = np.diag(eignv)
-        print(s)
-        index = np.nonzero(s<cond)
-        inv = lst.inv(s)
-        inv[index] = 0.
-        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-    except:
-        fsoln = lst.lstsq(A,b,rcond=cond)[0]
-    
-    return fsoln
+#def invSVD(A,b,cond):
+#    try:
+#        U,eignv,V = lst.svd(A, full_matrices=False)
+#        s = np.diag(eignv)
+#        print(s)
+#        index = np.nonzero(s<cond)
+#        inv = lst.inv(s)
+#        inv[index] = 0.
+#        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
+#    except:
+#        fsoln = lst.lstsq(A,b,rcond=cond)[0]
+#    
+#    return fsoln
 
 ## inversion procedure 
 def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
@@ -729,7 +729,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
 
     if ineq == 'no':
         print('ineq=no: Least-squared inversion')
-        fsoln = lst.lstsq(A,b,rcond=None)[0]
+        Cd = np.diag(sigmad**2, k = 0)
+        fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
         print('LSQT solution:', fsoln)
 
     else:
@@ -737,7 +738,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
-          mtemp = invSVD(Ain,b,cond)
+          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
           print('Prior obtained with SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
           print('SVD solution:', mtemp)
 
@@ -748,9 +749,9 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
           # # initialize bounds
           mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf 
 
-          # We here define bounds for postseismic to be the same sign than coseismic
-          # and coseismic inferior or egual to the coseimic initial 
-          print('Impose postseismic to be the same sign than coseismic')
+          # We here define bounds for postseismic to be the same sign than steps
+          # and steps inferior or egual to the coseimic initial 
+          print('Impose postseismic to be the same sign than steps')
           for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
@@ -761,7 +762,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
 
         else:
           minit = lst.lstsq(A,b,rcond=None)[0]
-          #minit = np.zeros(np.shape(A)[1])
           mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
 
         bounds=list(zip(mmin,mmax))
@@ -886,7 +886,7 @@ for jj in range((Npix)):
         print(taby)
         print(sigmad[k])
         m,sigmam = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
-        sys.exit()   
+        #sys.exit()   
      
         # forward model in original order
         mdisp[k] = np.dot(G,m)

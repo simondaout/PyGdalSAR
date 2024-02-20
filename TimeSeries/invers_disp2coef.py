@@ -21,7 +21,7 @@ weight for the next iteration.
 
 Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
-[--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
+[--linear=<yes/no>] [--steps=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
 [--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
 [--sampling=<value>] [--emp_sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
@@ -40,8 +40,8 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None]  
 --niter=<value>         Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, while for the next itarations, uncertainties are equals to the global RMS previous temporal decomposition [default: 0].
 --linear=<yes/no>       Add a linear function in the inversion [default:yes]
---coseismic=<value,value>     Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.) [default: None]
---postseismic=<value,value>   Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) [default: None].
+--steps=<value,value>     Add heaviside functions to the inversion, indicate steps time (e.g 2004.,2006.) [default: None]
+--postseismic=<value,value>   Add logarithmic transients to each steps step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than steps (e.g 1.,1.). To not associate postseismic function to a give steps step, put None (e.g None,1.) [default: None].
 --slowslip=<value,value>      Add slow-slip function in the inversion . As defined by Larson et al., 2004. Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None].
 --vector=<path>         Path to the vector text files containing a value for each dates [default: None]
 --seasonal=<yes/no>       If yes, add seasonal terms in the decomposition [default: no]
@@ -52,7 +52,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
 --nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
 --flat=<0/1/2/3/4/5/6/7/8/9>             Remove a spatial ramp at each iteration [default: 0].
---spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, coseismic...) [default: yes]
+--spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, steps...) [default: yes]
 --sampling=<value>      Downsampling factor for temporal decomposition [default: 1]
 --emp_sampling=<value>      Downsampling factor for empirical estimations [default: 1]
 --imref=<value>         Reference image number [default: 1]
@@ -66,7 +66,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --perc_los=<value>        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:99.]
 --perc_topo=<value>       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:99.]
 --cond=<value>            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
---ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: yes].
+--ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than steps steps of the first guess [default: yes].
 --fulloutput=<yes/no>      If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff=<path>           Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files 
 --plot=<yes/no>         Display plots [default: no]
@@ -152,7 +152,7 @@ def Heaviside(t):
 def Box(t):
         return Heaviside(t+0.5)-Heaviside(t-0.5)
 
-class coseismic(pattern):
+class steps(pattern):
       def __init__(self,name,reduction,date):
           pattern.__init__(self,name,reduction,date)
           self.to=date
@@ -178,7 +178,7 @@ class reference(pattern):
     def g(self,t):
         return np.ones((t.size))
 
-class interseismic(pattern):
+class linear(pattern):
     def __init__(self,name,reduction,date):
         pattern.__init__(self,name,reduction,date)
         self.to=date
@@ -812,10 +812,10 @@ fid.close()
 # Create functions of decomposition
 ######################################################
 
-if arguments["--coseismic"] ==  None:
+if arguments["--steps"] ==  None:
     cos = []
 else:
-    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
+    cos = list(map(float,arguments["--steps"].replace(',',' ').split()))
 
 if arguments["--postseismic"] ==  None:
     pos = []
@@ -846,12 +846,12 @@ basis=[
     ]
 index = len(basis)
 
-# initialise iteration with interseismic alone
+# initialise iteration with linear alone
 iteration=False
 
 if arguments["--linear"]=='yes':
     indexinter=index
-    basis.append(interseismic(name='interseismic',reduction='lin',date=datemin))
+    basis.append(linear(name='linear',reduction='lin',date=datemin))
     index = index + 1
 
 if arguments["--seasonal"] =='yes':
@@ -881,16 +881,15 @@ if arguments["--bianual"]=='yes':
 
 indexco = np.zeros(len(cos))
 for i in range(len(cos)):
-    basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
+    basis.append(steps(name='steps {}'.format(i),reduction='step{}'.format(i),date=cos[i])),
     indexco[i] = index
     index = index + 1
     iteration=True
 
-
 indexpo,indexpofull = [],[]
 for i in range(len(pos)):
   if pos[i] > 0. :
-    basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
+    basis.append(postseismic(name='postseismic {}'.format(i),reduction='log{}'.format(i),date=cos[i],tcar=pos[i])),
     indexpo.append(int(index))
     indexpofull.append(int(index))
     index = index + 1
@@ -976,20 +975,6 @@ else:
     inaps = inaps[indexd]
     logger.info('Output uncertainties for first iteration: {}'.format(inaps))
 
-# SVD inversion with cut-off eigenvalues
-def invSVD(A,b,cond):
-    try:
-        U,eignv,V = lst.svd(A, full_matrices=False)
-        s = np.diag(eignv)
-        index = np.nonzero(s<cond)
-        inv = lst.inv(s)
-        inv[index] = 0.
-        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-    except:
-        fsoln = lst.lstsq(A,b,rcond=cond)[0]
-    
-    return fsoln
-
 ## inversion procedure
 def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
@@ -1006,14 +991,15 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        fsoln = lst.lstsq(A,b,rcond=None)[0]
+        Cd = np.diag(sigmad**2, k = 0)
+        fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
 
     else:
         if len(indexpo>0):
           # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
-          mtemp = invSVD(Ain,b,cond)
-
+          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
+    
           # rebuild full vector
           for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
@@ -1021,8 +1007,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
           # # initialize bounds
           mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
 
-          # We here define bounds for postseismic to be the same sign than coseismic
-          # and coseismic inferior or egual to the coseimic initial
+          # We here define bounds for postseismic to be the same sign than steps
+          # and steps inferior or egual to the coseimic initial
           for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf
@@ -1033,8 +1019,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
 
         else:
           minit = lst.lstsq(A,b,rcond=None)[0]
-          #print(minit)
-          #minit = np.zeros(np.shape(A)[1])
           mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
 
         bounds=list(zip(mmin,mmax))
