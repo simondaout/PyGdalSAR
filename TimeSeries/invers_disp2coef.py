@@ -3015,9 +3015,9 @@ def empirical_cor(l):
   ramp[kk] = float('NaN')
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
-  del ramp, topo
+  del ramp, topo, maps_temp
   
-  return map_ramp, map_flata, map_topo, rmsi 
+  return map_flata, map_topo, rmsi 
 
 def temporal_decomp(pix):
     j = pix  % (new_cols)
@@ -3077,7 +3077,6 @@ maps_flata = np.copy(maps)
 models = np.zeros((new_lines,new_cols,N), dtype=np.float32)
 
 # prepare flatten maps
-maps_ramp = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 maps_topo = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
 for ii in range(int(arguments["--niter"])):
@@ -3109,7 +3108,7 @@ for ii in range(int(arguments["--niter"])):
       print()
     
       for l in range((N)):
-          maps_ramp[:,:,l], maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
+          maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
 
       if N < 30:
         # plot corrected ts
@@ -3126,7 +3125,6 @@ for ii in range(int(arguments["--niter"])):
         plt.setp(axd.get_yticklabels(), visible=False)
         figd.colorbar(caxd, orientation='vertical',aspect=10)
         figd.suptitle('Corrected time series maps')
-        # fig.tight_layout()
         figd.savefig('maps_flat.eps', format='EPS',dpi=150)
 
         if arguments["--topofile"] is not None:
@@ -3136,7 +3134,7 @@ for ii in range(int(arguments["--niter"])):
             figtopo.subplots_adjust(hspace=.001,wspace=0.001)
             for l in range((N)):
                 axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
+                caxtopo = axtopo.imshow(maps_topo[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
                 axtopo.set_title(idates[l],fontsize=6)
                 plt.setp(axtopo.get_xticklabels(), visible=False)
                 plt.setp(axtopo.get_yticklabels(), visible=False)
@@ -3144,27 +3142,8 @@ for ii in range(int(arguments["--niter"])):
                 plt.setp(axtopo.get_yticklabels(), visible=False)
             figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
             figtopo.suptitle('Time series RAMPS+TOPO')
-            # fig.tight_layout()
             figtopo.savefig('tropo.eps', format='EPS',dpi=150)
-            
-        else:
-            # plot corrected ts
-            nfigure +=1
-            figref = plt.figure(nfigure,figsize=(14,10))
-            figref.subplots_adjust(hspace=0.001,wspace=0.001)
-            for l in range((N)):
-                axref = figref.add_subplot(4,int(N/4)+1,l+1)
-                caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
-                axref.set_title(idates[l],fontsize=6)
-                plt.setp(axref.get_xticklabels(), visible=False)
-                plt.setp(axref.get_yticklabels(), visible=False)
-            plt.setp(axref.get_xticklabels(), visible=False)
-            plt.setp(axref.get_yticklabels(), visible=False)
-            figref.suptitle('Time series RAMPS')
-            figref.colorbar(caxref, orientation='vertical',aspect=10)
-            # fig.tight_layout()
-            figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
-
+ 
     if plot=='yes':
         plt.show()
     plt.close('all')
@@ -3296,23 +3275,23 @@ else:
         outname = '{}_coeff.r4'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open(outname, 'wb')
-        basis[l].m.flatten().astype('float32').tofile(fid)
+        basis[l].m.astype('float32').tofile(fid)
         fid.close()
         outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open(outname, 'wb')
-        basis[l].sigmam.flatten().astype('float32').tofile(fid)
+        basis[l].sigmam.astype('float32').tofile(fid)
         fid.close()
     for l in range((Mker)):
         outname = '{}_coeff.r4'.format(kernels[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].m.flatten().astype('float32').tofile(fid)
+        kernels[l].m.astype('float32').tofile(fid)
         fid.close()
         outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].sigmam.flatten().astype('float32').tofile(fid)
+        kernels[l].sigmam.astype('float32').tofile(fid)
         fid.close()
 
 
@@ -3324,7 +3303,7 @@ else:
 if flat>0:
   logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
   fid = open('depl_cumule_flat', 'wb')
-  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
+  maps_flata[:,:,:].astype('float32').tofile(fid)
   fid.close()
 
 if arguments["--fulloutput"]=='yes':
@@ -3333,6 +3312,9 @@ if arguments["--fulloutput"]=='yes':
     logger.info('Save time series maps in: {}'.format(outdir))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
+
+# clean memory
+del maps, maps_topo
 
 if N < 30:
   # plot displacements models and residuals
@@ -3348,40 +3330,32 @@ if N < 30:
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
-  cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+  cax = ax.imshow(maps_flata[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
   figclr.savefig('colorscale.eps', format='EPS',dpi=150)
   
   for l in range((N)):
-      data = as_strided(maps[:,:,l])
+      data = as_strided(maps_flata[:,:,l])
       if Mker>0:
           data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
           model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
       else:
           data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
           model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
-  
       res = data_flat - model
-      ramp = as_strided(maps_ramp[:,:,l])
-      tropo = as_strided(maps_topo[:,:,l])
-  
+      
       ax = fig.add_subplot(4,int(N/4)+1,l+1)
       axres = figres.add_subplot(4,int(N/4)+1,l+1)
-  
       cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
       caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-  
       ax.set_title(idates[l],fontsize=6)
       axres.set_title(idates[l],fontsize=6)
   
       plt.setp(ax.get_xticklabels(), visible=False)
       plt.setp(ax.get_yticklabels(), visible=False)
-  
       plt.setp(axres.get_xticklabels(), visible=False)
       plt.setp(axres.get_yticklabels(), visible=False)
-  
-      # fig.tight_layout()
 
       # ############
       # # SAVE .R4 #
@@ -3399,13 +3373,6 @@ if N < 30:
             ds.SetProjection(proj)
             band.FlushCache()
 
-            ds = driver.Create(outdir+'{}_ramp_tropo.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            band = ds.GetRasterBand(1)
-            band.WriteArray(ramp+tropo)
-            ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
-            band.FlushCache()
-
             ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
             band = ds.GetRasterBand(1)
             band.WriteArray(model)
@@ -3416,22 +3383,17 @@ if N < 30:
         else:
 
             fid = open(outdir+'{}_flat.r4'.format(idates[l]), 'wb')
-            data_flat.flatten().astype('float32').tofile(fid)
-            fid.close()
-
-            # save ramp maps
-            fid = open(outdir+'{}_ramp_tropo.r4'.format(idates[l]), 'wb')
-            (ramp+tropo).flatten().astype('float32').tofile(fid)
+            data_flat.astype('float32').tofile(fid)
             fid.close()
 
             # save model maps
             fid = open(outdir+'{}_model.r4'.format(idates[l]), 'wb')
-            model.flatten().astype('float32').tofile(fid)
+            model.astype('float32').tofile(fid)
             fid.close()
 
             # save residual maps
             fid = open(outdir+'{}_res.r4'.format(idates[l]), 'wb')
-            res.flatten().astype('float32').tofile(fid)
+            res.astype('float32').tofile(fid)
             # fid.close()
 
   fig.suptitle('Time series models')
@@ -3445,7 +3407,7 @@ if N < 30:
   plt.close('all')
 
 # clean memory
-del maps_ramp, maps_flata, maps_topo
+del maps_flata
 
 #######################################################
 # Compute Amplitude and phase seasonal
@@ -3484,12 +3446,12 @@ if arguments["--seasonal"]  == 'yes':
     else:
         logger.info('Save: {}'.format('ampwt_coeff.r4'))
         fid = open('ampwt_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('ampwt_sigcoeff.r4'))
         fid = open('ampwt_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3514,12 +3476,12 @@ if arguments["--seasonal"]  == 'yes':
     else:
         logger.info('Save: {}'.format('phiwt_coeff.r4'))
         fid = open('phiwt_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phiwt_sigcoeff.r4'))
         fid = open('phiwt_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 if arguments["--seasonal_increase"]  == 'yes':
@@ -3555,12 +3517,12 @@ if arguments["--seasonal_increase"]  == 'yes':
     else:
         logger.info('Save: {}'.format('ampwt_increase_coeff.r4'))
         fid = open('ampwt_increase_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('ampwt_increase_sigcoeff.r4'))
         fid = open('ampwt_increase_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3585,12 +3547,12 @@ if arguments["--seasonal_increase"]  == 'yes':
     else:
         logger.info('Save: {}'.format('phiwt_increase_coeff.r4'))
         fid = open('phiwt_increase_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phiwt_increase_sigcoeff.r4'))
         fid = open('phiwt_increase_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 if arguments["--semianual"] == 'yes':
@@ -3626,12 +3588,12 @@ if arguments["--semianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('amp_simiwt_coeff.r4'))
         fid = open('amp_simiwt_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('amp_simiwt_sigcoeff.r4'))
         fid = open('amp_simiwt_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3654,12 +3616,12 @@ if arguments["--semianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('phi_simiwt_coeff.r4'))
         fid = open('phi_simiwt_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phi_simiwt_sigcoeff.r4'))
         fid = open('phi_simiwt_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 if arguments["--bianual"] == 'yes':
@@ -3695,12 +3657,12 @@ if arguments["--bianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('amp_biwt_coeff.r4'))
         fid = open('ampw.5t_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('amp_biwt_sigcoeff.r4'))
         fid = open('ampw.5t_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3723,12 +3685,12 @@ if arguments["--bianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('phi_biwt_coeff.r4'))
         fid = open('phiw.5t_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phi_biwt_sigcoeff.r4'))
         fid = open('phiw.5t_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 #######################################################
