@@ -143,7 +143,7 @@ class reference(pattern):
     def g(self,t):
         return np.ones((t.size))
 
-class interseismic(pattern):
+class linear(pattern):
     def __init__(self,name,reduction,date):
         pattern.__init__(self,name,reduction,date)
         self.to=date
@@ -485,12 +485,16 @@ N = len(dates)
 # save bp0 before time crop
 bp0=base[imref] 
 
+# datemin est la reference temporelle pour les fonctions de base
+# dmin, dmax sont les dates limites des figures 
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
-    datemin = date2dec(dmin)
-    datemax = date2dec(dmax)
+    datemin = int(date2dec(dmin)[0])
+    datemax = int(date2dec(dmax)[0])
+    dmin = str(datemin) + '0101'
+    dmax = str(datemax) + '0101'
 else:
-    datemin, datemax = np.min(dates), np.max(dates)
+    datemin, datemax = int(np.min(dates)), int(np.max(dates))
     dmin = str(int(np.min(dates))) + '0101'
     dmax = str(int(np.max(dates))+1) + '0101'
 
@@ -596,7 +600,7 @@ basis=[
 index = len(basis)
 
 if inter=='yes':
-      basis.append(interseismic(name='interseismic',reduction='lin',date=datemin))
+      basis.append(linear(name='linear',reduction='lin',date=datemin))
       # 1
       indexinter=index
       index = index + 1
@@ -924,11 +928,12 @@ for jj in range((Npix)):
             for l in range((2)):
                 G[:,l]=basis[l+indexseas].g(tabx)
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseas:indexseas+2])
-            amp,phi = np.sqrt(m[indexseas]**2+m[indexseas+1]**2),np.arctan2(m[indexseas+1],m[indexseas])
+            amp = np.sqrt(m[indexseas]**2+m[indexseas+1]**2)
+            #phi = np.arctan2(m[indexseas+1],m[indexseas])
+            phi = np.arctan(m[indexseas+1]/m[indexseas])
 
             if phi<0: 
                phi = phi + 2*np.pi
-            #print(phi)
 
     if seasonalt=='yes':
             G=np.zeros((kk,2))
@@ -937,13 +942,17 @@ for jj in range((Npix)):
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
             disp_seast[k] = disp_seast[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
 
-            phit = np.arctan2(m[indexseast+1],m[indexseast])
+            #phit = np.arctan2(m[indexseast+1],m[indexseast])
+            phit = np.arctan(m[indexseast+1]/m[indexseast])
             ampt = np.sqrt(m[indexseast]**2+m[indexseast+1]**2)
-            
+ 
             # convert between 0 and 2pi
             if phit<0: 
                 phit = phit + 2*np.pi
 
+            print(phi,phit)
+            print(m[indexseas+1]/m[indexseas],m[indexseast+1]/m[indexseast] )
+ 
     if semianual=='yes':
             G=np.zeros((kk,2))
             for l in range((2)):

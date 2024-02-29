@@ -499,12 +499,16 @@ nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecol
 N = len(dates)
 baseref = base[imref]
 
+# datemin est la reference temporelle pour les fonctions de base
+# dmin, dmax sont les dates limites des figures
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
-    datemin = date2dec(dmin)
-    datemax = date2dec(dmax)
+    datemin = int(date2dec(dmin)[0])
+    datemax = int(date2dec(dmax)[0])
+    dmin = str(datemin) + '0101'
+    dmax = str(datemax) + '0101'
 else:
-    datemin, datemax = np.min(dates), np.max(dates)
+    datemin, datemax = int(np.min(dates)), int(np.max(dates))
     dmin = str(int(np.min(dates))) + '0101'
     dmax = str(int(np.max(dates))+1) + '0101'
 
@@ -3016,8 +3020,11 @@ def empirical_cor(l):
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
   del ramp, topo, maps_temp
-  
-  return map_flata, map_topo, rmsi 
+ 
+  if arguments["--topofile"] is not None: 
+    return map_flata, map_topo, rmsi 
+  else:
+    return map_flata, rmsi 
 
 def temporal_decomp(pix):
     j = pix  % (new_cols)
@@ -3077,7 +3084,8 @@ maps_flata = np.copy(maps)
 models = np.zeros((new_lines,new_cols,N), dtype=np.float32)
 
 # prepare flatten maps
-maps_topo = np.zeros((new_lines,new_cols,N),dtype=np.float32)
+if arguments["--topofile"] is not None:
+    maps_topo = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
 for ii in range(int(arguments["--niter"])):
     print()
@@ -3108,7 +3116,10 @@ for ii in range(int(arguments["--niter"])):
       print()
     
       for l in range((N)):
-          maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
+          if arguments["--topofile"] is not None:
+            maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
+          else:
+            maps_flata[:,:,l], rms[l] = empirical_cor(l)
 
       if N < 30:
         # plot corrected ts
@@ -3147,6 +3158,8 @@ for ii in range(int(arguments["--niter"])):
     if plot=='yes':
         plt.show()
     plt.close('all')
+    if arguments["--topofile"] is not None:
+        del maps_topo
 
     # save rms
     if (apsf=='no' and ii==0):
@@ -3314,7 +3327,7 @@ if arguments["--fulloutput"]=='yes':
         os.makedirs(outdir)
 
 # clean memory
-del maps, maps_topo
+del maps 
 
 if N < 30:
   # plot displacements models and residuals
@@ -3417,7 +3430,7 @@ if arguments["--seasonal"]  == 'yes':
     cosine = as_strided(basis[indexseas].m)
     sine = as_strided(basis[indexseas+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan2(sine,cosine)
+    phi = np.arctan(sine/cosine)
 
     sigcosine = as_strided(basis[indexseas].sigmam)
     sigsine = as_strided(basis[indexseas+1].sigmam)
@@ -3488,7 +3501,7 @@ if arguments["--seasonal_increase"]  == 'yes':
     cosine = as_strided(basis[indexseast].m)
     sine = as_strided(basis[indexseast+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan2(sine,cosine)
+    phi = np.arctan(sine/cosine)
 
     sigcosine = as_strided(basis[indexseast].sigmam)
     sigsine = as_strided(basis[indexseast+1].sigmam)
@@ -3559,7 +3572,7 @@ if arguments["--semianual"] == 'yes':
     cosine = as_strided(basis[indexsemi].m)
     sine = as_strided(basis[indexsemi+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan2(sine,cosine)
+    phi = np.arctan(sine/cosine)
 
     sigcosine = as_strided(basis[indexseas].sigmam)
     sigsine = as_strided(basis[indexseas+1].sigmam)
@@ -3628,7 +3641,7 @@ if arguments["--bianual"] == 'yes':
     cosine = as_strided(basis[indexbi].m)
     sine = as_strided(basis[indexbi+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan2(sine,cosine)
+    phi = np.arctan(sine/cosine)
 
     sigcosine = as_strided(basis[indexbi].sigmam)
     sigsine = as_strided(basis[indexbi+1].sigmam)
