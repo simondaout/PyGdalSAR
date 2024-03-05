@@ -504,11 +504,11 @@ baseref = base[imref]
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
     datemin = int(date2dec(dmin)[0])
-    datemax = int(date2dec(dmax)[0])
+    datemax = int(date2dec(dmax)[0]) + 1
     dmin = str(datemin) + '0101'
     dmax = str(datemax) + '0101'
 else:
-    datemin, datemax = int(np.min(dates)), int(np.max(dates))
+    datemin, datemax = int(np.min(dates)), int(np.max(dates)) + 1
     dmin = str(int(np.min(dates))) + '0101'
     dmax = str(int(np.max(dates))+1) + '0101'
 
