@@ -921,7 +921,8 @@ if arguments["--vector"] != None:
     nfigure = nfigure + 1
     indexvect = np.zeros(len(vectf))
     for i in range(len(vectf)):
-      ax = fig.add_subplot(i+1,1,len(vectf))
+      print(i, len(vectf))
+      ax = fig.add_subplot(len(vectf),1,i+1)
       v = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
       kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v))
       ax.plot(v,label='Vector')
