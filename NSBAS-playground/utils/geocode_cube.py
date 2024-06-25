@@ -116,10 +116,9 @@ for l in range((N)):
     outfile=str(idates[l])+'.unw'
     outrsc=str(idates[l])+'.unw.rsc'
     geooutfile='geo_'+outfile
-    tiffoutfile='geo_'+str(idates[l])+'.tiff'
 
-    print("+rm -f "+outfile+" "+outrsc+" "+tiffoutfile+" "+geooutfile)
-    r = subprocess.call("rm -f "+outfile+" "+outrsc+" "+tiffoutfile+" "+geooutfile, shell=True)
+    print("+rm -f "+outfile+" "+outrsc+" "+geooutfile)
+    r = subprocess.call("rm -f "+outfile+" "+outrsc+" "+geooutfile, shell=True)
 
     dst_ds = drv.Create(outfile, ncol, nlign, 2, gdal.GDT_Float32)
     dst_band1 = dst_ds.GetRasterBand(1)
@@ -143,6 +142,7 @@ for l in range((N)):
     geomagoutfile='geo_'+str(idates[l])+'.mag.grd'
     geophsoutfile='geo_'+str(idates[l])+'.phs.grd'
     mmoutfile='geo_'+str(idates[l])+'_LOSmm_nan.grd'
+    tiffoutfile='geo_'+str(idates[l])+'_LOSmm_nan.tiff'
 
     print("+geocode.pl "+geomapf+" "+outfile+" "+geooutfile)
     r = subprocess.call("geocode.pl "+geomapf+" "+outfile+" "+geooutfile,
@@ -165,9 +165,9 @@ for l in range((N)):
     if r != 0:
         raise Exception("grdmath failed")
     
-    #print("+gdal_translate -ot Float32 -b 2 -co COMPRESS=DEFLATE"+geooutfile+" "+tiffoutfile)
-    #r = subprocess.call("gdal_translate -ot Float32 -b 2 -co COMPRESS=DEFLATE "+geooutfile+" "+tiffoutfile,
-    #                    shell=True)
-    #if r != 0:
-    #    raise Exception("gdal_translate failed")
+    print("+gdal_translate -ot Float32  -co COMPRESS=DEFLATE "+mmoutfile+" "+tiffoutfile)
+    r = subprocess.call("gdal_translate -ot Float32  -co COMPRESS=DEFLATE "+mmoutfile+" "+tiffoutfile,
+                        shell=True)
+    if r != 0:
+        raise Exception("gdal_translate failed")
 
