@@ -354,8 +354,6 @@ min_slope = 2
 
 comp_name = []
 rot, slope = 0, 0
-# define invert components
-comp = np.array(comp) - 1 
 # rotation angle: angle between comp1 and East
 if 'DEM' in locals():
   if DEM is not None:
@@ -369,10 +367,12 @@ if 'DEM' in locals():
     name3 = 'Normal to line of Max Slope'
     logger.info('Invert components: {}'.format(name3))
     comp_name.append(name3)
-  else:
+else:
     logger.info('DEM is not defined, read horizontale rotation in clockwise rotation in input file (default, rotation=0)')
     #slope = np.deg2rad(30)
     rot = np.deg2rad(rotation)
+    # define invert components
+    comp = np.array(comp) - 1 
     for n in range(len(comp)):
         if int(comp[n]) == 0:
             name = 'East + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
