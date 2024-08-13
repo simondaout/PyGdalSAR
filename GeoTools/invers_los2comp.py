@@ -355,8 +355,7 @@ min_slope = 2
 comp_name = []
 rot, slope = 0, 0
 # rotation angle: angle between comp1 and East
-if 'DEM' in locals():
-  if DEM is not None:
+if ('DEM' in locals()) and (DEM is not None):
     logger.info('DEM is defined, compute aspect and slope for each pixel.')
     rot, slope = compute_slope_aspect(DEM)
     comp = [0, 2]
