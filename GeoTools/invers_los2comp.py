@@ -57,8 +57,8 @@ class network:
     name: name of raster displacement map (convention positive towards satellite)
     reduction: reducted name 
     wdir: relative path input files
-    lookf: name incidence angle file (angle between vertical and LOS)
-    headf: name heading file (angle between North and LOS)
+    lookf: name incidence angle file (angle between Vertical and LOS - ROIPAC convention)
+    headf: name heading file (angle between North and LOS - ROIPAC convention)
     scale: scale LOS displacement map
     format: format input files: GTiff, NetCDF, ROI_PAC (default: GTiff)
     scale_sig: scale sigma file
@@ -165,9 +165,9 @@ class network:
         del ds, band
 
         # convert head, look to angle phi, theta in rad
-        # theta: angle between LOS and horizontal
+        # theta: angle between LOS and horizontal (positive in anti-clockwise direction)
         self.theta = np.deg2rad(90.-self.look)
-        # phi: horizontal angle between LOS and comp1
+        # phi: horizontal angle between LOS and East (positive in anti-clockwise direction)
         self.phi = np.deg2rad(-90-self.head)
 
         logger.info('Average LOOK:{0:.5f}, THETA:{1:.5f} angles'.\
@@ -177,20 +177,26 @@ class network:
             format(np.nanmean(self.head),np.nanmean(np.rad2deg(self.phi))))
 
         # compute proj ENcomp3
-        self.proj=[np.cos(self.phi),
-               np.sin(self.phi),
+        self.proj=[np.cos(self.phi)*np.cos(self.theta),
+               np.sin(self.phi)*np.cos(self.theta),
                np.sin(self.theta)
               ]
 
         logger.info('Average horizontal LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
-            format(np.nanmean(self.proj[0]*np.cos(self.theta)),np.nanmean(self.proj[1]*np.cos(self.theta)),np.nanmean(self.proj[2])))
+            format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
 
+        #self.proj=[
+        #        np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.sin(self.slope)*np.sin(self.theta),
+        #        np.cos(self.theta)*(-np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
+        #        -np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
+        #        ]
+        
         self.proj=[
                 np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) - np.sin(self.slope)*np.sin(self.theta),
-                (np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi))*np.cos(self.theta),
+                np.cos(self.theta)*(np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
                 np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
-        ]
-
+            ]
+        
         logger.info('Average LOS projection to comp1, comp2, comp3: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
         print()
