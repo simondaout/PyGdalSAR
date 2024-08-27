@@ -54,25 +54,25 @@ print()
 class network:
     """
     Load InSAR displacements and LOS angle maps
-    name: name of raster displacement map (convention positive towards satellite)
-    reduction: reducted name 
-    wdir: relative path input files
-    lookf: name incidence angle file (angle between Vertical and LOS - ROIPAC convention)
-    headf: name heading file (angle between North and LOS - ROIPAC convention)
-    scale: scale LOS displacement map
-    format: format input files: GTiff, NetCDF, ROI_PAC (default: GTiff)
-    scale_sig: scale sigma file
-    bounds: optional bounds for plot [losmin,losmax]
-    DEM: name DEM file (.dem format)
+    :name: name of raster displacement map (convention positive towards satellite)
+    :reduction: reducted name 
+    :wdir: relative path input files
+    :incidence_file: name incidence angle file (angle between Vertical and LOS - ROIPAC convention
+    :heading_file: name heading file (angle between North and LOS - ROIPAC convention)
+    :scale: scale LOS displacement map
+    :format: format input files: GTiff, NetCDF, ROI_PAC (default: GTiff)
+    :scale_sig: scale sigma file
+    :bounds: optional bounds for plot [losmin,losmax]
+    :DEM: name DEM file (.dem format)
     """
     
-    def __init__(self,name,wdir,reduction,lookf,headf,sigmaf=None,scale=1,scale_sig=1000,format='GTiff',bounds=None, ref_zone=None):
+    def __init__(self,name,wdir,reduction,incidence_file,heading_file,sigmaf=None,scale=1,scale_sig=1000,format='GTiff',bounds=None, ref_zone=None):
         self.name = name
         self.wdir = wdir
         self.reduction = reduction
         self.path = wdir + name
-        self.lookf = wdir + lookf
-        self.headf = wdir + headf
+        self.incidence_file = wdir + incidence_file
+        self.heading_file = wdir + heading_file
         if sigmaf is not None:
             self.sigmaf = wdir + sigmaf
         else:
@@ -120,7 +120,7 @@ class network:
             self.losmin = self.bounds[0]
             self.losmax = self.bounds[1]
         
-        ds = gdal.Open(self.lookf,gdal.GA_ReadOnly)
+        ds = gdal.Open(self.incidence_file,gdal.GA_ReadOnly)
         # param output files
         self.gt = ds.GetGeoTransform()
         self.projref = ds.GetProjectionRef()
@@ -153,7 +153,7 @@ class network:
         self.sig_losmax = np.nanpercentile(self.sigma,98)
         self.sig_losmin = np.nanpercentile(self.sigma,2)
 
-        ds = gdal.Open(self.headf,gdal.GA_ReadOnly)
+        ds = gdal.Open(self.heading_file,gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
         self.head = band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         logger.info('Heading, Nlines: {}, Ncols: {}'.format(ds.RasterYSize,ds.RasterXSize))
@@ -185,17 +185,18 @@ class network:
         logger.info('Average horizontal LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
 
-        #self.proj=[
-        #        np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.sin(self.slope)*np.sin(self.theta),
-        #        np.cos(self.theta)*(-np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
-        #        -np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
-        #        ]
-        
+        # old version
         self.proj=[
-                np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) - np.sin(self.slope)*np.sin(self.theta),
-                np.cos(self.theta)*(np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
-                np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
-            ]
+                np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.sin(self.slope)*np.sin(self.theta),
+                np.cos(self.theta)*(-np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
+                -np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
+                ]
+        
+        #self.proj=[
+        #        np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) - np.sin(self.slope)*np.sin(self.theta),
+        #        np.cos(self.theta)*(np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
+        #        np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
+        #    ]
         
         logger.info('Average LOS projection to comp1, comp2, comp3: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
