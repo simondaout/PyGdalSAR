@@ -272,10 +272,10 @@ if (arguments["--cols"] is not None and arguments["--lines"] is not None):
     for i in range(len(ipix)):
       ax.scatter(ipix[i]-jbeg,jpix[i]-ibeg,marker='x',color='black',s=150.)
 
-#if arguments["--title"] ==  None:
-#    fig.canvas.set_window_title(infile)
-#else:
-#    fig.canvas.set_window_title(arguments["--title"])
+if arguments["--title"] ==  None:
+    fig.canvas.set_window_title(infile)
+else:
+    fig.canvas.set_window_title(arguments["--title"])
 
 try:
     del ds
