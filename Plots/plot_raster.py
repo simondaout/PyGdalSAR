@@ -173,7 +173,7 @@ else:
 jbeg,jend,ibeg,iend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # Initialize a matplotlib figure
-fig = plt.figure(1,figsize=(12,8))
+fig = plt.figure(1,figsize=(8,6))
 
 if sformat == "ROI_PAC":
     if (ds_extension == ".unw" or ds_extension ==".hgt"):
