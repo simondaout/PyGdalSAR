@@ -355,6 +355,7 @@ def checkinfile(file):
     if path.exists(file) is False:
         logger.critical("File: {0} not found, Exit !".format(file))
         logger.info("File: {0} not found in {1}, Exit !".format(file,getcwd()))
+        sys.exit()
 
 # create generator for pool
 @contextmanager
@@ -373,7 +374,12 @@ arguments = docopt.docopt(__doc__)
 if arguments["--lectfile"] ==  None:
     arguments["--lectfile"] = "lect.in"
 if arguments["--list_images"] ==  None:
-    arguments["--list_images"] = "images_retenues"
+    try:
+        checkinfile("images_retenues")
+        arguments["--list_images"] = "images_retenues"
+    except:
+        checkinfile("list_images.txt")
+        arguments["--list_images"] = "list_images.txt"
 if arguments["--cube"] ==  None:
     arguments["--cube"] = "depl_cumule"
 if arguments["--aps"] ==  None:
