@@ -495,7 +495,7 @@ cmap.set_bad('white')
 
 logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
 checkinfile(arguments["--list_images"])
-nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
+idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(1,3,5), unpack=True,dtype='i,f,f')
 N = len(dates)
 baseref = base[imref]
 
@@ -514,7 +514,7 @@ else:
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
-nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
+idates,dates,base = idates[indexd],dates[indexd],base[indexd]
 
 # lect cube
 checkinfile(arguments["--cube"])
@@ -971,7 +971,11 @@ if apsf=='no':
     inaps=np.ones((N)) # no weigthing for the first itertion
 else:
     fimages=apsf
-    inaps=np.loadtxt(fimages, comments='#', dtype='f')
+    try:
+        inaps=np.loadtxt(fimages, unpack=True, comments='#', usecols=(3), dtype='f')
+    except:
+        logger.warning('APS file is in decrepicated format, use RMSpixel file from inversion output with 3 columns')
+        inaps=np.loadtxt(fimages, comments='#', dtype='f')
     logger.info('Input uncertainties: {}'.format(inaps))
     logger.info('Set very low values to the 2 percentile to avoid overweighting...')
     minaps= np.nanpercentile(inaps,2)
@@ -996,9 +1000,11 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        Cd = np.diag(sigmad**2, k = 0)
-        fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
-
+        try:
+          Cd = np.diag(sigmad**2, k = 0)
+          fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
+        except:
+          fsoln = lst.lstsq(Ain,b,rcond=None)[0]  
     else:
         if len(indexpo>0):
           # invert first without post-seismic
@@ -3431,7 +3437,7 @@ if arguments["--seasonal"]  == 'yes':
     cosine = as_strided(basis[indexseas].m)
     sine = as_strided(basis[indexseas+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan(sine/cosine)
+    phi = np.arctan2(sine,cosine)
 
     sigcosine = as_strided(basis[indexseas].sigmam)
     sigsine = as_strided(basis[indexseas+1].sigmam)
@@ -3502,7 +3508,7 @@ if arguments["--seasonal_increase"]  == 'yes':
     cosine = as_strided(basis[indexseast].m)
     sine = as_strided(basis[indexseast+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan(sine/cosine)
+    phi = np.arctan2(sine,cosine)
 
     sigcosine = as_strided(basis[indexseast].sigmam)
     sigsine = as_strided(basis[indexseast+1].sigmam)
@@ -3573,7 +3579,7 @@ if arguments["--semianual"] == 'yes':
     cosine = as_strided(basis[indexsemi].m)
     sine = as_strided(basis[indexsemi+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan(sine/cosine)
+    phi = np.arctan2(sine,cosine)
 
     sigcosine = as_strided(basis[indexseas].sigmam)
     sigsine = as_strided(basis[indexseas+1].sigmam)
@@ -3642,7 +3648,7 @@ if arguments["--bianual"] == 'yes':
     cosine = as_strided(basis[indexbi].m)
     sine = as_strided(basis[indexbi+1].m)
     amp = np.sqrt(cosine**2+sine**2)
-    phi = np.arctan(sine/cosine)
+    phi = np.arctan2(sine,cosine)
 
     sigcosine = as_strided(basis[indexbi].sigmam)
     sigsine = as_strided(basis[indexbi+1].sigmam)

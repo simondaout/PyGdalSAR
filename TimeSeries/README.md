@@ -3,7 +3,8 @@ To use this package
 * cube file: time series displacement maps in a binary format of size N\*Ncol\*Nlines, where N is the number of acquisitions dates, Ncol is the number of columns per date and Nlines, the number of lines per dates. To create a cube, use create\_cube.py
 * list\_images file: text file of list of images made of 5 columns containing for each images 1) number 2) date in YYYYMMDD format 3) what you want (not use) 4) numerical date 5) perpendicular baseline.
 To convert date in YYYYMMDD format to numerical format, use date2dec.py.
-* lect.in: text file containing the number of columns and lines (eg. 1420 4000). (Depricated: it has to be replace by cube.hdr) 
+* lect.in: text file containing the number of columns and lines (eg. 1420 4000). (Depricated: it has to be replace by cube.hdr)
+* aps: RMSpixel.txt file from invers_pixel output: 3 columns txt file: 1) nb, 2) date, 3) RMS 
 
 invers\_disp2coef.py
 ============
