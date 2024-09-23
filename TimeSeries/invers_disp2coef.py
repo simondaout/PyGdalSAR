@@ -594,13 +594,12 @@ if arguments["--mask"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--mask"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      maski = band.ReadAsArray().flatten()*float(arguments["--scale_mask"])
+      mask = band.ReadAsArray()[ibeg:iend,jbeg:jend]*float(arguments["--scale_mask"])
       del ds
     else:
       fid = open(arguments["--mask"],'r')
-      maski = np.fromfile(fid,dtype=np.float32)*float(arguments["--scale_mask"])
+      mask = np.fromfile(fid,dtype=np.float32)[ibeg:iend,jbeg:jend]*float(arguments["--scale_mask"])
       fid.close()
-    mask = maski.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     maski = mask.flatten()
 else:
     mask_flat = np.ones((new_lines,new_cols))
@@ -614,15 +613,12 @@ if arguments["--topofile"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--topofile"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      elevi = band.ReadAsArray().flatten()
+      elev = band.ReadAsArray()[ibeg:iend,jbeg:jend]
       del ds
     else:
       fid = open(arguments["--topofile"],'r')
-      elevi = np.fromfile(fid,dtype=np.float32)
+      elev = np.fromfile(fid,dtype=np.float32)[ibeg:iend,jbeg:jend]
       fid.close()
-
-    elevi = elevi[:nlines*ncol]
-    elev = elevi.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     elev[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(elev)>9999.)
     elev[kk] = float('NaN')
@@ -633,9 +629,9 @@ if arguments["--topofile"] is not None:
     logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxtopo,mintopo))
 
 else:
-   elev = np.ones((new_lines,new_cols),dtype=np.float32)
-   elevi = elev.flatten()
-   maxtopo,mintopo = 2, 0 
+    elev = np.ones((new_lines,new_cols),dtype=np.float32)
+    elevi = elev.flatten()
+    maxtopo,mintopo = 2, 0 
 
 if arguments["--aspect"] is not None:
     extension = os.path.splitext(arguments["--aspect"])[1]
@@ -643,20 +639,18 @@ if arguments["--aspect"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--aspect"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      aspecti = band.ReadAsArray().flatten()
+      aspect = band.ReadAsArray()[ibeg:iend,jbeg:jend]
       del ds
     else:
       fid = open(arguments["--aspect"],'r')
-      aspecti = np.fromfile(fid,dtype=np.float32)
+      aspect = np.fromfile(fid,dtype=np.float32)[ibeg:iend,jbeg:jend]
       fid.close()
-    aspecti = aspecti[:nlines*ncol]
-    slope = aspecti.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
-    slope[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(slope>9999.))
+    aspect[np.isnan(maps[:,:,-1])] = float('NaN')
+    kk = np.nonzero(abs(aspect>9999.))
     slope[kk] = float('NaN')
-    aspecti = slope.flatten()
+    aspecti = aspect.flatten()
 else:
-    slope = np.ones((new_lines,new_cols))
+    aspect = np.ones((new_lines,new_cols))
     aspecti = slope.flatten()
 
 if arguments["--rmspixel"] is not None:
@@ -978,7 +972,7 @@ if apsf=='no':
 else:
     fimages=apsf
     try:
-        inaps=np.loadtxt(fimages, unpack=True, comments='#', usecols=(3), dtype='f')
+        inaps=np.loadtxt(fimages, unpack=True, comments='#', usecols=(2), dtype='f')
     except:
         logger.warning('APS file is in decrepicated format, use RMSpixel file from inversion output with 3 columns')
         inaps=np.loadtxt(fimages, comments='#', dtype='f')
