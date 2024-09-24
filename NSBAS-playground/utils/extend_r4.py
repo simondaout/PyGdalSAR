@@ -67,7 +67,7 @@ else:
 if arguments["<jend>"] ==  None:
     jend = ncol
 else:
-    jend = int(arguments["<iend>"])
+    jend = int(arguments["<jend>"])
 
 # Program
 fid = open(infile, 'r')
