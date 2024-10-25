@@ -22,13 +22,13 @@ weight for the next iteration.
 Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
 [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
 [--linear=<yes/no>] [--steps=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
-[--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
+[--semianual=<yes/no>] [--bianual=<yes/no>]  [--bperp=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
 [--sampling=<value>] [--emp_sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
 [--mask=<path>] [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--tempmask=<yes/no>]\
 [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--crop=<value,value,value,value>] [--crop_emp=<value,value,value,value>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
-[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] 
+[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] [--ndatasets=<nb_data_sets>] 
 
 -h --help               Show this screen
 --cube=<path>           Path to time series displacements cube file [default: no]
@@ -48,7 +48,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --semianual=<yes/no>      If yes, add semianual terms in the decomposition [default: no]
 --seasonal_increase PATH         If yes, add seasonal terms function of time in the inversion
 --bianual=<yes/no>       If yes, add bianual terms in the decomposition [default: no]
---dem=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
+--bperp=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
 --ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
 --nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
 --flat=<0/1/2/3/4/5/6/7/8/9>             Remove a spatial ramp at each iteration [default: 0].
@@ -74,6 +74,7 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --crop=<value,value,value,value>            Define a region of interest for the temporal decomposition 
 --crop_emp=<value,value,value,value>    Define a region of interest for the spatial estimatiom (ramp+phase/topo) 
 --nproc=<nb_cores>        Use <nb_cores> local cores to create delay maps [Default: 4]
+--ndatasets=<nb_data_sets> Number of data sets [Default:1] 
 """
 
 # 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
@@ -287,7 +288,7 @@ class slowslip(pattern):
           return funct
 
 ### KERNEL FUNCTIONS: not function of time
-class corrdem(pattern):
+class corrBperp(pattern):
     def __init__(self,name,reduction,bp0,bp):
         self.name = name
         self.reduction = reduction
@@ -396,8 +397,8 @@ if arguments["--semianual"] ==  None:
     arguments["--semianual"] = 'no'
 if arguments["--bianual"] ==  None:
     arguments["--bianual"] = 'no'
-if arguments["--dem"] ==  None:
-    arguments["--dem"] = 'no'
+if arguments["--bperp"] ==  None:
+    arguments["--bperp"] = 'no'
 if arguments["--niter"] ==  None:
     arguments["--niter"] = 1
 if arguments["--spatialiter"] ==  None:
@@ -471,6 +472,10 @@ if arguments["--nproc"] ==  None:
     nproc = 1
 else:
     nproc = int(arguments["--nproc"])
+if arguments["--ndatasets"] ==  None:
+    ndata = 1
+else:
+    ndata = int(arguments["--ndatasets"])
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
     logger.warning('plot is yes. Set nproc to 1')
@@ -501,9 +506,19 @@ cmap.set_bad('white')
 
 logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
 checkinfile(arguments["--list_images"])
-idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(1,3,5), unpack=True,dtype='i,f,f')
+if ndata ==1:
+    idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(1,3,5), unpack=True,dtype='i,f,f')
+    baseref = base[imref]
+    bases = [base]
+    basesref = [baseref]
+elif ndata ==2:
+    idates,dates,base, base2=np.loadtxt(arguments["--list_images"], comments='#', usecols=(1,3,5,6), unpack=True,dtype='i,f,f,f')
+    baseref = base[imref]
+    index = np.nonzero(base2) # lets impose the first image as reference image
+    baseref2 = base2[index[0]-1]
+    bases = [base, base2]
+    basesref = [baseref, baseref2] 
 N = len(dates)
-baseref = base[imref]
 
 # datemin est la reference temporelle pour les fonctions de base
 # dmin, dmax sont les dates limites des figures
@@ -520,7 +535,9 @@ else:
 
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
-idates,dates,base = idates[indexd],dates[indexd],base[indexd]
+idates,dates = idates[indexd],dates[indexd]
+for bp in bases:
+    bp = bp[indexd]
 
 # lect cube
 checkinfile(arguments["--cube"])
@@ -598,7 +615,7 @@ if arguments["--mask"] is not None:
       del ds
     else:
       fid = open(arguments["--mask"],'r')
-      mask = np.fromfile(fid,dtype=np.float32)[ibeg:iend,jbeg:jend]*float(arguments["--scale_mask"])
+      mask = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]*float(arguments["--scale_mask"])
       fid.close()
     maski = mask.flatten()
 else:
@@ -617,7 +634,7 @@ if arguments["--topofile"] is not None:
       del ds
     else:
       fid = open(arguments["--topofile"],'r')
-      elev = np.fromfile(fid,dtype=np.float32)[ibeg:iend,jbeg:jend]
+      elev = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
       fid.close()
     elev[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(elev)>9999.)
@@ -643,19 +660,27 @@ if arguments["--aspect"] is not None:
       del ds
     else:
       fid = open(arguments["--aspect"],'r')
-      aspect = np.fromfile(fid,dtype=np.float32)[ibeg:iend,jbeg:jend]
+      aspect = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
       fid.close()
     aspect[np.isnan(maps[:,:,-1])] = float('NaN')
     kk = np.nonzero(abs(aspect>9999.))
-    slope[kk] = float('NaN')
+    aspect[kk] = float('NaN')
     aspecti = aspect.flatten()
 else:
     aspect = np.ones((new_lines,new_cols))
-    aspecti = slope.flatten()
+    aspecti = aspect.flatten()
 
 if arguments["--rmspixel"] is not None:
+    extension = os.path.splitext(arguments["--rmspixel"])[1]
     checkinfile(arguments["--rmspixel"])
-    rmsmap = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+    if extension == ".tif":
+        ds = gdal.Open(arguments["--rmspixel"], gdal.GA_ReadOnly)
+        band = ds.GetRasterBand(1)
+        rmsmap = band.ReadAsArray()[ibeg:iend,jbeg:jend]
+        del ds
+    else:
+        rmsmap = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+
     kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap>999.))
     rmsmap[kk] = float('NaN')
     kk = np.nonzero(rmsmap>float(arguments["--threshold_rms"]))
@@ -674,29 +699,30 @@ else:
     spacial_mask = np.ones((new_lines,new_cols))
     arguments["--threshold_rms"] = 2.
 
-# plot bperp vs time
-fig = plt.figure(nfigure,figsize=(10,4))
-nfigure = nfigure + 1
-ax = fig.add_subplot(1,2,1)
-# convert idates to num
-x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-# format the ticks
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-ax.plot(x,base,"ro",label='Baseline history of the {} images'.format(N))
-ax.plot(x,base,"green")
-# rotates and right aligns the x labels, and moves the bottom of the
-# axes up to make room for them
-fig.autofmt_xdate()
-ax.set_xlabel('Time (Year/month/day)')
-ax.set_ylabel('Perpendicular Baseline')
-plt.legend(loc='best')
+for bp in bases: 
+    # plot bperp vs time
+    fig = plt.figure(nfigure,figsize=(10,4))
+    nfigure = nfigure + 1
+    ax = fig.add_subplot(1,2,1)
+    # convert idates to num
+    x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
+    # format the ticks
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
+    ax.plot(x,bp,"ro",label='Baseline history of the {} images'.format(N))
+    ax.plot(x,bp,"green")
+    # rotates and right aligns the x labels, and moves the bottom of the
+    # axes up to make room for them
+    fig.autofmt_xdate()
+    ax.set_xlabel('Time (Year/month/day)')
+    ax.set_ylabel('Perpendicular Baseline')
+    plt.legend(loc='best')
 
-ax = fig.add_subplot(1,2,2)
-ax.plot(np.mod(dates,1),base,"ro",label='Baseline seasonality of the {} images'.format(N))
-plt.legend(loc='best')
+    ax = fig.add_subplot(1,2,2)
+    ax.plot(np.mod(dates,1),base,"ro",label='Baseline seasonality of the {} images'.format(N))
+    plt.legend(loc='best')
 
-fig.savefig('baseline.eps', format='EPS',dpi=150)
-np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
+    fig.savefig('baseline.eps', format='EPS',dpi=150)
+    np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
 
 if arguments["--mask"] is not None:
     los_temp = as_strided(mask[ibeg_emp:iend_emp,jbeg_emp:jend_emp]).flatten()
@@ -911,10 +937,11 @@ for i in range(len(sse_time)):
     iteration=True
 
 kernels=[]
-if arguments["--dem"]=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=baseref,bp=base))
-   indexdem = index
-   index = index + 1
+if arguments["--bperp"]=='yes':
+    for bp,bref in bases,baserefs:
+        kernels.append(corrBperp(name='bperp correction',reduction='corrBperp',bp0=bref,bp=bp))
+        indexbperp = index
+        index = index + 1
 
 if arguments["--vector"] != None:
     fig = plt.figure(nfigure,figsize=(6,4))
@@ -2937,7 +2964,7 @@ def empirical_cor(l):
                 np.logical_and(pix_az<iend_emp,
                 np.logical_and(pix_rg>jbeg_emp,
                 np.logical_and(pix_rg<jend_emp, 
-                    slope>0.,
+                    aspect>0.,
                     ))))))))
                 ))))))
 
@@ -2992,7 +3019,7 @@ def empirical_cor(l):
                 np.logical_and(pix_az<lin_end,
                 np.logical_and(pix_rg>col_start,
                 np.logical_and(pix_rg<col_end, 
-                    slope>0.,
+                    aspect>0.,
                 ))))))))))))
                 ))
         
