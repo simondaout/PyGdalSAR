@@ -109,7 +109,7 @@ import os
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
-from datetime import datetime as datetimes
+from datetime import datetime as dt
 
 try:
     from nsbas import docopt
@@ -318,7 +318,7 @@ def date2dec(dates):
     dates  = np.atleast_1d(dates)
     times = []
     for date in dates:
-        x = datetimes.strptime('{}'.format(date),'%Y%m%d')
+        x = dt.strptime('{}'.format(date),'%Y%m%d')
         dec = float(x.strftime('%j'))/365.1
         year = float(x.strftime('%Y'))
         times.append(year + dec)
@@ -346,10 +346,10 @@ class ContextDecorator(object):
 
 class TimeIt(ContextDecorator):
     def __enter__(self):
-        self.start = datetimes.now()
+        self.start = dt.now()
         logger.info('Starting time process: {0}'.format(self.start))
     def __exit__(self, type, value, traceback):
-        logger.info('Time process: {0}s'.format((datetimes.now() - self.start).total_seconds()))
+        logger.info('Time process: {0}s'.format((dt.now() - self.start).total_seconds()))
 
 
 def checkinfile(file):
@@ -506,18 +506,35 @@ cmap.set_bad('white')
 
 logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
 checkinfile(arguments["--list_images"])
-if ndata ==1:
-    idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(1,3,5), unpack=True,dtype='i,f,f')
-    baseref = base[imref]
-    bases = [base]
-    basesref = [baseref]
-elif ndata ==2:
-    idates,dates,base, base2=np.loadtxt(arguments["--list_images"], comments='#', usecols=(1,3,5,6), unpack=True,dtype='i,f,f,f')
-    baseref = base[imref]
-    index = np.nonzero(base2) # lets impose the first image as reference image
-    baseref2 = base2[index[0]-1]
-    bases = [base, base2]
-    basesref = [baseref, baseref2] 
+
+# Initialisation des variables
+idates = None
+dates = None
+bases = []
+baserefs = []
+
+# Chargement du fichier images_retenues avec une structure dynamique pour ndata > 2
+if ndata >= 1:
+    # Charger les colonnes pour idates et dates (colonnes 1 et 3)
+    # Générer dynamiquement les colonnes pour chaque base (à partir de la colonne 5)
+    columns = [1, 3] + list(range(5, 5 + ndata))
+
+    # Charger les données en utilisant `usecols=columns`
+    data = np.loadtxt(arguments["--list_images"], comments='#', usecols=columns, unpack=True)
+
+    # Extraire les données de dates
+    idates = data[0].astype(int)
+    dates = data[1]
+
+    # Extraire les bases et initialiser les références
+    for i in range(ndata):
+        base = data[2 + i]
+        bases.append(base)
+
+        # Choisir la première date comme référence (index `imref = 0`)
+        baserefs.append(base[0])  # baseref correspondant à chaque base
+
+# Nombre total d'images (dates)
 N = len(dates)
 
 # datemin est la reference temporelle pour les fonctions de base
@@ -536,8 +553,8 @@ else:
 # clean dates
 indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
 idates,dates = idates[indexd],dates[indexd]
-for bp in bases:
-    bp = bp[indexd]
+# Mettre à jour les bases en filtrant également selon indexd
+bases = [bp[indexd] for bp in bases]
 
 # lect cube
 checkinfile(arguments["--cube"])
@@ -548,7 +565,6 @@ if not ds:
 else:
   ncol, nlines = ds.RasterXSize, ds.RasterYSize
   N = ds.RasterCount
-# print(nlines,ncol)
 
 logger.debug('Read reference zones: {}'.format(arguments["--ref_zone"]))
 if arguments["--ref_zone"] == None:
@@ -699,30 +715,43 @@ else:
     spacial_mask = np.ones((new_lines,new_cols))
     arguments["--threshold_rms"] = 2.
 
-for bp in bases: 
-    # plot bperp vs time
-    fig = plt.figure(nfigure,figsize=(10,4))
-    nfigure = nfigure + 1
-    ax = fig.add_subplot(1,2,1)
-    # convert idates to num
-    x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-    # format the ticks
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-    ax.plot(x,bp,"ro",label='Baseline history of the {} images'.format(N))
-    ax.plot(x,bp,"green")
-    # rotates and right aligns the x labels, and moves the bottom of the
-    # axes up to make room for them
+if arguments["--bperp"]=='yes':
+  for idx, bp in enumerate(bases):
+    # Création d'une figure pour chaque bp dans bases
+    fig = plt.figure(nfigure, figsize=(10, 4))
+    nfigure += 1
+
+    # Graphique 1: Baseline perpendiculaire en fonction du temps
+    ax1 = fig.add_subplot(1, 2, 1)
+
+    # selection des baselines non nulles
+    idx = np.flatnonzero(bp)
+    dates_temp = dates[idx]
+    idates_temp = idates[idx]
+    bp_temp = bp[idx]
+    N_temp = len(bp_temp)
+
+    # Conversion des dates au format numérique pour matplotlib
+    x = [mdates.date2num(dt.strptime(f'{d}', '%Y%m%d')) for d in idates_temp]
+
+    # Configuration de l'affichage des dates
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
+    ax1.plot(x, bp_temp, "ro", label=f'Baseline history of the {N_temp} images')
+    ax1.plot(x, bp_temp, "green")
     fig.autofmt_xdate()
-    ax.set_xlabel('Time (Year/month/day)')
-    ax.set_ylabel('Perpendicular Baseline')
-    plt.legend(loc='best')
 
-    ax = fig.add_subplot(1,2,2)
-    ax.plot(np.mod(dates,1),base,"ro",label='Baseline seasonality of the {} images'.format(N))
-    plt.legend(loc='best')
+    ax1.set_xlabel('Time (Year/month/day)')
+    ax1.set_ylabel('Perpendicular Baseline')
+    ax1.legend(loc='best')
 
-    fig.savefig('baseline.eps', format='EPS',dpi=150)
-    np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
+    # Graphique 2: Baseline en fonction de la saisonnalité (modulo 1 année)
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.plot(np.mod(dates_temp, 1), bp_temp, "ro", label=f'Baseline seasonality of the {N_temp} images')
+    ax2.legend(loc='best')
+
+    # Sauvegarde de la figure et des données
+    fig.savefig(f'baseline_{idx}.eps', format='EPS', dpi=150)
+    np.savetxt(f'bp_t_{idx}.in', np.vstack([dates_temp, bp_temp]).T, fmt='%.6f')
 
 if arguments["--mask"] is not None:
     los_temp = as_strided(mask[ibeg_emp:iend_emp,jbeg_emp:jend_emp]).flatten()
@@ -936,11 +965,14 @@ for i in range(len(sse_time)):
     index = index + 1
     iteration=True
 
-kernels=[]
+kernels = []
 if arguments["--bperp"]=='yes':
-    for bp,bref in bases,baserefs:
-        kernels.append(corrBperp(name='bperp correction',reduction='corrBperp',bp0=bref,bp=bp))
-        indexbperp = index
+    indexbperp = []
+    i = 0
+    for bp,bref in zip(bases,baserefs):
+        i = i + 1
+        kernels.append(corrBperp(name='bperp correction', reduction=f'corrBperp{i}', bp0=bref, bp=bp))
+        indexbperp.append(index)
         index = index + 1
 
 if arguments["--vector"] != None:
@@ -948,7 +980,6 @@ if arguments["--vector"] != None:
     nfigure = nfigure + 1
     indexvect = np.zeros(len(vectf))
     for i in range(len(vectf)):
-      print(i, len(vectf))
       ax = fig.add_subplot(len(vectf),1,i+1)
       v = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
       kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v))
@@ -1031,7 +1062,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
           Cd = np.diag(sigmad**2, k = 0)
           fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
         except:
-          fsoln = lst.lstsq(Ain,b,rcond=None)[0]  
+          fsoln = lst.lstsq(A,b,rcond=None)[0]  
     else:
         if len(indexpo>0):
           # invert first without post-seismic
@@ -1286,8 +1317,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
       elif order==1: # Remove a range ramp ay+b for each maps (y = col)
@@ -3744,32 +3773,7 @@ if arguments["--bianual"] == 'yes':
 # Plot
 #######################################################
 
-# plot ref term
-vmax = np.abs([np.nanpercentile(basis[0].m,98.),np.nanpercentile(basis[0].m,2.)]).max()
-vmin = -vmax
-
-nfigure +=1
-fig=plt.figure(nfigure,figsize=(14,12))
-
-ax = fig.add_subplot(1,M,1)
-cax = ax.imshow(basis[0].m,cmap=cmap,vmax=vmax,vmin=vmin)
-cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-plt.setp(ax.get_xticklabels(), visible=False)
-plt.setp(ax.get_yticklabels(), visible=False)
-
-# plot linear term
-vmax = np.abs([np.nanpercentile(basis[1].m,98.),np.nanpercentile(basis[1].m,2.)]).max()
-vmin = -vmax
-
-ax = fig.add_subplot(1,M,2)
-cax = ax.imshow(basis[1].m,cmap=cmap,vmax=vmax,vmin=vmin)
-ax.set_title(basis[1].reduction)
-cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-plt.setp(ax.get_xticklabels(), visible=False)
-plt.setp(ax.get_yticklabels(), visible=False)
-
-# plot others
-for l in range(2,Mbasis):
+for l in range(Mbasis):
     vmax = np.abs([np.nanpercentile(basis[l].m,98.),np.nanpercentile(basis[l].m,2.)]).max()
     vmin = -vmax
 
