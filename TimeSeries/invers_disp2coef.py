@@ -587,12 +587,22 @@ else:
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # extract time series
-cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
-cube = as_strided(cubei[:nlines*ncol*N])
-logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
-kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
-cube[kk] = float('NaN')
-maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
+try:
+    maps_temp = np.zeros((nlines, ncol, N), dtype=np.float32)
+    for band_index in range(1, N + 1):
+        band = ds.GetRasterBand(band_index)
+        maps_temp[:, :, band_index - 1] = band.ReadAsArray()
+    logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(maps_temp.flatten())))
+    kk = np.nonzero(np.logical_or(maps_temp==9990, maps_temp==9999))
+    maps_temp[kk] = float('NaN')
+except:
+    cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
+    cube = as_strided(cubei[:nlines*ncol*N])
+    logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
+    kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
+    cube[kk] = float('NaN')
+    maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
+    del cube, cubei
 
 # set at NaN zero values for all dates
 # kk = np.nonzero(maps_temp[:,:,-1]==0)
@@ -617,7 +627,7 @@ else:
 ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
 
 # clean
-del cube, cubei, maps_temp
+del maps_temp
 
 nfigure=0
 # open mask file
@@ -3772,6 +3782,9 @@ if arguments["--bianual"] == 'yes':
 #######################################################
 # Plot
 #######################################################
+
+nfigure +=1
+fig = plt.figure(nfigure,figsize=(14,10))
 
 for l in range(Mbasis):
     vmax = np.abs([np.nanpercentile(basis[l].m,98.),np.nanpercentile(basis[l].m,2.)]).max()
