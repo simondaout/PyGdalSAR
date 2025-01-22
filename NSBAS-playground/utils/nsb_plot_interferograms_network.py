@@ -52,10 +52,9 @@ import matplotlib.pyplot as plt
 from matplotlib import dates
 from matplotlib.dates import date2num, num2date
 
-try:
-    import pydot
-except ModuleNotFoundError as e:
-    from nsbas import pydot
+import pydot
+#except ModuleNotFoundError as e:
+#from nsbas import pydot
 
 fig = plt.figure(figsize=(13,6))
 ax = fig.add_subplot(111)
