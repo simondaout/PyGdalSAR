@@ -199,6 +199,7 @@ mf = scale*(mf - shift)
 
 # apply high pass filter
 if arguments["--filter"] == 'HP':
+    # make array with nans replaced by zeros and filter it
     m_filter_vals = np.copy(mf)
     m_filter_vals[np.isnan(mf)] = 0.
     m_lp_vals = ndimage.gaussian_filter(m_filter_vals, int(arguments["--fwindsize"]))

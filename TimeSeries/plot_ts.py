@@ -152,12 +152,12 @@ if arguments["--imref"] !=  None:
             maps[:,:,l][index] = float('NaN')
 
 if arguments["--vmax"] ==  None:
-    vmax = np.nanpercentile(maps, 98)*4.4563
+    vmax = np.nanpercentile(maps, 98)
 else:
     vmax = float(arguments["--vmax"])
 
 if arguments["--vmin"] ==  None:
-    vmin = np.nanpercentile(maps, 2)*4.4563 
+    vmin = np.nanpercentile(maps, 2) 
 else:
     vmin = float(arguments["--vmin"])
 
@@ -174,7 +174,7 @@ fig.subplots_adjust(wspace=0.001)
 # listdate=[1,4,8,74]
 # for l in listdate:
 for l in range((N)): 
-    d = as_strided(maps[ibeg:iend,jbeg:jend,l])*4.4563
+    d = as_strided(maps[ibeg:iend,jbeg:jend,l])
     ax = fig.add_subplot(4,int(N/4)+1,l+1)
     # ax = fig.add_subplot(1,4,i)
     # i = i+1

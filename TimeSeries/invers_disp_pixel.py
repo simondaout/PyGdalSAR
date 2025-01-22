@@ -10,17 +10,17 @@ invers_disp_pixel.py
 -------------
 Temporal decomposition of the time series delays of selected pixels (used depl_cumule (BIP format) and images_retenues, output of invers_pixel). 
 
-Usage: invers_disp_pixel.py --cols=<values> --ligns=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
+Usage: invers_disp_pixel.py --cols=<values> --lines=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--linear=<value>] [--steps=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
-[--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--dem=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
-[--name=<value>] [--scale=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] [--plot_dateslim=<values>] [--color=<value>] [--fillstyle=<value>] 
+[--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--bperp=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
+[--name=<value>] [--scale=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] [--plot_dateslim=<values>] [--color=<value>] [--fillstyle=<value>] [--ndatasets=<nb_data_sets>] 
 
 invers_disp_pixel.py -h | --help
 Options:
 
 -h --help               Show this screen
 --ncols VALUE           Pixel column numbers (eg. 200,400,450) 
---nligns VALUE          Pixel lines numbers  (eg. 1200,1200,3000) 
+--nlines VALUE          Pixel lines numbers  (eg. 1200,1200,3000) 
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
 --list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
@@ -38,7 +38,7 @@ Options:
 --bianual PATH          If yes, add bianual  terms in the inversion
 --vector PATH           Path to the vector text files containing a value for each dates [default: None]
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
---dem PATH              If yes, add term proportional to the perpendicular baseline in the inversion
+--bperp PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1.e-3]
 --ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than steps [default: no].       
@@ -52,6 +52,7 @@ jref                  lign number of the reference pixel [default: None]
 --plot_dateslim         Datemin,Datemax time series for plot only 
 --color                 Colors time series points [default:blue]
 --fillstyle             Fill Style time series points. Can be: none,full,top,bottom,right,left [default: none]
+--ndatasets=<nb_data_sets> Number of data sets [Default:1]
 """
 
 print()
@@ -90,7 +91,7 @@ import matplotlib.cm as cm
 import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from datetime import datetime as datetimes
+from datetime import datetime as dt
 import datetime
 import time
 
@@ -277,7 +278,7 @@ class stefan(pattern):
         return func
 
 ### KERNEL FUNCTIONS: not function of time
-class corrdem(pattern):
+class corrBperp(pattern):
     def __init__(self,name,reduction,bp0,bp):
         self.name = name
         self.reduction = reduction
@@ -307,7 +308,7 @@ def date2dec(dates):
     dates  = np.atleast_1d(dates)
     times = []
     for date in dates:
-        x = datetimes.strptime('{}'.format(date),'%Y%m%d')
+        x = dt.strptime('{}'.format(date),'%Y%m%d')
         dec = float(x.strftime('%j'))/365.1
         year = float(x.strftime('%Y'))
         times.append(year + dec)
@@ -323,7 +324,6 @@ if arguments["--list_images"] ==  None:
     listim = "images_retenues"
 else:
     listim = arguments["--list_images"]
-
 if arguments["--ineq"] ==  None:
     arguments["--ineq"] = 'no' 
 if arguments["--cond"] ==  None:
@@ -374,11 +374,10 @@ if arguments["--bianual"] ==  None:
     bianual = 'no'
 else:
     bianual = arguments["--bianual"]
-
-if arguments["--dem"] ==  None:
-    dem = 'no'
+if arguments["--bperp"] ==  None:
+    bperp = 'no'
 else:
-    dem = arguments["--dem"]
+    bperp = arguments["--bperp"]
 if arguments["--steps"] ==  None:
     cos = []
 else:
@@ -387,14 +386,12 @@ if arguments["--postseismic"] ==  None:
     pos = np.zeros(len(cos))
 else:
     pos = list(map(float,arguments["--postseismic"].replace('None','-1').replace(',',' ').split()))
-
 if arguments["--slowslip"] == None:
     sse=[]
 else:
     sse = list(map(float,arguments["--slowslip"].replace(',',' ').split())) 
 sse_time = sse[::2]
 sse_car = sse[1::2]  
-
 if arguments["--degreeday"] ==  None:
     degreeday = 'no'
 else:
@@ -404,15 +401,12 @@ else:
     except:
         print('degreeday argument must contain two float values corresponding to the thawing and freezing onsets')
         sys.exit(0)
-
 if arguments["--vector"] != None:
     vectf = arguments["--vector"].replace(',',' ').split()
 else:
     vectf = None
-
 if arguments["--bounds"] is not  None:
     ylim = list(map(float,arguments["--bounds"].replace(',',' ').split()))
-
 if arguments["<iref>"] ==  None:
     iref = None
 else:
@@ -421,27 +415,22 @@ if arguments["<jref>"] ==  None:
     jref = None
 else:
     jref = int(arguments["<jref>"])
-
 if arguments["--name"] ==  None:
     output = None
 else:
     output = arguments["--name"]
-
 if arguments["--scale"] ==  None:
     scale = 1
 else:
     scale = float(arguments["--scale"]) 
-
 if arguments["--plot"] ==  None:
     plot = 'yes'
 else:
     plot = arguments["--plot"]
-
 if arguments["--info"] ==  None:
    infof = None
 else:
    infof = arguments["--info"]
-
 if arguments["--color"] ==  None:
    color = "blue"
 else:
@@ -450,17 +439,21 @@ if arguments["--fillstyle"] ==  None:
    fillstyle = "none"
 else:
    fillstyle = arguments["--fillstyle"]
+if arguments["--ndatasets"] ==  None:
+    ndata = 1
+else:
+    ndata = int(arguments["--ndatasets"])
 
 if len(pos)>0 and len(cos) != len(pos):
     raise Exception("coseimic and postseismic lists are not the same size")
 
-# markers = ['o','v','^','s','P','X','o','v','^','s','P','X']
-markers = ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
+markers = ['o','v','^','s','P','X','o','v','^','s','P','X']
+#markers = ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
 
 ipix = list(map(int,arguments["--cols"].replace(',',' ').split()))
-jpix = list(map(int,arguments["--ligns"].replace(',',' ').split()))
+jpix = list(map(int,arguments["--lines"].replace(',',' ').split()))
 if len(jpix) != len(ipix):
-   raise Exception("ncols and nligns lists are not the same size")
+   raise Exception("ncols and nlines lists are not the same size")
 # number of pixels
 Npix = len(ipix)
 
@@ -479,31 +472,57 @@ if iend > ncol:
 if jend > nlign:
     jend = nlign
 
-# load images_retenues file
-nb,idates,dates,base=np.loadtxt(listim, comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-N = len(dates)
-# save bp0 before time crop
-bp0=base[imref] 
+# Initialisation des variables
+idates = None
+dates = None
+bases = []
+baserefs = []
 
-# datemin est la reference temporelle pour les fonctions de base
-# dmin, dmax sont les dates limites des figures 
-if arguments["--dateslim"] is not  None:
-    dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
+# Chargement du fichier images_retenues avec une structure dynamique pour ndata > 2
+if ndata >= 1:
+    # Charger les colonnes pour idates et dates (colonnes 1 et 3)
+    # Générer dynamiquement les colonnes pour chaque base (à partir de la colonne 5)
+    columns = [1, 3] + list(range(5, 5 + ndata))
+ 
+    # Charger les données en utilisant `usecols=columns`
+    data = np.loadtxt(arguments["--list_images"], comments='#', usecols=columns, unpack=True)
+
+    # Extraire les données de dates
+    idates = data[0].astype(int)
+    dates = data[1]
+ 
+    # Extraire les bases et initialiser les références
+    for i in range(ndata):
+        base = data[2 + i]
+        bases.append(base)
+        
+        # Choisir la première date comme référence (index `imref = 0`)
+        baserefs.append(base[0])  # baseref correspondant à chaque base
+
+# Nombre total d'images (dates)
+N = len(dates)
+
+# Définir datemin comme référence temporelle pour les fonctions de base
+# et dmin, dmax comme limites des figures
+if arguments["--dateslim"] is not None:
+    dmin, dmax = arguments["--dateslim"].replace(',', ' ').split()
     datemin = int(date2dec(dmin)[0])
-    datemax = int(date2dec(dmax)[0]) + 1 
+    datemax = int(date2dec(dmax)[0]) + 1
     dmin = str(datemin) + '0101'
     dmax = str(datemax) + '0101'
 else:
     datemin, datemax = int(np.min(dates)), int(np.max(dates)) + 1
     dmin = str(int(np.min(dates))) + '0101'
-    dmax = str(int(np.max(dates))+1) + '0101'
+    dmax = str(int(np.max(dates)) + 1) + '0101'
 
-if arguments["--plot_dateslim"] is not  None:
-    dmin,dmax = arguments["--plot_dateslim"].replace(',',' ').split()
+if arguments["--plot_dateslim"] is not None:
+    dmin, dmax = arguments["--plot_dateslim"].replace(',', ' ').split()
 
-# clean dates
-indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
-nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
+# Filtrer les dates selon les limites définies
+indexd = np.flatnonzero(np.logical_and(dates <= datemax, dates >= datemin))
+idates, dates = idates[indexd], dates[indexd]
+# Mettre à jour les bases en filtrant également selon indexd
+bases = [bp[indexd] for bp in bases]
 
 # lect cube
 cubei = np.fromfile(cubef,dtype=np.float32)
@@ -526,9 +545,6 @@ for l in range((N)):
 N = len(dates)
 maps = as_strided(maps[:,:,indexd])
 print('Reshape cube: ', maps.shape)
-
-# perp baseline term
-base_moy = np.mean(base)
 
 if apsf is not None:
     inaps=np.loadtxt(apsf, comments='#', unpack=True,dtype='f')*abs(scale)
@@ -559,11 +575,10 @@ if infof is not None:
       info = infoi[:nlign*ncol].reshape((nlign,ncol))
       fid.close()
 
+nfigure = 0
 # plot pixels on map
-fig = plt.figure(1,figsize=(12,8))
-# if arguments["--bounds"] is not  None:
-#     vmax,vmin = np.nanmax(ylim), np.nanmin(ylim)
-# else:
+fig = plt.figure(nfigure,figsize=(12,8))
+nfigure += 1
 vmax = np.nanpercentile(maps[:,:,-1],90)
 vmin = np.nanpercentile(maps[:,:,-1],10)
 
@@ -589,9 +604,44 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 plt.suptitle('Black symbols: pixels, red cross: reference point')
 plt.savefig('Map_{}.pdf'.format(output), format='PDF')
-# print(iref, jref)
-# plt.show()
-# sys.exit()
+
+if arguments["--bperp"]=='yes':
+  for idx, bp in enumerate(bases):
+    # Création d'une figure pour chaque bp dans bases
+    fig = plt.figure(nfigure, figsize=(10, 4))
+    nfigure += 1
+    
+    # Graphique 1: Baseline perpendiculaire en fonction du temps
+    ax1 = fig.add_subplot(1, 2, 1)
+    
+    # selection des baselines non nulles
+    index = np.flatnonzero(bp)
+    dates_temp = dates[index]
+    idates_temp = idates[index]
+    bp_temp = bp[index] 
+    N_temp = len(bp_temp)
+ 
+    # Conversion des dates au format numérique pour matplotlib
+    x = [mdates.date2num(dt.strptime(f'{d}', '%Y%m%d')) for d in idates_temp]
+    
+    # Configuration de l'affichage des dates
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
+    ax1.plot(x, bp_temp, "ro", label=f'Baseline history of the {N_temp} images')
+    ax1.plot(x, bp_temp, "green")
+    fig.autofmt_xdate()
+    
+    ax1.set_xlabel('Time (Year/month/day)')
+    ax1.set_ylabel('Perpendicular Baseline')
+    ax1.legend(loc='best')
+    
+    # Graphique 2: Baseline en fonction de la saisonnalité (modulo 1 année)
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.plot(np.mod(dates_temp, 1), bp_temp, "ro", label=f'Baseline seasonality of the {N_temp} images')
+    ax2.legend(loc='best')
+    
+    # Sauvegarde de la figure et des données
+    fig.savefig('baseline_{}.eps'.format(idx), format='EPS', dpi=150)
+    np.savetxt('bp_t_{}.in'.format(idx), np.vstack([dates_temp, bp_temp]).T, fmt='%.6f')
 
 # 0
 basis=[
@@ -607,7 +657,6 @@ if inter=='yes':
 
 if degreeday=='yes':
    indexdd = index
-   print(ddt, ddf, datemin)
    basis.append(stefan(name='degree-day',reduction='ddt',date=datemin,tcar1=ddt,tcar2=ddf))
    index = index + 1
 
@@ -666,15 +715,19 @@ indexpo = np.array(indexpo)
 indexpofull = np.array(indexpofull)
 
 kernels=[]
-
-if dem=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=bp0,bp=base))
-   indexdem = index
-   index = index + 1
+if arguments["--bperp"]=='yes':
+    indexbperp = []
+    i = 0
+    for bp,bref in zip(bases,baserefs):
+        i = i + 1
+        kernels.append(corrBperp(name='bperp correction', reduction=f'corrBperp{i}', bp0=bref, bp=bp))
+        indexbperp.append(index)
+        index = index + 1
 
 if vectf != None:
   indexvect = np.zeros(len(vectf))
-  fig = plt.figure(100,figsize=(12,8))
+  fig = plt.figure(nfigure,figsize=(12,8))
+  nfigure += 1 
   for i in range(len(vectf)):
     kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v[i]))
     ax = fig.add_subplot(len(vectf),1,i+1)
@@ -701,21 +754,6 @@ M = Mbasis + Mker
 for i in range((Mbasis)):
     basis[i].info()
 
-# SVD inversion with cut-off eigenvalues
-#def invSVD(A,b,cond):
-#    try:
-#        U,eignv,V = lst.svd(A, full_matrices=False)
-#        s = np.diag(eignv)
-#        print(s)
-#        index = np.nonzero(s<cond)
-#        inv = lst.inv(s)
-#        inv[index] = 0.
-#        fsoln = np.dot( V.T, np.dot( inv , np.dot(U.T, b) ))
-#    except:
-#        fsoln = lst.lstsq(A,b,rcond=cond)[0]
-#    
-#    return fsoln
-
 ## inversion procedure 
 def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
@@ -733,9 +771,12 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
 
     if ineq == 'no':
         print('ineq=no: Least-squared inversion')
-        Cd = np.diag(sigmad**2, k = 0)
-        fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
-        print('LSQT solution:', fsoln)
+        try:
+            Cd = np.diag(sigmad**2, k = 0)
+            fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
+            print('LSQT solution:', fsoln)
+        except:
+            fsoln = lst.lstsq(A,b,rcond=None)[0]
 
     else:
         print('ineq=yes: Iterative least-square inversion.')
@@ -795,7 +836,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
     return fsoln,sigmam
 
 # plot diplacements maps
-nfigure = 10
 if Npix > 2:
     fig = plt.figure(nfigure+1,figsize=(12,8))
 else:
@@ -826,11 +866,11 @@ for jj in range((Npix)):
     print('---------------------------------------')
     print() 
 
-    x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
+    x = [date2num(dt.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
     if arguments["--plot_dateslim"] is not  None:
         dmin,dmax = arguments["--plot_dateslim"].replace(',',' ').split()
-    xmin = datetimes.strptime('{}'.format(dmin),'%Y%m%d')
-    xmax = datetimes.strptime('{}'.format(dmax),'%Y%m%d')
+    xmin = dt.strptime('{}'.format(dmin),'%Y%m%d')
+    xmax = dt.strptime('{}'.format(dmax),'%Y%m%d')
     xlim=date2num(np.array([xmin,xmax]))
 
     # extract data
@@ -856,7 +896,7 @@ for jj in range((Npix)):
 
     # inversion model
     mdisp= np.ones((N), dtype=np.float32)*float('NaN')
-    demerr = np.zeros((N))
+    bperperr = np.zeros((N))
     lin = np.zeros((N))
     k = np.flatnonzero(~np.isnan(disp))
     kk = len(k)
@@ -894,10 +934,10 @@ for jj in range((Npix)):
      
         # forward model in original order
         mdisp[k] = np.dot(G,m)
-        if dem=='yes':
-            demerr[k] =  np.dot(G[:,indexdem],m[indexdem])
+        if bperp=='yes':
+            bperperr[k] =  np.dot(G[:,indexbperp[0]:indexbperp[0]+ndata],m[indexbperp[0]:indexbperp[0]+ndata])
         else:
-            demerr = np.zeros((N))
+            bperperr = np.zeros((N))
         
         print()
         print('computation time:', time.time() - t)
@@ -922,15 +962,15 @@ for jj in range((Npix)):
     if inter=='yes':
         lin[k] = np.dot(G[:,indexinter],m[indexinter])
 
-    # plot data and model minus dem error and seasonal terms
+    # plot data and model minus bperp error and seasonal terms
     if seasonal=='yes':
             G=np.zeros((kk,2))
             for l in range((2)):
                 G[:,l]=basis[l+indexseas].g(tabx)
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseas:indexseas+2])
             amp = np.sqrt(m[indexseas]**2+m[indexseas+1]**2)
-            #phi = np.arctan2(m[indexseas+1],m[indexseas])
-            phi = np.arctan(m[indexseas+1]/m[indexseas])
+            phi = np.arctan2(m[indexseas+1],m[indexseas])
+            #phi = np.arctan(m[indexseas+1]/m[indexseas])
 
             if phi<0: 
                phi = phi + 2*np.pi
@@ -942,8 +982,8 @@ for jj in range((Npix)):
             disp_seas[k] = disp_seas[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
             disp_seast[k] = disp_seast[k] + np.dot(G[:,:],m[indexseast:indexseast+2])
 
-            #phit = np.arctan2(m[indexseast+1],m[indexseast])
-            phit = np.arctan(m[indexseast+1]/m[indexseast])
+            phit = np.arctan2(m[indexseast+1],m[indexseast])
+            #phit = np.arctan(m[indexseast+1]/m[indexseast])
             ampt = np.sqrt(m[indexseast]**2+m[indexseast+1]**2)
  
             # convert between 0 and 2pi
@@ -965,24 +1005,45 @@ for jj in range((Npix)):
                 G[:,l]=basis[l+indexbi].g(tabx)
             disp_seas[k] = disp_seas[k] +  np.dot(G[:,:],m[indexbi:indexbi+2])
 
-    # plot data and model minus dem error
-    if infof is not None:
-      # print(infof, infm)
-      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lines:{}, column:{}, Info:{:.2f}'.format(jj,i,j,infm))
-    else:
-      ax.plot(x,disp-demerr,markers[jj],color=color,fillstyle=fillstyle,label='TS {}: lines:{}, column:{}'.format(jj,i,j))
-    
-    ax.errorbar(x,disp-demerr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
-    
-    # plot data and model minus dem error and linear term
+    # Tracé des données corrigées de l'erreur de baseline perpendiculaire (`bperp`) et du modèle
+    for jj, bp in enumerate(bases):
+        # Remplacer les valeurs non nulles de `bp` par 1, et les zéros par NaN pour les masquer
+        bp_masked = np.where(bp != 0, 1.0, np.nan)
+        dispp = disp * bp_masked  # Sélectionner les valeurs de déplacement en fonction de `bp`
+
+         # Tracé avec ou sans information additionnelle `infof`
+        if infof is not None:
+            ax.plot(x, dispp - bperperr,
+            markers[jj],
+            color=color,
+            fillstyle=fillstyle,
+            label=f'TS {jj}: lines:{i}, column:{j}, Info:{infm:.2f}'
+            )
+        else:
+            ax.plot(x, dispp - bperperr,
+            markers[jj],
+            color=color,
+            fillstyle=fillstyle,
+            label=f'TS {jj}: lines:{i}, column:{j}'
+            )
+
+         # Ajout des barres d'erreur
+        ax.errorbar(x,dispp - bperperr,
+        yerr=sigmad,
+        ecolor=color,
+        fmt='none',
+        alpha=0.5
+        )
+  
+    # plot data and model minus bperp error and linear term
     if inter=='yes':
-        ax3.plot(x,disp-demerr-lin,markers[jj],color=color,fillstyle=fillstyle,markersize=4,label='detrended data')
-        ax3.errorbar(x,disp-demerr-lin,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
+        ax3.plot(x,disp-bperperr-lin,markers[jj],color=color,fillstyle=fillstyle,markersize=4,label='detrended data')
+        ax3.errorbar(x,disp-bperperr-lin,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
             
     if semianual=='yes' or seasonal=='yes' or bianual=='yes' or seasonalt == 'yes':
-        ax2.plot(x,disp-disp_seas-demerr,markers[jj],color=color,fillstyle=fillstyle,label='data -seasonal')
-        # ax2.plot(x,mdisp-disp_seas-demerr,'o',color='red',alpha=0.5,label='model -seasonal')
-        ax2.errorbar(x,disp-disp_seas-demerr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.3)
+        ax2.plot(x,disp-disp_seas-bperperr,markers[jj],color=color,fillstyle=fillstyle,label='data -seasonal')
+        # ax2.plot(x,mdisp-disp_seas-bperperr,'o',color='red',alpha=0.5,label='model -seasonal')
+        ax2.errorbar(x,disp-disp_seas-bperperr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.3)
 
     # create synthetic time
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
@@ -999,10 +1060,12 @@ for jj in range((Npix)):
     
     if inter=='yes':
         model_lin = np.dot(G[:,indexinter],m[indexinter])
-    if dem=='yes':
-        model_dem = np.dot(G[:,indexdem],m[indexdem])
+   
+    # we need to substrat bperp model to the whole model 
+    if bperp=='yes':
+        model_bperp = np.dot(G[:,indexbperp[0]:indexbperp[0]+ndata],m[indexbperp[0]:indexbperp[0]+ndata])
     else:
-        model_dem = np.zeros(len(model))
+        model_bperp = np.zeros(len(model))
         
     if seasonal=='yes':
         G=np.zeros((len(tdec),2))
@@ -1021,7 +1084,6 @@ for jj in range((Npix)):
         for l in range((2)):
             G[:,l]=basis[l+indexseast].g(tdec)
         mseas = mseas + np.dot(G[:,:],m[indexseast:indexseast+2])
-        # mseast = mseast + np.dot(G[:,:],m[indexseast:indexseast+2])
 
     if bianual=='yes':
         G=np.zeros((len(tdec),2))
@@ -1032,39 +1094,33 @@ for jj in range((Npix)):
     # plot model
     if inter=='yes':
         if seasonal=='yes' and seasonalt=='no':
-            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],amp,phi))
-            ax3.plot(t,model-model_lin-model_dem,'-r')
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],amp,phi))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
         elif seasonal=='yes' and seasonalt=='yes':
-            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],ampt,phit,amp,phi))
-            ax3.plot(t,model-model_lin-model_dem,'-r')
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],ampt,phit,amp,phi))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
         elif seasonal=='no' and seasonalt=='yes':
-            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}'.format(m[indexinter],ampt,phit))
-            ax3.plot(t,model-model_lin-model_dem,'-r')
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}'.format(m[indexinter],ampt,phit))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
         else:
-            ax.plot(t,model-model_dem,'-r',label='Rate: {:.2f}'.format(m[indexinter]))
-            ax3.plot(t,model-model_lin-model_dem,'-r')
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}'.format(m[indexinter]))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
     else:
-        ax.plot(t,model-model_dem,'-r')
+        ax.plot(t,model-model_bperp,'-r')
            
     if seasonal=='yes' or semianual=='yes' or bianual=='yes' or seasonalt=='yes':
-        ax2.plot(t,model-mseas-model_dem,'-r')
-        # ax2.plot(t,model-mseast-model_dem,'-r')
+        ax2.plot(t,model-mseas-model_bperp,'-r')
         ax2.legend(loc='best',fontsize='x-small')
         ax2.set_xlim(xlim)
-        # if arguments["--bounds"] is not  None:
-        #     ax2.set_ylim(ylim)
 
     ax.legend(loc='best',fontsize='x-small')
     ax.set_xlim(xlim)
-    # ax.set_xlim([2003,2011])
     if arguments["--bounds"] is not  None:
         ax.set_ylim(ylim)
     
     if inter=='yes':
         ax3.legend(loc='best',fontsize='x-small')
         ax3.set_xlim(xlim)
-    #     if arguments["--bounds"] is not  None:
-    #         ax3.set_ylim(ylim)
 
     fig.autofmt_xdate()
     ax.set_xlabel('Time (Year/month/day)')
