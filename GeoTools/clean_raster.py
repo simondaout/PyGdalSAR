@@ -199,9 +199,17 @@ mf = scale*(mf - shift)
 
 # apply high pass filter
 if arguments["--filter"] == 'HP':
-    m_filter = np.copy(mf)
-    m_filter[np.isnan(mf)] = 0.
-    mf = mf - ndimage.gaussian_filter(m_filter, int(arguments["--fwindsize"]))
+    m_filter_vals = np.copy(mf)
+    m_filter_vals[np.isnan(mf)] = 0.
+    m_lp_vals = ndimage.gaussian_filter(m_filter_vals, int(arguments["--fwindsize"]))
+    # make same size array full of ones, but set to zero where there is a nan in mf
+    m_filter_ones = 0*np.copy(mf)+1
+    m_filter_ones[np.isnan(mf)] = 0.
+    m_lp_ones = ndimage.gaussian_filter(m_filter_ones, int(arguments["--fwindsize"]))
+    # find the ratio to make coefficients sum to one near nan values
+    m_lp = m_lp_vals/m_lp_ones
+    # subtract to obtain hp filter
+    mf = mf - m_lp
 
 elif arguments["--filter"] == 'LP':
     m_filter = np.copy(mf)
