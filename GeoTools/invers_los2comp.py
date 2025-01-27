@@ -6,7 +6,7 @@
 # written in Python-Gdal
 #
 ############################################
-# Authors :   Louise Van Inghelandt, Simon Doaut
+# Authors :   Hugo Watine, Louise Van Inghelandt, Simon Doaut
 # Date:       03/02/2022
 ############################################
 
@@ -261,49 +261,50 @@ if len(argv)>1:
     print(network.__doc__)
     exit()
 
-def compute_slope_aspect(path):
+def compute_slope_aspect(path, filter_size=2.0):
    
-    global filter, Px, Py, slope, aspect
-    
     #### LOAD DEM
     ds = gdal.Open(path,gdal.GA_ReadOnly)
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
 
-    if 'fwindsize' in locals():
-        logger.info('filter DEM with a windowsize of {}'.format(fwindsize))
-    else:
-        fwindsize = 2.
-    filter = scipy.ndimage.gaussian_filter(topo,fwindsize)
-    #filter = scipy.ndimage.gaussian_filter(topo,2.)
     gt = ds.GetGeoTransform()
     projref = ds.GetProjectionRef()
     drv = gdal.GetDriverByName('GTiff')
+    
+    # Filter to smooth data and remove noise
+    filtered_topo = scipy.ndimage.gaussian_filter(topo, sigma=(filter_size, filter_size))   
+ 
+    # Get middle latitude for geospatial calculations
+    lats = gt[3] + (np.arange(nlines) * gt[5])
+    lat_mean = np.mean(lats)
+    print("GeoTransform:", gt)
+    print("Average latitude:", lat_mean)
 
-    # Get middle latitude
-    data1 = ds.GetGeoTransform()   
-    lats = data1[3] + (np.arange(nlines) * data1[5])
-    lat_moy = np.mean(lats)
+    # Determine resolution based on coordinate system
+    res_x, res_y = gt[1], gt[5]
+    srs = osr.SpatialReference(wkt=projref)
+
+    if srs.IsGeographic():
+        res_x *= 40075e3 / 360  # Convert degrees to meters
+        res_y *= (40075e3 / 360) * np.cos(np.deg2rad(lat_mean))
+        print("Geographic coordinates (converted to meters)")
+    else:
+        print("Projected coordinates (meters)")
+
+    print(f"Resolution: dx={res_x:.2f}, dy={res_y:.2f}")
+
+    # Compute gradient (first axis = Y, second axis = X)
+    dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x)
     
-    # Get resolution depending on whether the 
-    res = data1[1]*40075e3/360
-    logger.info("Spatial resolution in deg: {}, in meter: {}".format(data1[1],res))
-    if res<1 or res>500:
-        logger.info("Spatial resolution seems unrealistic. Exit!")
-        exit()  
-    
-    # Calcul gradient
-    Py, Px = np.gradient(filter, res, res*np.cos(np.deg2rad(lat_moy)))
-    Px = Px.astype(float); Py = Py.astype(float)
-    # Slope
-    slope = np.arctan(np.sqrt(Py**2+Px**2))
-    # smooth slope to avoid crazy values 
-    slope[np.rad2deg(slope)>80]=0.
-    slope[np.rad2deg(slope)<min_slope]=0.
-    # Line of max slope
-    aspect = np.arctan2(Py,-Px)
-    
+    # Compute gradient (first axis = Y, second axis = X)
+    dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x)
+
+    # Calculate slope and aspect
+    slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
+    aspect = np.arctan2(dsm_dy, -dsm_dx)  # clockwise from east
+   
     # Create aspect and slope files
     dst = drv.Create('slope.tif', nlines, ncols, 1, gdal.GDT_Float32)
     bandt = dst.GetRasterBand(1)
@@ -318,18 +319,13 @@ def compute_slope_aspect(path):
     dst.SetGeoTransform(gt)
     dst.SetProjection(projref)
     bandt.FlushCache()
-    
-    return -aspect, slope
-    #return 0, np.deg2rad(10)
 
-def plot_slope_aspect():
-  
     # Plot DEM, Slope, Py and aspect
     fig = plt.figure(1,figsize=(11,7))
     cmap = cm.terrain
     # Plot topo
     ax = fig.add_subplot(2,2,1)
-    cax = ax.imshow(filter[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(filter,98),vmin=np.nanpercentile(filter,2))
+    cax = ax.imshow(filtered_topo[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(filtered_topo,98),vmin=np.nanpercentile(filtered_topo,2))
     ax.set_title('DEM',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
@@ -339,7 +335,7 @@ def plot_slope_aspect():
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,3)
-    cax = ax.imshow(Py[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(Py,98),vmin=np.nanpercentile(Py,2))
+    cax = ax.imshow(dsm_dy[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(dsm_dy,98),vmin=np.nanpercentile(dsm_dy,2))
     ax.set_title('Py',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
@@ -353,6 +349,7 @@ def plot_slope_aspect():
     if PLOT:
         plt.show()      
 
+    return aspect, slope
 
 #### compute rotations
 # rot: tourne l'axe N vers l'axe E. 
@@ -454,10 +451,6 @@ else:
 
 logger.info('Plot DATA ....') 
 print()
-if 'DEM' in locals():
-  if DEM is not None:
-    plot_slope_aspect()
-
 try:
     from matplotlib.colors import LinearSegmentedColormap
     cm_locs = os.environ["PYGDALSAR"] + '/contrib/python/colormaps/'
