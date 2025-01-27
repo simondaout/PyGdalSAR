@@ -66,15 +66,15 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
     slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
     aspect = np.rad2deg(np.arctan2(dsm_dy, -dsm_dx))  # clockwise from east
 
-    crop_slice = (slice(450, 850), slice(500, 900))
-    aspect_crop = aspect[crop_slice] 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-    cax= ax.imshow(aspect_crop, cmap='Greys_r', origin='upper', alpha=0.5, vmax=180, vmin=-180)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    divider = make_axes_locatable(ax)
-    c = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(cax, cax=c) 
+    #crop_slice = (slice(450, 850), slice(500, 900))
+    #aspect_crop = aspect[crop_slice] 
+    #fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    #cax= ax.imshow(aspect_crop, cmap='Greys_r', origin='upper', alpha=0.5, vmax=180, vmin=-180)
+    #ax.set_xticks([])
+    #ax.set_yticks([])
+    #divider = make_axes_locatable(ax)
+    #c = divider.append_axes("right", size="5%", pad=0.05)
+    #plt.colorbar(cax, cax=c) 
     #plt.show()
     #sys.exit()
 
