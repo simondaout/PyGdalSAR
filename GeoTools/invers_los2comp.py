@@ -185,7 +185,7 @@ class network:
         logger.info('Average horizontal LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
 
-        # old version
+        # old version: rotation dans le sens anti-horaire
         #self.proj=[
         #        np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.sin(self.slope)*np.sin(self.theta),
         #        np.cos(self.theta)*(-np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
@@ -587,23 +587,27 @@ for n in range(N):
     # clean based on uncertainties
     index = s>np.nanpercentile(s,98.)
     d[index] = float('NaN') 
+    m[index] = 0.
     index = s/abs(d) > 2. 
-    #m[index] = 0.
+    d[index] = float('NaN')
+    m[index] = 0.
     # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,99.8),d<np.percentile(d,.2))
     d[index]= float('NaN') 
+    m[index] = 0.
     
     if 'DEM' in locals():
        if DEM is not None:
          # mask based on aspect
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)>60,np.rad2deg(rot)<120))
          m[indice] =  0.
+         d[indice] = float('NaN')
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)<-60,np.rad2deg(rot)>-120))
          m[indice] =  0.
+         d[indice] = float('NaN')
 
          # clean flat regions: inversion invalid
-         #d[np.rad2deg(slope)<min_slope] = float('NaN')
-         #s[np.rad2deg(slope)<min_slope] = float('NaN')
+         d[np.rad2deg(slope)<min_slope] = float('NaN')
          m[np.rad2deg(slope)<min_slope] = float('NaN') 
 
    
