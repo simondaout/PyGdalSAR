@@ -11,7 +11,7 @@ import numpy as np
 import scipy.ndimage
 import scipy.optimize as opt
 import scipy.linalg as lst
-from osgeo import gdal
+from osgeo import gdal, osr
 gdal.UseExceptions()
 from math import sin, cos
 from numpy.lib.stride_tricks import as_strided
@@ -25,7 +25,7 @@ import matplotlib.patches as patches
 from sys import argv,exit,stdin,stdout
 import getopt
 import os, math
-from os import path
+from os import path, sys
 
 def compute_slope_aspect(path):
    
@@ -34,32 +34,54 @@ def compute_slope_aspect(path):
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
     ncols, nlines = ds.RasterYSize, ds.RasterXSize
-    filtrer = scipy.ndimage.gaussian_filter(topo,2.)
     gt = ds.GetGeoTransform()
     projref = ds.GetProjectionRef()
     drv = gdal.GetDriverByName('GTiff')
 
+    # filter over a two pixels windows to remove outliers
+    filtrer = scipy.ndimage.gaussian_filter(topo,sigma = (2., 2.))
+    
     # Get middle latitude
-    data1 = ds.GetGeoTransform()   
-    lats = data1[3] + (np.arange(nlines) * data1[5])
+    data = ds.GetGeoTransform()   
+    lats = data[3] + (np.arange(nlines) * data[5])
     lat_moy = np.mean(lats)
-    
-    # Get resolution depending on whether the 
-    res = data1[1]*40075e3/360
-    print("Spatial resolution in deg: {}, in meter: {}".format(data1[1],res))
-    if res<1 or res>500:
-        print("Spatial resolution seems unrealistic. Exit!")
-        exit()  
-    
-    # Calcul gradient
-    Py, Px = np.gradient(filtrer, res, res*np.cos(np.deg2rad(lat_moy)))
-    Px = Px.astype(float); Py = Py.astype(float)
-    # Slope
-    slope = np.arctan(np.sqrt(Py**2+Px**2))
-    # smooth slope to avoid crazy values 
-    # Line of max slope
-    aspect = np.arctan2(Py,-Px)
-    
+    print("Metadata:", data)
+    print("Average lattitude:", lat_moy)    
+
+    # Get resolution depending on the coordinate reference system 
+    res_x = data[1]
+    res_y = data[5]
+    srs = osr.SpatialReference(wkt=ds.GetProjection()) 
+    #if abs(res_x) < 0.01: # si inf. à 0.01m, certainement en degré, mais serait plus propre de vérifier le SCR
+    if srs.IsGeographic():
+        res_x = (res_x*40075e3/360) # conversion degre to meter 
+        res_y = (res_y*40075e3/360)*np.cos(np.deg2rad(lat_moy)) 
+        print("Geographic coordinates")
+        print("dx: {}, dy: {}".format(res_x, res_y))
+        dsm_dy, dsm_dx = np.gradient(filtrer, res_x, res_y) 
+    else:
+        print("Cartographic coordinates")
+        print("dx: {}, dy: {}".format(res_x, res_y))
+        dsm_dy, dsm_dx = np.gradient(filtrer, res_x, res_y) # d'abord resolution en y (négative) puis x
+        # dsm_dy est la pente dans la direction des lignes
+        # dsm_dx est la pente dans la direction des colonnes
+ 
+    # Compute slope and downslope direction
+    slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
+    aspect = np.arctan2(-dsm_dy, dsm_dx)    # clockwise slope direction from 0 to 360
+  
+    #crop_slice = (slice(450, 850), slice(500, 900))
+    #aspect_crop = np.rad2deg(aspect[crop_slice]) 
+    #fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    #cax= ax.imshow(aspect_crop, cmap='Greys_r', origin='upper', alpha=0.5, vmax=180, vmin=0)
+    #ax.set_xticks([])
+    #ax.set_yticks([])
+    #divider = make_axes_locatable(ax)
+    #c = divider.append_axes("right", size="5%", pad=0.05)
+    #plt.colorbar(cax, cax=c) 
+    #plt.show()
+    #sys.exit()
+
     # Create aspect and slope files
     dst = drv.Create('slope.tif', nlines, ncols, 1, gdal.GDT_Float32)
     bandt = dst.GetRasterBand(1)
@@ -75,27 +97,27 @@ def compute_slope_aspect(path):
     dst.SetProjection(projref)
     bandt.FlushCache()
 
-    # Plot DEM, Slope, Py and aspect
+    # Plot DEM, Slope, gradients and aspect
     fig = plt.figure(1,figsize=(11,7))
     cmap = cm.terrain
     # Plot topo
     ax = fig.add_subplot(2,2,1)
-    cax = ax.imshow(filtrer,cmap=cmap,vmax=np.nanpercentile(filtrer,98),vmin=np.nanpercentile(filtrer,2))
+    cax = ax.imshow(filtrer, cmap='Greys_r', vmax=np.nanpercentile(filtrer,98), vmin=np.nanpercentile(filtrer,2))
     ax.set_title('DEM',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,2)
-    cax = ax.imshow(np.rad2deg(slope),cmap=cmap,vmax=np.nanpercentile(np.rad2deg(slope),98),vmin=np.nanpercentile(np.rad2deg(slope),2))
+    cax = ax.imshow(np.rad2deg(slope), cmap='Greys_r', vmax=np.nanpercentile(np.rad2deg(slope),90), vmin=np.nanpercentile(np.rad2deg(slope),10))
     ax.set_title('Slope',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,3)
-    cax = ax.imshow(Py,cmap=cmap,vmax=np.nanpercentile(Py,98),vmin=np.nanpercentile(Py,2))
-    ax.set_title('Py',fontsize=6)
+    cax = ax.imshow(dsm_dy,cmap='Greys_r', vmax=np.nanpercentile(dsm_dy,98), vmin=np.nanpercentile(dsm_dy,2))
+    ax.set_title('Gradient in y',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,4)
-    cax = ax.imshow(aspect,cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
+    cax = ax.imshow(np.rad2deg(aspect), cmap='Greys_r', vmax=180, vmin=-180)
     ax.set_title('aspect',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
     
