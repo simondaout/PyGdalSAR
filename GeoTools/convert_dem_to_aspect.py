@@ -64,7 +64,19 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
 
     # Calculate slope and aspect
     slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
-    aspect = (np.rad2deg(np.arctan2(-dsm_dy, dsm_dx)) + 360) % 360 # clockwise from east form 0 to 360
+    aspect = np.rad2deg(np.arctan2(dsm_dy, -dsm_dx))  # clockwise from east
+
+    crop_slice = (slice(450, 850), slice(500, 900))
+    aspect_crop = aspect[crop_slice] 
+    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    cax= ax.imshow(aspect_crop, cmap='Greys_r', origin='upper', alpha=0.5, vmax=180, vmin=-180)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    divider = make_axes_locatable(ax)
+    c = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cax, cax=c) 
+    #plt.show()
+    #sys.exit()
 
     # Save outputs to GeoTIFF
     def save_raster(filename, array):
@@ -81,9 +93,9 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
     # Plot results
     if plot:
         fig, axes = plt.subplots(2, 2, figsize=(11, 7))
-        titles = ['DEM', 'Slope', 'Gradient Y', 'Aspect']
-        datasets = [filtered_topo, np.rad2deg(slope), dsm_dy, aspect]
-        cmaps = ['Greys_r', 'Greys_r', 'coolwarm', 'hsv']
+        titles = ['Slope', 'Gradient X', 'Gradient Y', 'Aspect']
+        datasets = [slope[450:850, 500:900], dsm_dx[450:850, 500:900], dsm_dy[450:850, 500:900], aspect[450:850, 500:900]]
+        cmaps = ['Greys_r', 'coolwarm', 'coolwarm', 'Greys_r']
 
         for ax, title, data, cmap in zip(axes.flatten(), titles, datasets, cmaps):
             im = ax.imshow(data, cmap=cmap, origin='upper', vmax=np.percentile(data,90), vmin=np.percentile(data,10))
