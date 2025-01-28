@@ -557,7 +557,7 @@ for n in range(N):
     index = s>np.nanpercentile(s,98.)
     d[index] = float('NaN') 
     m[index] = 0.
-    index = s/abs(d) > 2. 
+    index = s/abs(d) > 3. 
     d[index] = float('NaN')
     m[index] = 0.
     # clean based on outiliers
