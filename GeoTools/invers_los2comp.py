@@ -20,7 +20,7 @@ import numpy as np
 import scipy.ndimage
 import scipy.optimize as opt
 import numpy.linalg as lst
-from osgeo import gdal
+from osgeo import gdal, osr
 gdal.UseExceptions()
 from math import sin, cos
 from numpy.lib.stride_tricks import as_strided
@@ -86,20 +86,6 @@ class network:
 
         self.rot = rot
         self.slope = slope
-        #self.rot = np.ones(np.shape(self.rot))*np.pi/2 
-        #self.slope = np.ones(np.shape(self.rot))*np.deg2rad(10)
-        #fig = plt.figure(4,figsize=(11,7))
-        #cmap = cm.terrain
-        ## Plot topo
-        #ax = fig.add_subplot(2,2,1)
-        #cax = ax.imshow(np.rad2deg(self.rot),cmap=cmap)
-        #ax.set_title('ROT',fontsize=6)
-        #fig.colorbar(cax, orientation='vertical')
-        #ax = fig.add_subplot(2,2,2)
-        #cax = ax.imshow(np.rad2deg(self.slope),cmap=cmap)
-        #ax.set_title('Slope',fontsize=6)
-        #fig.colorbar(cax, orientation='vertical')
-        #plt.show()
 
         logger.info('Read track: {}'.format(self.name))
         ds = gdal.Open(self.path,gdal.GA_ReadOnly)
@@ -185,13 +171,6 @@ class network:
         logger.info('Average horizontal LOS projection to east, north, up: {0:.5f} {1:.5f} {2:.5f}'.\
             format(np.nanmean(self.proj[0]),np.nanmean(self.proj[1]),np.nanmean(self.proj[2])))
 
-        # old version
-        #self.proj=[
-        #        np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.sin(self.slope)*np.sin(self.theta),
-        #        np.cos(self.theta)*(-np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
-        #        -np.sin(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) + np.sin(self.rot)*np.sin(self.phi)) + np.cos(self.slope)*np.sin(self.theta)
-        #        ]
-        
         self.proj=[
                 np.cos(self.slope)*np.cos(self.theta)*(np.cos(self.rot)*np.cos(self.phi) - np.sin(self.rot)*np.sin(self.phi)) - np.sin(self.slope)*np.sin(self.theta),
                 np.cos(self.theta)*(np.sin(self.rot)*np.cos(self.phi) + np.cos(self.rot)*np.sin(self.phi)),
@@ -297,9 +276,6 @@ def compute_slope_aspect(path, filter_size=2.0):
 
     # Compute gradient (first axis = Y, second axis = X)
     dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x)
-    
-    # Compute gradient (first axis = Y, second axis = X)
-    dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x)
 
     # Calculate slope and aspect
     slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
@@ -325,22 +301,22 @@ def compute_slope_aspect(path, filter_size=2.0):
     cmap = cm.terrain
     # Plot topo
     ax = fig.add_subplot(2,2,1)
-    cax = ax.imshow(filtered_topo[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(filtered_topo,98),vmin=np.nanpercentile(filtered_topo,2))
+    cax = ax.imshow(filtered_topo,cmap='Greys_r',vmax=np.nanpercentile(filtered_topo,98),vmin=np.nanpercentile(filtered_topo,2))
     ax.set_title('DEM',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,2)
-    cax = ax.imshow(np.rad2deg(slope[ibeg:iend,jbeg:jend]),cmap=cmap,vmax=np.nanpercentile(np.rad2deg(slope),98),vmin=np.nanpercentile(np.rad2deg(slope),2))
+    cax = ax.imshow(np.rad2deg(slope),cmap='Greys_r',vmax=np.nanpercentile(np.rad2deg(slope),98),vmin=np.nanpercentile(np.rad2deg(slope),2))
     ax.set_title('Slope',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,3)
-    cax = ax.imshow(dsm_dy[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(dsm_dy,98),vmin=np.nanpercentile(dsm_dy,2))
+    cax = ax.imshow(dsm_dy,cmap='coolwarm',vmax=np.nanpercentile(dsm_dy,98),vmin=np.nanpercentile(dsm_dy,2))
     ax.set_title('Py',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
 
     ax = fig.add_subplot(2,2,4)
-    cax = ax.imshow(aspect[ibeg:iend,jbeg:jend],cmap=cmap,vmax=np.nanpercentile(aspect,98),vmin=np.nanpercentile(aspect,2))
+    cax = ax.imshow(np.rad2deg(aspect),cmap='Greys_r',vmax=180,vmin=-180)
     ax.set_title('aspect',fontsize=6)
     fig.colorbar(cax, orientation='vertical')
     
@@ -580,23 +556,27 @@ for n in range(N):
     # clean based on uncertainties
     index = s>np.nanpercentile(s,98.)
     d[index] = float('NaN') 
+    m[index] = 0.
     index = s/abs(d) > 2. 
-    #m[index] = 0.
+    d[index] = float('NaN')
+    m[index] = 0.
     # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,99.8),d<np.percentile(d,.2))
     d[index]= float('NaN') 
+    m[index] = 0.
     
     if 'DEM' in locals():
        if DEM is not None:
          # mask based on aspect
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)>60,np.rad2deg(rot)<120))
          m[indice] =  0.
+         #d[indice] = float('NaN')
          indice = np.nonzero(np.logical_and(np.rad2deg(rot)<-60,np.rad2deg(rot)>-120))
          m[indice] =  0.
+         #d[indice] = float('NaN')
 
          # clean flat regions: inversion invalid
-         #d[np.rad2deg(slope)<min_slope] = float('NaN')
-         #s[np.rad2deg(slope)<min_slope] = float('NaN')
+         d[np.rad2deg(slope)<min_slope] = float('NaN')
          m[np.rad2deg(slope)<min_slope] = float('NaN') 
 
    
