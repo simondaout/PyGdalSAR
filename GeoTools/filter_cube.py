@@ -10,19 +10,19 @@
 """\
 filter_cube.py
 -------------
-Clean a cube file using the fonction clean_raster.py from PygdalSAR
+Clean a time series cube with a HP or LP filter band by band
 
-Usage: filter_cube.py --infile=<path> --outfile=<path> [--plot=<yes/no>] [--filter=<HP/LP>] [--fwindsize=<value>] [--mask=<path>] [--threshold=<value>] \
+Usage: filter_cube.py --infile=<path> [--outfile=<path>] [--plot=<yes/no>] [--filter=<HP/LP>] [--fwindsize=<value>] [--mask=<path>] [--threshold=<value>] \
 
 Options:
 -h --help           Show this screen.
---infile PATH       time series cube to filter
---outfile PATH      output file
+--infile PATH       Time series cube to filter
+--outfile PATH      Output file
 --filter=<HP/LP>    Apply a high pass (HP) or a low pass (LP) gaussian filter to the image [default: HP]
 --fwindsize=<value> Filter window size [default: 30]
---plot=<yes/no>     plot intermediate result [default:no]
---mask PATH         file used as mask (e.g. RMSpixel)
---threshold VALUE   threshold value on mask file (Keep pixel with mask > threshold) 
+--plot=<yes/no>     Plot intermediate result [default:no]
+--mask PATH         File used as mask before filtering (e.g. RMSpixel)
+--threshold VALUE   Threshold value on mask file (Keep pixel with mask > threshold) [default: 2] 
 """
 
 print()
@@ -56,6 +56,9 @@ if arguments["--threshold"] ==  None:
     arguments["--threshold"] = 2.
 else:
     arguments["--threshold"] = float(arguments["--threshold"])
+if arguments["--outfile"] == None:
+    basename = os.path.splitext(arguments["--infile"])[0]
+    arguments["--outfile"] = basename + '_' + arguments["--filter"] + arguments["--fwindsize"]    
 
 # mask
 if maskf != 'no':
