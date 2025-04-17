@@ -48,6 +48,7 @@ import docopt
 from parsers import gamma as gm
 gdal.UseExceptions()
 import shutil
+import os
 
 arguments = docopt.docopt(__doc__)
 int_path=arguments["--int_path"]
@@ -238,7 +239,13 @@ else:
       idate = str(date1) + '_' + str(date2)
       folder = int_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
       if sformat == 'GTIFF':
-        infile = os.path.abspath(folder + '/' + prefix + str(date1) + '_' + str(date2) + suffix + '.tiff')
+        base = os.path.abspath(folder + '/' + prefix + str(date1) + '_' + str(date2) + suffix )
+        infile = None
+        for ext in ['.tiff', '.tif']:
+            candidate = base + ext
+            if os.path.exists(candidate):
+                infile = candidate
+                break
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band = ds.GetRasterBand(1)
         los = ds_band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
