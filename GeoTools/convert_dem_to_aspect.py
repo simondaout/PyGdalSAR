@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import numpy as np
@@ -12,7 +12,7 @@ import sys
 import getopt
 
 def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
-    """ 
+    """
     Compute slope and aspect from a DEM file.
 
     Args:
@@ -28,6 +28,9 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
         print(f"Error: File '{dem_path}' not found.")
         sys.exit(1)
 
+    # extract basename
+    filename = os.path.splitext(os.path.basename(demfile))[0] 
+
     # Load DEM
     ds = gdal.Open(dem_path, gdal.GA_ReadOnly)
     band = ds.GetRasterBand(1)
@@ -38,6 +41,7 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
     drv = gdal.GetDriverByName('GTiff')
 
     # Filter to smooth data and remove noise
+    print(f"Filtering DEM with a {filter_size} window size.")
     filtered_topo = scipy.ndimage.gaussian_filter(topo, sigma=(filter_size, filter_size))
 
     # Get middle latitude for geospatial calculations
@@ -64,19 +68,7 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
 
     # Calculate slope and aspect
     slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
-    aspect = np.rad2deg(np.arctan2(dsm_dy, -dsm_dx))  # clockwise from east
-
-    #crop_slice = (slice(450, 850), slice(500, 900))
-    #aspect_crop = aspect[crop_slice] 
-    #fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-    #cax= ax.imshow(aspect_crop, cmap='Greys_r', origin='upper', alpha=0.5, vmax=180, vmin=-180)
-    #ax.set_xticks([])
-    #ax.set_yticks([])
-    #divider = make_axes_locatable(ax)
-    #c = divider.append_axes("right", size="5%", pad=0.05)
-    #plt.colorbar(cax, cax=c) 
-    #plt.show()
-    #sys.exit()
+    aspect = np.rad2deg(np.arctan2(dsm_dy, -dsm_dx)) % 360  # Clockwise from east
 
     # Save outputs to GeoTIFF
     def save_raster(filename, array):
@@ -87,18 +79,23 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
         dst.FlushCache()
         print(f"Saved: {filename}")
 
-    save_raster('slope.tif', np.rad2deg(slope))
-    save_raster('aspect.tif', aspect)
+    save_raster(filename + '_slope.tif', np.rad2deg(slope))
+    save_raster(filename + '_aspect.tif', aspect)
 
     # Plot results
     if plot:
         fig, axes = plt.subplots(2, 2, figsize=(11, 7))
         titles = ['Slope', 'Gradient X', 'Gradient Y', 'Aspect']
-        datasets = [slope[450:850, 500:900], dsm_dx[450:850, 500:900], dsm_dy[450:850, 500:900], aspect[450:850, 500:900]]
+        datasets = [
+            slope[450:850, 500:900],
+            dsm_dx[450:850, 500:900],
+            dsm_dy[450:850, 500:900],
+            aspect[450:850, 500:900]
+        ]
         cmaps = ['Greys_r', 'coolwarm', 'coolwarm', 'Greys_r']
 
         for ax, title, data, cmap in zip(axes.flatten(), titles, datasets, cmaps):
-            im = ax.imshow(data, cmap=cmap, origin='upper', vmax=np.percentile(data,90), vmin=np.percentile(data,10))
+            im = ax.imshow(data, cmap=cmap, origin='upper', vmax=np.nanpercentile(data, 90), vmin=np.nanpercentile(data, 10))
             ax.set_title(title)
             divider = make_axes_locatable(ax)
             cbar = divider.append_axes("right", size="5%", pad=0.05)
@@ -109,10 +106,13 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
 
     return -aspect, slope
 
+
 def usage():
-    print("Usage: convert_dem_to_aspect.py demfile [-v] [-h]")
+    print("Usage: convert_dem_to_aspect.py demfile [filter_size] [-v] [-h]")
     print("-v Verbose mode. Show more information")
     print("-h Show this help message")
+    print("filter_size  Filter window size in meter for the DSM (default: 2.0)")
+
 
 if __name__ == "__main__":
     try:
@@ -121,12 +121,13 @@ if __name__ == "__main__":
         print("Error in arguments. Use -h for help.")
         sys.exit(2)
 
+    verbose = False
     for opt, arg in opts:
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
         elif opt in ("-v", "--verbose"):
-            print("Verbose mode enabled")
+            verbose = True
 
     if len(args) < 1:
         print("Error: No DEM file provided.")
@@ -134,5 +135,11 @@ if __name__ == "__main__":
         sys.exit(1)
 
     demfile = args[0]
-    compute_slope_aspect(demfile, plot=True)
+    filter_size = float(args[1]) if len(args) > 1 else 2.0
+
+    if verbose:
+        print(f"Processing DEM file: {demfile}")
+        print(f"Filter size: {filter_size}")
+    
+    compute_slope_aspect(demfile, filter_size=filter_size, plot=True)
 

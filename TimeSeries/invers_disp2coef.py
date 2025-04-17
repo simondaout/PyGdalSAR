@@ -3306,8 +3306,8 @@ for ii in range(int(arguments["--niter"])):
     np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
     # set apsf is yes for iteration
     apsf=='yes'
-    # update aps for next iterations
-    inaps = np.copy(aps)
+    # update aps for next iterations taking into account inaps and the residues of the last iteration
+    inaps = np.copy(aps) * inaps
 
 #######################################################
 # Save functions in binary file
