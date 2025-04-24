@@ -3,8 +3,8 @@
 """
 compute_dphi_dz.py
 -------------------
-Reads in raster files - vertical and topo
-Plots topo on x axis vs vertical vel on y axis, pixel by pixel
+Reads in raster files - Velocities and topo
+Plots topo on x axis vs  vel on y axis, pixel by pixel
 Inputs must be the same size and the same number of pixels
 
 .. Author:
@@ -14,12 +14,12 @@ Inputs must be the same size and the same number of pixels
     10th May 2023
 
 Usage:
-    vert-vs-topo.py --vertical=<path> --topo=<path> --outfile=<path> [--ymin=<value>] [--ymax=<value>] [--tp=<value>] [<ibeg>] [<iend>] [<jbeg>] [<jend>]
+    vert-vs-topo.py --data=<path> --topo=<path> --outfile=<path> [--ymin=<value>] [--ymax=<value>] [--tp=<value>] [<ibeg>] [<iend>] [<jbeg>] [<jend>]
                     [--latmin=<val>] [--latmax=<val>] [--lonmin=<val>] [--lonmax=<val>]
 
 Options:
     -h --help             Show this screen.
-    --vertical=PATH       Path to vertical velocity file.
+    --data=PATH           Path to data velocity or LOS file.
     --topo=PATH           Path to topography file.
     --outfile=PATH        Output file name or path.
     --ymin=<value>        Minimum value for y-axis in scatter plot.
@@ -43,7 +43,7 @@ from matplotlib.patches import Rectangle
 
 args = docopt.docopt(__doc__)
 
-vertical = args["--vertical"]
+data = args["--data"]
 topo = args["--topo"]
 outfile = args["--outfile"]
 tp = float(args["--tp"]) if args["--tp"] else 0.1
@@ -57,7 +57,7 @@ if args["--ymin"] and args["--ymax"]:
 sformat = 'GTIFF'
 band = 1
 
-ds = gdal.Open(vertical, gdal.GA_ReadOnly)
+ds = gdal.Open(data, gdal.GA_ReadOnly)
 phase_band = ds.GetRasterBand(band)
 nlines, ncols = ds.RasterYSize, ds.RasterXSize
 
@@ -120,7 +120,7 @@ axcompare.set_title(outfile, fontsize=14)
 
 # Corrected legend
 axcompare.legend(loc='best')  # Automatically find the best location
-fig2.canvas.manager.set_window_title('Cropped data + ylims')
+fig2.canvas.manager.set_window_title('Cropped data')
 plt.tight_layout()
 fig2.savefig(f'{outfile}_crop_ylims_plot.png', format='PNG', dpi=180)
 
@@ -141,9 +141,9 @@ fig = plt.figure(1,figsize=(15,8))
 
 rad2mm = 1
 
-####### Plot the vertical velocity - Big context map
+####### Plot the data velocity - Big context map
 axcontext = fig.add_subplot(1,3,1)
-# Put the values of the vertical velocity array into phi
+# Put the values of the data velocity array into phi
 phi = phase_band.ReadAsArray(0, 0,
        ds.RasterXSize, ds.RasterYSize,
        ds.RasterXSize, ds.RasterYSize)
@@ -163,14 +163,14 @@ divider = make_axes_locatable(axcontext)
 ccontext = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(caxcontext, cax=ccontext)
 
-axcontext.set_title('Vertical velocity', fontsize=14)
+axcontext.set_title('Data', fontsize=14)
 
 # Add the subplot outline
 deli=abs(iend-ibeg)
 delj=abs(jend-jbeg)
 axcontext.add_patch(Rectangle((jbeg, ibeg), delj, deli, fc='none',color="black",linewidth=2))
 
-####### Plot the vertical velocity - cropped map
+####### Plot the data velocity - cropped map
 ax = fig.add_subplot(1,3,2)
 # Trim the maps
 cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm
@@ -190,12 +190,12 @@ divider = make_axes_locatable(ax)
 c = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(cax, cax=c)
 
-ax.set_title('Vertical velocity (cropped)', fontsize=14)
+ax.set_title('Data (cropped)', fontsize=14)
 
 ###### Plot the topography
 axtopo = fig.add_subplot(1,3,3)
 
-# Put the values of the vertical velocity array into phi
+# Put the values of the data velocity array into phi
 phitopo = phase_bandtopo.ReadAsArray(0, 0,
        dstopo.RasterXSize, dstopo.RasterYSize,
        dstopo.RasterXSize, dstopo.RasterYSize)
@@ -222,7 +222,7 @@ axtopo.set_title('Topography (cropped)', fontsize=14)
 
 ############################
 
-fig.canvas.manager.set_window_title('Vertical velocity and topo')
+fig.canvas.manager.set_window_title('Data and topo')
 
 try:
     del ds
