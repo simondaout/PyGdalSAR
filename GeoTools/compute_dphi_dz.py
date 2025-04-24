@@ -15,7 +15,7 @@ Inputs must be the same size and the same number of pixels
 
 Usage:
     vert-vs-topo.py --data=<path> --topo=<path> --outfile=<path> [--ymin=<value>] [--ymax=<value>] [--tp=<value>] [<ibeg>] [<iend>] [<jbeg>] [<jend>]
-                    [--latmin=<val>] [--latmax=<val>] [--lonmin=<val>] [--lonmax=<val>]
+                    [--latmin=<val>] [--latmax=<val>] [--lonmin=<val>] [--lonmax=<val>] [--plot=<value>]
 
 Options:
     -h --help             Show this screen.
@@ -29,6 +29,7 @@ Options:
     --iend=<value>        Line number (biggest y-value) bounded the cutting zone [default: nlines].
     --jbeg=<value>        Column number (smallest x-value) bounded the cutting zone [default: 0].
     --jend=<value>        Column number (biggest x-value) bounded the cutting zone [default: ncols].
+    --plot=<value>        if True, display figures  [default: True].
 """
 
 import os, sys, logging
@@ -47,6 +48,7 @@ data = args["--data"]
 topo = args["--topo"]
 outfile = args["--outfile"]
 tp = float(args["--tp"]) if args["--tp"] else 0.1
+plot = args["--plot"]  if args["--plot"] else True
 
 yflag = False
 if args["--ymin"] and args["--ymax"]:
@@ -122,7 +124,7 @@ axcompare.set_title(outfile, fontsize=14)
 axcompare.legend(loc='best')  # Automatically find the best location
 fig2.canvas.manager.set_window_title('Cropped data')
 plt.tight_layout()
-fig2.savefig(f'{outfile}_crop_ylims_plot.png', format='PNG', dpi=180)
+fig2.savefig(f'{outfile}_scatterplot.pdf', format='PDF', dpi=180)
 
 #####################################################################################
 # PLOT TIFF MAPS
@@ -138,8 +140,6 @@ except:
 
 # Initialize a matplotlib figure
 fig = plt.figure(1,figsize=(15,8))
-
-rad2mm = 1
 
 ####### Plot the data velocity - Big context map
 axcontext = fig.add_subplot(1,3,1)
@@ -173,7 +173,7 @@ axcontext.add_patch(Rectangle((jbeg, ibeg), delj, deli, fc='none',color="black",
 ####### Plot the data velocity - cropped map
 ax = fig.add_subplot(1,3,2)
 # Trim the maps
-cutphi = as_strided(phi[ibeg:iend,jbeg:jend])*rad2mm
+cutphi = as_strided(phi[ibeg:iend,jbeg:jend])
 
 vmax = np.nanpercentile(cutphi,98)
 vmin = np.nanpercentile(cutphi,2)
@@ -200,7 +200,7 @@ phitopo = phase_bandtopo.ReadAsArray(0, 0,
        dstopo.RasterXSize, dstopo.RasterYSize,
        dstopo.RasterXSize, dstopo.RasterYSize)
 
-cutphitopo = as_strided(phitopo[ibeg:iend,jbeg:jend])*rad2mm
+cutphitopo = as_strided(phitopo[ibeg:iend,jbeg:jend])
 
 vmaxtopo = np.nanpercentile(cutphitopo,98)
 vmintopo = np.nanpercentile(cutphitopo,2)
@@ -234,8 +234,10 @@ except:
 plt.tight_layout()
 # ax.set_rasterized(True)
 try:
-    fig.savefig('{}_map.png'.format(outfile), format='PNG',dpi=180)
+    fig.savefig('{}_map.pdf'.format(outfile), format='PDF',dpi=180)
 except:
     pass
 
-plt.show()
+plot=False
+if plot:
+    plt.show()
