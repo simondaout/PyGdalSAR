@@ -238,6 +238,5 @@ try:
 except:
     pass
 
-plot=False
 if plot:
     plt.show()
