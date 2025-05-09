@@ -1287,7 +1287,8 @@ def empirical_cor(kk):
 
 
     elif sformat == 'GTIFF':
-        infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.geo.unw.tif'
+        folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
+        infile = int_path + folder + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.tiff'
 
         checkinfile(infile)
 
@@ -1321,7 +1322,8 @@ def empirical_cor(kk):
                 k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
                 rms_map[k] = float('NaN')
             elif sformat == 'GTIFF':
-                rmsfile=  int_path + str(date1) + '_' + str(date2) + '.geo.cc.tif'
+                folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
+                rmsfile=  int_path + folder + 'CNES_Coh_geo_' + str(date1) + '_' + str(date2) + rlook + '.tiff'
                 checkinfile(rmsfile)
                 ds = gdal.Open(rmsfile, gdal.GA_ReadOnly)
                 ds_band1 = ds.GetRasterBand(1)
@@ -1507,7 +1509,7 @@ def empirical_cor(kk):
     
     ax = fig.add_subplot(2,3,3)
     cax = ax.imshow(rms_map,cmap=cmap,interpolation='nearest')
-    ax.set_title('RMS')
+    ax.set_title('COH')
     plt.setp( ax.get_xticklabels(), visible=None)
     plt.setp( ax.get_yticklabels(), visible=None)
     divider = make_axes_locatable(ax)
@@ -1545,7 +1547,7 @@ def empirical_cor(kk):
     plt.colorbar(cax, cax=c)
     fig.tight_layout()
 
-    if sformat == 'ROI_PAC':
+    if sformat == 'ROI_PAC' or sformat == 'GTIFF':
         fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
     else:
         fig.savefig(out_path + idate +'corrections.png', format='PNG')
