@@ -349,6 +349,10 @@ if ('DEM' in locals()) and (DEM is not None):
 else:
     logger.info('DEM is not defined, read horizontale rotation in clockwise rotation in input file (default, rotation=0)')
     #slope = np.deg2rad(30)
+    if 'rotation' not in locals():
+        logger.warning('Define angle between north and new axis in the rotation variable in the input file')
+        logger.warning('Set to 0 by default')
+        rotation = 0
     rot = np.deg2rad(rotation)
     # define invert components
     comp = np.array(comp) - 1 
@@ -399,12 +403,11 @@ for i in range(M):
     # Apply reference zone shift...
     if insar[i].ref_zone is not None:
       if insar[i].ref_zone[1]<=insar[i].los.shape[0] and insar[i].ref_zone[3]<=insar[i].los.shape[1]:
-        for i in range(M):
-            ref_z = insar[i].los[insar[i].ref_zone[0]:insar[i].ref_zone[1],insar[i].ref_zone[2]:insar[i].ref_zone[3]]
-            if np.isnan(np.nanmean(ref_z)) is True:
+         ref_z = insar[i].los[insar[i].ref_zone[0]:insar[i].ref_zone[1],insar[i].ref_zone[2]:insar[i].ref_zone[3]]
+         if np.isnan(np.nanmean(ref_z)) is True:
                 logger.critical('Reference zone given contains only NaN values. Re-choose [y0, y1, x0, x1]. Exit!')
                 exit()
-            insar[i].los = insar[i].los - np.nanmean(ref_z)
+         insar[i].los = insar[i].los - np.nanmean(ref_z)
       else:
         logger.critical('Reference zone given is outside image. Re-choose [y0, y1, x0, x1]. Exit!')
         exit()
@@ -555,14 +558,14 @@ for n in range(N):
     m = as_strided(mask[:,:,int(comp[n])])
     # clean based on uncertainties
     index = s>np.nanpercentile(s,98.)
-    d[index] = float('NaN') 
+    #d[index] = float('NaN') 
     m[index] = 0.
-    index = s/abs(d) > 2. 
-    d[index] = float('NaN')
+    index = s/abs(d) > 3. 
+    #d[index] = float('NaN')
     m[index] = 0.
     # clean based on outiliers
     index = np.logical_or(d>np.percentile(d,99.8),d<np.percentile(d,.2))
-    d[index]= float('NaN') 
+    #d[index]= float('NaN') 
     m[index] = 0.
     
     if 'DEM' in locals():
@@ -584,7 +587,7 @@ for n in range(N):
 # PLOT RESULTS
 ################################
 
-fig=plt.figure(3, figsize=(11,7))
+fig=plt.figure(3, figsize=(10,12))
 
 for n in range(N):
 
@@ -596,7 +599,7 @@ for n in range(N):
     vmax =  np.nanpercentile(data,98)
     vmin = np.nanpercentile(data,2) 
     ax = fig.add_subplot(3,N,n+1)
-    cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=vmin,interpolation=None)
+    cax = ax.imshow(data,cmap=cmap_r,vmax=vmax,vmin=vmin)
     ax.set_title('{}'.format(comp_name[n]))
 
     divider = make_axes_locatable(ax)
@@ -610,7 +613,7 @@ for n in range(N):
 
     vmax=np.nanpercentile(sigdata,99)
     ax = fig.add_subplot(3,N,n+1+N)
-    cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0,interpolation=None)
+    cax = ax.imshow(sigdata,cmap=cmap_r,vmax=vmax,vmin=0)
     ax.set_title('SIGMA {}'.format(comp_name[n]))
     
     divider = make_axes_locatable(ax)
@@ -618,7 +621,7 @@ for n in range(N):
     plt.colorbar(cax, cax=c)
     
     ax = fig.add_subplot(3,N,n+1+N*2)
-    cax = ax.imshow(m,cmap=cm.Greys,interpolation=None)
+    cax = ax.imshow(m,cmap=cm.Greys)
     ax.set_title('MASK {}'.format(comp_name[n]))
 
     # Colorbar
@@ -626,7 +629,7 @@ for n in range(N):
     c = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cax, cax=c)
 
-# fig.tight_layout()
+fig.tight_layout()
 fig.savefig('decomposition_{}.pdf'.format(output), format='PDF',dpi=300)
 
 ################################
