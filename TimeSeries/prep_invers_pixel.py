@@ -254,7 +254,8 @@ else:
 
         if do_coh == 0:
             cohformat = int(1)
-            cohfile = os.path.abspath(coh_path + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.cc.tif')
+            folder = coh_path + 'int_'+ str(date1) + '_' + str(date2) + '/'
+            cohfile = os.path.abspath(folder + '/' + prefix_coh + str(date1) + '_' + str(date2) + suffix_coh + '.tiff')
             ds = gdal.Open(cohfile, gdal.GA_ReadOnly)
             ds_band = ds.GetRasterBand(1)
             coh = ds_band.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
