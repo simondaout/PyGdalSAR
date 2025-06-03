@@ -51,7 +51,6 @@ if arguments["-w"] == None:
     w = 'n'
 else :
     w = 'y'
-print(w)
 
 import matplotlib.pyplot as plt
 from matplotlib import dates
@@ -85,7 +84,7 @@ for line in open(arguments["<pair_file>"], "r"):
 
 if w == 'y':
     norm = colors.Normalize(vmin=min(weight), vmax=max(weight))
-    cmap = cm.rainbow
+    cmap = cm.PuBu
 
 # Draw nodes
 x, y = [], []
