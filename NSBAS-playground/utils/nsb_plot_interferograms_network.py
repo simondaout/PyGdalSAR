@@ -22,16 +22,15 @@
 nsb_plot_interferograms_network
 
 Usage:
-  nsb_plot_interferograms_network [-o <out_path>] <pair_file> <baseline_file>
+  nsb_plot_interferograms_network [-o <out_path>] <pair_file> <baseline_file> [-w <y/n>]
   nsb_plot_interferograms_network -h | --help
 
 Options:
   -o OUT_PATH  Write figure to file.
   -h --help    Show this screen.
+  -w <y/n>     show the weight used for TS analysis in the third column of pair_file (default: no)
 
 """
-
-
 
 import string, os
 from datetime import datetime
@@ -48,9 +47,16 @@ arguments = docopt.docopt(__doc__)
 if arguments["-o"]:
    mpl.use('pdf')
 
+if arguments["-w"] == None:
+    w = 'n'
+else :
+    w = 'y'
+
 import matplotlib.pyplot as plt
 from matplotlib import dates
 from matplotlib.dates import date2num, num2date
+import matplotlib.cm as cm
+import matplotlib.colors as colors
 
 import pydot
 #except ModuleNotFoundError as e:
@@ -61,13 +67,25 @@ ax = fig.add_subplot(111)
 
 # Load graph from <pair_file> and <baseline_file>
 graph = pydot.Dot("interferogram_network", graph_type="digraph")
+weight = []
 for line in open(arguments["<baseline_file>"], "r"):
     lines = line.split()
     date, pbaseline, rest = lines[0], lines[1], lines[2]
     graph.add_node(pydot.Node(date.strip(), label=date.strip(), bperp=float(pbaseline)))
 for line in open(arguments["<pair_file>"], "r"):
-    date1, date2 = line.split()[0], line.split()[1]
-    graph.add_edge(pydot.Edge(date1.strip(), date2.strip()))
+    if w == 'n':
+        date1, date2 = line.split()[0], line.split()[1]
+        graph.add_edge(pydot.Edge(date1.strip(), date2.strip()))
+        weight.append(1)
+    else :
+        date1, date2, wei = line.split()[0], line.split()[1], float(line.split()[2])
+        graph.add_edge(pydot.Edge(date1.strip(), date2.strip()))
+        weight.append(wei)
+
+if w == 'y':
+    norm = colors.Normalize(vmin=min(weight), vmax=max(weight))
+    cmap = cm.PuBu
+
 # Draw nodes
 x, y = [], []
 for n in graph.get_nodes():
@@ -75,14 +93,28 @@ for n in graph.get_nodes():
     y.append(float(n.get_attributes()["bperp"]))
 ax.plot(x, y, "o", color='dodgerblue', mec='black', markersize=4, picker=5)
 # Draw arrows
-for edge in graph.get_edges():
+for i, edge in enumerate(graph.get_edges()):
     master = graph.get_node(edge.get_source())[0]
     slave = graph.get_node(edge.get_destination())[0]
     x = date2num(datetime.strptime(master.get_label(), "%Y%m%d"))
     y = float(master.get_attributes()["bperp"])
     dx = date2num(datetime.strptime(slave.get_label(), "%Y%m%d")) - x
     dy = float(slave.get_attributes()["bperp"]) - y
-    ax.arrow(x, y, dx, dy, linewidth=.5, color='black', alpha=.5)
+
+    if w == 'y':
+        wei = weight[i]
+        color = cmap(norm(wei))
+    else:
+        color = 'black'
+    
+    ax.arrow(x, y, dx, dy, linewidth=.5, color=color, alpha=.5)
+
+if w == 'y':
+    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Weight')
+
 # Register click usage to display date of nearest point
 def onpick(event):
     global ax, an
@@ -100,12 +132,12 @@ def onpick(event):
     an.set_text(num2date(x).strftime("%Y/%m/%d"))
     an.set_visible(True)
     fig.canvas.draw()
-an = ax.annotate("",
-                 xy=(0, 0), xycoords="data",
-                 xytext=(0, 0), textcoords="data",
-                 arrowprops=dict(facecolor="black", width=1, frac=0.3),
-                 bbox=dict(boxstyle="round", fc="w"))
-an.set_visible(False)
+#an = ax.annotate("",
+#                 xy=(0, 0), xycoords="data",
+#                 xytext=(0, 0), textcoords="data",
+#                 arrowprops=dict(facecolor="black", width=1, frac=0.3),
+#                 bbox=dict(boxstyle="round", fc="w"))
+#an.set_visible(False)
 fig.canvas.mpl_connect("pick_event", onpick)
 # Show
 #fig.canvas.set_window_title("Interferogram network")
