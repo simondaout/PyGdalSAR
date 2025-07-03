@@ -279,7 +279,7 @@ def compute_slope_aspect(path, filter_size=2.0):
 
     # Calculate slope and aspect
     slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
-    aspect = np.arctan2(dsm_dy, -dsm_dx)  # clockwise from east
+    aspect = np.arctan2(dsm_dy, -dsm_dx)  # anti-clockwise from east
    
     # Create aspect and slope files
     dst = drv.Create('slope.tif', nlines, ncols, 1, gdal.GDT_Float32)
