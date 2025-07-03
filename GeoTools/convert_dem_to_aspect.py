@@ -64,11 +64,11 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
     print(f"Resolution: dx={res_x:.2f}, dy={res_y:.2f}")
 
     # Compute gradient (first axis = Y, second axis = X)
-    dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x)
+    dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x) # Y: lines, X: colomns
 
     # Calculate slope and aspect
     slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
-    aspect = np.rad2deg(np.arctan2(dsm_dy, -dsm_dx)) % 360  # Clockwise from east
+    aspect = np.rad2deg(np.arctan2(dsm_dy, -dsm_dx))  # Clockwise from east
 
     # Save outputs to GeoTIFF
     def save_raster(filename, array):
@@ -87,10 +87,10 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
         fig, axes = plt.subplots(2, 2, figsize=(11, 7))
         titles = ['Slope', 'Gradient X', 'Gradient Y', 'Aspect']
         datasets = [
-            slope[450:850, 500:900],
-            dsm_dx[450:850, 500:900],
-            dsm_dy[450:850, 500:900],
-            aspect[450:850, 500:900]
+            slope[:, :],
+            dsm_dx[:, :],
+            dsm_dy[:, :],
+            aspect[:, :]
         ]
         cmaps = ['Greys_r', 'coolwarm', 'coolwarm', 'Greys_r']
 
@@ -104,7 +104,7 @@ def compute_slope_aspect(dem_path, filter_size=2.0, plot=True):
         fig.savefig('dem_slope_aspect.png', dpi=300)
         plt.show()
 
-    return -aspect, slope
+    return aspect, slope
 
 
 def usage():
