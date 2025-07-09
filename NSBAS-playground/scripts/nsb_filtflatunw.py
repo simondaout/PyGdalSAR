@@ -356,11 +356,11 @@ class PileInt:
         ''' Return model file name 
         Assume model computed on the Rlooks_unw IFG...
         '''
-        _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
+        _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.stack'
         #if int(self.Rlooks_unw) > 1:
-        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.acp'
+        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) +  '_' + self.Rlooks_unw + 'rlks' + '.stack'
         #else:
-        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.acp'
+        #  _f = str(self._ifgs[kk].date1) + '-' + str(self._ifgs[kk].date2) + '.stack'
         return _f
 
     def geterafiles(self,kk):
@@ -1167,7 +1167,7 @@ def flat_model(config,kk):
             checkinfile(filtfile)
 
         # param file
-        param = config.stack.getname(kk) + '.acp'
+        param = config.stack.getname(kk) + '.stack'
         newparam = config.stack.getmodelfile(kk)
 
         if path.exists(filtfile) == False:
