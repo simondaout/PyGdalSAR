@@ -30,7 +30,7 @@ Options:
 --lectfile PATH     Path of the lect.in file [default: lect.in]
 --crop VALUE       Crop option with smoothing of boundaries [default: 0,ncols,0,nlines]
 --buff VALUE        Number of pixels for crop smothing  (default: 50)
---perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:99.9]
+--perc VALUE        Percentile of hidden LOS pixel for the estimation and clean outliers [default:100]
 --ramp<lin/quad/cub/no>      Correct the map from ramp in range and azimuth
 --ref=<jstart,jend,istart,iend> Set to zero displacements from jstart to jend
 --removeNAN         replace NaN by 0
@@ -150,7 +150,7 @@ else:
     ncols, nlines = list(map(int, open(lecfile).readline().split(None, 2)[0:2]))
     fid = open(infile, 'r')
     m = np.fromfile(fid,dtype=float32).reshape((nlines,ncols))
-    m[m==0.0] = float('NaN')
+#    m[m==0.0] = float('NaN')
 
 if arguments["--ref"] == None:
     lin_start, lin_jend, col_start, col_jend = None,None,None,None
@@ -228,7 +228,7 @@ if ramp != 'no':
     m_ramp = np.copy(mf)
     m_ramp[kk] = float('NaN')
 
-if ramp=='lin':
+if ramp == 'lin':
     index = np.nonzero(~np.isnan(m_ramp))
     temp = np.array(index).T
     mi = m[index].flatten()
@@ -260,7 +260,7 @@ if ramp=='lin':
     mf = mf - ramp
     del temp
 
-if ramp=='quad':
+elif ramp=='quad':
     index = np.nonzero(~np.isnan(m_ramp))
     temp = np.array(index).T
     mi = m[index].flatten()
@@ -439,7 +439,8 @@ maxlos,minlos=np.nanpercentile(mf,perc),np.nanpercentile(mf,(100-perc))
 print('Clean outliers outside {}-{} with perc:{}:'.format(maxlos,minlos,perc))
 kk = np.nonzero(
     np.logical_or(mf<minlos,mf>maxlos))
-mf[kk] = float('NaN')
+#mf[kk] = float('NaN')
+mf[kk] = 0
 
 # Plot
 vmax = np.nanpercentile(mf,98)
@@ -449,6 +450,7 @@ if setzero == 'yes':
     print('HELLO')
     # replace "NaN" to 0
     mf[np.isnan(mf)] = 0.
+    #mf[np.isnan(m)] = np.nan
 
 #save output
 if sformat == 'R4':
