@@ -3260,6 +3260,7 @@ for ii in range(int(arguments["--niter"])):
         # scale between 0 and 1 
         maxaps = np.nanmax(in_aps)
         in_aps = in_aps/maxaps
+        in_aps[imref] = 0.5
         min_aps= np.nanpercentile(in_aps,2)
         index = np.flatnonzero(in_aps<min_aps)
         in_aps[index] = min_aps
