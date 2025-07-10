@@ -19,7 +19,7 @@ in time based on a library of temporal functions (linear, heaviside, logarithm, 
 or given in as vector text file with the vector argument, (3) estimation of the misfit that will be then used as 
 weight for the next iteration. 
 
-Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--rms=<path>]\
 [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
 [--linear=<yes/no>] [--steps=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
 [--semianual=<yes/no>] [--bianual=<yes/no>]  [--bperp=<yes/no>] [--vector=<path>] \
@@ -34,7 +34,8 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --cube=<path>           Path to time series displacements cube file [default: no]
 --lectfile=<path>       Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
 --list_images=<path>    Path to list images file. text file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues].
---aps=<path>            Path to the APS file. Text file with a single columns giving an input error to each dates. By default, mo weigthing if no empirical estimation or misfit spatial estimation used as input uncertianties [default: None].
+--aps=<path>            Path to the APS file. Text file with two columns (dates, APS) giving an input APS to each dates. By default, no weigthing if no empirical estimation or misfit from the spatial estimation used as input uncertianties [default: None].
+--rms=<path>            Path to the RMS file. Text file with two columns (dates, RMS) giving an input RMS to each dates. By default, no weigthing if no empirical estimation or misfit from the spatial estimation used as input uncertianties [default: None].
 --rmspixel=<path>       Path to the RMS map. Map in r4 or tiff format that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None].
 --threshold_rms=<value> Threshold on rmspixel argument for empitical spatial estimations [default: 1.]
 --ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None]  
@@ -103,7 +104,7 @@ import scipy as sp
 import scipy.optimize as opt
 import numpy.linalg as lst
 from osgeo import gdal, osr
-import math,sys,getopt
+import math, sys, getopt, shutil
 from os import path, environ, getcwd
 import os
 import matplotlib
@@ -383,10 +384,6 @@ if arguments["--list_images"] ==  None:
         arguments["--list_images"] = "list_images.txt"
 if arguments["--cube"] ==  None:
     arguments["--cube"] = "depl_cumule"
-if arguments["--aps"] ==  None:
-    apsf = 'no'
-else:
-    apsf = arguments["--aps"]
 if arguments["--linear"] ==  None:
     arguments["--linear"] = 'yes'
 if arguments["--seasonal"] ==  None:
@@ -1034,23 +1031,43 @@ for l in range((Mker)):
     kernels[l].m = np.ones((new_lines,new_cols))*float('NaN')
     kernels[l].sigmam = np.ones((new_lines,new_cols))*float('NaN')
 
-# initialize qual
-if apsf=='no':
-    inaps=np.ones((N)) # no weigthing for the first itertion
+# initialize aps
+if  arguments["--aps"] is None:
+    in_aps = np.ones((N)) # no weigthing for the first itertion
 else:
-    fimages=apsf
+    fimages =  arguments["--aps"]
     try:
-        inaps=np.loadtxt(fimages, unpack=True, comments='#', usecols=(2), dtype='f')
+        in_aps = np.loadtxt(fimages, unpack=True, comments='#', usecols=(2), dtype='f')
     except:
-        logger.warning('APS file is in decrepicated format, use RMSpixel file from inversion output with 3 columns')
-        inaps=np.loadtxt(fimages, comments='#', dtype='f')
-    logger.info('Input uncertainties: {}'.format(inaps))
+        logger.warning('APS file is in decrepicated format, requiered two columns text file`')
+        in_aps = np.loadtxt(fimages, comments='#', dtype='f')
+    logger.info('Input APS: {}'.format(in_aps))
     logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-    minaps= np.nanpercentile(inaps,2)
-    index = np.flatnonzero(inaps<minaps)
-    inaps[index] = minaps
-    inaps = inaps[indexd]
-    logger.info('Output uncertainties for first iteration: {}'.format(inaps))
+    min_aps= np.nanpercentile(in_aps,2)
+    index = np.flatnonzero(in_aps<min_aps)
+    in_aps[index] = min_aps
+    in_aps = in_aps[indexd]
+
+# initialize rms
+if  arguments["--rms"] is None:
+    in_rms = np.ones((N)) # no weigthing for the first itertion
+else:
+    fimages =  arguments["--rms"]
+    try:
+        in_rms = np.loadtxt(fimages, unpack=True, comments='#', usecols=(2), dtype='f')
+    except:
+        logger.warning('RMS file is in decrepicated format, requiered two columns text file`')
+        in_rms = np.loadtxt(fimages, comments='#', dtype='f')
+    logger.info('Input RMS: {}'.format(in_rms))
+    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
+    min_rms= np.nanpercentile(in_rms,2)
+    index = np.flatnonzero(in_rms < min_rms)
+    in_rms[index] = min_rms
+    in_rms = in_rms[indexd]
+
+## initialize input uncertainties
+in_sigma = in_rms * in_aps
+logger.info('Input uncertainties: {}'.format(in_rms))
 
 ## inversion procedure
 def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
@@ -3135,13 +3152,13 @@ def temporal_decomp(pix):
             G[:,Mbasis+l]=kernels[l].g(k)
         
         # inversion
-        m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
+        m,sigmam = consInvert(G,taby,in_sigma[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
         #if np.max(m)>40:
         #  print('line:',i,'col:',j)
         #  print(len(k), N)
         #  print(G[:6,:6])
         #  print(taby)
-        #  print(inaps[k])
+        #  print(in_sigma[k])
         #  print(m)
         #  print(sigmam)
         #  sys.exit()
@@ -3235,19 +3252,39 @@ for ii in range(int(arguments["--niter"])):
         del maps_topo
 
     # save rms
-    if (apsf=='no' and ii==0):
+    if (arguments["--aps"] is None and ii==0):
         # aps from rms
-        logger.info('Use RMS empirical estimation as uncertainties for time decomposition')
-        inaps = np.copy(rms)
+        logger.info('Use RMS empirical estimations as input APS for time decomposition')
+        in_aps = np.copy(rms)
         logger.info('Set very low values to the 2 percentile to avoid overweighting...')
         # scale between 0 and 1 
-        maxaps = np.nanmax(inaps)
-        inaps = inaps/maxaps
-        minaps= np.nanpercentile(inaps,2)
-        index = np.flatnonzero(inaps<minaps)
-        inaps[index] = minaps
-        np.savetxt('rms_empcor.txt', inaps.T)
+        maxaps = np.nanmax(in_aps)
+        in_aps = in_aps/maxaps
+        min_aps= np.nanpercentile(in_aps,2)
+        index = np.flatnonzero(in_aps<min_aps)
+        in_aps[index] = min_aps
+        in_sigma = in_aps * in_rms
+        np.savetxt('rms_empcor.txt', in_aps.T)
         del rms
+
+    #######################################################
+    # Save new cubes
+    #######################################################
+
+    # create new cube
+    if flat>0:
+        logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
+        fid = open('depl_cumule_flat', 'wb')
+        maps_flata[:,:,:].astype('float32').tofile(fid)
+        in_hdr = arguments["--cube"] + '.hdr'
+        arguments["--cube"] = 'depl_cumule_flat' # update depl_cumul
+        out_hdr = 'depl_cumule_flat.hdr'
+        try:
+            shutil.copy(in_hdr, out_hdr)
+        except:
+            pass
+        fid.close()
+        del fid
 
     ########################
     # TEMPORAL ITERATION N #
@@ -3261,8 +3298,7 @@ for ii in range(int(arguments["--niter"])):
     #########################################
     print()
 
-    # initialize aps for each images to 1
-    logger.debug('Input uncertainties: {}'.format(inaps))
+    logger.info('Input uncertainties: {}'.format(in_sigma))
 
     # reiinitialize maps models
     models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
@@ -3293,21 +3329,21 @@ for ii in range(int(arguments["--niter"])):
     index = np.logical_or(models>9999., models<-9999)
     models[index] = 0.
     squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
-    aps = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
+    res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
-    # remove low aps to avoid over-fitting in next iter
-    minaps= np.nanpercentile(aps,2)
-    index = np.flatnonzero(aps<minaps)
-    aps[index] = minaps
+    # remove low res to avoid over-fitting in next iter
+    min_res= np.nanpercentile(res,2)
+    index = np.flatnonzero(res < min_res)
+    res[index] = min_res
 
-    print('Dates      APS  ')
+    print('Dates      Residuals  ')
     for l in range(N):
-        print (idates[l], aps[l])
-    np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
-    # set apsf is yes for iteration
-    apsf=='yes'
-    # update aps for next iterations taking into account inaps and the residues of the last iteration
-    inaps = np.copy(aps) * inaps
+        print (idates[l], res[l])
+    np.savetxt('aps_{}.txt'.format(ii), res.T, fmt=('%.6f'))
+    # set apsf is yes for next iteration
+    arguments["--aps"] == 'yes'
+    # update aps for next iterations taking into account in_aps and the residues of the last iteration
+    in_sigma = res * in_aps * in_rms
 
 #######################################################
 # Save functions in binary file
@@ -3382,15 +3418,8 @@ else:
 
 
 #######################################################
-# Save new cubes
+# Save new maps
 #######################################################
-
-# create new cube
-if flat>0:
-  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-  fid = open('depl_cumule_flat', 'wb')
-  maps_flata[:,:,:].astype('float32').tofile(fid)
-  fid.close()
 
 if arguments["--fulloutput"]=='yes':
     # create MAPS directory to save .r4
