@@ -2981,15 +2981,15 @@ def empirical_cor(l):
   global fig_dphi
 
   # first clean los
-  maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
+  map_temp = as_strided(maps[:,:,l]) - as_strided(models[:,:,l])
 
   # no estimation on the ref image set to zero 
   if np.nansum(maps[:,:,l]) != 0:
 
-    maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
+    maxlos,minlos=np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
     logger.debug('Set Max-Min LOS for empirical estimation: {0}-{1}'.format(maxlos,minlos))
-    kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-    maps_temp[kk] = float('NaN')
+    kk = np.nonzero(np.logical_or(map_temp==0.,np.logical_or((map_temp>maxlos),(map_temp<minlos))))
+    map_temp[kk] = float('NaN')
 
     itemp = ibeg_emp
     for lign in range(ibeg_emp,iend_emp,10):
@@ -3010,12 +3010,12 @@ def empirical_cor(l):
     index = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
             np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
-            np.logical_and(~np.isnan(maps_temp),
+            np.logical_and(~np.isnan(map_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
                 np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
                 np.logical_and(rmsmap>1.e-6,
-                np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>ibeg_emp,
                 np.logical_and(pix_az<iend_emp,
                 np.logical_and(pix_rg>jbeg_emp,
@@ -3028,7 +3028,7 @@ def empirical_cor(l):
     temp = np.array(index).T
     x = temp[:,0]; y = temp[:,1]
     # clean maps
-    los_clean = maps_temp[index].flatten()
+    los_clean = map_temp[index].flatten()
     topo_clean = elev[index].flatten()
     rms_clean = rmsmap[index].flatten()
     
@@ -3065,12 +3065,12 @@ def empirical_cor(l):
         indexref = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
             np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
-            np.logical_and(~np.isnan(maps_temp),
+            np.logical_and(~np.isnan(map_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
                 np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
                 np.logical_and(rmsmap>1.e-6,
-                np.logical_and(~np.isnan(maps_temp),
+                np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>lin_start,
                 np.logical_and(pix_az<lin_end,
                 np.logical_and(pix_rg>col_start,
@@ -3109,24 +3109,22 @@ def empirical_cor(l):
   ramp[kk] = float('NaN')
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
-  del ramp, topo, maps_temp
+  del ramp, topo, map_temp
  
   if arguments["--topofile"] is not None: 
     return map_flata, map_topo, rmsi 
   else:
     return map_flata, rmsi 
 
-def temporal_decomp(pix):
+def temporal_decomp(pix, disp, sigma, cond, ineq, eguality):
     j = pix  % (new_cols)
     i = int(pix/(new_cols))
-    #i,j=221,318 
 
     # Initialisation
     mdisp=np.ones((N), dtype=np.float32)*float('NaN')
     mlin=np.ones((N), dtype=np.float32)*float('NaN')
     mseas=np.ones((N), dtype=np.float32)*float('NaN')
     mvect=np.ones((N), dtype=np.float32)*float('NaN')
-    disp = as_strided(maps_flata[i,j,:])
     k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
     # do not take into account NaN data
     kk = len(k)
@@ -3152,25 +3150,14 @@ def temporal_decomp(pix):
             G[:,Mbasis+l]=kernels[l].g(k)
         
         # inversion
-        m,sigmam = consInvert(G,taby,in_sigma[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
-        #if np.max(m)>40:
-        #  print('line:',i,'col:',j)
-        #  print(len(k), N)
-        #  print(G[:6,:6])
-        #  print(taby)
-        #  print(in_sigma[k])
-        #  print(m)
-        #  print(sigmam)
-        #  sys.exit()
+        m,sigmam = consInvert(G,taby,sigma[k],cond=cond,ineq=ineq,eguality=eguality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
 
-        # Build seasonal and vect models
     return m, sigmam, mdisp 
 
 # initialization
-maps_flata = np.copy(maps)
 models = np.zeros((new_lines,new_cols,N), dtype=np.float32)
 
 # prepare flatten maps
@@ -3207,9 +3194,9 @@ for ii in range(int(arguments["--niter"])):
     
       for l in range((N)):
           if arguments["--topofile"] is not None:
-            maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
+            maps[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
           else:
-            maps_flata[:,:,l], rms[l] = empirical_cor(l)
+            maps[:,:,l], rms[l] = empirical_cor(l)
 
       if N < 30:
         # plot corrected ts
@@ -3218,7 +3205,7 @@ for ii in range(int(arguments["--niter"])):
         figd.subplots_adjust(hspace=0.001,wspace=0.001)
         for l in range((N)):
             axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
+            caxd = axd.imshow(maps[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
             axd.set_title(idates[l],fontsize=6)
             plt.setp(axd.get_xticklabels(), visible=False)
             plt.setp(axd.get_yticklabels(), visible=False)
@@ -3276,7 +3263,7 @@ for ii in range(int(arguments["--niter"])):
     if flat>0:
         logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
         fid = open('depl_cumule_flat', 'wb')
-        maps_flata[:,:,:].astype('float32').tofile(fid)
+        maps[:,:,:].astype('float32').tofile(fid)
         in_hdr = arguments["--cube"] + '.hdr'
         arguments["--cube"] = 'depl_cumule_flat' # update depl_cumul
         out_hdr = 'depl_cumule_flat.hdr'
@@ -3305,14 +3292,13 @@ for ii in range(int(arguments["--niter"])):
     models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
     with TimeIt():
-          for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
+        for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
               j = pix  % (new_cols)
               i = int(pix/(new_cols))
-
               if ((i % 10) == 0) and (j==0):
-                logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
-              
-              m, sigmam, models[i,j,:]  = temporal_decomp(pix)
+                  logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
+              disp = as_strided(maps[i,j,:])
+              m, sigmam, models[i,j,:]  = temporal_decomp(pix, disp, in_sigma, arguments['--cond'], arguments['--ineq'], eguality)
             
               # save m
               for l in range((Mbasis)):
@@ -3329,7 +3315,7 @@ for ii in range(int(arguments["--niter"])):
     # remove outiliers
     index = np.logical_or(models>9999., models<-9999)
     models[index] = 0.
-    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
+    squared_diff = (np.nan_to_num(maps,nan=0) - np.nan_to_num(models, nan=0))**2
     res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low res to avoid over-fitting in next iter
@@ -3429,9 +3415,6 @@ if arguments["--fulloutput"]=='yes':
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-# clean memory
-del maps 
-
 if N < 30:
   # plot displacements models and residuals
   nfigure +=1
@@ -3446,18 +3429,18 @@ if N < 30:
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
-  cax = ax.imshow(maps_flata[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+  cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
   figclr.savefig('colorscale.eps', format='EPS',dpi=150)
   
   for l in range((N)):
-      data = as_strided(maps_flata[:,:,l])
+      data = as_strided(maps[:,:,l])
       if Mker>0:
-          data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
+          data_flat = as_strided(maps[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
           model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
       else:
-          data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
+          data_flat = as_strided(maps[:,:,l]) - as_strided(basis[0].m[:,:])
           model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
       res = data_flat - model
       
@@ -3523,7 +3506,7 @@ if N < 30:
   plt.close('all')
 
 # clean memory
-del maps_flata
+del maps
 
 #######################################################
 # Compute Amplitude and phase seasonal
