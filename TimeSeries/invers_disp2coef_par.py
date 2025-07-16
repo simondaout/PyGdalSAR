@@ -19,40 +19,41 @@ in time based on a library of temporal functions (linear, heaviside, logarithm, 
 or given in as vector text file with the vector argument, (3) estimation of the misfit that will be then used as 
 weight for the next iteration. 
 
-Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] \
+Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<path>] [--aps=<path>] [--rms=<path>]\
 [--rmspixel=<path>] [--threshold_rms=<value>] [--ref_zone=<jstart,jend,istart,iend>] [--niter=<value>]  [--spatialiter=<yes/no>] \
-[--linear=<yes/no>] [--coseismic=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
-[--semianual=<yes/no>] [--bianual=<yes/no>]  [--dem=<yes/no>] [--vector=<path>] \
+[--linear=<yes/no>] [--steps=<value,value>] [--postseismic=<value,value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--slowslip=<value,value>] \
+[--semianual=<yes/no>] [--bianual=<yes/no>]  [--bperp=<yes/no>] [--vector=<path>] \
 [--flat=<0/1/2/3/4/5/6/7/8/9>] [--nfit=<0/1>] [--ivar=<0/1>] \
 [--sampling=<value>] [--emp_sampling=<value>] [--imref=<value>]  [--cond=<value>] [--ineq=<yes/no>]  \
 [--mask=<path>] [--rampmask=<yes/no>] [--threshold_mask=<value>] [--scale_mask=<value>] [--tempmask=<yes/no>]\
 [--topofile=<path>] [--aspect=<path>] [--perc_topo=<value>] [--perc_los=<value>] \
 [--crop=<value,value,value,value>] [--crop_emp=<value,value,value,value>] [--fulloutput=<yes/no>] [--geotiff=<path>] [--plot=<yes/no>] \
-[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] 
+[--dateslim=<values_min,value_max>]  [--nproc=<nb_cores>] [--ndatasets=<nb_data_sets>] 
 
 -h --help               Show this screen
 --cube=<path>           Path to time series displacements cube file [default: no]
 --lectfile=<path>       Path to the lect.in file. Simple text file containing width and length and number of images of the time series cube (output of invers_pixel). By default the program will try to find an .hdr file. [default: lect.in].
 --list_images=<path>    Path to list images file. text file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues].
---aps=<path>            Path to the APS file. Text file with a single columns giving an input error to each dates. By default, mo weigthing if no empirical estimation or misfit spatial estimation used as input uncertianties [default: None].
+--aps=<path>            Path to the APS file. Text file with two columns (dates, APS) giving an input APS to each dates. By default, no weigthing if no empirical estimation or misfit from the spatial estimation used as input uncertianties [default: None].
+--rms=<path>            Path to the RMS file. Text file with two columns (dates, RMS) giving an input RMS to each dates. By default, no weigthing if no empirical estimation or misfit from the spatial estimation used as input uncertianties [default: None].
 --rmspixel=<path>       Path to the RMS map. Map in r4 or tiff format that gives an error for each pixel (e.g RMSpixel, output of invers_pixel) [default: None].
 --threshold_rms=<value> Threshold on rmspixel argument for empitical spatial estimations [default: 1.]
 --ref_zone=<lin_start,lin_end,col_start,col_end> Starting and ending lines and col numbers where phase is set to zero [default: None]  
 --niter=<value>         Number of iterations. At the first iteration, image uncertainties is given by aps file or misfit spatial iteration, while for the next itarations, uncertainties are equals to the global RMS previous temporal decomposition [default: 0].
 --linear=<yes/no>       Add a linear function in the inversion [default:yes]
---coseismic=<value,value>     Add heaviside functions to the inversion, indicate coseismic time (e.g 2004.,2006.) [default: None]
---postseismic=<value,value>   Add logarithmic transients to each coseismic step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than coseismic (e.g 1.,1.). To not associate postseismic function to a give coseismic step, put None (e.g None,1.) [default: None].
+--steps=<value,value>     Add heaviside functions to the inversion, indicate steps time (e.g 2004.,2006.) [default: None]
+--postseismic=<value,value>   Add logarithmic transients to each steps step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than steps (e.g 1.,1.). To not associate postseismic function to a give steps step, put None (e.g None,1.) [default: None].
 --slowslip=<value,value>      Add slow-slip function in the inversion . As defined by Larson et al., 2004. Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None].
 --vector=<path>         Path to the vector text files containing a value for each dates [default: None]
 --seasonal=<yes/no>       If yes, add seasonal terms in the decomposition [default: no]
 --semianual=<yes/no>      If yes, add semianual terms in the decomposition [default: no]
 --seasonal_increase PATH         If yes, add seasonal terms function of time in the inversion
 --bianual=<yes/no>       If yes, add bianual terms in the decomposition [default: no]
---dem=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
+--bperp=<yes/no>           If yes, add term proportional to the perpendicular baseline in the inversion [default: no]
 --ivar=<0/1>            Define the phase/elevation relationship: ivar=0 function of elevation, ivar=1 crossed function of azimuth and elevation [default: 0]
 --nfit=<0/1>            Fit degree in azimuth or in elevation (0:linear (default), 1: quadratic) [default: 0]
 --flat=<0/1/2/3/4/5/6/7/8/9>             Remove a spatial ramp at each iteration [default: 0].
---spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, coseismic...) [default: yes]
+--spatialiter=<yes/no>   If 'yes' iterate the spatial estimations at each iterations (defined by niter arguments) on the maps minus the temporal terms (ie. linear, steps...) [default: yes]
 --sampling=<value>      Downsampling factor for temporal decomposition [default: 1]
 --emp_sampling=<value>      Downsampling factor for empirical estimations [default: 1]
 --imref=<value>         Reference image number [default: 1]
@@ -66,14 +67,15 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --perc_los=<value>        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:99.]
 --perc_topo=<value>       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:99.]
 --cond=<value>            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
---ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than coseismic steps of the first guess [default: yes].
---fulloutput=<yes/no>      If yes produce maps of models as well as flatten cube without seasonal and linear term [default: no]
+--ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than steps steps of the first guess [default: yes].
+--fulloutput=<yes/no>      If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff=<path>           Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files 
 --plot=<yes/no>         Display plots [default: no]
 --dateslim=<value,value>     Datemin,Datemax time series 
 --crop=<value,value,value,value>            Define a region of interest for the temporal decomposition 
---crop_emp=<value,value,value,value>    Define a region of interest for the spatial estimatiom (ramp+phase/topo)
---nproc=<nb_cores>        Use <nb_cores> local cores to create delay maps [Default: 5] 
+--crop_emp=<value,value,value,value>    Define a region of interest for the spatial estimatiom (ramp+phase/topo) 
+--nproc=<nb_cores>        Use <nb_cores> local cores to create delay maps [Default: 4]
+--ndatasets=<nb_data_sets> Number of data sets [Default:1] 
 """
 
 # 0: ref frame [default], 1: range ramp ax+b , 2: azimutal ramp ay+b, 3: ax+by+c,
@@ -101,16 +103,17 @@ from numpy.lib.stride_tricks import as_strided
 import scipy as sp
 import scipy.optimize as opt
 import numpy.linalg as lst
-import scipy.sparse.linalg as spla
-from scipy.sparse import lil_matrix
 from osgeo import gdal, osr
-import math,sys,getopt
+import math, sys, getopt, shutil
 from os import path, environ, getcwd
 import os
 import matplotlib
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
-from datetime import datetime as datetimes
+from datetime import datetime as dt
+import multiprocessing
+from multiprocessing import shared_memory
+import psutil
 
 try:
     from nsbas import docopt
@@ -119,11 +122,8 @@ except:
 
 from contextlib import contextmanager
 from functools import wraps, partial
-# muti trheading
-import concurrent.futures
-import multiprocessing
+# import multiprocessing
 import logging, time
-import threading
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -157,7 +157,7 @@ def Heaviside(t):
 def Box(t):
         return Heaviside(t+0.5)-Heaviside(t-0.5)
 
-class coseismic(pattern):
+class steps(pattern):
       def __init__(self,name,reduction,date):
           pattern.__init__(self,name,reduction,date)
           self.to=date
@@ -183,7 +183,7 @@ class reference(pattern):
     def g(self,t):
         return np.ones((t.size))
 
-class interseismic(pattern):
+class linear(pattern):
     def __init__(self,name,reduction,date):
         pattern.__init__(self,name,reduction,date)
         self.to=date
@@ -292,7 +292,7 @@ class slowslip(pattern):
           return funct
 
 ### KERNEL FUNCTIONS: not function of time
-class corrdem(pattern):
+class corrBperp(pattern):
     def __init__(self,name,reduction,bp0,bp):
         self.name = name
         self.reduction = reduction
@@ -322,7 +322,7 @@ def date2dec(dates):
     dates  = np.atleast_1d(dates)
     times = []
     for date in dates:
-        x = datetimes.strptime('{}'.format(date),'%Y%m%d')
+        x = dt.strptime('{}'.format(date),'%Y%m%d')
         dec = float(x.strftime('%j'))/365.1
         year = float(x.strftime('%Y'))
         times.append(year + dec)
@@ -350,16 +350,58 @@ class ContextDecorator(object):
 
 class TimeIt(ContextDecorator):
     def __enter__(self):
-        self.start = datetimes.now()
+        self.start = dt.now()
         logger.info('Starting time process: {0}'.format(self.start))
     def __exit__(self, type, value, traceback):
-        logger.info('Time process: {0}s'.format((datetimes.now() - self.start).total_seconds()))
+        logger.info('Time process: {0}s'.format((dt.now() - self.start).total_seconds()))
 
 
 def checkinfile(file):
     if path.exists(file) is False:
         logger.critical("File: {0} not found, Exit !".format(file))
         logger.info("File: {0} not found in {1}, Exit !".format(file,getcwd()))
+        sys.exit()
+
+def write_envi_hdr(filename, shape, dtype='float32', interleave='bip'):
+    """
+    Crée un fichier ENVI .hdr à partir d'un fichier.
+    
+    Parameters:
+    - filename: nom du fichier sans extension (.hdr sera ajouté)
+    - shape: tuple (lines, samples, bands)
+    - dtype: type numpy ('float32', 'int16', ...)
+    - interleave: 'bsq', 'bil' ou 'bip'
+    """
+
+    lines, samples, bands = shape
+    dtype_map = {
+        'uint8': 1,
+        'int16': 2,
+        'int32': 3,
+        'float32': 4,
+        'float64': 5,
+        'complex64': 6,
+        'complex128': 9,
+        'uint16': 12,
+        'uint32': 13,
+        'int64': 14,
+        'uint64': 15,
+    }
+
+    if dtype not in dtype_map:
+        raise ValueError(f"Unsupported data type for ENVI: {dtype}")
+    
+    hdr_content = f"""ENVI
+samples = {samples}
+lines   = {lines}
+bands   = {bands}
+data type = {dtype_map[dtype]}
+interleave = {interleave}
+byte order = 0
+"""
+
+    with open(filename + '.hdr', 'w') as f:
+        f.write(hdr_content)
 
 ################################
 # Initialization
@@ -370,13 +412,14 @@ arguments = docopt.docopt(__doc__)
 if arguments["--lectfile"] ==  None:
     arguments["--lectfile"] = "lect.in"
 if arguments["--list_images"] ==  None:
-    arguments["--list_images"] = "images_retenues"
+    try:
+        checkinfile("images_retenues")
+        arguments["--list_images"] = "images_retenues"
+    except:
+        checkinfile("list_images.txt")
+        arguments["--list_images"] = "list_images.txt"
 if arguments["--cube"] ==  None:
     arguments["--cube"] = "depl_cumule"
-if arguments["--aps"] ==  None:
-    apsf = 'no'
-else:
-    apsf = arguments["--aps"]
 if arguments["--linear"] ==  None:
     arguments["--linear"] = 'yes'
 if arguments["--seasonal"] ==  None:
@@ -387,8 +430,8 @@ if arguments["--semianual"] ==  None:
     arguments["--semianual"] = 'no'
 if arguments["--bianual"] ==  None:
     arguments["--bianual"] = 'no'
-if arguments["--dem"] ==  None:
-    arguments["--dem"] = 'no'
+if arguments["--bperp"] ==  None:
+    arguments["--bperp"] = 'no'
 if arguments["--niter"] ==  None:
     arguments["--niter"] = 1
 if arguments["--spatialiter"] ==  None:
@@ -459,11 +502,16 @@ if arguments["--perc_topo"] ==  None:
 if arguments["--perc_los"] ==  None:
     arguments["--perc_los"] = 98.
 if arguments["--nproc"] ==  None:
-    nproc = 5
+    nproc = 10
 else:
     nproc = int(arguments["--nproc"])
+if arguments["--ndatasets"] ==  None:
+    ndata = 1
+else:
+    ndata = int(arguments["--ndatasets"])
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
+    logger.warning('plot is yes. Set nproc to 1')
     nproc = 1
     if environ["TERM"].startswith("screen"):
         matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
@@ -481,9 +529,6 @@ elif int(arguments["--imref"]) < 1:
 else:
     imref = int(arguments["--imref"]) - 1
 
-# Créez un objet barrière avec le nombre de threads que vous utilisez
-barrier = threading.Barrier(nproc)
-
 #####################################################################################
 # INITIALISATION
 #####################################################################################
@@ -494,22 +539,55 @@ cmap.set_bad('white')
 
 logger.debug('Load list of dates file: {}'.format(arguments["--list_images"]))
 checkinfile(arguments["--list_images"])
-nb,idates,dates,base=np.loadtxt(arguments["--list_images"], comments='#', usecols=(0,1,3,5), unpack=True,dtype='i,i,f,f')
-N = len(dates)
-baseref = base[imref]
 
+# Initialisation des variables
+idates = None
+dates = None
+bases = []
+baserefs = []
+
+# Chargement du fichier images_retenues avec une structure dynamique pour ndata > 2
+if ndata >= 1:
+    # Charger les colonnes pour idates et dates (colonnes 1 et 3)
+    # Générer dynamiquement les colonnes pour chaque base (à partir de la colonne 5)
+    columns = [1, 3] + list(range(5, 5 + ndata))
+
+    # Charger les données en utilisant `usecols=columns`
+    data = np.loadtxt(arguments["--list_images"], comments='#', usecols=columns, unpack=True)
+
+    # Extraire les données de dates
+    idates = data[0].astype(int)
+    dates = data[1]
+
+    # Extraire les bases et initialiser les références
+    for i in range(ndata):
+        base = data[2 + i]
+        bases.append(base)
+
+        # Choisir la première date comme référence (index `imref = 0`)
+        baserefs.append(base[0])  # baseref correspondant à chaque base
+
+# Nombre total d'images (dates)
+N = len(dates)
+
+# datemin est la reference temporelle pour les fonctions de base
+# dmin, dmax sont les dates limites des figures
 if arguments["--dateslim"] is not  None:
     dmin,dmax = arguments["--dateslim"].replace(',',' ').split()
-    datemin = date2dec(dmin)
-    datemax = date2dec(dmax)
-else:
-    datemin, datemax = int(np.min(dates)), int(np.max(dates))+1
-    dmax = str(datemax) + '0101'
+    datemin = int(date2dec(dmin)[0])
+    datemax = int(date2dec(dmax)[0]) + 1
     dmin = str(datemin) + '0101'
+    dmax = str(datemax) + '0101'
+else:
+    datemin, datemax = int(np.min(dates)), int(np.max(dates)) + 1
+    dmin = str(int(np.min(dates))) + '0101'
+    dmax = str(int(np.max(dates))+1) + '0101'
 
 # clean dates
-indexd = np.flatnonzero(np.logical_and(dates<datemax,dates>datemin))
-nb,idates,dates,base = nb[indexd],idates[indexd],dates[indexd],base[indexd]
+indexd = np.flatnonzero(np.logical_and(dates<=datemax,dates>=datemin))
+idates,dates = idates[indexd],dates[indexd]
+# Mettre à jour les bases en filtrant également selon indexd
+bases = [bp[indexd] for bp in bases]
 
 # lect cube
 checkinfile(arguments["--cube"])
@@ -520,7 +598,6 @@ if not ds:
 else:
   ncol, nlines = ds.RasterXSize, ds.RasterYSize
   N = ds.RasterCount
-# print(nlines,ncol)
 
 logger.debug('Read reference zones: {}'.format(arguments["--ref_zone"]))
 if arguments["--ref_zone"] == None:
@@ -543,27 +620,47 @@ else:
 ibeg,iend,jbeg,jend = int(crop[0]),int(crop[1]),int(crop[2]),int(crop[3])
 
 # extract time series
-cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
-cube = as_strided(cubei[:nlines*ncol*N])
-logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
-kk = np.flatnonzero(cube>9990)
-cube[kk] = float('NaN')
-maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
+try:
+    maps_temp = np.zeros((nlines, ncol, N), dtype=np.float32)
+    for band_index in range(1, N + 1):
+        band = ds.GetRasterBand(band_index)
+        maps_temp[:, :, band_index - 1] = band.ReadAsArray()
+    logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(maps_temp.flatten())))
+    kk = np.nonzero(np.logical_or(maps_temp==9990, maps_temp==9999))
+    maps_temp[kk] = float('NaN')
+except:
+    cubei = np.fromfile(arguments["--cube"],dtype=np.float32)
+    cube = as_strided(cubei[:nlines*ncol*N])
+    logger.info('Load time series cube: {0}, with length: {1}'.format(arguments["--cube"], len(cube)))
+    kk = np.flatnonzero(np.logical_or(cube==9990, cube==9999))
+    cube[kk] = float('NaN')
+    maps_temp = as_strided(cube.reshape((nlines,ncol,N)))
+    del cube, cubei
 
 # set at NaN zero values for all dates
-# kk = np.nonzero(maps_temp[:,:,-1]==0)
 cst = np.copy(maps_temp[:,:,imref])
+cst[np.isnan(cst)] = 0.0
 for l in range((N)):
     maps_temp[:,:,l] = maps_temp[:,:,l] - cst
     if l != imref:
         index = np.nonzero(maps_temp[:,:,l]==0.0)
         maps_temp[:,:,l][index] = float('NaN')
-
 N=len(dates)
-maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
+maps_temp = maps_temp[ibeg:iend,jbeg:jend,indexd]
 logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
-logger.info('Reshape cube: {}'.format(maps.shape))
-new_lines, new_cols = maps.shape[0], maps.shape[1]
+logger.info('Reshape cube: {}'.format(maps_temp.shape))
+new_lines, new_cols = maps_temp.shape[0], maps_temp.shape[1]
+
+# save time series for processinf
+logger.info('Save time series cube: {}'.format('disp_cumul_flat'))
+maps = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
+    shape=maps_temp.shape)
+maps[:] = maps_temp[:]
+maps.flush()  # Force l’écriture sur disque
+write_envi_hdr('disp_cumul_flat', shape=(new_lines, new_cols, N))
+
+# clean
+del maps_temp
 
 if arguments["--crop_emp"] ==  None:
     crop_emp = [0,new_lines,0,new_cols]
@@ -571,9 +668,6 @@ else:
     crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
     logger.warning('Crop empirical estimation between lines {}-{} and cols {}-{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
 ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
-
-# clean
-del cube, cubei, maps_temp
 
 nfigure=0
 # open mask file
@@ -583,13 +677,12 @@ if arguments["--mask"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--mask"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      maski = band.ReadAsArray().flatten()*float(arguments["--scale_mask"])
+      mask = band.ReadAsArray()[ibeg:iend,jbeg:jend]*float(arguments["--scale_mask"])
       del ds
     else:
       fid = open(arguments["--mask"],'r')
-      maski = np.fromfile(fid,dtype=np.float32)*float(arguments["--scale_mask"])
+      mask = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]*float(arguments["--scale_mask"])
       fid.close()
-    mask = maski.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
     maski = mask.flatten()
 else:
     mask_flat = np.ones((new_lines,new_cols))
@@ -603,28 +696,24 @@ if arguments["--topofile"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--topofile"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      elevi = band.ReadAsArray().flatten()
+      elev_map = band.ReadAsArray()[ibeg:iend,jbeg:jend]
       del ds
     else:
       fid = open(arguments["--topofile"],'r')
-      elevi = np.fromfile(fid,dtype=np.float32)
+      elev_map = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
       fid.close()
-
-    elevi = elevi[:nlines*ncol]
-    elev = elevi.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
-    elev[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(elev)>9999.)
-    elev[kk] = float('NaN')
-    elevi = elev.flatten()
+    elev_map[np.isnan(maps[:,:,-1])] = float('NaN')
+    kk = np.nonzero(abs(elev_map)>9999.)
+    elev_map[kk] = float('NaN')
 
     # define max min topo for empirical relationship
-    maxtopo,mintopo = np.nanpercentile(elev,float(arguments["--perc_topo"])),np.nanpercentile(elev,100-float(arguments["--perc_topo"]))
+    maxtopo,mintopo = np.nanpercentile(elev_map,float(arguments["--perc_topo"])),np.nanpercentile(elev_map,100-float(arguments["--perc_topo"]))
     logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxtopo,mintopo))
 
 else:
-   elev = np.ones((new_lines,new_cols),dtype=np.float32)
-   elevi = elev.flatten()
-   maxtopo,mintopo = 2, 0 
+    elev_map = np.ones((new_lines,new_cols),dtype=np.float32)
+    elev_map.flatten() = elev_map.flatten()
+    maxtopo,mintopo = 2, 0 
 
 if arguments["--aspect"] is not None:
     extension = os.path.splitext(arguments["--aspect"])[1]
@@ -632,29 +721,33 @@ if arguments["--aspect"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--aspect"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      aspecti = band.ReadAsArray().flatten()
+      aspect_map = band.ReadAsArray()[ibeg:iend,jbeg:jend]
       del ds
     else:
       fid = open(arguments["--aspect"],'r')
-      aspecti = np.fromfile(fid,dtype=np.float32)
+      aspect_map = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
       fid.close()
-    aspecti = aspecti[:nlines*ncol]
-    slope = aspecti.reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
-    slope[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(slope>9999.))
-    slope[kk] = float('NaN')
-    aspecti = slope.flatten()
+    aspect_map[np.isnan(maps[:,:,-1])] = float('NaN')
+    kk = np.nonzero(abs(aspect_map>9999.))
+    aspect_map[kk] = float('NaN')
 else:
-    slope = np.ones((new_lines,new_cols))
-    aspecti = slope.flatten()
+    aspect_map = np.ones((new_lines,new_cols))
 
 if arguments["--rmspixel"] is not None:
+    extension = os.path.splitext(arguments["--rmspixel"])[1]
     checkinfile(arguments["--rmspixel"])
-    rmsmap = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
-    kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap>999.))
-    rmsmap[kk] = float('NaN')
-    kk = np.nonzero(rmsmap>float(arguments["--threshold_rms"]))
-    spacial_mask = np.copy(rmsmap)
+    if extension == ".tif":
+        ds = gdal.Open(arguments["--rmspixel"], gdal.GA_ReadOnly)
+        band = ds.GetRasterBand(1)
+        rms_map = band.ReadAsArray()[ibeg:iend,jbeg:jend]
+        del ds
+    else:
+        rms_map = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+
+    kk = np.nonzero(np.logical_or(rms_map==0.0, rms_map>999.))
+    rms_map[kk] = float('NaN')
+    kk = np.nonzero(rms_map>float(arguments["--threshold_rms"]))
+    spacial_mask = np.copy(rms_map)
     spacial_mask[kk] = float('NaN')
     fig = plt.figure(nfigure,figsize=(9,4))
     nfigure = nfigure + 1
@@ -665,33 +758,47 @@ if arguments["--rmspixel"] is not None:
     fig.colorbar(cax, orientation='vertical',aspect=10)
     del spacial_mask
 else:
-    rmsmap = np.ones((new_lines,new_cols))
+    rms_map = np.ones((new_lines,new_cols))
     spacial_mask = np.ones((new_lines,new_cols))
     arguments["--threshold_rms"] = 2.
 
-# plot bperp vs time
-fig = plt.figure(nfigure,figsize=(10,4))
-nfigure = nfigure + 1
-ax = fig.add_subplot(1,2,1)
-# convert idates to num
-x = [date2num(datetimes.strptime('{}'.format(d),'%Y%m%d')) for d in idates]
-# format the ticks
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
-ax.plot(x,base,"ro",label='Baseline history of the {} images'.format(N))
-ax.plot(x,base,"green")
-# rotates and right aligns the x labels, and moves the bottom of the
-# axes up to make room for them
-fig.autofmt_xdate()
-ax.set_xlabel('Time (Year/month/day)')
-ax.set_ylabel('Perpendicular Baseline')
-plt.legend(loc='best')
+if arguments["--bperp"]=='yes':
+  for idx, bp in enumerate(bases):
+    # Création d'une figure pour chaque bp dans bases
+    fig = plt.figure(nfigure, figsize=(10, 4))
+    nfigure += 1
 
-ax = fig.add_subplot(1,2,2)
-ax.plot(np.mod(dates,1),base,"ro",label='Baseline seasonality of the {} images'.format(N))
-plt.legend(loc='best')
+    # Graphique 1: Baseline perpendiculaire en fonction du temps
+    ax1 = fig.add_subplot(1, 2, 1)
 
-fig.savefig('baseline.eps', format='EPS',dpi=150)
-np.savetxt('bp_t.in', np.vstack([dates,base]).T, fmt='%.6f')
+    # selection des baselines non nulles
+    idx = np.flatnonzero(bp)
+    dates_temp = dates[idx]
+    idates_temp = idates[idx]
+    bp_temp = bp[idx]
+    N_temp = len(bp_temp)
+
+    # Conversion des dates au format numérique pour matplotlib
+    x = [mdates.date2num(dt.strptime(f'{d}', '%Y%m%d')) for d in idates_temp]
+
+    # Configuration de l'affichage des dates
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y/%m/%d"))
+    ax1.plot(x, bp_temp, "ro", label=f'Baseline history of the {N_temp} images')
+    ax1.plot(x, bp_temp, "green")
+    fig.autofmt_xdate()
+
+    ax1.set_xlabel('Time (Year/month/day)')
+    ax1.set_ylabel('Perpendicular Baseline')
+    ax1.legend(loc='best')
+
+    # Graphique 2: Baseline en fonction de la saisonnalité (modulo 1 année)
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.plot(np.mod(dates_temp, 1), bp_temp, "ro", label=f'Baseline seasonality of the {N_temp} images')
+    ax2.legend(loc='best')
+
+    # Sauvegarde de la figure et des données
+    fig.savefig(f'baseline_{idx}.eps', format='EPS', dpi=150)
+    np.savetxt(f'bp_t_{idx}.in', np.vstack([dates_temp, bp_temp]).T, fmt='%.6f')
 
 if arguments["--mask"] is not None:
     los_temp = as_strided(mask[ibeg_emp:iend_emp,jbeg_emp:jend_emp]).flatten()
@@ -766,38 +873,50 @@ if arguments["--mask"] is not None:
     cax = ax.imshow(mask_flat,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Flat Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
-    #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,3,3)
     cax = ax.imshow(mask_flat_clean,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Final Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
-    #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.savefig('mask.eps', format='EPS',dpi=150)
     del mask_flat_clean
 
+
+def plot_displacement_maps(maps, idates, nfigure=0, cmap='RdBu', plot='yes', filename='maps.eps', title='Time series maps', fig_dpi=150):
+    """
+    Affiche et sauvegarde une série de cartes de déplacement (type cube t,x,y).
+
+    """
+    N = maps.shape[2]
+    ncols = int(N / 4) + 1
+    vmax = np.nanpercentile(maps, 99.)
+    vmin = np.nanpercentile(maps, 1.)
+
+    fig = plt.figure(nfigure, figsize=(14, 10))
+    fig.subplots_adjust(wspace=0.001)
+
+    for l in range(N):
+        d = as_strided(maps[:, :, l])
+        ax = fig.add_subplot(4, ncols, l + 1)
+        cax = ax.imshow(d, cmap=cmap, vmin=vmin, vmax=vmax, interpolation='nearest')
+        ax.set_title(str(idates[l]), fontsize=6)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.suptitle('{}'.format(title), fontsize=12)
+    fig.colorbar(cax, orientation='vertical', aspect=10)
+    fig.subplots_adjust(hspace=.001,wspace=0.001)
+    fig.savefig(filename, format='EPS', dpi=fig_dpi)
+
+    if plot == 'yes':
+        plt.show()
+    
+    plt.close(fig)
+    del fig
+
 # plot diplacements maps
 nfigure+=1
-fig = plt.figure(nfigure,figsize=(14,10))
-fig.subplots_adjust(wspace=0.001)
-vmax = np.nanpercentile(maps[:,:,:],99.)
-vmin = np.nanpercentile(maps[:,:,:],1.)
-
-for l in range((N)):
-    d = as_strided(maps[:,:,l])
-    ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
-    ax.set_title(idates[l],fontsize=6)
-    plt.setp( ax.get_xticklabels(), visible=False)
-    plt.setp( ax.get_yticklabels(), visible=False)
-
-plt.suptitle('Time series maps')
-fig.colorbar(cax, orientation='vertical',aspect=10)
-fig.savefig('maps.eps', format='EPS',dpi=150)
-
-if plot=='yes':
-        plt.show()
-del fig
+plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series maps', filename='maps.eps')
 
 #######################################################
 # Save new lect.in file
@@ -811,10 +930,10 @@ fid.close()
 # Create functions of decomposition
 ######################################################
 
-if arguments["--coseismic"] ==  None:
+if arguments["--steps"] ==  None:
     cos = []
 else:
-    cos = list(map(float,arguments["--coseismic"].replace(',',' ').split()))
+    cos = list(map(float,arguments["--steps"].replace(',',' ').split()))
 
 if arguments["--postseismic"] ==  None:
     pos = []
@@ -845,12 +964,12 @@ basis=[
     ]
 index = len(basis)
 
-# initialise iteration with interseismic alone
+# initialise iteration with linear alone
 iteration=False
 
 if arguments["--linear"]=='yes':
     indexinter=index
-    basis.append(interseismic(name='interseismic',reduction='lin',date=datemin))
+    basis.append(linear(name='linear',reduction='lin',date=datemin))
     index = index + 1
 
 if arguments["--seasonal"] =='yes':
@@ -880,16 +999,15 @@ if arguments["--bianual"]=='yes':
 
 indexco = np.zeros(len(cos))
 for i in range(len(cos)):
-    basis.append(coseismic(name='coseismic {}'.format(i),reduction='cos{}'.format(i),date=cos[i])),
+    basis.append(steps(name='steps {}'.format(i),reduction='step{}'.format(i),date=cos[i])),
     indexco[i] = index
     index = index + 1
     iteration=True
 
-
 indexpo,indexpofull = [],[]
 for i in range(len(pos)):
   if pos[i] > 0. :
-    basis.append(postseismic(name='postseismic {}'.format(i),reduction='post{}'.format(i),date=cos[i],tcar=pos[i])),
+    basis.append(postseismic(name='postseismic {}'.format(i),reduction='log{}'.format(i),date=cos[i],tcar=pos[i])),
     indexpo.append(int(index))
     indexpofull.append(int(index))
     index = index + 1
@@ -899,7 +1017,6 @@ for i in range(len(pos)):
 indexpo = np.array(indexpo)
 indexpofull = np.array(indexpofull)
 
-
 indexsse = np.zeros(len(sse_time))
 for i in range(len(sse_time)):
     basis.append(slowslip(name='sse {}'.format(i),reduction='sse{}'.format(i),date=sse_time[i],tcar=sse_car[i])),
@@ -907,19 +1024,22 @@ for i in range(len(sse_time)):
     index = index + 1
     iteration=True
 
-kernels=[]
-
-if arguments["--dem"]=='yes':
-   kernels.append(corrdem(name='dem correction',reduction='corrdem',bp0=baseref,bp=base))
-   indexdem = index
-   index = index + 1
+kernels = []
+if arguments["--bperp"]=='yes':
+    indexbperp = []
+    i = 0
+    for bp,bref in zip(bases,baserefs):
+        i = i + 1
+        kernels.append(corrBperp(name='bperp correction', reduction=f'corrBperp{i}', bp0=bref, bp=bp))
+        indexbperp.append(index)
+        index = index + 1
 
 if arguments["--vector"] != None:
     fig = plt.figure(nfigure,figsize=(6,4))
     nfigure = nfigure + 1
     indexvect = np.zeros(len(vectf))
     for i in range(len(vectf)):
-      ax = fig.add_subplot(i+1,1,len(vectf))
+      ax = fig.add_subplot(len(vectf),1,i+1)
       v = np.loadtxt(vectf[i], comments='#', unpack = False, dtype='f')
       kernels.append(vector(name=vectf[i],reduction='vector_{}'.format(i),vect=v))
       ax.plot(v,label='Vector')
@@ -963,29 +1083,50 @@ for l in range((Mker)):
     kernels[l].m = np.ones((new_lines,new_cols))*float('NaN')
     kernels[l].sigmam = np.ones((new_lines,new_cols))*float('NaN')
 
-# initialize qual
-if apsf=='no':
-    inaps=np.ones((N)) # no weigthing for the first itertion
+# initialize aps
+if  arguments["--aps"] is None:
+    in_aps = np.ones((N)) # no weigthing for the first itertion
 else:
-    fimages=apsf
-    inaps=np.loadtxt(fimages, comments='#', dtype='f')
-    logger.info('Input uncertainties: {}'.format(inaps))
-    logger.info('Scale input uncertainties between 0 and 1 and set very low values to the 2 \
-      percentile to avoid overweighting...')
-    # maxinaps = np.nanmax(inaps)
-    # inaps= inaps/maxinaps
-    minaps= np.nanpercentile(inaps,2)
-    index = np.flatnonzero(inaps<minaps)
-    inaps[index] = minaps
-    logger.info('Output uncertainties for first iteration: {}'.format(inaps))
-    print
+    fimages =  arguments["--aps"]
+    try:
+        in_aps = np.loadtxt(fimages, unpack=True, comments='#', usecols=(2), dtype='f')
+    except:
+        logger.warning('APS file is in decrepicated format, requiered two columns text file`')
+        in_aps = np.loadtxt(fimages, comments='#', dtype='f')
+    logger.info('Input APS: {}'.format(in_aps))
+    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
+    min_aps= np.nanpercentile(in_aps,2)
+    index = np.flatnonzero(in_aps<min_aps)
+    in_aps[index] = min_aps
+    in_aps = in_aps[indexd]
 
-## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=False):
+# initialize rms
+if  arguments["--rms"] is None:
+    in_rms = np.ones((N)) # no weigthing for the first itertion
+else:
+    fimages =  arguments["--rms"]
+    try:
+        in_rms = np.loadtxt(fimages, unpack=True, comments='#', usecols=(2), dtype='f')
+    except:
+        logger.warning('RMS file is in decrepicated format, requiered two columns text file`')
+        in_rms = np.loadtxt(fimages, comments='#', dtype='f')
+    logger.info('Input RMS: {}'.format(in_rms))
+    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
+    min_rms= np.nanpercentile(in_rms,2)
+    index = np.flatnonzero(in_rms < min_rms)
+    in_rms[index] = min_rms
+    in_rms = in_rms[indexd]
+
+## initialize input uncertainties
+in_sigma = in_rms * in_aps
+logger.info('Input uncertainties: {}'.format(in_rms))
+
+## inversion procedure
+def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
     '''Solves the constrained inversion problem.
 
     Minimize:
-    
+
     ||Ax-b||^2
 
     Subject to:
@@ -996,52 +1137,54 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=Fal
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        Cd = np.diag(sigmad**2, k = 0)
-        fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))       
- 
+        try:
+          Cd = np.diag(sigmad**2, k = 0)
+          fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
+        except:
+          fsoln = lst.lstsq(A,b,rcond=None)[0]  
     else:
         if len(indexpo>0):
-          # prior solution without postseismic 
+          # invert first without post-seismic
           Ain = np.delete(A,indexpo,1)
           mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
-     
+    
           # rebuild full vector
           for z in range(len(indexpo)):
             mtemp = np.insert(mtemp,indexpo[z],0)
           minit = np.copy(mtemp)
           # # initialize bounds
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf 
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
 
-          # We here define bounds for postseismic to be the same sign than coseismic
-          # and coseismic inferior or egual to the coseimic initial 
+          # We here define bounds for postseismic to be the same sign than steps
+          # and steps inferior or egual to the coseimic initial
           for i in range(len(indexco)):
             if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
+                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf
+                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])]
             if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
                 mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
                 mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-          bounds=list(zip(mmin,mmax))
-        
+
         else:
           minit = lst.lstsq(A,b,rcond=None)[0]
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf       
- 
+          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
+
+        bounds=list(zip(mmin,mmax))
         def eq_cond(x, *args):
-           return (x[indexseast+1],x[[indexseast]]) - (x[indexseas+1],x[[indexseas]])
- 
+           return (x[indexseast+1]/x[indexseast]) - (x[indexseas+1]/x[indexseas])
+
         ####Objective function and derivative
         _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
         _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-
         if eguality:
             res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime,eqcons=[eq_cond], \
                 iter=iter,full_output=True,iprint=0,acc=acc)
         else:
             res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-                iter=iter,full_output=True,iprint=0,acc=acc)  
+                iter=iter,full_output=True,iprint=0,acc=acc)
         fsoln = res[0]
-  
+        #print('Optimization:', fsoln)
+
     try:
        varx = np.linalg.inv(np.dot(A.T,A))
        res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
@@ -1049,7 +1192,6 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6,eguality=Fal
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
-
     return fsoln,sigmam
 
 def linear_inv(G, data, sigma):
@@ -1148,7 +1290,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]
                 logger.info('Remove ref frame %f + %f z for date: %i'%(a,b,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1159,7 +1301,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),2))
                 G[:,0] = 1
-                G[:,1] = elevi
+                G[:,1] = elev_map.flatten()
 
                 res = los - np.dot(G,pars)
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
@@ -1176,7 +1318,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print ('Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1187,8 +1329,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 G[:,0] = 1
-                G[:,1] = elevi
-                G[:,2] = elevi**2
+                G[:,1] = elev_map.flatten()
+                G[:,2] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
@@ -1204,7 +1346,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a + c*topo_clean*az
                 funcbins = a + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1215,8 +1357,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 G[:,0] = 1
-                G[:,1] = elevi
-                G[:,2] = elevi
+                G[:,1] = elev_map.flatten()
+                G[:,2] = elev_map.flatten()
                 for i in range(nlines):
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
@@ -1236,7 +1378,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a + b*topo_clean*az
                 funcbins = a + b*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1247,15 +1389,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,0] = 1
-                G[:,1] = elevi
-                G[:,2] = elevi
-                G[:,3] = elevi**2
+                G[:,1] = elev_map.flatten()
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()**2
                 for i in range(nlines):
                     G[i*new_cols:(i+1)*new_cols,1] *= (i - ibeg_emp)
 
                 res = los - np.dot(G,pars)
-                rms = np.sqrt(np.nanmean(res**2))
-                logger.info('RMS dates %i: %f'%(idates[l], rms))
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
 
       elif order==1: # Remove a range ramp ay+b for each maps (y = col)
@@ -1293,7 +1433,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg + b
                 funcbins = a*rgbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1306,7 +1446,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[:,1] = 1
-                G[:,2] = elevi
+                G[:,2] = elev_map.flatten()
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1325,7 +1465,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b
                 funcbins = a*rgbins+ b
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1338,8 +1478,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 for i in range(nlines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1358,7 +1498,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b + d*topo_clean*az
                 funcbins = a*rgbins+ b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1369,8 +1509,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
@@ -1394,7 +1534,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b + c*topo_clean*az
                 funcbins = a*rgbins+ b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1405,9 +1545,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
-                G[:,4] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
@@ -1451,7 +1591,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1464,7 +1604,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
                 G[:,1] = 1
-                G[:,2] = elevi
+                G[:,2] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -1484,7 +1624,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1497,8 +1637,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1517,7 +1657,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b + d*topo_clean*az
                 funcbins = a*azbins + b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1528,8 +1668,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
@@ -1553,7 +1693,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b + c*topo_clean*az
                 funcbins = a*azbins + b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1564,9 +1704,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
-                G[:,4] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
@@ -1611,7 +1751,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1625,7 +1765,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
                 G[:,2] = 1
-                G[:,3] = elevi
+                G[:,3] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -1646,7 +1786,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1660,8 +1800,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
                 G[:,2] = 1
-                G[:,3] = elevi
-                G[:,4] = elevi**2
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1681,7 +1821,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c + e*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1692,8 +1832,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,2] = 1
-                G[:,3] = elevi
-                G[:,4] = elevi
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
@@ -1719,7 +1859,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
                 print ('Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c + d*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1730,9 +1870,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,2] = 1
-                G[:,3] = elevi
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
@@ -1782,7 +1922,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1797,7 +1937,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
+                G[:,4] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -1820,7 +1960,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1835,8 +1975,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1858,7 +1998,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d + f*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1869,8 +2009,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -1899,7 +2039,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d + e*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1910,9 +2050,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -1966,7 +2106,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -1981,7 +2121,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
+                G[:,4] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2003,7 +2143,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2019,8 +2159,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
 
@@ -2043,7 +2183,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d + f*topo_clean*az
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2054,8 +2194,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
@@ -2084,7 +2224,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d + e*topo_clean*az
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2095,9 +2235,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
@@ -2151,7 +2291,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2166,7 +2306,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
                 G[:,3] = 1
-                G[:,4] = elevi
+                G[:,4] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2188,7 +2328,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2203,8 +2343,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2225,7 +2365,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d + f*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2236,8 +2376,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
@@ -2266,7 +2406,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h = pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d + e*topo_clean*az + h*(topo_clean*az)**2
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + e*topobins*azbins + h*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2277,10 +2417,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
-                G[:,6] = elevi**2
-                G[:,7] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
+                G[:,7] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
@@ -2336,7 +2476,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*az+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2352,7 +2492,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
                 G[:,4] = 1
-                G[:,5] = elevi
+                G[:,5] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2376,7 +2516,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2392,8 +2532,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2415,7 +2555,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + g*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2426,8 +2566,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2457,7 +2597,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + f*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2468,9 +2608,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
-                G[:,7] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2528,7 +2668,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2545,7 +2685,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
                 G[:,5] = 1
-                G[:,6] = elevi
+                G[:,6] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2569,7 +2709,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2586,8 +2726,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
                 G[:,5] = 1
-                G[:,6] = elevi
-                G[:,7] = elevi**2
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2611,7 +2751,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + h*topo_clean*az
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + h*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2622,8 +2762,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,5] = 1
-                G[:,6] = elevi
-                G[:,7] = elevi
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
                     G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
@@ -2656,7 +2796,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]; k=pars[9]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + g*topo_clean*az + k*(topo_clean*az)**2
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + g*topobins*azbins + k*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2667,10 +2807,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),10))
                 G[:,5] = 1
-                G[:,6] = elevi
-                G[:,7] = elevi
-                G[:,8] = elevi**2
-                G[:,9] = elevi**2
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()
+                G[:,8] = elev_map.flatten()**2
+                G[:,9] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
                     G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
@@ -2727,7 +2867,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 funct = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2743,7 +2883,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
                     G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,4] = 1
-                G[:,5] = elevi
+                G[:,5] = elev_map.flatten()
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2766,7 +2906,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2782,8 +2922,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
                     G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2806,7 +2946,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + g*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2817,8 +2957,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2848,7 +2988,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + f*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
@@ -2859,9 +2999,9 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
-                G[:,7] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2884,25 +3024,24 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
          pass
       return ramp, flata, topo, rms
  
+
 def empirical_cor(l):
   """
-  Function that preapare and run empirical estimaton for each interferogram kk
+  Function that preapare and run empirical estimaton for each date l
   """
 
-  # Passage global des images
-  global fig_dphi, maps, models
-  global maps_ramp, maps_flat, maps_topo, rms
+  global fig_dphi
 
-  # on fait les estimations sur les images moins le modele
-  maps_temp = np.matrix.copy(maps[:,:,l]) - np.matrix.copy(models[:,:,l])
+  # first clean los
+  map_temp = as_strided(maps[:,:,l]) - as_strided(models[:,:,l])
 
   # no estimation on the ref image set to zero 
   if np.nansum(maps[:,:,l]) != 0:
 
-    maxlos,minlos=np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(maps_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
+    maxlos,minlos=np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
     logger.debug('Set Max-Min LOS for empirical estimation: {0}-{1}'.format(maxlos,minlos))
-    kk = np.nonzero(np.logical_or(maps_temp==0.,np.logical_or((maps_temp>maxlos),(maps_temp<minlos))))
-    maps_temp[kk] = float('NaN')
+    kk = np.nonzero(np.logical_or(map_temp==0.,np.logical_or((map_temp>maxlos),(map_temp<minlos))))
+    map_temp[kk] = float('NaN')
 
     itemp = ibeg_emp
     for lign in range(ibeg_emp,iend_emp,10):
@@ -2920,20 +3059,21 @@ def empirical_cor(l):
     logger.debug('Threshold RMS: {}'.format(float(arguments["--threshold_rms"])))
 
     # selection pixels
-    index = np.nonzero(np.logical_and(elev<maxtopo,
-        np.logical_and(elev>mintopo,
+    pix_az, pix_rg = np.indices((new_lines,new_cols))
+    index = np.nonzero(np.logical_and(elev_map<maxtopo,
+        np.logical_and(elev_map>mintopo,
             np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
-            np.logical_and(~np.isnan(maps_temp),
-                np.logical_and(~np.isnan(rmsmap),
-                np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
-                np.logical_and(rmsmap>1.e-6,
-                np.logical_and(~np.isnan(maps_temp),
+            np.logical_and(~np.isnan(map_temp),
+                np.logical_and(~np.isnan(rms_map),
+                np.logical_and(~np.isnan(elev_map),
+                np.logical_and(rms_map<float(arguments["--threshold_rms"]),
+                np.logical_and(rms_map>1.e-6,
+                np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>ibeg_emp,
                 np.logical_and(pix_az<iend_emp,
                 np.logical_and(pix_rg>jbeg_emp,
                 np.logical_and(pix_rg<jend_emp, 
-                    slope>0.,
+                    aspect_map>0.,
                     ))))))))
                 ))))))
 
@@ -2941,9 +3081,9 @@ def empirical_cor(l):
     temp = np.array(index).T
     x = temp[:,0]; y = temp[:,1]
     # clean maps
-    los_clean = maps_temp[index].flatten()
-    topo_clean = elev[index].flatten()
-    rms_clean = rmsmap[index].flatten()
+    los_clean = map_temp[index].flatten()
+    topo_clean = elev_map[index].flatten()
+    rms_clean = rms_map[index].flatten()
     
     logger.debug('Number of points for empirical estimation: {}'.format(len(los_clean)))
     if len(los_clean) < 1:
@@ -2975,21 +3115,20 @@ def empirical_cor(l):
       y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
 
     if (lin_start is not None) and (lin_end is not None):
-      # try:
-        indexref = np.nonzero(np.logical_and(elev<maxtopo,
-        np.logical_and(elev>mintopo,
+        indexref = np.nonzero(np.logical_and(elev_map<maxtopo,
+        np.logical_and(elev_map>mintopo,
             np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
-            np.logical_and(~np.isnan(maps_temp),
-                np.logical_and(~np.isnan(rmsmap),
-                np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
-                np.logical_and(rmsmap>1.e-6,
-                np.logical_and(~np.isnan(maps_temp),
+            np.logical_and(~np.isnan(map_temp),
+                np.logical_and(~np.isnan(rms_map),
+                np.logical_and(~np.isnan(elev_map),
+                np.logical_and(rms_map<float(arguments["--threshold_rms"]),
+                np.logical_and(rms_map>1.e-6,
+                np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>lin_start,
                 np.logical_and(pix_az<lin_end,
                 np.logical_and(pix_rg>col_start,
                 np.logical_and(pix_rg<col_end, 
-                    slope>0.,
+                    aspect_map>0.,
                 ))))))))))))
                 ))
         
@@ -2998,21 +3137,22 @@ def empirical_cor(l):
              sys.exit()
 
         ## Set data minus temporal model to zero in the ref area
-        zone = as_strided(map_flata[:,:] - models[:,:,l])
-        los_ref2 = zone[indexref].flatten()
-        rms_ref = rmsmap[indexref].flatten()
+        res = as_strided(map_flata[:,:] - models[:,:,l])
+        res_ref = res[indexref].flatten()
+        rms_ref = rms_map[indexref].flatten()
         amp_ref = 1./rms_ref
         amp_ref = amp_ref/np.nanmax(amp_ref)
         # weigth avera of the phase
-        cst = np.nansum(los_ref2*amp_ref) / np.nansum(amp_ref)
+        cst = np.nansum(res_ref*amp_ref) / np.nansum(amp_ref)
         logger.info('Re-estimation of a constant within lines {0}-{1} and cols {2}-{3}'.format(lin_start,lin_end,col_start,col_end))
         logger.info('Average phase within ref area: {0}:'.format(cst))
         if np.isnan(cst):
           cst = 0.
         map_ramp, map_flata = map_ramp + cst, map_flata - cst
-        del zone
+        del res, res_ref, rms_ref, amp_ref, cst
       
   else:
+    logger.info('Empty displacements for date: {}:'.format(l))
     map_flata = np.copy(maps[:,:,l])
     map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))
     rmsi = 1
@@ -3023,39 +3163,64 @@ def empirical_cor(l):
   ramp[kk] = float('NaN')
   topo = as_strided(map_topo)
   topo[kk] = float('NaN')
-  del ramp, topo
-
-  # remplissage des images 
-  maps_ramp[:, :, l] = map_ramp; maps_flata[:, :, l] = map_flata
-  maps_topo[:, :, l] = map_topo; rms[l] = rmsi 
-
-def temporal_decomp(pix):
-    'Linear temporal parametric decomposition'
-
-    # Passage global des variables et matrice
-    #global inaps, dates, maps_flata
-    #global basis, kernels, models 
-    # shared index
-    #global M, new_cols, new_lines, N, Mbasis, Mker
+  del ramp, topo, map_temp
  
-    col = pix  % (new_cols)
-    line = int(pix/(new_cols))
-    if ((line % 10) == 0) and (col==0):
-      logger.info('Processing line: {} --- {} seconds ---'.format(line,time.time() - start_time))
+  if arguments["--topofile"] is not None: 
+    return map_flata, map_topo, rmsi 
+  else:
+    return map_flata, rmsi 
+
+def init():
+    global N, M, dates
+
+def compute_auto_block_size(new_lines, new_cols, N, dtype='float32', target_memory_MB=400):
+    """
+    Détermine une taille de bloc (nb de lignes) pour rester dans target_memory_MB
+    """
+    bytes_per_element = np.dtype(dtype).itemsize
+    bytes_per_pixel = N * bytes_per_element
+    bytes_per_line = new_cols * bytes_per_pixel
+
+    target_bytes = target_memory_MB * 1024 * 1024
+    block_size = target_bytes // bytes_per_line
+
+    # Toujours >= 1 et <= new_lines
+    return max(1, min(int(block_size), new_lines))
+
+def temporal_decomp_chunk(chunk, sigma, cond, ineq, eguality):
+    # chunk: (N, nb_pixels)
+    N, P = chunk.shape
+    m_all = np.empty((P, M), dtype=np.float32)
+    sigmam_all = np.empty((P, M), dtype=np.float32)
+    models_all = np.empty((P, N), dtype=np.float32)
+
+    for i in range(P):
+        disp = chunk[:, i]
+        m, sigmam, model = temporal_decomp(disp, sigma, cond, ineq, eguality)
+        m_all[i, :] = m
+        sigmam_all[i, :] = sigmam
+        models_all[i, :] = model
+
+    return m_all, sigmam_all, models_all
+
+def temporal_decomp(disp, sigma, cond, ineq, eguality):
 
     # Initialisation
     mdisp=np.ones((N), dtype=np.float32)*float('NaN')
     mlin=np.ones((N), dtype=np.float32)*float('NaN')
-    disp = as_strided(maps_flata[line,col,:])
+    mseas=np.ones((N), dtype=np.float32)*float('NaN')
+    mvect=np.ones((N), dtype=np.float32)*float('NaN')
     k = np.flatnonzero(~np.isnan(disp)) # invers of isnan
     # do not take into account NaN data
-    kk = len(k); tabx = dates[k]; taby = disp[k]
+    kk = len(k)
+    tabx = dates[k]
+    taby = disp[k]
 
     # Inisilize m to zero
     m = np.ones((M), dtype=np.float32)*float('NaN')
     sigmam = np.ones((M), dtype=np.float32)*float('NaN')
 
-    if kk > N/6.:
+    if kk > N/6:
         G=np.zeros((kk,M), dtype=np.float32)
         # Build G family of function k1(t),k2(t),...,kn(t): #
         #                                                   #
@@ -3068,30 +3233,23 @@ def temporal_decomp(pix):
             G[:,l]=basis[l].g(tabx)
         for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
-
-        ### Inversion ###
-        m,sigmam = consInvert(G,taby,inaps[k],cond=arguments["--cond"],ineq=arguments["--ineq"],eguality=eguality)
-        #################
+        
+        # inversion
+        m,sigmam = consInvert(G,taby,sigma[k],cond=cond,ineq=ineq,eguality=eguality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
-   
-    return m, sigmam, mdisp 
-    ## filled shared matrix
-    #models[line,col,:] = mdisp
-    #for l in range((Mbasis)):
-    #    basis[l].m[line,col] = m[l]
-    #    basis[l].sigmam[line,col] = sigmam[l]
-    #for l in range((Mker)):
-    #    kernels[l].m[line,col] = m[l+Mbasis]
-    #    kernels[l].sigmam[line,col] = sigmam[l+Mbasis]
 
-# initialization
-maps_flata = np.copy(maps)
+    return m, sigmam, mdisp 
+
+# Create memmap output file to store models
+models = np.memmap('disp_cumul_models', dtype='float32', mode='w+',
+                        shape=(new_lines, new_cols, N))
+write_envi_hdr('disp_cumul_models', shape=(new_lines, new_cols, N))
+
 # prepare flatten maps
-models = np.zeros((new_lines,new_cols,N), dtype=np.float32)
-maps_ramp = np.zeros((new_lines,new_cols,N), dtype=np.float32)
-maps_topo = np.zeros((new_lines,new_cols,N), dtype=np.float32)
+if arguments["--topofile"] is not None:
+    maps_topo = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
 for ii in range(int(arguments["--niter"])):
     print()
@@ -3104,7 +3262,6 @@ for ii in range(int(arguments["--niter"])):
     #############################
 
     rms = np.zeros((N),dtype=np.float32)
-    pix_az, pix_rg = np.indices((new_lines,new_cols))
     # if radar file just initialise figure
     if arguments["--topofile"] is not None:
       nfigure +=1
@@ -3114,150 +3271,140 @@ for ii in range(int(arguments["--niter"])):
     if (ii==0) or (arguments["--spatialiter"]=='yes') :
 
       print() 
+      #########################################
       print('---------------')
       print('Empirical estimations')
       print('---------------')
+      #########################################
       print()
- 
-      #############################       
-      image_indices = list(range((N)))
-      #for image in range(N):
-      #  empirical_cor(image)
-      #with concurrent.futures.ThreadPoolExecutor() as executor:
-      #      executor.map(empirical_cor, image_indices)
-      with multiprocessing.Pool(processes=nproc) as pool:
-            pool.map(empirical_cor, image_indices)
-      #############################
- 
+
+      for l in range((N)):
+          if arguments["--topofile"] is not None:
+            maps[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
+          else:
+            maps[:,:,l], rms[l] = empirical_cor(l)
+    
       if N < 30:
         # plot corrected ts
         nfigure +=1
-        figd = plt.figure(nfigure,figsize=(14,10))
-        figd.subplots_adjust(hspace=0.001,wspace=0.001)
-        for l in range((N)):
-            axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps_flata[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
-            axd.set_title(idates[l],fontsize=6)
-            plt.setp(axd.get_xticklabels(), visible=False)
-            plt.setp(axd.get_yticklabels(), visible=False)
-        plt.setp(axd.get_xticklabels(), visible=False)
-        plt.setp(axd.get_yticklabels(), visible=False)
-        figd.colorbar(caxd, orientation='vertical',aspect=10)
-        figd.suptitle('Corrected time series maps')
-        # fig.tight_layout()
-        figd.savefig('maps_flat.eps', format='EPS',dpi=150)
+        plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
 
         if arguments["--topofile"] is not None:
             fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
             nfigure +=1
-            figtopo = plt.figure(nfigure,figsize=(14,10))
-            figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-            for l in range((N)):
-                axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[:,:,l]+maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-                axtopo.set_title(idates[l],fontsize=6)
-                plt.setp(axtopo.get_xticklabels(), visible=False)
-                plt.setp(axtopo.get_yticklabels(), visible=False)
-                plt.setp(axtopo.get_xticklabels(), visible=False)
-                plt.setp(axtopo.get_yticklabels(), visible=False)
-            figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-            figtopo.suptitle('Time series RAMPS+TOPO')
-            # fig.tight_layout()
-            figtopo.savefig('tropo.eps', format='EPS',dpi=150)
-            
-        else:
-            # plot corrected ts
-            nfigure +=1
-            figref = plt.figure(nfigure,figsize=(14,10))
-            figref.subplots_adjust(hspace=0.001,wspace=0.001)
-            for l in range((N)):
-                axref = figref.add_subplot(4,int(N/4)+1,l+1)
-                caxref = axref.imshow(maps_ramp[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
-                axref.set_title(idates[l],fontsize=6)
-                plt.setp(axref.get_xticklabels(), visible=False)
-                plt.setp(axref.get_yticklabels(), visible=False)
-            plt.setp(axref.get_xticklabels(), visible=False)
-            plt.setp(axref.get_yticklabels(), visible=False)
-            figref.suptitle('Time series RAMPS')
-            figref.colorbar(caxref, orientation='vertical',aspect=10)
-            # fig.tight_layout()
-            figref.savefig('maps_ramps.eps', format='EPS',dpi=150)
-
+            plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps')
+ 
     if plot=='yes':
         plt.show()
     plt.close('all')
+    if arguments["--topofile"] is not None:
+        del maps_topo
 
     # save rms
-    if (apsf=='no' and ii==0):
+    if (arguments["--aps"] is None and ii==0):
         # aps from rms
-        logger.info('Use RMS empirical estimation as uncertainties for time decomposition')
-        inaps = np.copy(rms)
+        logger.info('Use RMS empirical estimations as input APS for time decomposition')
+        in_aps = np.copy(rms)
         logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-        minaps= np.nanpercentile(inaps,2)
-        index = np.flatnonzero(inaps<minaps)
-        inaps[index] = minaps
-        np.savetxt('rms_empcor.txt', inaps.T)
+        # scale between 0 and 1 
+        maxaps = np.nanmax(in_aps)
+        in_aps = in_aps/maxaps
+        in_aps[imref] = 0.5
+        min_aps= np.nanpercentile(in_aps,2)
+        index = np.flatnonzero(in_aps<min_aps)
+        in_aps[index] = min_aps
+        in_sigma = in_aps * in_rms
+        np.savetxt('rms_empcor.txt', in_aps.T)
         del rms
 
+        maps.flush()  # Force l’écriture sur disque
+         
     ########################
     # TEMPORAL ITERATION N #
     ########################
 
     print() 
+    #########################################
     print('---------------')
     print('Time Decomposition')
     print('---------------')
+    #########################################
     print()
 
-    # initialize aps for each images to 1
-    logger.debug('Input uncertainties: {}'.format(inaps))
-
-    # reiinitialize maps models
-    models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
+    logger.info('Input uncertainties: {}'.format(in_sigma))
+    
+    # number of lines per block
+    block_size = compute_auto_block_size(new_lines, new_cols, N)
+    logger.info('Block size for parallelisation: {} '.format(block_size))
 
     with TimeIt():
-          
-          pixels_indices = range(0,(new_lines)*(new_cols),int(arguments["--sampling"]))
-          #for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
-          #    temporal_decomp(pix)
-          ############################
-          #with concurrent.futures.ThreadPoolExecutor(10) as executor:
-          #      executor.map(temporal_decomp, pixels_indices)
-          with multiprocessing.Pool(processes=nproc) as pool:
-             results = list(pool.map(temporal_decomp, pixels_indices))
-          ############################
+      with multiprocessing.Pool(processes=nproc, initializer=init) as pool:
+        for line in range(0, new_lines, block_size):
+            end_line = min(line + block_size, new_lines)
+            block_size_local = end_line - line
+            logger.info('Processing line: {} --- {:.2f} seconds ---'.format(line, time.time() - start_time)) 
+            
+            temp_array = maps[line:end_line, :, :]
+            line_time_series = temp_array.transpose(2, 0, 1).reshape(N, -1) 
+            chunks = np.array_split(line_time_series, nproc, axis=1)
 
-    for pix, result in zip(pixels_indices,results):
-        j = pix  % (new_cols)
-        i = int(pix/(new_cols))
-        m, sigmam, models[i,j,:] = result[0], result[1], result[2] 
-        for l in range((Mbasis)):
-            basis[l].m[i,j] = m[l]
-            basis[l].sigmam[i,j] = sigmam[l]
-        for l in range((Mker)):
-            kernels[l].m[i,j] = m[Mbasis+l]
-            kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
+            args_list = [
+                (chunk, in_sigma, arguments['--cond'], arguments['--ineq'], eguality)
+                for chunk in chunks
+            ]
+            results = pool.starmap(temporal_decomp_chunk, args_list) 
+            
+            # separer les resultats
+            m_chunks, sigmam_chunks, models_chunks = zip(*results)
+            
+            # reformer les tableaux
+            m = np.concatenate(m_chunks, axis=0) # shape: (nb_pixels, M)
 
-        del m, sigmam
-    del results
+            sigmam = np.concatenate(sigmam_chunks, axis=0) # shape: (nb_pixels, M) 
 
+            models_temp = np.concatenate(models_chunks, axis=0) # shape: (nb_pixels, N)
+            
+            # stocker les tableaux 
+            models[line:end_line, :, :] = models_temp.reshape(block_size_local, new_cols, N)
+            
+            # Stocker les coefficients m et sigmam dans les objets basis[] et kernels[]
+            for idx in range(block_size_local * new_cols):
+                i = line + (idx // new_cols)
+                j = idx % new_cols
+                for l in range(Mbasis):
+                    basis[l].m[i, j] = m[idx, l]
+                    basis[l].sigmam[i, j] = sigmam[idx, l]
+                for l in range(Mker):
+                    basis_idx = Mbasis + l
+                    kernels[l].m[i, j] = m[idx, basis_idx]
+                    kernels[l].sigmam[i, j] = sigmam[idx, basis_idx]
+
+            # nettoyage
+            del m, sigmam, m_chunks, sigmam_chunks, models_chunks, models_temp, results 
+    
     # compute RMSE
-    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
-    aps = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)
-         
-    # remove low aps to avoid over-fitting in next iter
-    inaps= np.nanpercentile(aps,2)
-    index = np.flatnonzero(aps<minaps)
-    aps[index] = minaps
+    # remove outiliers
+    index = np.logical_or(models>9999., models<-9999)
+    models[index] = 0.
+    squared_diff = (np.nan_to_num(maps,nan=0) - np.nan_to_num(models, nan=0))**2
+    res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
-    print('Dates      APS    ')
+    # remove low res to avoid over-fitting in next iter
+    min_res= np.nanpercentile(res,2)
+    index = np.flatnonzero(res < min_res)
+    res[index] = min_res
+
+    print('Dates      Residuals  ')
     for l in range(N):
-        print(idates[l], aps[l])
-    np.savetxt('aps_{}.txt'.format(ii), aps.T, fmt=('%.6f'))
-    # set apsf is yes for iteration
-    apsf=='yes'
-    # update aps for next iterations
-    inaps = np.copy(aps)
+        print (idates[l], res[l])
+    np.savetxt('aps_{}.txt'.format(ii), res.T, fmt=('%.6f'))
+    # set apsf is yes for next iteration
+    arguments["--aps"] == 'yes'
+    # update aps for next iterations taking into account in_aps and the residues of the last iteration
+    in_sigma = res * in_aps * in_rms
+
+    maps.flush()  # Force l’écriture sur disque
+    models.flush()  # Force l’écriture sur disque
 
 #######################################################
 # Save functions in binary file
@@ -3311,36 +3458,29 @@ else:
         outname = '{}_coeff.r4'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open(outname, 'wb')
-        basis[l].m.flatten().astype('float32').tofile(fid)
+        basis[l].m.astype('float32').tofile(fid)
         fid.close()
         outname = '{}_sigcoeff.r4'.format(basis[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open(outname, 'wb')
-        basis[l].sigmam.flatten().astype('float32').tofile(fid)
+        basis[l].sigmam.astype('float32').tofile(fid)
         fid.close()
     for l in range((Mker)):
         outname = '{}_coeff.r4'.format(kernels[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open('{}_coeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].m.flatten().astype('float32').tofile(fid)
+        kernels[l].m.astype('float32').tofile(fid)
         fid.close()
         outname = '{}_sigcoeff.r4'.format(kernels[l].reduction)
         logger.info('Save: {}'.format(outname))
         fid = open('{}_sigcoeff.r4'.format(kernels[l].reduction), 'wb')
-        kernels[l].sigmam.flatten().astype('float32').tofile(fid)
+        kernels[l].sigmam.astype('float32').tofile(fid)
         fid.close()
 
 
 #######################################################
-# Save new cubes
+# Save new maps
 #######################################################
-
-# create new cube
-if flat>0:
-  logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-  fid = open('depl_cumule_flat', 'wb')
-  maps_flata[:,:,:].flatten().astype('float32').tofile(fid)
-  fid.close()
 
 if arguments["--fulloutput"]=='yes':
     # create MAPS directory to save .r4
@@ -3352,115 +3492,33 @@ if arguments["--fulloutput"]=='yes':
 if N < 30:
   # plot displacements models and residuals
   nfigure +=1
-  figres = plt.figure(nfigure,figsize=(14,10))
-  figres.subplots_adjust(hspace=.001,wspace=0.001)
-  
-  nfigure +=1
-  fig = plt.figure(nfigure,figsize=(14,10))
-  fig.subplots_adjust(hspace=.001,wspace=0.01)
-  
-  nfigure +=1
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
+  vmax = np.nanpercentile(maps[:,:,:],99.)
+  vmin = np.nanpercentile(maps[:,:,:],1.)  
   cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
   figclr.savefig('colorscale.eps', format='EPS',dpi=150)
   
-  for l in range((N)):
-      data = as_strided(maps[:,:,l])
-      if Mker>0:
-          data_flat = as_strided(maps_flata[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
-          model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
-      else:
-          data_flat = as_strided(maps_flata[:,:,l]) - as_strided(basis[0].m[:,:])
-          model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
+  #for l in range((N)):
+  #    if Mker>0:
+  #        maps[:,:,l] = maps[:,:,l]- kernels[0].m[:,:] - basis[0].m[:,:]
+  #        models[:,:,l] = models[:,:,l] - basis[0].m[:,:] - kernels[0].m[:,:]
+  #    else:
+  #        maps[:,:,l] = maps[:,:,l] - basis[0].m[:,:]
+  #        models[:,:,l] = models[:,:,l] - basis[0].m[:,:]
+  nfigure +=1
+  plot_displacement_maps(models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series models', filename='maps-time-models.eps')
+  nfigure +=1
+  plot_displacement_maps(maps-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
   
-      res = data_flat - model
-      ramp = as_strided(maps_ramp[:,:,l])
-      tropo = as_strided(maps_topo[:,:,l])
-  
-      ax = fig.add_subplot(4,int(N/4)+1,l+1)
-      axres = figres.add_subplot(4,int(N/4)+1,l+1)
-  
-      cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-      caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-  
-      ax.set_title(idates[l],fontsize=6)
-      axres.set_title(idates[l],fontsize=6)
-  
-      plt.setp(ax.get_xticklabels(), visible=False)
-      plt.setp(ax.get_yticklabels(), visible=False)
-  
-      plt.setp(axres.get_xticklabels(), visible=False)
-      plt.setp(axres.get_yticklabels(), visible=False)
-  
-      # fig.tight_layout()
-
-      # ############
-      # # SAVE .R4 #
-      # ############
-
-      # save flatten maps
-      if arguments["--fulloutput"]=='yes':
-
-        if arguments["--geotiff"] is not None:
-
-            ds = driver.Create(outdir+'{}_flat.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            band = ds.GetRasterBand(1)
-            band.WriteArray(data_flat)
-            ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
-            band.FlushCache()
-
-            ds = driver.Create(outdir+'{}_ramp_tropo.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            band = ds.GetRasterBand(1)
-            band.WriteArray(ramp+tropo)
-            ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
-            band.FlushCache()
-
-            ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            band = ds.GetRasterBand(1)
-            band.WriteArray(model)
-            ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
-            band.FlushCache()
-
-        else:
-
-            fid = open(outdir+'{}_flat.r4'.format(idates[l]), 'wb')
-            data_flat.flatten().astype('float32').tofile(fid)
-            fid.close()
-
-            # save ramp maps
-            fid = open(outdir+'{}_ramp_tropo.r4'.format(idates[l]), 'wb')
-            (ramp+tropo).flatten().astype('float32').tofile(fid)
-            fid.close()
-
-            # save model maps
-            fid = open(outdir+'{}_model.r4'.format(idates[l]), 'wb')
-            model.flatten().astype('float32').tofile(fid)
-            fid.close()
-
-            # save residual maps
-            fid = open(outdir+'{}_res.r4'.format(idates[l]), 'wb')
-            res.flatten().astype('float32').tofile(fid)
-            # fid.close()
-
-  fig.suptitle('Time series models')
-  figres.suptitle('Time series residuals')
-  # figall.suptitle('Time series inversion')
-  fig.savefig('models.eps', format='EPS',dpi=150)
-  figres.savefig('residuals.eps', format='EPS',dpi=150)
-  # figall.savefig('timeseries.eps', format='EPS',dpi=150)
-  if plot=='yes':
-    plt.show()
-  plt.close('all')
+maps.flush()  # Force l’écriture sur disque
+models.flush()  # Force l’écriture sur disque
 
 # clean memory
-del maps_ramp, maps_flata, maps_topo
+del maps, models
 
 #######################################################
 # Compute Amplitude and phase seasonal
@@ -3499,12 +3557,12 @@ if arguments["--seasonal"]  == 'yes':
     else:
         logger.info('Save: {}'.format('ampwt_coeff.r4'))
         fid = open('ampwt_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('ampwt_sigcoeff.r4'))
         fid = open('ampwt_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3529,12 +3587,12 @@ if arguments["--seasonal"]  == 'yes':
     else:
         logger.info('Save: {}'.format('phiwt_coeff.r4'))
         fid = open('phiwt_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phiwt_sigcoeff.r4'))
         fid = open('phiwt_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 if arguments["--seasonal_increase"]  == 'yes':
@@ -3543,8 +3601,8 @@ if arguments["--seasonal_increase"]  == 'yes':
     amp = np.sqrt(cosine**2+sine**2)
     phi = np.arctan2(sine,cosine)
 
-    sigcosine = as_strided(basis[indexseas].sigmam)
-    sigsine = as_strided(basis[indexseas+1].sigmam)
+    sigcosine = as_strided(basis[indexseast].sigmam)
+    sigsine = as_strided(basis[indexseast+1].sigmam)
     sigamp = np.sqrt(sigcosine**2+sigsine**2)
     sigphi = (sigcosine*abs(sine)+sigsine*abs(cosine))/(sigcosine**2+sigsine**2)
 
@@ -3570,12 +3628,12 @@ if arguments["--seasonal_increase"]  == 'yes':
     else:
         logger.info('Save: {}'.format('ampwt_increase_coeff.r4'))
         fid = open('ampwt_increase_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('ampwt_increase_sigcoeff.r4'))
         fid = open('ampwt_increase_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3600,12 +3658,12 @@ if arguments["--seasonal_increase"]  == 'yes':
     else:
         logger.info('Save: {}'.format('phiwt_increase_coeff.r4'))
         fid = open('phiwt_increase_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phiwt_increase_sigcoeff.r4'))
         fid = open('phiwt_increase_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 if arguments["--semianual"] == 'yes':
@@ -3641,12 +3699,12 @@ if arguments["--semianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('amp_simiwt_coeff.r4'))
         fid = open('amp_simiwt_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('amp_simiwt_sigcoeff.r4'))
         fid = open('amp_simiwt_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3669,12 +3727,12 @@ if arguments["--semianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('phi_simiwt_coeff.r4'))
         fid = open('phi_simiwt_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phi_simiwt_sigcoeff.r4'))
         fid = open('phi_simiwt_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 if arguments["--bianual"] == 'yes':
@@ -3710,12 +3768,12 @@ if arguments["--bianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('amp_biwt_coeff.r4'))
         fid = open('ampw.5t_coeff.r4', 'wb')
-        amp.flatten().astype('float32').tofile(fid)
+        amp.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('amp_biwt_sigcoeff.r4'))
         fid = open('ampw.5t_sigcoeff.r4', 'wb')
-        sigamp.flatten().astype('float32').tofile(fid)
+        sigamp.astype('float32').tofile(fid)
         fid.close()
 
     if arguments["--geotiff"] is not None:
@@ -3738,44 +3796,22 @@ if arguments["--bianual"] == 'yes':
     else:
         logger.info('Save: {}'.format('phi_biwt_coeff.r4'))
         fid = open('phiw.5t_coeff.r4', 'wb')
-        phi.flatten().astype('float32').tofile(fid)
+        phi.astype('float32').tofile(fid)
         fid.close()
 
         logger.info('Save: {}'.format('phi_biwt_sigcoeff.r4'))
         fid = open('phiw.5t_sigcoeff.r4', 'wb')
-        sigphi.flatten().astype('float32').tofile(fid)
+        sigphi.astype('float32').tofile(fid)
         fid.close()
 
 #######################################################
 # Plot
 #######################################################
 
-# plot ref term
-vmax = np.abs([np.nanpercentile(basis[0].m,98.),np.nanpercentile(basis[0].m,2.)]).max()
-vmin = -vmax
-
 nfigure +=1
-fig=plt.figure(nfigure,figsize=(14,12))
+fig = plt.figure(nfigure,figsize=(14,10))
 
-ax = fig.add_subplot(1,M,1)
-cax = ax.imshow(basis[0].m,cmap=cmap,vmax=vmax,vmin=vmin)
-cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-plt.setp(ax.get_xticklabels(), visible=False)
-plt.setp(ax.get_yticklabels(), visible=False)
-
-# plot linear term
-vmax = np.abs([np.nanpercentile(basis[1].m,98.),np.nanpercentile(basis[1].m,2.)]).max()
-vmin = -vmax
-
-ax = fig.add_subplot(1,M,2)
-cax = ax.imshow(basis[1].m,cmap=cmap,vmax=vmax,vmin=vmin)
-ax.set_title(basis[1].reduction)
-cbar = fig.colorbar(cax, orientation='vertical',shrink=0.2)
-plt.setp(ax.get_xticklabels(), visible=False)
-plt.setp(ax.get_yticklabels(), visible=False)
-
-# plot others
-for l in range(2,Mbasis):
+for l in range(Mbasis):
     vmax = np.abs([np.nanpercentile(basis[l].m,98.),np.nanpercentile(basis[l].m,2.)]).max()
     vmin = -vmax
 
@@ -3806,3 +3842,4 @@ fig.savefig('inversion.eps', format='EPS',dpi=150)
 
 if plot=='yes':
     plt.show()
+
