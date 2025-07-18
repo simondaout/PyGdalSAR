@@ -359,13 +359,38 @@ def checkinfile(file):
         logger.info("File: {0} not found in {1}, Exit !".format(file,getcwd()))
         sys.exit()
 
-# create generator for pool
-@contextmanager
-def poolcontext(*arg, **kargs):
-    pool = multiprocessing.Pool(*arg, **kargs)
-    yield pool
-    pool.terminate()
-    pool.join()
+def plot_displacement_maps(maps, idates, nfigure=0, cmap='RdBu', plot='yes', filename='maps.eps', title='Time series maps', fig_dpi=150):
+    """
+    Affiche et sauvegarde une série de cartes de déplacement (type cube t,x,y).
+
+    """
+    N = maps.shape[2]
+    ncols = int(N / 4) + 1
+    vmax = np.nanpercentile(maps, 99.)
+    vmin = np.nanpercentile(maps, 1.)
+
+    fig = plt.figure(nfigure, figsize=(14, 10))
+    fig.subplots_adjust(wspace=0.001)
+
+    for l in range(N):
+        d = as_strided(maps[:, :, l])
+        ax = fig.add_subplot(4, ncols, l + 1)
+        cax = ax.imshow(d, cmap=cmap, vmin=vmin, vmax=vmax, interpolation='nearest')
+        ax.set_title(str(idates[l]), fontsize=6)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.suptitle('{}'.format(title), fontsize=12)
+    fig.colorbar(cax, orientation='vertical', aspect=10)
+    fig.subplots_adjust(hspace=.001,wspace=0.001)
+    fig.savefig(filename, format='EPS', dpi=fig_dpi)
+
+    if plot == 'yes':
+        plt.show()
+    
+    plt.close(fig)
+    del fig
+
 
 ################################
 # Initialization
@@ -466,7 +491,7 @@ if arguments["--perc_topo"] ==  None:
 if arguments["--perc_los"] ==  None:
     arguments["--perc_los"] = 98.
 if arguments["--nproc"] ==  None:
-    nproc = 1
+    nproc = 5
 else:
     nproc = int(arguments["--nproc"])
 if arguments["--ndatasets"] ==  None:
@@ -604,6 +629,7 @@ except:
 # set at NaN zero values for all dates
 # kk = np.nonzero(maps_temp[:,:,-1]==0)
 cst = np.copy(maps_temp[:,:,imref])
+cst[np.isnan(cst)] = 0.0
 for l in range((N)):
     maps_temp[:,:,l] = maps_temp[:,:,l] - cst
     if l != imref:
@@ -845,26 +871,7 @@ if arguments["--mask"] is not None:
 
 # plot diplacements maps
 nfigure+=1
-fig = plt.figure(nfigure,figsize=(14,10))
-fig.subplots_adjust(wspace=0.001)
-vmax = np.nanpercentile(maps[:,:,:],99.)
-vmin = np.nanpercentile(maps[:,:,:],1.)
-
-for l in range((N)):
-    d = as_strided(maps[:,:,l])
-    ax = fig.add_subplot(4,int(N/4)+1,l+1)
-    cax = ax.imshow(d,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
-    ax.set_title(idates[l],fontsize=6)
-    plt.setp( ax.get_xticklabels(), visible=False)
-    plt.setp( ax.get_yticklabels(), visible=False)
-
-plt.suptitle('Time series maps')
-fig.colorbar(cax, orientation='vertical',aspect=10)
-fig.savefig('maps.eps', format='EPS',dpi=150)
-
-if plot=='yes':
-        plt.show()
-del fig
+plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series maps', filename='maps.eps')
 
 #######################################################
 # Save new lect.in file
@@ -2973,12 +2980,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
       return ramp, flata, topo, rms
  
 
-def empirical_cor(l):
+def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, threshold_rms, threshold_mask, emp_sampling, lin_start, lin_end, col_start, col_end): 
   """
   Function that preapare and run empirical estimaton for each interferogram kk
   """
 
   global fig_dphi
+  global maps, models, elev_map, aspect_map, rms_map
 
   # first clean los
   map_temp = as_strided(maps[:,:,l]) - as_strided(models[:,:,l])
@@ -2986,7 +2994,7 @@ def empirical_cor(l):
   # no estimation on the ref image set to zero 
   if np.nansum(maps[:,:,l]) != 0:
 
-    maxlos,minlos=np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(arguments["--perc_los"])),np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(arguments["--perc_los"]))
+    maxlos,minlos=np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(perc_los)),np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(perc_los))
     logger.debug('Set Max-Min LOS for empirical estimation: {0}-{1}'.format(maxlos,minlos))
     kk = np.nonzero(np.logical_or(map_temp==0.,np.logical_or((map_temp>maxlos),(map_temp<minlos))))
     map_temp[kk] = float('NaN')
@@ -2999,21 +3007,21 @@ def empirical_cor(l):
             break
     logger.debug('Begining of the image: {}'.format(itemp))
 
-    if arguments["--topofile"] is not None:
+    if topofile is not None:
         ax_dphi = fig_dphi.add_subplot(4,int(N/4)+1,l+1)
     else:
         ax_dphi = None
 
-    logger.debug('Threshold RMS: {}'.format(float(arguments["--threshold_rms"])))
+    logger.debug('Threshold RMS: {}'.format(float(threshold_rms)))
 
     # selection pixels
     index = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
-            np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
+            np.logical_and(mask_flat>float(threshold_mask),
             np.logical_and(~np.isnan(map_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
+                np.logical_and(rmsmap<float(threshold_rms),
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>ibeg_emp,
@@ -3036,7 +3044,7 @@ def empirical_cor(l):
     if len(los_clean) < 1:
       logger.critical('No points left for empirical estimation. Exit!')
       logger.critical('threshold RMS: {0}, threshold Mask: {1}, Min-Max LOS: {2}-{3}, Min-Max topo: {4}-{5}, lines: {6}-{7}, \
-        cols: {8}- {9}'.format(float(arguments["--threshold_rms"]),float(arguments["--threshold_mask"]),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
+        cols: {8}- {9}'.format(float(threshold_rms),float(threshold_mask),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
       sys.exit()
 
     # print itemp, iend_emp
@@ -3056,7 +3064,7 @@ def empirical_cor(l):
 
     # call ramp estim
     los = as_strided(maps[:,:,l]).flatten()
-    samp = int(arguments["--emp_sampling"])
+    samp = int(emp_sampling)
 
     map_ramp, map_flata, map_topo, rmsi = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
       y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
@@ -3064,11 +3072,11 @@ def empirical_cor(l):
     if (lin_start is not None) and (lin_end is not None):
         indexref = np.nonzero(np.logical_and(elev<maxtopo,
         np.logical_and(elev>mintopo,
-            np.logical_and(mask_flat>float(arguments["--threshold_mask"]),
+            np.logical_and(mask_flat>float(threshold_mask),
             np.logical_and(~np.isnan(map_temp),
                 np.logical_and(~np.isnan(rmsmap),
                 np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<float(arguments["--threshold_rms"]),
+                np.logical_and(rmsmap<float(threshold_rms),
                 np.logical_and(rmsmap>1.e-6,
                 np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>lin_start,
@@ -3194,49 +3202,24 @@ for ii in range(int(arguments["--niter"])):
     
       for l in range((N)):
           if arguments["--topofile"] is not None:
-            maps[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l)
+            maps[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
           else:
-            maps[:,:,l], rms[l] = empirical_cor(l)
+            maps[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
 
       if N < 30:
         # plot corrected ts
         nfigure +=1
-        figd = plt.figure(nfigure,figsize=(14,10))
-        figd.subplots_adjust(hspace=0.001,wspace=0.001)
-        for l in range((N)):
-            axd = figd.add_subplot(4,int(N/4)+1,l+1)
-            caxd = axd.imshow(maps[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin,interpolation='none')
-            axd.set_title(idates[l],fontsize=6)
-            plt.setp(axd.get_xticklabels(), visible=False)
-            plt.setp(axd.get_yticklabels(), visible=False)
-        plt.setp(axd.get_xticklabels(), visible=False)
-        plt.setp(axd.get_yticklabels(), visible=False)
-        figd.colorbar(caxd, orientation='vertical',aspect=10)
-        figd.suptitle('Corrected time series maps')
-        figd.savefig('maps_flat.eps', format='EPS',dpi=150)
+        plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
 
         if arguments["--topofile"] is not None:
             fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
             nfigure +=1
-            figtopo = plt.figure(nfigure,figsize=(14,10))
-            figtopo.subplots_adjust(hspace=.001,wspace=0.001)
-            for l in range((N)):
-                axtopo = figtopo.add_subplot(4,int(N/4)+1,l+1)
-                caxtopo = axtopo.imshow(maps_topo[:,:,l],cmap=cmap,vmax=vmax,vmin=vmin)
-                axtopo.set_title(idates[l],fontsize=6)
-                plt.setp(axtopo.get_xticklabels(), visible=False)
-                plt.setp(axtopo.get_yticklabels(), visible=False)
-                plt.setp(axtopo.get_xticklabels(), visible=False)
-                plt.setp(axtopo.get_yticklabels(), visible=False)
-            figtopo.colorbar(caxtopo, orientation='vertical',aspect=10)
-            figtopo.suptitle('Time series RAMPS+TOPO')
-            figtopo.savefig('tropo.eps', format='EPS',dpi=150)
- 
+            plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps') 
+            del maps_topo
+
     if plot=='yes':
         plt.show()
     plt.close('all')
-    if arguments["--topofile"] is not None:
-        del maps_topo
 
     # save rms
     if (arguments["--aps"] is None and ii==0):
@@ -3261,12 +3244,12 @@ for ii in range(int(arguments["--niter"])):
 
     # create new cube
     if flat>0:
-        logger.info('Save flatten time series cube: {}'.format('depl_cumule_flat'))
-        fid = open('depl_cumule_flat', 'wb')
+        logger.info('Save flatten time series cube: {}'.format('disp_cumule_flat'))
+        fid = open('disp_cumule_flat', 'wb')
         maps[:,:,:].astype('float32').tofile(fid)
         in_hdr = arguments["--cube"] + '.hdr'
-        arguments["--cube"] = 'depl_cumule_flat' # update depl_cumul
-        out_hdr = 'depl_cumule_flat.hdr'
+        arguments["--cube"] = 'disp_cumule_flat' # update depl_cumul
+        out_hdr = 'disp_cumule_flat.hdr'
         try:
             shutil.copy(in_hdr, out_hdr)
         except:
@@ -3295,7 +3278,7 @@ for ii in range(int(arguments["--niter"])):
         for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
               j = pix  % (new_cols)
               i = int(pix/(new_cols))
-              if ((i % 10) == 0) and (j==0):
+              if ((i % 20) == 0) and (j==0):
                   logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
               disp = as_strided(maps[i,j,:])
               m, sigmam, models[i,j,:]  = temporal_decomp(pix, disp, in_sigma, arguments['--cond'], arguments['--ineq'], eguality)
@@ -3403,110 +3386,46 @@ else:
         kernels[l].sigmam.astype('float32').tofile(fid)
         fid.close()
 
-
 #######################################################
-# Save new maps
+# Save models
 #######################################################
 
 if arguments["--fulloutput"]=='yes':
-    # create MAPS directory to save .r4
-    outdir = './MAPS/'
-    logger.info('Save time series maps in: {}'.format(outdir))
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
+        logger.info('Save  time series cube model: {}'.format('disp_cumule_models'))
+        fid = open('depl_cumule_models', 'wb')
+        maps[:,:,:].astype('float32').tofile(fid)
+        in_hdr = arguments["--cube"] + '.hdr'
+        out_hdr = 'depl_cumule_models.hdr'
+        try:
+            shutil.copy(in_hdr, out_hdr)
+        except:
+            pass
+        fid.close()
+        del fid
+
+#######################################################
+# Plot models and residuals
+#######################################################
 
 if N < 30:
-  # plot displacements models and residuals
-  nfigure +=1
-  figres = plt.figure(nfigure,figsize=(14,10))
-  figres.subplots_adjust(hspace=.001,wspace=0.001)
-  
-  nfigure +=1
-  fig = plt.figure(nfigure,figsize=(14,10))
-  fig.subplots_adjust(hspace=.001,wspace=0.01)
-  
   nfigure +=1
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
+  vmax = np.nanpercentile(maps[:,:,:],99.)
+  vmin = np.nanpercentile(maps[:,:,:],1.)  
   cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
-  figclr.savefig('colorscale.eps', format='EPS',dpi=150)
-  
-  for l in range((N)):
-      data = as_strided(maps[:,:,l])
-      if Mker>0:
-          data_flat = as_strided(maps[:,:,l])- as_strided(kernels[0].m[:,:]) - as_strided(basis[0].m[:,:])
-          model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:]) - as_strided(kernels[0].m[:,:])
-      else:
-          data_flat = as_strided(maps[:,:,l]) - as_strided(basis[0].m[:,:])
-          model = as_strided(models[:,:,l]) - as_strided(basis[0].m[:,:])
-      res = data_flat - model
-      
-      ax = fig.add_subplot(4,int(N/4)+1,l+1)
-      axres = figres.add_subplot(4,int(N/4)+1,l+1)
-      cax = ax.imshow(model,cmap=cmap,vmax=vmax,vmin=vmin)
-      caxres = axres.imshow(res,cmap=cmap,vmax=vmax,vmin=vmin)
-      ax.set_title(idates[l],fontsize=6)
-      axres.set_title(idates[l],fontsize=6)
-  
-      plt.setp(ax.get_xticklabels(), visible=False)
-      plt.setp(ax.get_yticklabels(), visible=False)
-      plt.setp(axres.get_xticklabels(), visible=False)
-      plt.setp(axres.get_yticklabels(), visible=False)
+  figclr.savefig('colorscale.eps', format='EPS',dpi=150) 
 
-      # ############
-      # # SAVE .R4 #
-      # ############
-
-      # save flatten maps
-      if arguments["--fulloutput"]=='yes':
-
-        if arguments["--geotiff"] is not None:
-
-            ds = driver.Create(outdir+'{}_flat.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            band = ds.GetRasterBand(1)
-            band.WriteArray(data_flat)
-            ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
-            band.FlushCache()
-
-            ds = driver.Create(outdir+'{}_model.tif'.format(idates[l]), new_cols, new_lines, 1, gdal.GDT_Float32)
-            band = ds.GetRasterBand(1)
-            band.WriteArray(model)
-            ds.SetGeoTransform(gt)
-            ds.SetProjection(proj)
-            band.FlushCache()
-
-        else:
-
-            fid = open(outdir+'{}_flat.r4'.format(idates[l]), 'wb')
-            data_flat.astype('float32').tofile(fid)
-            fid.close()
-
-            # save model maps
-            fid = open(outdir+'{}_model.r4'.format(idates[l]), 'wb')
-            model.astype('float32').tofile(fid)
-            fid.close()
-
-            # save residual maps
-            fid = open(outdir+'{}_res.r4'.format(idates[l]), 'wb')
-            res.astype('float32').tofile(fid)
-            # fid.close()
-
-  fig.suptitle('Time series models')
-  figres.suptitle('Time series residuals')
-  # figall.suptitle('Time series inversion')
-  fig.savefig('models.eps', format='EPS',dpi=150)
-  figres.savefig('residuals.eps', format='EPS',dpi=150)
-  # figall.savefig('timeseries.eps', format='EPS',dpi=150)
-  if plot=='yes':
-    plt.show()
-  plt.close('all')
+  nfigure +=1
+  plot_displacement_maps(models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series models', filename='maps-time-models.eps')
+  nfigure +=1
+  plot_displacement_maps(maps-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
 
 # clean memory
-del maps
+del maps, models
 
 #######################################################
 # Compute Amplitude and phase seasonal
