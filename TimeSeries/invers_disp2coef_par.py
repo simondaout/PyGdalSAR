@@ -3140,7 +3140,7 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
              sys.exit()
 
         ## Set data minus temporal model to zero in the ref area
-        res = as_strided(map_flata[:,:] - models[:,:,l])
+        res = as_strided(map_flata[:,:] - model_map[:,:])
         res_ref = res[indexref].flatten()
         rms_ref = rms_map[indexref].flatten()
         amp_ref = 1./rms_ref
@@ -3306,11 +3306,6 @@ for ii in range(int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
-    # if topo file just initialise figure
-    #if arguments["--topofile"] is not None:
-    #  nfigure +=1
-    #  fig_dphi = plt.figure(nfigure,figsize=(14,10))
-    
     # if iteration = 0 or spatialiter==yes, then spatial estimation
     if (ii==0) or (arguments["--spatialiter"]=='yes') :
 
@@ -3331,7 +3326,6 @@ for ii in range(int(arguments["--niter"])):
         plt.show()
     plt.close('all')
 
-    del elev_map, aspect_map, rms_map
     gc.collect()
     
     # save rms
@@ -3373,7 +3367,6 @@ for ii in range(int(arguments["--niter"])):
         plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
 
         if arguments["--topofile"] is not None:
-        #    fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
             nfigure +=1
             plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps')
             del maps_topo
@@ -3392,7 +3385,7 @@ for ii in range(int(arguments["--niter"])):
             block_size_local = end_line - line
             logger.info('Processing line: {} --- {:.2f} seconds ---'.format(line, time.time() - start_time)) 
             
-            temp_array = maps[line:end_line, :, :]
+            temp_array = as_strided(maps[line:end_line, :, :])
             line_time_series = temp_array.transpose(2, 0, 1).reshape(N, -1) 
             chunks = np.array_split(line_time_series, nproc, axis=1)
 
