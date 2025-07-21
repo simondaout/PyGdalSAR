@@ -102,6 +102,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import scipy as sp
 import scipy.optimize as opt
+from scipy.linalg import cholesky, solve_triangular
 import numpy.linalg as lst
 from osgeo import gdal, osr
 import math, sys, getopt, shutil
@@ -114,7 +115,8 @@ from datetime import datetime as dt
 import multiprocessing
 from multiprocessing import shared_memory
 import psutil
-import gc
+#import gc
+#gc.disable()
 
 try:
     from nsbas import docopt
@@ -374,7 +376,11 @@ def write_envi_hdr(filename, shape, dtype='float32', interleave='bip'):
     - interleave: 'bsq', 'bil' ou 'bip'
     """
 
-    lines, samples, bands = shape
+    if len(shape) == 3:
+        lines, samples, bands = shape
+    else:
+        lines, samples = shape
+        bands = 1
     dtype_map = {
         'uint8': 1,
         'int16': 2,
@@ -403,6 +409,38 @@ byte order = 0
 
     with open(filename + '.hdr', 'w') as f:
         f.write(hdr_content)
+
+# ReadAsArray(xoff, yoff, xsize, ysize)
+# xoff, yoff : décalage horizontal et vertical du coin supérieur gauche
+# xsize, ysize : taille de la fenêtre en colonnes/lignes
+def read_band(band_idx, file_path, line, ncol, num_lines):
+    ds = gdal.Open(file_path)
+    band = ds.GetRasterBand(band_idx)
+    return band.ReadAsArray(0, line, ncol, num_lines)
+
+def write_band(band_index, path, array_to_write, x_offset, y_offset):
+    """
+    Écrit un tableau dans une bande raster à la position spécifiée.
+
+    Args:
+        band_index (int): Numéro de la bande (1-based).
+        path (str): Chemin du fichier raster.
+        array_to_write (np.ndarray): Tableau 2D à écrire (shape: (n_rows, n_cols)).
+        x_offset (int): Colonne de départ dans l'image (offset horizontal).
+        y_offset (int): Ligne de départ dans l'image (offset vertical).
+    """
+    ds = gdal.Open(path, gdal.GA_Update)  # GA_Update pour pouvoir écrire
+    if ds is None:
+        raise RuntimeError(f"Impossible d’ouvrir {path} en écriture.")
+
+    band = ds.GetRasterBand(band_index)
+    if band is None:
+        raise RuntimeError(f"Bande {band_index} introuvable dans {path}.")
+
+    band.WriteArray(array_to_write, xoff=x_offset, yoff=y_offset)
+    band.FlushCache()
+    ds = None  # libère le fichier
+
 
 ################################
 # Initialization
@@ -512,8 +550,8 @@ else:
     ndata = int(arguments["--ndatasets"])
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
-    logger.warning('plot is yes. Set nproc to 1')
-    nproc = 1
+    #logger.warning('plot is yes. Set nproc to 1')
+    #nproc = 1
     if environ["TERM"].startswith("screen"):
         matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
@@ -647,18 +685,10 @@ for l in range((N)):
         index = np.nonzero(maps_temp[:,:,l]==0.0)
         maps_temp[:,:,l][index] = float('NaN')
 N=len(dates)
-maps_temp = maps_temp[ibeg:iend,jbeg:jend,indexd]
+maps = maps_temp[ibeg:iend,jbeg:jend,indexd]
 logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
-logger.info('Reshape cube: {}'.format(maps_temp.shape))
-new_lines, new_cols = maps_temp.shape[0], maps_temp.shape[1]
-
-# save time series for processinf
-logger.info('Save time series cube: {}'.format('disp_cumul_flat'))
-maps = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
-    shape=maps_temp.shape)
-maps[:] = maps_temp[:]
-maps.flush()  # Force l’écriture sur disque
-write_envi_hdr('disp_cumul_flat', shape=(new_lines, new_cols, N))
+logger.info('Reshape cube: {}'.format(maps.shape))
+new_lines, new_cols = maps.shape[0], maps.shape[1]
 
 # clean
 del maps_temp
@@ -716,6 +746,9 @@ else:
     maxtopo,mintopo = 2, 0 
 elev_map = np.memmap('elev_map', dtype='float32', mode='w+', shape=(new_lines,new_cols))
 elev_map[:] = elev_map_temp
+elev_map.flush()
+write_envi_hdr('elev_map', shape=(new_lines, new_cols))
+
 del elev_map_temp, elev_map
 
 if arguments["--aspect"] is not None:
@@ -737,6 +770,8 @@ else:
     aspect_map_temp = np.ones((new_lines,new_cols))
 aspect_map = np.memmap('aspect_map', dtype='float32', mode='w+', shape=(new_lines,new_cols))
 aspect_map[:] = aspect_map_temp[:]
+aspect_map.flush()
+write_envi_hdr('aspect_map', shape=(new_lines, new_cols))
 del aspect_map_temp, aspect_map
 
 if arguments["--rmspixel"] is not None:
@@ -770,6 +805,8 @@ else:
 # save map
 rms_map = np.memmap('rms_map', dtype='float32', mode='w+', shape=(new_lines,new_cols))
 rms_map[:] = rms_map_temp[:]
+rms_map.flush()
+write_envi_hdr('rms_map', shape=(new_lines, new_cols))
 del rms_map_temp, rms_map
 
 if arguments["--bperp"]=='yes':
@@ -927,7 +964,6 @@ def plot_displacement_maps(maps, idates, nfigure=0, cmap='RdBu', plot='yes', fil
 # plot diplacements maps
 nfigure+=1
 plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series maps', filename='maps.eps')
-del maps
 
 #######################################################
 # Save new lect.in file
@@ -1148,11 +1184,12 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        try:
-          Cd = np.diag(sigmad**2, k = 0)
-          fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
-        except:
-          fsoln = lst.lstsq(A,b,rcond=None)[0]  
+        # Résolution du système pondéré par la décomposition de Cholesky
+        Cd = np.diag(sigmad**2, k = 0)
+        L = cholesky(Cd, lower=True)   # Cd = L L^T
+        A_w = solve_triangular(L, A, lower=True)
+        b_w = solve_triangular(L, b, lower=True)
+        fsoln = np.linalg.lstsq(A_w, b_w, rcond=None)[0]
     else:
         if len(indexpo>0):
           # invert first without post-seismic
@@ -1197,10 +1234,10 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         #print('Optimization:', fsoln)
 
     try:
-       varx = np.linalg.inv(np.dot(A.T,A))
-       res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
-       scale = 1./(A.shape[0]-A.shape[1])
-       sigmam = np.sqrt(scale*res2*np.diag(varx))
+       varx = np.linalg.inv(A.T @ A)
+       res2 = np.sum((b - A @ fsoln)**2)
+       scale = 1. / (A.shape[0] - A.shape[1])
+       sigmam = np.sqrt(scale * res2 * np.diag(varx))
     except:
        sigmam = np.ones((A.shape[1]))*float('NaN')
     return fsoln,sigmam
@@ -1209,12 +1246,12 @@ def linear_inv(G, data, sigma):
       'Iterative linear inversion'
 
       x0 = lst.lstsq(G,data)[0]
-      _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
-      _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
-      pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
-
-      return pars
-
+      #_func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
+      #_fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
+      #pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0,acc=1.e-9)[0]
+      #return pars
+      return x0
+    
 def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
 
@@ -3155,7 +3192,7 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
         del res, res_ref, rms_ref, amp_ref, cst
       
   else:
-    logger.info('Empty displacements for date: {}:'.format(l))
+    logger.info('Empty displacements for date: {}'.format(l))
     map_flata = np.copy(disp_map)
     map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))
     rmsi = 1
@@ -3175,9 +3212,10 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
 
 _global_data = {}
 
-def init_worker(maps_path, models_path, elev_path, aspect_path, rms_path, shape_2d, shape_3d, dtype):
+def init_worker(maps , maps_flata_path, models_path, elev_path, aspect_path, rms_path, shape_2d, shape_3d, dtype):
     global _global_data
-    _global_data['maps'] = np.memmap(maps_path, dtype=dtype, mode='r+', shape=shape_3d)
+    _global_data['maps'] = maps
+    _global_data['maps_flata'] = np.memmap(maps_flata_path, dtype=dtype, mode='r+', shape=shape_3d)
     _global_data['models'] = np.memmap(models_path, dtype=dtype, mode='r', shape=shape_3d)
     _global_data['elev_map'] = np.memmap(elev_path, dtype=dtype, mode='r', shape=shape_2d)
     _global_data['aspect_map'] = np.memmap(aspect_path, dtype=dtype, mode='r', shape=shape_2d)
@@ -3186,41 +3224,31 @@ def init_worker(maps_path, models_path, elev_path, aspect_path, rms_path, shape_
     _global_data['maps_topo'] = np.memmap('maps_topo', dtype=dtype, mode='w+', shape=shape_3d)
 
 def empirical_cor_wrapper(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, threshold_rms, threshold_mask, emp_sampling):
-    maps = _global_data['maps']
-    models = _global_data['models']
+    disp_map = _global_data['maps'][:, :, l]
+    model_map = _global_data['models'][:, :, l]
     elev_map = _global_data['elev_map']
     aspect_map = _global_data['aspect_map']
     rms_map = _global_data['rms_map']
-    residuals_emp = _global_data['residuals_emp']
-
-    disp_map = maps[:, :, l]
-    model_map = models[:, :, l]
 
     if topofile is not None:
-        maps_topo = _global_data['maps_topo']
-        corrected_map, topo_map, residual = empirical_cor(
+        map_topo = _global_data['maps_topo'][:, :, l]
+        _global_data['maps_flata'][:, :, l], _global_data['maps_topo'][:, :, l], _global_data['residuals_emp'][l] = empirical_cor(
             l, disp_map, model_map, elev_map, aspect_map, rms_map,
             ibeg_emp, iend_emp, mintopo, maxtopo,
             topofile, perc_los, threshold_rms, threshold_mask, emp_sampling
         )
-        maps[:, :, l] = corrected_map
-        maps_topo[:, :, l] = topo_map
-        residuals_emp[l] = residual
     else:
-        corrected_map, residual = empirical_cor(
+        _global_data['maps_flata'][:, :, l], _global_data['residuals_emp'][l] = empirical_cor(
             l, disp_map, model_map, elev_map, aspect_map, rms_map,
             ibeg_emp, iend_emp, mintopo, maxtopo,
             topofile, perc_los, threshold_rms, threshold_mask, emp_sampling
         )
-        maps[:, :, l] = corrected_map
-        residuals_emp[l] = residual 
-        maps.flush()
-        residuals_emp.flush()         
+    del disp_map, model_map, elev_map, aspect_map, rms_map   
 
 def init():
     global N, M, dates
 
-def compute_auto_block_size(new_lines, new_cols, N, dtype='float32', target_memory_MB=400):
+def compute_auto_block_size(new_lines, new_cols, N, dtype='float32', target_memory_MB=200):
     """
     Détermine une taille de bloc (nb de lignes) pour rester dans target_memory_MB
     """
@@ -3289,12 +3317,20 @@ def temporal_decomp(disp, sigma, cond, ineq, eguality):
 
     return m, sigmam, mdisp 
 
-# Create memmap output file to store models
+# Create memmap output file to store tempor models and flatten maps
+logger.info('Save time series cube for temporal models: {}'.format('disp_cumul_models'))
 models = np.memmap('disp_cumul_models', dtype='float32', mode='w+',
                         shape=(new_lines, new_cols, N))
 write_envi_hdr('disp_cumul_models', shape=(new_lines, new_cols, N))
 models.flush()
 del models 
+
+logger.info('Save flatten time series cube: {}'.format('disp_cumul_flat'))
+maps_flata = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
+    shape=(new_lines, new_cols, N))
+maps_flata.flush()  # Force l’écriture sur disque
+write_envi_hdr('disp_cumul_flat', shape=(new_lines, new_cols, N))
+del maps_flata
 
 for ii in range(int(arguments["--niter"])):
     print()
@@ -3318,15 +3354,18 @@ for ii in range(int(arguments["--niter"])):
       print()
 
       nprocess = min(N, nproc)
-      with multiprocessing.Pool(processes=nprocess, initializer=init_worker, initargs=('disp_cumul_flat', 'disp_cumul_models', 'elev_map', 'aspect_map', 'rms_map', (new_lines, new_cols), (new_lines, new_cols, N), 'float32')) as pool:
+      with multiprocessing.Pool(processes=nprocess, initializer=init_worker, initargs=(maps, 'disp_cumul_flat' ,'disp_cumul_models', 'elev_map', 'aspect_map', 'rms_map', (new_lines, new_cols), (new_lines, new_cols, N), 'float32')) as pool:
           results = pool.starmap(empirical_cor_wrapper, [(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"]) for l in range(N)]) 
-
-
+     
     if plot=='yes':
         plt.show()
     plt.close('all')
 
-    gc.collect()
+    try:
+        del _global_data
+    except:
+        pass
+    #gc.collect()
     
     # save rms
     if (arguments["--aps"] is None and ii==0):
@@ -3356,15 +3395,10 @@ for ii in range(int(arguments["--niter"])):
     #########################################
     print()
 
-    # open maps 
-    maps = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
-                        shape=(new_lines, new_cols, N))
-    models = np.memmap('disp_cumul_models', dtype='float32', mode='r+',
-                        shape=(new_lines, new_cols, N))
     if N < 30:
         # plot corrected ts
         nfigure +=1
-        plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
+        plot_displacement_maps(maps_flata, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
 
         if arguments["--topofile"] is not None:
             nfigure +=1
@@ -3376,6 +3410,7 @@ for ii in range(int(arguments["--niter"])):
     # number of lines per block
     #block_size = min(int(new_cols/4), compute_auto_block_size(new_lines, new_cols, N))
     block_size = compute_auto_block_size(new_lines, new_cols, N)
+    block_size = 100
     logger.info('Block size for parallelisation: {} '.format(block_size))
 
     with TimeIt():
@@ -3384,9 +3419,15 @@ for ii in range(int(arguments["--niter"])):
             end_line = min(line + block_size, new_lines)
             block_size_local = end_line - line
             logger.info('Processing line: {} --- {:.2f} seconds ---'.format(line, time.time() - start_time)) 
-            
-            temp_array = as_strided(maps[line:end_line, :, :])
-            line_time_series = temp_array.transpose(2, 0, 1).reshape(N, -1) 
+           
+            results = [pool.apply_async(read_band, args=(i+1, 'disp_cumul_flat', line, new_cols, block_size_local)) for i in range(N)] #lecture asynchrone des N bandes 
+            bands_data = [result.get() for result in results] # Récupère les résultats des apply_async
+            temp_array = np.concatenate([np.expand_dims(band, axis=0) for band in bands_data], axis=0)
+            line_time_series = np.array(temp_array)
+            line_time_series = np.reshape(line_time_series, (N,new_cols*block_size_local))
+            line_time_series = np.squeeze(line_time_series)
+  
+            #line_time_series = temp_array.transpose(2, 0, 1).reshape(N, -1) 
             chunks = np.array_split(line_time_series, nproc, axis=1)
 
             args_list = [
@@ -3405,9 +3446,9 @@ for ii in range(int(arguments["--niter"])):
 
             models_temp = np.concatenate(models_chunks, axis=0) # shape: (nb_pixels, N)
             
-            # stocker les tableaux 
-            models[line:end_line, :, :] = models_temp.reshape(block_size_local, new_cols, N)
-            
+            # stocker les tableaux
+            results = [pool.apply_async(write_band, args=(i+1, 'disp_cumul_models', models_temp.reshape(block_size_local, new_cols, N), 0, line)) for i in range(N)]
+
             # Stocker les coefficients m et sigmam dans les objets basis[] et kernels[]
             for idx in range(block_size_local * new_cols):
                 i = line + (idx // new_cols)
@@ -3422,12 +3463,20 @@ for ii in range(int(arguments["--niter"])):
 
             # nettoyage
             del m, sigmam, m_chunks, sigmam_chunks, models_chunks, models_temp, results 
+   
+    
+    # open temporal models and flatten maps with gdal 
+    maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
+                        shape=(new_lines, new_cols, N))
+ 
+    maps_models = np.memmap('disp_cumul_models', dtype='float32', mode='r+',
+                        shape=(new_lines, new_cols, N))
     
     # compute RMSE
     # remove outiliers
     index = np.logical_or(models>9999., models<-9999)
     models[index] = 0.
-    squared_diff = (np.nan_to_num(maps,nan=0) - np.nan_to_num(models, nan=0))**2
+    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
     res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low res to avoid over-fitting in next iter
@@ -3444,9 +3493,10 @@ for ii in range(int(arguments["--niter"])):
     # update aps for next iterations taking into account in_aps and the residues of the last iteration
     in_sigma = res * in_aps * in_rms
 
-    maps.flush()  # Force l’écriture sur disque
-    models.flush()  # Force l’écriture sur disque
-    del maps, models
+    del maps_flata, models
+
+# clean unflatten maps
+del maps
 
 #######################################################
 # Save functions in binary file
@@ -3524,16 +3574,9 @@ else:
 # Save new maps
 #######################################################
 
-if arguments["--fulloutput"]=='yes':
-    # create MAPS directory to save .r4
-    outdir = './MAPS/'
-    logger.info('Save time series maps in: {}'.format(outdir))
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-
 if N < 30:
 
-  maps = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
+  maps_flata = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
                         shape=(new_lines, new_cols, N))
   models = np.memmap('disp_cumul_models', dtype='float32', mode='r',
                         shape=(new_lines, new_cols, N))
@@ -3543,9 +3586,9 @@ if N < 30:
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
-  vmax = np.nanpercentile(maps[:,:,:],99.)
-  vmin = np.nanpercentile(maps[:,:,:],1.)  
-  cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+  vmax = np.nanpercentile(maps_flata[:,:,:],99.)
+  vmin = np.nanpercentile(maps_flata[:,:,:],1.)  
+  cax = ax.imshow(maps_flata[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
   figclr.savefig('colorscale.eps', format='EPS',dpi=150)
@@ -3553,13 +3596,13 @@ if N < 30:
   nfigure +=1
   plot_displacement_maps(models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series models', filename='maps-time-models.eps')
   nfigure +=1
-  plot_displacement_maps(maps-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
+  plot_displacement_maps(maps_flata-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
   
-  maps.flush()  # Force l’écriture sur disque
+  maps_flata.flush()  # Force l’écriture sur disque
   models.flush()  # Force l’écriture sur disque
 
   # clean memory
-  del maps, models
+  del maps_flata, models
 
 #######################################################
 # Compute Amplitude and phase seasonal
