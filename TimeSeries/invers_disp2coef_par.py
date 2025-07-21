@@ -689,6 +689,13 @@ logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
 logger.info('Reshape cube: {}'.format(maps.shape))
 new_lines, new_cols = maps.shape[0], maps.shape[1]
 
+logger.info('Save cleaned time series cube: {}'.format('disp_cumul_clean'))
+maps_memmap = np.memmap('disp_cumul_clean', dtype='float32', mode='w+',
+    shape=(new_lines, new_cols, N))
+maps_memmap[:] = maps[:]
+maps_memmap.flush()  # Force l’écriture sur disque
+write_envi_hdr('disp_cumul_clean', shape=(new_lines, new_cols, N))
+del maps_memmap
 # clean
 del maps_temp
 
@@ -963,6 +970,7 @@ def plot_displacement_maps(maps, idates, nfigure=0, cmap='RdBu', plot='yes', fil
 # plot diplacements maps
 nfigure+=1
 plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series maps', filename='maps.eps')
+del maps
 
 #######################################################
 # Save new lect.in file
@@ -3208,9 +3216,9 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
 
 _global_data = {}
 
-def init_worker(maps , maps_flata_path, models_path, elev_path, aspect_path, rms_path, shape_2d, shape_3d, dtype):
+def init_worker(maps_path , maps_flata_path, models_path, elev_path, aspect_path, rms_path, shape_2d, shape_3d, dtype):
     global _global_data
-    _global_data['maps'] = maps
+    _global_data['maps'] = np.memmap(maps_path, dtype=dtype, mode='r', shape=shape_3d)
     _global_data['maps_flata'] = np.memmap(maps_flata_path, dtype=dtype, mode='r+', shape=shape_3d)
     _global_data['models'] = np.memmap(models_path, dtype=dtype, mode='r', shape=shape_3d)
     _global_data['elev_map'] = np.memmap(elev_path, dtype=dtype, mode='r', shape=shape_2d)
@@ -3322,11 +3330,11 @@ models.flush()
 del models 
 
 logger.info('Save flatten time series cube: {}'.format('disp_cumul_flat'))
-maps_flata = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
+maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
     shape=(new_lines, new_cols, N))
-maps_flata.flush()  # Force l’écriture sur disque
+maps_flat.flush()  # Force l’écriture sur disque
 write_envi_hdr('disp_cumul_flat', shape=(new_lines, new_cols, N))
-del maps_flata
+del maps_flat
 
 for ii in range(int(arguments["--niter"])):
     print()
@@ -3350,7 +3358,7 @@ for ii in range(int(arguments["--niter"])):
       print()
 
       nprocess = min(N, nproc)
-      with multiprocessing.Pool(processes=nprocess, initializer=init_worker, initargs=(maps, 'disp_cumul_flat' ,'disp_cumul_models', 'elev_map', 'aspect_map', 'rms_map', (new_lines, new_cols), (new_lines, new_cols, N), 'float32')) as pool:
+      with multiprocessing.Pool(processes=nprocess, initializer=init_worker, initargs=('disp_cumul_clean', 'disp_cumul_flat' ,'disp_cumul_models', 'elev_map', 'aspect_map', 'rms_map', (new_lines, new_cols), (new_lines, new_cols, N), 'float32')) as pool:
           results = pool.starmap(empirical_cor_wrapper, [(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"]) for l in range(N)]) 
      
     if plot=='yes':
