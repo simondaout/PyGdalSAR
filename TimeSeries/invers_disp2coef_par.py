@@ -115,8 +115,7 @@ from datetime import datetime as dt
 import multiprocessing
 from multiprocessing import shared_memory
 import psutil
-#import gc
-#gc.disable()
+import gc
 
 try:
     from nsbas import docopt
@@ -1242,13 +1241,13 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
        sigmam = np.ones((A.shape[1]))*float('NaN')
     return fsoln,sigmam
 
-def linear_inv(G, data, sigmad):
-      'Iterative linear inversion'
-
-      W = np.diag(1.0 / sigmad)
-      x0 = lst.lstsq(W @ G, W @ data, rcond=None)[0]
-      return x0
-    
+def linear_inv(A, b, sigmad):
+    W = 1.0 / sigmad
+    A_w = W[:, np.newaxis] * A
+    b_w = W * b
+    fsoln = np.linalg.lstsq(A_w, b_w, rcond=None)[0]  
+    return fsoln
+ 
 def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
 
@@ -3358,11 +3357,8 @@ for ii in range(int(arguments["--niter"])):
         plt.show()
     plt.close('all')
 
-    try:
-        del _global_data
-    except:
-        pass
-    #gc.collect()
+    del _global_data
+    gc.collect()
     
     # save rms
     if (arguments["--aps"] is None and ii==0):
@@ -3380,6 +3376,19 @@ for ii in range(int(arguments["--niter"])):
         in_sigma = in_aps * in_rms
         np.savetxt('rms_empcor.txt', in_aps.T)
     
+    if N < 30:
+        # plot corrected ts
+        nfigure +=1
+        maps_flata = np.memmap('disp_cumul_flat', dtype='float32', mode='r',shape=(new_lines, new_cols, N))
+        plot_displacement_maps(maps_flata, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
+        del maps_flata
+
+        if arguments["--topofile"] is not None:
+            nfigure +=1
+            maps_topo = np.memmap('maps_topo', dtype='float32', mode='r',shape=(new_lines, new_cols, N))
+            plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps')
+            del maps_topo
+ 
     ########################
     # TEMPORAL ITERATION N #
     ########################
@@ -3392,16 +3401,6 @@ for ii in range(int(arguments["--niter"])):
     #########################################
     print()
 
-    if N < 30:
-        # plot corrected ts
-        nfigure +=1
-        plot_displacement_maps(maps_flata, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
-
-        if arguments["--topofile"] is not None:
-            nfigure +=1
-            plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps')
-            del maps_topo
- 
     logger.info('Input uncertainties: {}'.format(in_sigma))
     
     # number of lines per block
@@ -3430,10 +3429,10 @@ for ii in range(int(arguments["--niter"])):
                 (chunk, in_sigma, arguments['--cond'], arguments['--ineq'], eguality)
                 for chunk in chunks
             ]
-            results = pool.starmap(temporal_decomp_chunk, args_list) 
+            results_read = pool.starmap(temporal_decomp_chunk, args_list) 
             
             # separer les resultats
-            m_chunks, sigmam_chunks, models_chunks = zip(*results)
+            m_chunks, sigmam_chunks, models_chunks = zip(*results_read)
             
             # reformer les tableaux
             m = np.concatenate(m_chunks, axis=0) # shape: (nb_pixels, M)
@@ -3441,9 +3440,11 @@ for ii in range(int(arguments["--niter"])):
             sigmam = np.concatenate(sigmam_chunks, axis=0) # shape: (nb_pixels, M) 
 
             models_temp = np.concatenate(models_chunks, axis=0) # shape: (nb_pixels, N)
-            
+            models_temp =  models_temp.reshape(block_size_local, new_cols, N)
+
             # stocker les tableaux
-            results = [pool.apply_async(write_band, args=(i+1, 'disp_cumul_models', models_temp.reshape(block_size_local, new_cols, N), 0, line)) for i in range(N)]
+            results_write = [pool.apply_async(write_band, args=(i+1, 'disp_cumul_models', models_temp[:, :, i], 0, line)) for i in range(N)]
+            [res.get() for res in results_write] # attend la fin des écritures
 
             # Stocker les coefficients m et sigmam dans les objets basis[] et kernels[]
             for idx in range(block_size_local * new_cols):
@@ -3458,21 +3459,21 @@ for ii in range(int(arguments["--niter"])):
                     kernels[l].sigmam[i, j] = sigmam[idx, basis_idx]
 
             # nettoyage
-            del m, sigmam, m_chunks, sigmam_chunks, models_chunks, models_temp, results 
-   
-    
+            del m, sigmam, m_chunks, sigmam_chunks, models_chunks, models_temp, results_read, results_write 
+            gc.collect()
+ 
     # open temporal models and flatten maps with gdal 
     maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
                         shape=(new_lines, new_cols, N))
  
-    maps_models = np.memmap('disp_cumul_models', dtype='float32', mode='r+',
+    models = np.memmap('disp_cumul_models', dtype='float32', mode='r+',
                         shape=(new_lines, new_cols, N))
     
     # compute RMSE
     # remove outiliers
     index = np.logical_or(models>9999., models<-9999)
     models[index] = 0.
-    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
+    squared_diff = (np.nan_to_num(maps_flat,nan=0) - np.nan_to_num(models, nan=0))**2
     res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low res to avoid over-fitting in next iter
@@ -3489,7 +3490,7 @@ for ii in range(int(arguments["--niter"])):
     # update aps for next iterations taking into account in_aps and the residues of the last iteration
     in_sigma = res * in_aps * in_rms
 
-    del maps_flata, models
+    del maps_flat, models
 
 # clean unflatten maps
 del maps
@@ -3572,7 +3573,7 @@ else:
 
 if N < 30:
 
-  maps_flata = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
+  maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
                         shape=(new_lines, new_cols, N))
   models = np.memmap('disp_cumul_models', dtype='float32', mode='r',
                         shape=(new_lines, new_cols, N))
@@ -3582,9 +3583,9 @@ if N < 30:
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
-  vmax = np.nanpercentile(maps_flata[:,:,:],99.)
-  vmin = np.nanpercentile(maps_flata[:,:,:],1.)  
-  cax = ax.imshow(maps_flata[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+  vmax = np.nanpercentile(maps_flat[:,:,:],99.)
+  vmin = np.nanpercentile(maps_flat[:,:,:],1.)  
+  cax = ax.imshow(maps_flat[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
   figclr.savefig('colorscale.eps', format='EPS',dpi=150)
@@ -3592,13 +3593,10 @@ if N < 30:
   nfigure +=1
   plot_displacement_maps(models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series models', filename='maps-time-models.eps')
   nfigure +=1
-  plot_displacement_maps(maps_flata-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
+  plot_displacement_maps(maps_flat-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
   
-  maps_flata.flush()  # Force l’écriture sur disque
-  models.flush()  # Force l’écriture sur disque
-
   # clean memory
-  del maps_flata, models
+  del maps_flat, models
 
 #######################################################
 # Compute Amplitude and phase seasonal
