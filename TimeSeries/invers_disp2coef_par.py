@@ -685,7 +685,7 @@ for l in range((N)):
         index = np.nonzero(maps_temp[:,:,l]==0.0)
         maps_temp[:,:,l][index] = float('NaN')
 N=len(dates)
-maps = maps_temp[ibeg:iend,jbeg:jend,indexd]
+maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
 logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
 logger.info('Reshape cube: {}'.format(maps.shape))
 new_lines, new_cols = maps.shape[0], maps.shape[1]
@@ -1245,11 +1245,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
 def linear_inv(G, data, sigma):
       'Iterative linear inversion'
 
-      x0 = lst.lstsq(G,data)[0]
-      #_func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
-      #_fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
-      #pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0,acc=1.e-9)[0]
-      #return pars
+      W = np.diag(1.0 / sigmad)
+      x0 = lst.lstsq(W @ G, W @ data, rcond=None)[0]
       return x0
     
 def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
@@ -3410,7 +3407,6 @@ for ii in range(int(arguments["--niter"])):
     # number of lines per block
     #block_size = min(int(new_cols/4), compute_auto_block_size(new_lines, new_cols, N))
     block_size = compute_auto_block_size(new_lines, new_cols, N)
-    block_size = 100
     logger.info('Block size for parallelisation: {} '.format(block_size))
 
     with TimeIt():
