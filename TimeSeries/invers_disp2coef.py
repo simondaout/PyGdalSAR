@@ -102,6 +102,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import scipy as sp
 import scipy.optimize as opt
+from scipy.linalg import cholesky, solve_triangular
 import numpy.linalg as lst
 from osgeo import gdal, osr
 import math, sys, getopt, shutil
@@ -801,7 +802,7 @@ if arguments["--mask"] is not None:
         G=np.zeros((len(los_clean),4))
         G[:,0], G[:,1], G[:,2], G[:,3] = y**2, y, x, 1
         # ramp inversion
-        pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),los_clean)
+        pars = np.linalg.lstsq(G, los_clean)
         a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
         logger.info('Remove ramp mask %f x**2 %f x  + %f y + %f for : %s'%(a,b,c,d,arguments["--mask"]))
 
@@ -1092,11 +1093,13 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         raise ValueError('Incompatible dimensions for A and b')
 
     if ineq == 'no':
-        try:
-          Cd = np.diag(sigmad**2, k = 0)
-          fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
-        except:
-          fsoln = lst.lstsq(A,b,rcond=None)[0]  
+        # Résolution du système pondéré par la décomposition de Cholesky
+        Cd = np.diag(sigmad**2, k = 0)
+        L = cholesky(Cd, lower=True)   # Cd = L L^T
+        A_w = solve_triangular(L, A, lower=True)
+        b_w = solve_triangular(L, b, lower=True)
+        fsoln = np.linalg.lstsq(A_w, b_w, rcond=None)[0]
+        #fsoln = lst.lstsq(A,b,rcond=None)[0]  
     else:
         if len(indexpo>0):
           # invert first without post-seismic
@@ -1141,8 +1144,8 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
         #print('Optimization:', fsoln)
 
     try:
-       varx = np.linalg.inv(np.dot(A.T,A))
-       res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
+       varx = np.linalg.pinv(A.T @ A)
+       res2 = np.sum((b - A @ fsoln)**2)
        scale = 1./(A.shape[0]-A.shape[1])
        sigmam = np.sqrt(scale*res2*np.diag(varx))
     except:
@@ -1155,7 +1158,7 @@ def linear_inv(G, data, sigma):
       x0 = lst.lstsq(G,data)[0]
       _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
       _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
-      pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+      pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0,acc=1.e-9)[0]
 
       return pars
 
@@ -2988,7 +2991,7 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
   global fig_dphi
   global maps, models, elev_map, aspect_map, rms_map
 
-  # first clean los
+  # the estimation is done on the non flatten maps - temporal models
   map_temp = as_strided(maps[:,:,l]) - as_strided(models[:,:,l])
 
   # no estimation on the ref image set to zero 
@@ -3166,7 +3169,8 @@ def temporal_decomp(pix, disp, sigma, cond, ineq, eguality):
     return m, sigmam, mdisp 
 
 # initialization
-models = np.zeros((new_lines,new_cols,N), dtype=np.float32)
+models = np.zeros((new_lines,new_cols,N), dtype=np.float32) # temporal models
+maps_flata = np.copy(maps) # flatten maps
 
 # prepare flatten maps
 if arguments["--topofile"] is not None:
@@ -3202,14 +3206,14 @@ for ii in range(int(arguments["--niter"])):
     
       for l in range((N)):
           if arguments["--topofile"] is not None:
-            maps[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
+            maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
           else:
-            maps[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
+            maps_flata[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
 
       if N < 30:
         # plot corrected ts
         nfigure +=1
-        plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
+        plot_displacement_maps(maps_flata, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
 
         if arguments["--topofile"] is not None:
             fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
@@ -3246,7 +3250,7 @@ for ii in range(int(arguments["--niter"])):
     if flat>0:
         logger.info('Save flatten time series cube: {}'.format('disp_cumule_flat'))
         fid = open('disp_cumule_flat', 'wb')
-        maps[:,:,:].astype('float32').tofile(fid)
+        maps_flata[:,:,:].astype('float32').tofile(fid)
         in_hdr = arguments["--cube"] + '.hdr'
         arguments["--cube"] = 'disp_cumule_flat' # update depl_cumul
         out_hdr = 'disp_cumule_flat.hdr'
@@ -3271,7 +3275,7 @@ for ii in range(int(arguments["--niter"])):
 
     logger.info('Input uncertainties: {}'.format(in_sigma))
 
-    # reiinitialize maps models
+    # reiinitialize maps models at each iteration
     models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
 
     with TimeIt():
@@ -3280,7 +3284,7 @@ for ii in range(int(arguments["--niter"])):
               i = int(pix/(new_cols))
               if ((i % 20) == 0) and (j==0):
                   logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
-              disp = as_strided(maps[i,j,:])
+              disp = as_strided(maps_flata[i,j,:])
               m, sigmam, models[i,j,:]  = temporal_decomp(pix, disp, in_sigma, arguments['--cond'], arguments['--ineq'], eguality)
             
               # save m
@@ -3298,7 +3302,7 @@ for ii in range(int(arguments["--niter"])):
     # remove outiliers
     index = np.logical_or(models>9999., models<-9999)
     models[index] = 0.
-    squared_diff = (np.nan_to_num(maps,nan=0) - np.nan_to_num(models, nan=0))**2
+    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
     res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low res to avoid over-fitting in next iter
@@ -3391,17 +3395,17 @@ else:
 #######################################################
 
 if arguments["--fulloutput"]=='yes':
-        logger.info('Save  time series cube model: {}'.format('disp_cumule_models'))
-        fid = open('depl_cumule_models', 'wb')
-        maps[:,:,:].astype('float32').tofile(fid)
-        in_hdr = arguments["--cube"] + '.hdr'
-        out_hdr = 'depl_cumule_models.hdr'
-        try:
-            shutil.copy(in_hdr, out_hdr)
-        except:
-            pass
-        fid.close()
-        del fid
+   logger.info('Save  time series cube model: {}'.format('disp_cumule_models'))
+   fid = open('depl_cumule_models', 'wb')
+   models[:,:,:].astype('float32').tofile(fid)
+   in_hdr = arguments["--cube"] + '.hdr'
+   out_hdr = 'depl_cumule_models.hdr'
+   try:
+     shutil.copy(in_hdr, out_hdr)
+   except:
+     pass
+   fid.close()
+   del fid
 
 #######################################################
 # Plot models and residuals
