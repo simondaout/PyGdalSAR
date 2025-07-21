@@ -540,7 +540,7 @@ if arguments["--perc_topo"] ==  None:
 if arguments["--perc_los"] ==  None:
     arguments["--perc_los"] = 98.
 if arguments["--nproc"] ==  None:
-    nproc = 10
+    nproc = 6
 else:
     nproc = int(arguments["--nproc"])
 if arguments["--ndatasets"] ==  None:
@@ -676,6 +676,7 @@ except:
     del cube, cubei
 
 # set at NaN zero values for all dates
+logger.info('Refer cumulative displacements to date: {0}'.format(idates[imref]))
 cst = np.copy(maps_temp[:,:,imref])
 cst[np.isnan(cst)] = 0.0
 for l in range((N)):
@@ -685,9 +686,10 @@ for l in range((N)):
         maps_temp[:,:,l][index] = float('NaN')
 N=len(dates)
 maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
-logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
+logger.info('Crop images between {0} and {1}: {2}'.format(dmin,dmax,N))
 logger.info('Reshape cube: {}'.format(maps.shape))
 new_lines, new_cols = maps.shape[0], maps.shape[1]
+del maps_temp
 
 logger.info('Save cleaned time series cube: {}'.format('disp_cumul_clean'))
 maps_memmap = np.memmap('disp_cumul_clean', dtype='float32', mode='w+',
@@ -696,8 +698,6 @@ maps_memmap[:] = maps[:]
 maps_memmap.flush()  # Force l’écriture sur disque
 write_envi_hdr('disp_cumul_clean', shape=(new_lines, new_cols, N))
 del maps_memmap
-# clean
-del maps_temp
 
 if arguments["--crop_emp"] ==  None:
     crop_emp = [0,new_lines,0,new_cols]
