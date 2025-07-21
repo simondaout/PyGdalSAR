@@ -1152,15 +1152,13 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
        sigmam = np.ones((A.shape[1]))*float('NaN')
     return fsoln,sigmam
 
-def linear_inv(G, data, sigma):
+
+def linear_inv(G, data, sigmad):
       'Iterative linear inversion'
 
-      x0 = lst.lstsq(G,data)[0]
-      _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
-      _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
-      pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=200,full_output=True,iprint=0,acc=1.e-9)[0]
-
-      return pars
+      W = np.diag(1.0 / sigmad)
+      x0 = lst.lstsq(W @ G, W @ data, rcond=None)[0]
+      return x0
 
 def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
