@@ -1242,7 +1242,7 @@ def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=Fa
        sigmam = np.ones((A.shape[1]))*float('NaN')
     return fsoln,sigmam
 
-def linear_inv(G, data, sigma):
+def linear_inv(G, data, sigmad):
       'Iterative linear inversion'
 
       W = np.diag(1.0 / sigmad)
@@ -3405,8 +3405,8 @@ for ii in range(int(arguments["--niter"])):
     logger.info('Input uncertainties: {}'.format(in_sigma))
     
     # number of lines per block
-    #block_size = min(int(new_cols/4), compute_auto_block_size(new_lines, new_cols, N))
     block_size = compute_auto_block_size(new_lines, new_cols, N)
+    block_size = 100 
     logger.info('Block size for parallelisation: {} '.format(block_size))
 
     with TimeIt():
