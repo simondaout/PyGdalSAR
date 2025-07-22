@@ -66,8 +66,8 @@ Usage: invers_disp2coef.py  [--cube=<path>] [--lectfile=<path>] [--list_images=<
 --aspect=<path>            Path to aspect file in r4 or tif format: take into account the slope orientation in  the phase/topo relationship .
 --perc_los=<value>        Percentile of hidden LOS pixel for the spatial estimations to clean outliers [default:99.]
 --perc_topo=<value>       Percentile of topography ranges for the spatial estimations to remove some very low valleys or peaks [default:99.]
---cond=<value>            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-3]
---ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add ineguality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than steps steps of the first guess [default: yes].
+--cond=<value>            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1e-6]
+--ineq=<yes/no>           If yes, sequential least-square optimisation. If no, SVD inversion with mask on eigenvalues smaller than --cond value. If postseimsic functions, add inequality constraints in the inversion. Use least square results without post-seismic functions as a first guess to iterate the inversion. Then, force postseismic to be the same sign and inferior than steps steps of the first guess [default: yes].
 --fulloutput=<yes/no>      If yes produce maps of models, residuals, ramps, as well as flatten cube without seasonal and linear term [default: no]
 --geotiff=<path>           Path to Geotiff to save outputs in tif format. If None save output are saved as .r4 files 
 --plot=<yes/no>         Display plots [default: no]
@@ -451,7 +451,7 @@ if arguments["--scale_mask"] ==  None:
 if arguments["--topofile"] ==  None:
    arguments["--topofile"] = None
 if arguments["--cond"] ==  None:
-    arguments["--cond"] = 1e-3
+    arguments["--cond"] = 1e-6
 if arguments["--rmspixel"] ==  None:
     arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
@@ -1011,9 +1011,9 @@ indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
 
-eguality = False
+equality = False
 if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
-    eguality = True
+    equality = True
     arguments["--ineq"] = 'yes'
 
 print()
@@ -1077,91 +1077,94 @@ else:
 in_sigma = in_rms * in_aps
 logger.info('Input uncertainties: {}'.format(in_rms))
 
-## inversion procedure
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
-    '''Solves the constrained inversion problem.
+def consInvert(A, b, sigmad, ineq='yes', cond=1e-6, iter=60, acc=5e-4, equality=False):
+    """
+    Résout Ax ≈ b sous contraintes d'inégalité (et éventuellement d’égalité).
 
-    Minimize:
-
-    ||Ax-b||^2
-
-    Subject to:
-    mmin < m < mmax
-    '''
-
+    Retourne :
+        fsoln : vecteur de solution
+        sigmam : incertitudes (diag de la covariance)
+    """
+    global indexpo, indexco, indexpofull, pos, indexseas, indexseast
     if A.shape[0] != len(b):
-        raise ValueError('Incompatible dimensions for A and b')
+        raise ValueError('Dimensions incompatibles pour A et b')
 
     if ineq == 'no':
-        # Résolution du système pondéré par la décomposition de Cholesky
-        Cd = np.diag(sigmad**2, k = 0)
-        L = cholesky(Cd, lower=True)   # Cd = L L^T
-        A_w = solve_triangular(L, A, lower=True)
-        b_w = solve_triangular(L, b, lower=True)
-        fsoln = np.linalg.lstsq(A_w, b_w, rcond=None)[0]
-        #fsoln = lst.lstsq(A,b,rcond=None)[0]  
+        W = np.diag(1.0 / sigmad)
+        fsoln = np.linalg.lstsq(W @ A, W @ b, rcond=cond)[0]
     else:
-        if len(indexpo>0):
-          # invert first without post-seismic
-          Ain = np.delete(A,indexpo,1)
-          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
-    
-          # rebuild full vector
-          for z in range(len(indexpo)):
-            mtemp = np.insert(mtemp,indexpo[z],0)
-          minit = np.copy(mtemp)
-          # # initialize bounds
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
+        # Initialisation
+        if indexpo is not None and len(indexpo) > 0:
+            Ain = np.delete(A, indexpo, axis=1)
+            Win = np.diag(1.0 / np.delete(sigmad, indexpo))
+            mtemp = np.linalg.lstsq(Win @ Ain, Win @ b, rcond=cond)[0]
 
-          # We here define bounds for postseismic to be the same sign than steps
-          # and steps inferior or egual to the coseimic initial
-          for i in range(len(indexco)):
-            if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])]
-            if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
-                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-
+            # Réinsérer les post-sismiques
+            for z in range(len(indexpo)):
+                mtemp = np.insert(mtemp, indexpo[z], 0.0)
+            minit = np.copy(mtemp)
         else:
-          minit = lst.lstsq(A,b,rcond=None)[0]
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
+            W = np.diag(1.0 / sigmad)
+            minit = np.linalg.lstsq(W @ A, W @ b, rcond=cond)[0]
 
-        bounds=list(zip(mmin,mmax))
-        def eq_cond(x, *args):
-           return (x[indexseast+1]/x[indexseast]) - (x[indexseas+1]/x[indexseas])
+        # Définir les bornes
+        n = len(minit)
+        mmin = -np.ones(n) * np.inf
+        mmax = np.ones(n) * np.inf
 
-        ####Objective function and derivative
-        _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
-        _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        if eguality:
-            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime,eqcons=[eq_cond], \
-                iter=iter,full_output=True,iprint=0,acc=acc)
+        if indexpo is not None and indexco is not None:
+            for i in range(len(indexco)):
+                ico = int(indexco[i])
+                ipo = int(indexpofull[i])
+                if pos[i] > 0. and minit[ico] > 0.:
+                    mmin[ipo], mmax[ipo] = 0, np.inf
+                    mmin[ico], mmax[ico] = 0, minit[ico]
+                elif pos[i] > 0. and minit[ico] < 0.:
+                    mmin[ipo], mmax[ipo] = -np.inf, 0
+                    mmin[ico], mmax[ico] = minit[ico], 0
+
+        bounds = list(zip(mmin, mmax))
+
+        # Fonction à minimiser
+        def _func(x):
+            return np.sum(((A @ x - b) / sigmad) ** 2)
+
+        def _fprime(x):
+            return 2 * A.T @ ((A @ x - b) / sigmad**2)
+
+        # Contraintes d'égalité
+        if equality:
+            def eq_cond(x):
+                return (x[indexseast + 1] / x[indexseast]) - (x[indexseas + 1] / x[indexseas])
+            res = opt.fmin_slsqp(_func, minit, bounds=bounds, fprime=_fprime,
+                                 eqcons=[eq_cond], iter=iter, acc=acc,
+                                 full_output=True, iprint=0)
         else:
-            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-                iter=iter,full_output=True,iprint=0,acc=acc)
-        fsoln = res[0]
-        #print('Optimization:', fsoln)
+            res = opt.fmin_slsqp(_func, minit, bounds=bounds, fprime=_fprime,
+                                 iter=iter, acc=acc, full_output=True, iprint=0)
 
+        fsoln, fx, its, imode, msg = res
+        if imode != 0:
+            #logger.warning("SLSQP did not converge: {msg}")
+            fsoln = minit  # ou np.full_like(minit, np.nan)
+
+    # Calcul de l'incertitude
     try:
-       varx = np.linalg.pinv(A.T @ A)
-       res2 = np.sum((b - A @ fsoln)**2)
-       scale = 1./(A.shape[0]-A.shape[1])
-       sigmam = np.sqrt(scale*res2*np.diag(varx))
-    except:
-       sigmam = np.ones((A.shape[1]))*float('NaN')
-    return fsoln,sigmam
+        varx = np.linalg.pinv(A.T @ A)
+        res2 = np.sum((b - A @ fsoln) ** 2)
+        scale = 1. / (A.shape[0] - A.shape[1])
+        sigmam = np.sqrt(scale * res2 * np.diag(varx))
+    except np.linalg.LinAlgError:
+        sigmam = np.full(A.shape[1], np.nan)
 
+    return fsoln, sigmam
 
-def linear_inv(G, data, sigma):
-      'Iterative linear inversion'
-
-      x0 = lst.lstsq(G,data)[0]
-      _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
-      _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
-      pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
-
-      return pars
+def linear_inv(A, b, sigmad):
+    W = 1.0 / sigmad
+    A_w = W[:, np.newaxis] * A
+    b_w = W * b
+    fsoln = np.linalg.lstsq(A_w, b_w, rcond=1e-5)[0]  
+    return fsoln
 
 def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
@@ -3128,7 +3131,7 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
   else:
     return map_flata, rmsi 
 
-def temporal_decomp(pix, disp, sigma, cond, ineq, eguality):
+def temporal_decomp(pix, disp, sigma, cond, ineq, equality):
     j = pix  % (new_cols)
     i = int(pix/(new_cols))
 
@@ -3162,7 +3165,7 @@ def temporal_decomp(pix, disp, sigma, cond, ineq, eguality):
             G[:,Mbasis+l]=kernels[l].g(k)
         
         # inversion
-        m,sigmam = consInvert(G,taby,sigma[k],cond=cond,ineq=ineq,eguality=eguality)
+        m,sigmam = consInvert(G,taby,sigma[k],cond=cond,ineq=ineq,equality=equality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
@@ -3286,7 +3289,7 @@ for ii in range(int(arguments["--niter"])):
               if ((i % 20) == 0) and (j==0):
                   logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
               disp = as_strided(maps_flata[i,j,:])
-              m, sigmam, models[i,j,:]  = temporal_decomp(pix, disp, in_sigma, arguments['--cond'], arguments['--ineq'], eguality)
+              m, sigmam, models[i,j,:]  = temporal_decomp(pix, disp, in_sigma, arguments['--cond'], arguments['--ineq'], equality)
             
               # save m
               for l in range((Mbasis)):
