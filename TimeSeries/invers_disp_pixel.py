@@ -40,8 +40,8 @@ Options:
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
 --bperp PATH              If yes, add term proportional to the perpendicular baseline in the inversion
 --imref VALUE           Reference image number [default: 1]
---cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1.e-3]
---ineq VALUE            If yes, add ineguality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than steps [default: no].       
+--cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1.e-6]
+--ineq VALUE            If yes, add inequality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than steps [default: no].       
 --name Value            Name output figures [default: None] 
 --scale                Scaling value between input data and desired output [default: 1]
 --plot                  Display results [default: yes]            
@@ -321,13 +321,11 @@ def date2dec(dates):
 arguments = docopt.docopt(__doc__)
 
 if arguments["--list_images"] ==  None:
-    listim = "images_retenues"
-else:
-    listim = arguments["--list_images"]
+    arguments["--list_images"] = "images_retenues"
 if arguments["--ineq"] ==  None:
     arguments["--ineq"] = 'no' 
 if arguments["--cond"] ==  None:
-    rcond = 1e-3
+    rcond = 1e-6
 else:
     rcond = float(arguments["--cond"]) 
 if arguments["--imref"] ==  None:
@@ -483,13 +481,14 @@ if ndata >= 1:
     # Charger les colonnes pour idates et dates (colonnes 1 et 3)
     # Générer dynamiquement les colonnes pour chaque base (à partir de la colonne 5)
     columns = [1, 3] + list(range(5, 5 + ndata))
- 
+
     # Charger les données en utilisant `usecols=columns`
     data = np.loadtxt(arguments["--list_images"], comments='#', usecols=columns, unpack=True)
 
     # Extraire les données de dates
     idates = data[0].astype(int)
     dates = data[1]
+
  
     # Extraire les bases et initialiser les références
     for i in range(ndata):
@@ -739,9 +738,9 @@ indexpo = indexpo.astype(int)
 indexco = indexco.astype(int)
 indexsse = indexsse.astype(int)
 
-eguality = False
+equality = False
 if arguments["--seasonal_increase"] == 'yes' and arguments["--seasonal"] == 'yes':
-    eguality = True
+    equality = True
     arguments["--ineq"] = 'yes'
 
 # define size G matrix
@@ -754,86 +753,88 @@ M = Mbasis + Mker
 for i in range((Mbasis)):
     basis[i].info()
 
-## inversion procedure 
-def consInvert(A,b,sigmad,ineq='yes',cond=1.0e-3, iter=100,acc=1e-6, eguality=False):
-    '''Solves the constrained inversion problem.
+def consInvert(A, b, sigmad, ineq='yes', cond=1e-6, iter=60, acc=5e-4, equality=False):
+    """
+    Résout Ax ≈ b sous contraintes d'inégalité (et éventuellement d’égalité).
 
-    Minimize:
-    
-    ||Ax-b||^2
-
-    Subject to:
-    mmin < m < mmax
-    '''
-
+    Retourne :
+        fsoln : vecteur de solution
+        sigmam : incertitudes (diag de la covariance)
+    """
+    global indexpo, indexco, indexpofull, pos, indexseas, indexseast
     if A.shape[0] != len(b):
-        raise ValueError('Incompatible dimensions for A and b')
+        raise ValueError('Dimensions incompatibles pour A et b')
 
     if ineq == 'no':
-        print('ineq=no: Least-squared inversion')
-        try:
-            Cd = np.diag(sigmad**2, k = 0)
-            fsoln = np.dot(np.linalg.inv(np.dot(np.dot(A.T,np.linalg.inv(Cd)),A)),np.dot(np.dot(A.T,np.linalg.inv(Cd)),b))
-            print('LSQT solution:', fsoln)
-        except:
-            fsoln = lst.lstsq(A,b,rcond=None)[0]
-
+        W = np.diag(1.0 / sigmad)
+        fsoln = np.linalg.lstsq(W @ A, W @ b, rcond=cond)[0]
     else:
-        print('ineq=yes: Iterative least-square inversion.')
-        if len(indexpo>0):
-          # invert first without post-seismic
-          Ain = np.delete(A,indexpo,1)
-          mtemp = lst.lstsq(Ain,b,rcond=cond)[0]
-          print('Prior obtained with SVD decomposition neglecting small eigenvectors inferior to {} (cond)'.format(cond))
-          print('SVD solution:', mtemp)
+        # Initialisation
+        if indexpo is not None and len(indexpo) > 0:
+            Ain = np.delete(A, indexpo, axis=1)
+            Win = np.diag(1.0 / np.delete(sigmad, indexpo))
+            mtemp = np.linalg.lstsq(Win @ Ain, Win @ b, rcond=cond)[0]
 
-          # rebuild full vector
-          for z in range(len(indexpo)):
-            mtemp = np.insert(mtemp,indexpo[z],0)
-          minit = np.copy(mtemp)
-          # # initialize bounds
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf 
-
-          # We here define bounds for postseismic to be the same sign than steps
-          # and steps inferior or egual to the coseimic initial 
-          print('Impose postseismic to be the same sign than steps')
-          for i in range(len(indexco)):
-            if (pos[i] > 0.) and (minit[int(indexco[i])]>0.):
-                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = 0, np.inf 
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = 0, minit[int(indexco[i])] 
-            if (pos[i] > 0.) and (minit[int(indexco[i])]<0.):
-                mmin[int(indexpofull[i])], mmax[int(indexpofull[i])] = -np.inf , 0
-                mmin[int(indexco[i])], mmax[int(indexco[i])] = minit[int(indexco[i])], 0
-
+            # Réinsérer les post-sismiques
+            for z in range(len(indexpo)):
+                mtemp = np.insert(mtemp, indexpo[z], 0.0)
+            minit = np.copy(mtemp)
         else:
-          minit = lst.lstsq(A,b,rcond=None)[0]
-          mmin,mmax = -np.ones(len(minit))*np.inf, np.ones(len(minit))*np.inf
+            W = np.diag(1.0 / sigmad)
+            minit = np.linalg.lstsq(W @ A, W @ b, rcond=cond)[0]
 
-        bounds=list(zip(mmin,mmax))
-        def eq_cond(x, *args):
-           return (x[indexseast+1]/x[indexseast]) - (x[indexseas+1]/x[indexseas])
-       
-        ####Objective function and derivative
-        _func = lambda x: np.sum(((np.dot(A,x)-b)/sigmad)**2)
-        _fprime = lambda x: 2*np.dot(A.T/sigmad, (np.dot(A,x)-b)/sigmad)
-        if eguality:
-            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime,eqcons=[eq_cond], \
-                iter=iter,full_output=True,iprint=0,acc=acc)  
+        # Définir les bornes
+        n = len(minit)
+        mmin = -np.ones(n) * np.inf
+        mmax = np.ones(n) * np.inf
+
+        if indexpo is not None and indexco is not None:
+            for i in range(len(indexco)):
+                ico = int(indexco[i])
+                ipo = int(indexpofull[i])
+                if pos[i] > 0. and minit[ico] > 0.:
+                    mmin[ipo], mmax[ipo] = 0, np.inf
+                    mmin[ico], mmax[ico] = 0, minit[ico]
+                elif pos[i] > 0. and minit[ico] < 0.:
+                    mmin[ipo], mmax[ipo] = -np.inf, 0
+                    mmin[ico], mmax[ico] = minit[ico], 0
+
+        bounds = list(zip(mmin, mmax))
+
+        # Fonction à minimiser
+        def _func(x):
+            return np.sum(((A @ x - b) / sigmad) ** 2)
+
+        def _fprime(x):
+            return 2 * A.T @ ((A @ x - b) / sigmad**2)
+
+        # Contraintes d'égalité
+        if equality:
+            def eq_cond(x):
+                return (x[indexseast + 1] / x[indexseast]) - (x[indexseas + 1] / x[indexseas])
+            res = opt.fmin_slsqp(_func, minit, bounds=bounds, fprime=_fprime,
+                                 eqcons=[eq_cond], iter=iter, acc=acc,
+                                 full_output=True, iprint=0)
         else:
-            res = opt.fmin_slsqp(_func,minit,bounds=bounds,fprime=_fprime, \
-                iter=iter,full_output=True,iprint=0,acc=acc)  
-        fsoln = res[0]
-        print('Optimization:', fsoln)
- 
+            res = opt.fmin_slsqp(_func, minit, bounds=bounds, fprime=_fprime,
+                                 iter=iter, acc=acc, full_output=True, iprint=0)
+
+        fsoln, fx, its, imode, msg = res
+        if imode != 0:
+            logger.warning("SLSQP did not converge: {msg}")
+            fsoln = minit  # ou np.full_like(minit, np.nan)
+
+    # Calcul de l'incertitude
     try:
-       varx = np.linalg.inv(np.dot(A.T,A))
-       res2 = np.sum(pow((b-np.dot(A,fsoln)),2))
-       scale = 1./(A.shape[0]-A.shape[1])
-       sigmam = np.sqrt(scale*res2*np.diag(varx))
-    except:
-       sigmam = np.ones((A.shape[1]))*float('NaN')
-    print('model errors:', sigmam)
-    return fsoln,sigmam
+        varx = np.linalg.pinv(A.T @ A)
+        res2 = np.sum((b - A @ fsoln) ** 2)
+        scale = 1. / (A.shape[0] - A.shape[1])
+        sigmam = np.sqrt(scale * res2 * np.diag(varx))
+    except np.linalg.LinAlgError:
+        sigmam = np.full(A.shape[1], np.nan)
+
+    return fsoln, sigmam
+
 
 # plot diplacements maps
 if Npix > 2:
@@ -925,15 +926,16 @@ for jj in range((Npix)):
             names.append(kernels[l].reduction)
         
         print('basis functions:', names)
-        print(len(k), N)
-        print(G[:6,:6])
-        print(taby)
-        print(sigmad[k])
-        m,sigmam = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], eguality=eguality)
+        #print(len(k), N)
+        #print(G[:6,:6])
+        #print(taby)
+        #print(sigmad[k])
+        m,sigmam = consInvert(G,taby,sigmad[k],cond=rcond, ineq=arguments["--ineq"], equality=equality)
         #sys.exit()   
      
         # forward model in original order
         mdisp[k] = np.dot(G,m)
+
         if bperp=='yes':
             bperperr[k] =  np.dot(G[:,indexbperp[0]:indexbperp[0]+ndata],m[indexbperp[0]:indexbperp[0]+ndata])
         else:
@@ -1046,6 +1048,7 @@ for jj in range((Npix)):
         ax2.errorbar(x,disp-disp_seas-bperperr,yerr = sigmad, ecolor=color,fmt='none', alpha=0.3)
 
     # create synthetic time
+    #t = np.arange(xmin, xmax, 0.1)
     t = np.array([xmin + datetime.timedelta(days=d) for d in range(0, 2920)])
     tdec = np.array([float(date.strftime('%Y')) + float(date.strftime('%j'))/365.1 for date in t])
     mseas = np.zeros(len(tdec))
