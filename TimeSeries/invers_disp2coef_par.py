@@ -1173,7 +1173,7 @@ else:
 
 ## initialize input uncertainties
 in_sigma = in_rms * in_aps
-logger.info('Input uncertainties: {}'.format(in_rms))
+logger.info('Input uncertainties: {}'.format(in_aps))
 
 def linear_inv(A, b, sigmad):
     W = 1.0 / sigmad
