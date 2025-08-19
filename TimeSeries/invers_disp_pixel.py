@@ -99,51 +99,6 @@ import time
 # docopt (command line parser)
 import docopt
 
-def write_envi_hdr(filename, shape, dtype='float32', interleave='bip'):
-    """
-    Crée un fichier ENVI .hdr à partir d'un fichier.
-    
-    Parameters:
-    - filename: nom du fichier sans extension (.hdr sera ajouté)
-    - shape: tuple (lines, samples, bands)
-    - dtype: type numpy ('float32', 'int16', ...)
-    - interleave: 'bsq', 'bil' ou 'bip'
-    """
-
-    if len(shape) == 3:
-        lines, samples, bands = shape
-    else:
-        lines, samples = shape
-        bands = 1
-    dtype_map = {
-        'uint8': 1,
-        'int16': 2,
-        'int32': 3,
-        'float32': 4,
-        'float64': 5,
-        'complex64': 6,
-        'complex128': 9,
-        'uint16': 12,
-        'uint32': 13,
-        'int64': 14,
-        'uint64': 15,
-    }
-
-    if dtype not in dtype_map:
-        raise ValueError(f"Unsupported data type for ENVI: {dtype}")
-    
-    hdr_content = f"""ENVI
-samples = {samples}
-lines   = {lines}
-bands   = {bands}
-data type = {dtype_map[dtype]}
-interleave = {interleave}
-byte order = 0
-"""
-
-    with open(filename + '.hdr', 'w') as f:
-        f.write(hdr_content)
-
 ########################################################################
 # Define basis functions
 ########################################################################
