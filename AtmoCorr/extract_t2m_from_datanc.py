@@ -14,7 +14,7 @@ print('Coordinates:', ds.GetGeoTransform())
 print('Grid:', ds.RasterYSize,ds.RasterXSize)
 
 # convert dates
-date_ref = datetime.datetime(1900, 1, 1)
+#date_ref = datetime.datetime(1900, 1, 1)
 
 temp = np.zeros((ds.RasterYSize,ds.RasterXSize,ds.RasterCount)) 
 dates,time,mode=[],[],[]
@@ -25,11 +25,10 @@ for b in range(1, ds.RasterCount+1):
     # print(bandmd)
     
     # extract time
-    netcdf_time = int(bandmd["NETCDF_DIM_time"])
-    print(bandmd)
-    # print(netcdf_time)
-    # print(netcdf_time/24, netcdf_time%24)
-    date = date_ref + datetime.timedelta(netcdf_time/24, netcdf_time%24)
+    print(bandmd.keys())
+    netcdf_time = int(bandmd["NETCDF_DIM_valid_time"])
+    #print(bandmd)
+    date = datetime.datetime.utcfromtimestamp(netcdf_time)
     dates.append(date)
     # convert date to dec
     dec = float(date.strftime('%j'))/365.1
@@ -39,9 +38,10 @@ for b in range(1, ds.RasterCount+1):
     time.append(year+dec)
     
     # extract temp
-    scale = float(bandmd["scale_factor"])
-    offset = float(bandmd["add_offset"])
-    data = band.ReadAsArray()*scale + offset
+    #scale = float(bandmd["scale_factor"])
+    #offset = float(bandmd["add_offset"])
+    #data = band.ReadAsArray()*scale + offset
+    data = band.ReadAsArray()
     
     #print(date, " -> ", np.mean(data), "m")
     #temp.append(data[-1,-1]) 
@@ -152,7 +152,7 @@ for i in range(ds.RasterYSize):
         # save data
         fid=open('temperatures_{}_{}.txt'.format(lat,lon),'wb')
         #np.savetxt(fid,np.vstack([time,t]).T,fmt='%.6f',delimiter='\t',newline='\n')
-        np.savetxt(fid,np.vstack([dates,time,t]).T,fmt='%s',delimiter='\t',newline='\n')
+        np.savetxt(fid,np.vstack([dates,time,t]).T,fmt='%s',delimiter=',',newline='\n')
 
 # create new GDAL NCDF
 drv = gdal.GetDriverByName("NETCDF")
