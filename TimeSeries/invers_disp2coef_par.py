@@ -1173,7 +1173,7 @@ else:
 
 ## initialize input uncertainties
 in_sigma = in_rms * in_aps
-logger.info('Input uncertainties: {}'.format(in_aps))
+logger.info('Input uncertainties: {}'.format(in_sigma))
 
 def linear_inv(A, b, sigmad):
     W = 1.0 / sigmad
@@ -3222,7 +3222,6 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
   else:
     return map_flata, rmsi 
 
-_global_data = {}
 
 def init_worker(maps_path , maps_flata_path, models_path, elev_path, aspect_path, rms_path, shape_2d, shape_3d, dtype):
     global _global_data
@@ -3356,6 +3355,7 @@ for ii in range(int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
+    _global_data = {}
     # if iteration = 0 or spatialiter==yes, then spatial estimation
     if (ii==0) or (arguments["--spatialiter"]=='yes') :
 
