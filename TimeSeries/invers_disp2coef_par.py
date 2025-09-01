@@ -1147,12 +1147,8 @@ else:
     except:
         logger.warning('APS file is in decrepicated format, requiered two columns text file`')
         in_aps = np.loadtxt(fimages, comments='#', dtype='f')
+    in_aps += 0.4 
     logger.info('Input APS: {}'.format(in_aps))
-    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-    min_aps= np.nanpercentile(in_aps,2)
-    index = np.flatnonzero(in_aps<min_aps)
-    in_aps[index] = min_aps
-    in_aps = in_aps[indexd]
 
 # initialize rms
 if  arguments["--rms"] is None:
@@ -1164,15 +1160,11 @@ else:
     except:
         logger.warning('RMS file is in decrepicated format, requiered two columns text file`')
         in_rms = np.loadtxt(fimages, comments='#', dtype='f')
+    in_rms += 0.4
     logger.info('Input RMS: {}'.format(in_rms))
-    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-    min_rms= np.nanpercentile(in_rms,2)
-    index = np.flatnonzero(in_rms < min_rms)
-    in_rms[index] = min_rms
-    in_rms = in_rms[indexd]
 
 ## initialize input uncertainties
-in_sigma = in_rms * in_aps
+in_sigma = in_rms * in_aps  
 logger.info('Input uncertainties: {}'.format(in_sigma))
 
 def linear_inv(A, b, sigmad):
@@ -3383,15 +3375,12 @@ for ii in range(int(arguments["--niter"])):
         # aps from rms
         logger.info('Use RMS empirical estimations as input APS for time decomposition')
         in_aps = np.memmap('residuals_emp', dtype='float32', mode='r+', shape=(N,)) 
-        logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-        # scale between 0 and 1 
-        maxaps = np.nanmax(in_aps)
-        in_aps = in_aps/maxaps
-        in_aps[imref] = 0.5
-        min_aps= np.nanpercentile(in_aps,2)
-        index = np.flatnonzero(in_aps<min_aps)
-        in_aps[index] = min_aps
+        in_aps = in_aps + 0.4
+        meanaps = np.nanmean(in_aps)
+        in_aps[imref] = meanaps
+        # update in_sigma
         in_sigma = in_aps * in_rms
+        logger.info('Save RMS empirical corrections in rms_empcor.txt file')
         np.savetxt('rms_empcor.txt', in_aps.T)
     
     if N < 30:
@@ -3495,14 +3484,12 @@ for ii in range(int(arguments["--niter"])):
     res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low res to avoid over-fitting in next iter
-    min_res= np.nanpercentile(res,2)
-    index = np.flatnonzero(res < min_res)
-    res[index] = min_res
+    res = res + 0.4
 
     print('Dates      Residuals  ')
     for l in range(N):
         print(f"{idates[l]}    {res[l]:.4f}")
-    np.savetxt('aps_{}.txt'.format(ii), res.T, fmt=('%.6f'))
+    np.savetxt('sigma_{}.txt'.format(ii), res.T, fmt=('%.6f'))
     # set apsf is yes for next iteration
     arguments["--aps"] == 'yes'
     # update aps for next iterations taking into account in_aps and the residues of the last iteration
