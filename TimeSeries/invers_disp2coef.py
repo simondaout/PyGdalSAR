@@ -112,6 +112,10 @@ import matplotlib
 import matplotlib.cm as cm
 import matplotlib.dates as mdates
 from datetime import datetime as dt
+import multiprocessing
+from multiprocessing import shared_memory
+import psutil
+import gc
 
 try:
     from nsbas import docopt
@@ -360,37 +364,81 @@ def checkinfile(file):
         logger.info("File: {0} not found in {1}, Exit !".format(file,getcwd()))
         sys.exit()
 
-def plot_displacement_maps(maps, idates, nfigure=0, cmap='RdBu', plot='yes', filename='maps.eps', title='Time series maps', fig_dpi=150):
+def write_envi_hdr(filename, shape, dtype='float32', interleave='bip'):
     """
-    Affiche et sauvegarde une série de cartes de déplacement (type cube t,x,y).
-
-    """
-    N = maps.shape[2]
-    ncols = int(N / 4) + 1
-    vmax = np.nanpercentile(maps, 99.)
-    vmin = np.nanpercentile(maps, 1.)
-
-    fig = plt.figure(nfigure, figsize=(14, 10))
-    fig.subplots_adjust(wspace=0.001)
-
-    for l in range(N):
-        d = as_strided(maps[:, :, l])
-        ax = fig.add_subplot(4, ncols, l + 1)
-        cax = ax.imshow(d, cmap=cmap, vmin=vmin, vmax=vmax, interpolation='nearest')
-        ax.set_title(str(idates[l]), fontsize=6)
-        ax.set_xticks([])
-        ax.set_yticks([])
-
-    plt.suptitle('{}'.format(title), fontsize=12)
-    fig.colorbar(cax, orientation='vertical', aspect=10)
-    fig.subplots_adjust(hspace=.001,wspace=0.001)
-    fig.savefig(filename, format='EPS', dpi=fig_dpi)
-
-    if plot == 'yes':
-        plt.show()
+    Crée un fichier ENVI .hdr à partir d'un fichier.
     
-    plt.close(fig)
-    del fig
+    Parameters:
+    - filename: nom du fichier sans extension (.hdr sera ajouté)
+    - shape: tuple (lines, samples, bands)
+    - dtype: type numpy ('float32', 'int16', ...)
+    - interleave: 'bsq', 'bil' ou 'bip'
+    """
+
+    if len(shape) == 3:
+        lines, samples, bands = shape
+    else:
+        lines, samples = shape
+        bands = 1
+    dtype_map = {
+        'uint8': 1,
+        'int16': 2,
+        'int32': 3,
+        'float32': 4,
+        'float64': 5,
+        'complex64': 6,
+        'complex128': 9,
+        'uint16': 12,
+        'uint32': 13,
+        'int64': 14,
+        'uint64': 15,
+    }
+
+    if dtype not in dtype_map:
+        raise ValueError(f"Unsupported data type for ENVI: {dtype}")
+    
+    hdr_content = f"""ENVI
+samples = {samples}
+lines   = {lines}
+bands   = {bands}
+data type = {dtype_map[dtype]}
+interleave = {interleave}
+byte order = 0
+"""
+
+    with open(filename + '.hdr', 'w') as f:
+        f.write(hdr_content)
+
+# ReadAsArray(xoff, yoff, xsize, ysize)
+# xoff, yoff : décalage horizontal et vertical du coin supérieur gauche
+# xsize, ysize : taille de la fenêtre en colonnes/lignes
+def read_band(band_idx, file_path, line, ncol, num_lines):
+    ds = gdal.Open(file_path)
+    band = ds.GetRasterBand(band_idx)
+    return band.ReadAsArray(0, line, ncol, num_lines)
+
+def write_band(band_index, path, array_to_write, x_offset, y_offset):
+    """
+    Écrit un tableau dans une bande raster à la position spécifiée.
+
+    Args:
+        band_index (int): Numéro de la bande (1-based).
+        path (str): Chemin du fichier raster.
+        array_to_write (np.ndarray): Tableau 2D à écrire (shape: (n_rows, n_cols)).
+        x_offset (int): Colonne de départ dans l'image (offset horizontal).
+        y_offset (int): Ligne de départ dans l'image (offset vertical).
+    """
+    ds = gdal.Open(path, gdal.GA_Update)  # GA_Update pour pouvoir écrire
+    if ds is None:
+        raise RuntimeError(f"Impossible d’ouvrir {path} en écriture.")
+
+    band = ds.GetRasterBand(band_index)
+    if band is None:
+        raise RuntimeError(f"Bande {band_index} introuvable dans {path}.")
+
+    band.WriteArray(array_to_write, xoff=x_offset, yoff=y_offset)
+    band.FlushCache()
+    ds = None  # libère le fichier
 
 
 ################################
@@ -492,7 +540,7 @@ if arguments["--perc_topo"] ==  None:
 if arguments["--perc_los"] ==  None:
     arguments["--perc_los"] = 98.
 if arguments["--nproc"] ==  None:
-    nproc = 5
+    nproc = 10
 else:
     nproc = int(arguments["--nproc"])
 if arguments["--ndatasets"] ==  None:
@@ -501,8 +549,8 @@ else:
     ndata = int(arguments["--ndatasets"])
 if arguments["--plot"] ==  'yes':
     plot = 'yes'
-    logger.warning('plot is yes. Set nproc to 1')
-    nproc = 1
+    #logger.warning('plot is yes. Set nproc to 1')
+    #nproc = 1
     if environ["TERM"].startswith("screen"):
         matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
     import matplotlib.pyplot as plt
@@ -628,7 +676,7 @@ except:
     del cube, cubei
 
 # set at NaN zero values for all dates
-# kk = np.nonzero(maps_temp[:,:,-1]==0)
+logger.info('Refer cumulative displacements to date: {0}'.format(idates[imref]))
 cst = np.copy(maps_temp[:,:,imref])
 cst[np.isnan(cst)] = 0.0
 for l in range((N)):
@@ -636,12 +684,22 @@ for l in range((N)):
     if l != imref:
         index = np.nonzero(maps_temp[:,:,l]==0.0)
         maps_temp[:,:,l][index] = float('NaN')
-
 N=len(dates)
 maps = np.copy(maps_temp[ibeg:iend,jbeg:jend,indexd])
-logger.info('Number images between {0} and {1}: {2}'.format(dmin,dmax,N))
+logger.info('Crop images between {0} and {1}: {2}'.format(dmin,dmax,N))
 logger.info('Reshape cube: {}'.format(maps.shape))
 new_lines, new_cols = maps.shape[0], maps.shape[1]
+del maps_temp
+
+logger.info('Save cleaned time series cube: {}'.format('disp_cumul_clean'))
+maps_memmap = np.memmap('disp_cumul_clean', dtype='float32', mode='w+',
+    shape=(new_lines, new_cols, N))
+maps_memmap[:] = maps[:]
+maps_memmap.flush()  # Force l’écriture sur disque
+write_envi_hdr('disp_cumul_clean', shape=(new_lines, new_cols, N))
+del maps_memmap
+# compute std maps for weighting 
+std_maps = np.nanstd(maps)
 
 if arguments["--crop_emp"] ==  None:
     crop_emp = [0,new_lines,0,new_cols]
@@ -649,9 +707,6 @@ else:
     crop_emp = list(map(float,arguments["--crop_emp"].replace(',',' ').split()))
     logger.warning('Crop empirical estimation between lines {}-{} and cols {}-{}'.format(int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])))
 ibeg_emp,iend_emp,jbeg_emp,jend_emp = int(crop_emp[0]),int(crop_emp[1]),int(crop_emp[2]),int(crop_emp[3])
-
-# clean
-del maps_temp
 
 nfigure=0
 # open mask file
@@ -680,25 +735,29 @@ if arguments["--topofile"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--topofile"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      elev = band.ReadAsArray()[ibeg:iend,jbeg:jend]
+      elev_map_temp = band.ReadAsArray()[ibeg:iend,jbeg:jend]
       del ds
     else:
       fid = open(arguments["--topofile"],'r')
-      elev = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
+      elev_map_temp = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
       fid.close()
-    elev[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(elev)>9999.)
-    elev[kk] = float('NaN')
-    elevi = elev.flatten()
+    elev_map_temp[np.isnan(maps[:,:,-1])] = float('NaN')
+    kk = np.nonzero(abs(elev_map_temp)>9999.)
+    elev_map_temp[kk] = float('NaN')
 
     # define max min topo for empirical relationship
-    maxtopo,mintopo = np.nanpercentile(elev,float(arguments["--perc_topo"])),np.nanpercentile(elev,100-float(arguments["--perc_topo"]))
+    maxtopo,mintopo = np.nanpercentile(elev_map_temp,float(arguments["--perc_topo"])),np.nanpercentile(elev_map_temp,100-float(arguments["--perc_topo"]))
     logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxtopo,mintopo))
 
 else:
-    elev = np.ones((new_lines,new_cols),dtype=np.float32)
-    elevi = elev.flatten()
+    elev_map_temp = np.ones((new_lines,new_cols),dtype=np.float32)
     maxtopo,mintopo = 2, 0 
+elev_map = np.memmap('elev_map', dtype='float32', mode='w+', shape=(new_lines,new_cols))
+elev_map[:] = elev_map_temp
+elev_map.flush()
+write_envi_hdr('elev_map', shape=(new_lines, new_cols))
+
+del elev_map_temp, elev_map
 
 if arguments["--aspect"] is not None:
     extension = os.path.splitext(arguments["--aspect"])[1]
@@ -706,19 +765,22 @@ if arguments["--aspect"] is not None:
     if extension == ".tif":
       ds = gdal.Open(arguments["--aspect"], gdal.GA_ReadOnly)
       band = ds.GetRasterBand(1)
-      aspect = band.ReadAsArray()[ibeg:iend,jbeg:jend]
+      aspect_map_temp = band.ReadAsArray()[ibeg:iend,jbeg:jend]
       del ds
     else:
       fid = open(arguments["--aspect"],'r')
-      aspect = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
+      aspect_map_temp = np.fromfile(fid,dtype=np.float32).reshape(nlines, ncol)[ibeg:iend,jbeg:jend]
       fid.close()
-    aspect[np.isnan(maps[:,:,-1])] = float('NaN')
-    kk = np.nonzero(abs(aspect>9999.))
-    aspect[kk] = float('NaN')
-    aspecti = aspect.flatten()
+    aspect_map_temp[np.isnan(maps[:,:,-1])] = float('NaN')
+    kk = np.nonzero(abs(aspect_map_temp>9999.))
+    aspect_map_temp[kk] = float('NaN')
 else:
-    aspect = np.ones((new_lines,new_cols))
-    aspecti = aspect.flatten()
+    aspect_map_temp = np.ones((new_lines,new_cols))
+aspect_map = np.memmap('aspect_map', dtype='float32', mode='w+', shape=(new_lines,new_cols))
+aspect_map[:] = aspect_map_temp[:]
+aspect_map.flush()
+write_envi_hdr('aspect_map', shape=(new_lines, new_cols))
+del aspect_map_temp, aspect_map
 
 if arguments["--rmspixel"] is not None:
     extension = os.path.splitext(arguments["--rmspixel"])[1]
@@ -726,15 +788,15 @@ if arguments["--rmspixel"] is not None:
     if extension == ".tif":
         ds = gdal.Open(arguments["--rmspixel"], gdal.GA_ReadOnly)
         band = ds.GetRasterBand(1)
-        rmsmap = band.ReadAsArray()[ibeg:iend,jbeg:jend]
+        rms_map_temp = band.ReadAsArray()[ibeg:iend,jbeg:jend]
         del ds
     else:
-        rmsmap = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
+        rms_map_temp = np.fromfile(arguments["--rmspixel"],dtype=np.float32).reshape((nlines,ncol))[ibeg:iend,jbeg:jend]
 
-    kk = np.nonzero(np.logical_or(rmsmap==0.0, rmsmap>999.))
-    rmsmap[kk] = float('NaN')
-    kk = np.nonzero(rmsmap>float(arguments["--threshold_rms"]))
-    spacial_mask = np.copy(rmsmap)
+    kk = np.nonzero(np.logical_or(rms_map_temp==0.0, rms_map_temp>999.))
+    rms_map_temp[kk] = float('NaN')
+    kk = np.nonzero(rms_map_temp>float(arguments["--threshold_rms"]))
+    spacial_mask = np.copy(rms_map_temp)
     spacial_mask[kk] = float('NaN')
     fig = plt.figure(nfigure,figsize=(9,4))
     nfigure = nfigure + 1
@@ -745,9 +807,15 @@ if arguments["--rmspixel"] is not None:
     fig.colorbar(cax, orientation='vertical',aspect=10)
     del spacial_mask
 else:
-    rmsmap = np.ones((new_lines,new_cols))
+    rms_map_temp = np.ones((new_lines,new_cols))
     spacial_mask = np.ones((new_lines,new_cols))
     arguments["--threshold_rms"] = 2.
+# save map
+rms_map = np.memmap('rms_map', dtype='float32', mode='w+', shape=(new_lines,new_cols))
+rms_map[:] = rms_map_temp[:]
+rms_map.flush()
+write_envi_hdr('rms_map', shape=(new_lines, new_cols))
+del rms_map_temp, rms_map
 
 if arguments["--bperp"]=='yes':
   for idx, bp in enumerate(bases):
@@ -802,7 +870,7 @@ if arguments["--mask"] is not None:
         G=np.zeros((len(los_clean),4))
         G[:,0], G[:,1], G[:,2], G[:,3] = y**2, y, x, 1
         # ramp inversion
-        pars = np.linalg.lstsq(G, los_clean)
+        pars = np.dot(np.dot(np.linalg.inv(np.dot(G.T,G)),G.T),los_clean)
         a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
         logger.info('Remove ramp mask %f x**2 %f x  + %f y + %f for : %s'%(a,b,c,d,arguments["--mask"]))
 
@@ -860,19 +928,51 @@ if arguments["--mask"] is not None:
     cax = ax.imshow(mask_flat,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Flat Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
-    #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
 
     ax = fig.add_subplot(1,3,3)
     cax = ax.imshow(mask_flat_clean,cmap=cmap,vmax=vmax,vmin=vmin,interpolation='nearest')
     ax.set_title('Final Mask')
     plt.setp( ax.get_xticklabels(), visible=False)
-    #cbar = fig.colorbar(cax, orientation='vertical',aspect=10)
     fig.savefig('mask.eps', format='EPS',dpi=150)
     del mask_flat_clean
+
+
+def plot_displacement_maps(maps, idates, nfigure=0, cmap='RdBu', plot='yes', filename='maps.eps', title='Time series maps', fig_dpi=150):
+    """
+    Affiche et sauvegarde une série de cartes de déplacement (type cube t,x,y).
+
+    """
+    N = maps.shape[2]
+    ncols = int(N / 4) + 1
+    vmax = np.nanpercentile(maps, 99.)
+    vmin = np.nanpercentile(maps, 1.)
+
+    fig = plt.figure(nfigure, figsize=(14, 10))
+    fig.subplots_adjust(wspace=0.001)
+
+    for l in range(N):
+        d = as_strided(maps[:, :, l])
+        ax = fig.add_subplot(4, ncols, l + 1)
+        cax = ax.imshow(d, cmap=cmap, vmin=vmin, vmax=vmax, interpolation='nearest')
+        ax.set_title(str(idates[l]), fontsize=6)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.suptitle('{}'.format(title), fontsize=12)
+    fig.colorbar(cax, orientation='vertical', aspect=10)
+    fig.subplots_adjust(hspace=.001,wspace=0.001)
+    fig.savefig(filename, format='EPS', dpi=fig_dpi)
+
+    if plot == 'yes':
+        plt.show()
+    
+    plt.close(fig)
+    del fig
 
 # plot diplacements maps
 nfigure+=1
 plot_displacement_maps(maps, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series maps', filename='maps.eps')
+del maps
 
 #######################################################
 # Save new lect.in file
@@ -1049,12 +1149,8 @@ else:
     except:
         logger.warning('APS file is in decrepicated format, requiered two columns text file`')
         in_aps = np.loadtxt(fimages, comments='#', dtype='f')
+    in_aps += std_maps 
     logger.info('Input APS: {}'.format(in_aps))
-    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-    min_aps= np.nanpercentile(in_aps,2)
-    index = np.flatnonzero(in_aps<min_aps)
-    in_aps[index] = min_aps
-    in_aps = in_aps[indexd]
 
 # initialize rms
 if  arguments["--rms"] is None:
@@ -1066,16 +1162,19 @@ else:
     except:
         logger.warning('RMS file is in decrepicated format, requiered two columns text file`')
         in_rms = np.loadtxt(fimages, comments='#', dtype='f')
+    in_rms += std_maps
     logger.info('Input RMS: {}'.format(in_rms))
-    logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-    min_rms= np.nanpercentile(in_rms,2)
-    index = np.flatnonzero(in_rms < min_rms)
-    in_rms[index] = min_rms
-    in_rms = in_rms[indexd]
 
 ## initialize input uncertainties
-in_sigma = in_rms * in_aps
-logger.info('Input uncertainties: {}'.format(in_rms))
+in_sigma = in_rms * in_aps  
+logger.info('Input uncertainties: {}'.format(in_sigma))
+
+def linear_inv(A, b, sigmad):
+    W = 1.0 / sigmad
+    A_w = W[:, np.newaxis] * A
+    b_w = W * b
+    fsoln = np.linalg.lstsq(A_w, b_w, rcond=1e-5)[0]  
+    return fsoln
 
 def consInvert(A, b, sigmad, ineq='yes', cond=1e-6, iter=60, acc=5e-4, equality=False):
     """
@@ -1159,14 +1258,7 @@ def consInvert(A, b, sigmad, ineq='yes', cond=1e-6, iter=60, acc=5e-4, equality=
 
     return fsoln, sigmam
 
-def linear_inv(A, b, sigmad):
-    W = 1.0 / sigmad
-    A_w = W[:, np.newaxis] * A
-    b_w = W * b
-    fsoln = np.linalg.lstsq(A_w, b_w, rcond=1e-5)[0]  
-    return fsoln
-
-def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
+def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
 
       # initialize topo
@@ -1252,18 +1344,18 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]
                 logger.info('Remove ref frame %f + %f z for date: %i'%(a,b,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,b*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),2))
                 G[:,0] = 1
-                G[:,1] = elevi
+                G[:,1] = elev_map.flatten()
 
                 res = los - np.dot(G,pars)
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
@@ -1280,19 +1372,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print ('Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,b*x+c*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,b*x+c*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 G[:,0] = 1
-                G[:,1] = elevi
-                G[:,2] = elevi**2
+                G[:,1] = elev_map.flatten()
+                G[:,2] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 topo = np.dot(G,pars).reshape(new_lines,new_cols)
@@ -1308,19 +1400,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a + c*topo_clean*az
                 funcbins = a + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,b*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 G[:,0] = 1
-                G[:,1] = elevi
-                G[:,2] = elevi
+                G[:,1] = elev_map.flatten()
+                G[:,2] = elev_map.flatten()
                 for i in range(nlines):
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
 
@@ -1340,20 +1432,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a + b*topo_clean*az
                 funcbins = a + b*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,0] = 1
-                G[:,1] = elevi
-                G[:,2] = elevi
-                G[:,3] = elevi**2
+                G[:,1] = elev_map.flatten()
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()**2
                 for i in range(nlines):
                     G[i*new_cols:(i+1)*new_cols,1] *= (i - ibeg_emp)
 
@@ -1395,20 +1487,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg + b
                 funcbins = a*rgbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in range(nlines):
                     G[i*ncol:(i+1)*ncol,0] = np.arange((ncol)) - jbeg_emp
                 G[:,1] = 1
-                G[:,2] = elevi
+                G[:,2] = elev_map.flatten()
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1427,21 +1519,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b
                 funcbins = a*rgbins+ b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in range(nlines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1460,19 +1552,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b + d*topo_clean*az
                 funcbins = a*rgbins+ b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
@@ -1496,20 +1588,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b + c*topo_clean*az
                 funcbins = a*rgbins+ b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
-                G[:,4] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
@@ -1553,20 +1645,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),3))
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
                 G[:,1] = 1
-                G[:,2] = elevi
+                G[:,2] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -1586,21 +1678,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b
                 funcbins = a*azbins + b
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x + d*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x + d*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] =(i - ibeg_emp)
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1619,19 +1711,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b + d*topo_clean*az
                 funcbins = a*azbins + b + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,c*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,3] *= (i - ibeg_emp)
@@ -1655,20 +1747,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az + b + c*topo_clean*az
                 funcbins = a*azbins + b + c*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,1] = 1
-                G[:,2] = elevi
-                G[:,3] = elevi
-                G[:,4] = elevi**2
+                G[:,2] = elev_map.flatten()
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] *= (i - ibeg_emp)
@@ -1713,13 +1805,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,d*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),4))
@@ -1727,7 +1819,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
                 G[:,2] = 1
-                G[:,3] = elevi
+                G[:,3] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -1748,13 +1840,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c
                 funcbins = a*rgbins+ b*azbins + c
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -1762,8 +1854,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
                 G[:,2] = 1
-                G[:,3] = elevi
-                G[:,4] = elevi**2
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1783,19 +1875,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c + e*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,d*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
                 G[:,2] = 1
-                G[:,3] = elevi
-                G[:,4] = elevi
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
@@ -1821,20 +1913,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
                 print ('Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c + d*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c + d*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,2] = 1
-                G[:,3] = elevi
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,3] = elev_map.flatten()
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] =(i - ibeg_emp)
@@ -1884,13 +1976,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -1899,7 +1991,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
+                G[:,4] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -1922,13 +2014,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -1937,8 +2029,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -1960,19 +2052,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d + f*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2001,20 +2093,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d + e*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2068,13 +2160,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -2083,7 +2175,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
+                G[:,4] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2105,13 +2197,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
 
                 # build total G matrix
@@ -2121,8 +2213,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] =(i - ibeg_emp)
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
 
@@ -2145,19 +2237,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d + f*topo_clean*az
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
@@ -2186,20 +2278,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d + e*topo_clean*az
                 funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + e*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = np.arange((new_cols)) -  jbeg_emp
@@ -2253,13 +2345,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),5))
@@ -2268,7 +2360,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
                 G[:,3] = 1
-                G[:,4] = elevi
+                G[:,4] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2290,13 +2382,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
@@ -2305,8 +2397,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
                     G[i*new_cols:(i+1)*new_cols,2] = np.arange((new_cols)) - jbeg_emp
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2327,19 +2419,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d + f*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
@@ -2368,21 +2460,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h = pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d + e*topo_clean*az + h*(topo_clean*az)**2
                 funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + e*topobins*azbins + h*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,3] = 1
-                G[:,4] = elevi
-                G[:,5] = elevi
-                G[:,6] = elevi**2
-                G[:,7] = elevi**2
+                G[:,4] = elev_map.flatten()
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
+                G[:,7] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i -  ibeg_emp
@@ -2438,13 +2530,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*az+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
@@ -2454,7 +2546,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
                 G[:,4] = 1
-                G[:,5] = elevi
+                G[:,5] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2478,13 +2570,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -2494,8 +2586,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,3] = np.arange((new_cols)) - jbeg_emp
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2517,19 +2609,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + g*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2559,20 +2651,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + f*topo_clean*az
                 funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
-                G[:,7] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2630,13 +2722,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,g*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -2647,7 +2739,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
                 G[:,5] = 1
-                G[:,6] = elevi
+                G[:,6] = elev_map.flatten()
 
 
                 res = los - np.dot(G,pars)
@@ -2671,13 +2763,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
@@ -2688,8 +2780,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,3] = (np.arange((new_cols)) - jbeg_emp)**2
                     G[i*new_cols:(i+1)*new_cols,4] = np.arange((new_cols)) - jbeg_emp
                 G[:,5] = 1
-                G[:,6] = elevi
-                G[:,7] = elevi**2
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2713,19 +2805,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + h*topo_clean*az
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + h*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,g*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,5] = 1
-                G[:,6] = elevi
-                G[:,7] = elevi
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
                     G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
@@ -2758,21 +2850,21 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]; k=pars[9]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + g*topo_clean*az + k*(topo_clean*az)**2
                 funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + g*topobins*azbins + k*(topobins*azbins)**2
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,h*x+i*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,h*x+i*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),10))
                 G[:,5] = 1
-                G[:,6] = elevi
-                G[:,7] = elevi
-                G[:,8] = elevi**2
-                G[:,9] = elevi**2
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()
+                G[:,8] = elev_map.flatten()**2
+                G[:,9] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = (i - ibeg_emp)**3
                     G[i*new_cols:(i+1)*new_cols,1] = (i - ibeg_emp)**2
@@ -2829,13 +2921,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 funct = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,e*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),6))
@@ -2845,7 +2937,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
                     G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,4] = 1
-                G[:,5] = elevi
+                G[:,5] = elev_map.flatten()
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2868,13 +2960,13 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
@@ -2884,8 +2976,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
                     G[i*new_cols:(i+1)*new_cols,2] = ((i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp))**2
                     G[i*new_cols:(i+1)*new_cols,3] = (i-ibeg_emp) * (np.arange((new_cols))-jbeg_emp)
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()**2
 
                 res = los - np.dot(G,pars)
                 nparam = G.shape[1]
@@ -2908,19 +3000,19 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + g*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + g*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,f*x,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),7))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2950,20 +3042,20 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
-                # plot phase/elev
+                # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + f*topo_clean*az
                 funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + f*topobins*azbins
                 x = np.linspace(mintopo, maxtopo, 100)
-                ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
-                ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
+                #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
+                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
                 G=np.zeros((len(los),8))
                 G[:,4] = 1
-                G[:,5] = elevi
-                G[:,6] = elevi
-                G[:,7] = elevi**2
+                G[:,5] = elev_map.flatten()
+                G[:,6] = elev_map.flatten()
+                G[:,7] = elev_map.flatten()**2
                 for i in range(new_lines):
                     G[i*new_cols:(i+1)*new_cols,0] = np.arange((new_cols)) - jbeg_emp
                     G[i*new_cols:(i+1)*new_cols,1] = i - ibeg_emp
@@ -2985,21 +3077,17 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l,ax_dphi):
       except:
          pass
       return ramp, flata, topo, rms
- 
 
-def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, threshold_rms, threshold_mask, emp_sampling, lin_start, lin_end, col_start, col_end): 
+def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, threshold_rms, threshold_mask, emp_sampling): 
   """
-  Function that preapare and run empirical estimaton for each interferogram kk
+  Function that preapare and run empirical estimaton for each date l
   """
-
-  global fig_dphi
-  global maps, models, elev_map, aspect_map, rms_map
-
-  # the estimation is done on the non flatten maps - temporal models
-  map_temp = as_strided(maps[:,:,l]) - as_strided(models[:,:,l])
+  
+  # in iteration 2, empirical estimation is computed on residuals between data and temporal model
+  map_temp = disp_map - model_map
 
   # no estimation on the ref image set to zero 
-  if np.nansum(maps[:,:,l]) != 0:
+  if np.nansum(disp_map) != 0:
 
     maxlos,minlos=np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],float(perc_los)),np.nanpercentile(map_temp[ibeg_emp:iend_emp,jbeg_emp:jend_emp],100-float(perc_los))
     logger.debug('Set Max-Min LOS for empirical estimation: {0}-{1}'.format(maxlos,minlos))
@@ -3008,34 +3096,30 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
 
     itemp = ibeg_emp
     for lign in range(ibeg_emp,iend_emp,10):
-        if np.isnan(np.nanmean(maps[lign:lign+10,:,l])):
+        if np.isnan(np.nanmean(disp_map[lign:lign+10,:])):
             itemp = lign
         else:
             break
     logger.debug('Begining of the image: {}'.format(itemp))
 
-    if topofile is not None:
-        ax_dphi = fig_dphi.add_subplot(4,int(N/4)+1,l+1)
-    else:
-        ax_dphi = None
-
     logger.debug('Threshold RMS: {}'.format(float(threshold_rms)))
 
     # selection pixels
-    index = np.nonzero(np.logical_and(elev<maxtopo,
-        np.logical_and(elev>mintopo,
+    pix_az, pix_rg = np.indices((new_lines,new_cols))
+    index = np.nonzero(np.logical_and(elev_map<maxtopo,
+        np.logical_and(elev_map>mintopo,
             np.logical_and(mask_flat>float(threshold_mask),
             np.logical_and(~np.isnan(map_temp),
-                np.logical_and(~np.isnan(rmsmap),
-                np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<float(threshold_rms),
-                np.logical_and(rmsmap>1.e-6,
+                np.logical_and(~np.isnan(rms_map),
+                np.logical_and(~np.isnan(elev_map),
+                np.logical_and(rms_map<float(threshold_rms),
+                np.logical_and(rms_map>1.e-6,
                 np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>ibeg_emp,
                 np.logical_and(pix_az<iend_emp,
                 np.logical_and(pix_rg>jbeg_emp,
                 np.logical_and(pix_rg<jend_emp, 
-                    aspect>0.,
+                    aspect_map>0.,
                     ))))))))
                 ))))))
 
@@ -3044,14 +3128,14 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
     x = temp[:,0]; y = temp[:,1]
     # clean maps
     los_clean = map_temp[index].flatten()
-    topo_clean = elev[index].flatten()
-    rms_clean = rmsmap[index].flatten()
+    topo_clean = elev_map[index].flatten()
+    rms_clean = rms_map[index].flatten()
     
     logger.debug('Number of points for empirical estimation: {}'.format(len(los_clean)))
     if len(los_clean) < 1:
       logger.critical('No points left for empirical estimation. Exit!')
-      logger.critical('threshold RMS: {0}, threshold Mask: {1}, Min-Max LOS: {2}-{3}, Min-Max topo: {4}-{5}, lines: {6}-{7}, \
-        cols: {8}- {9}'.format(float(threshold_rms),float(threshold_mask),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
+      logger.critical('threshold RMS: {0}, threshold Mask: {1}, Min-Max LOS: {2} -- {3}, Min-Max topo: {4} -- {5}, lines: {6} -- {7}, \
+        cols: {8} -- {9}'.format(float(threshold_rms),float(threshold_mask),minlos,maxlos,mintopo,maxtopo,ibeg_emp,iend_emp,jbeg_emp,jend_emp))
       sys.exit()
 
     # print itemp, iend_emp
@@ -3070,27 +3154,27 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
       nfit_temp=nfit
 
     # call ramp estim
-    los = as_strided(maps[:,:,l]).flatten()
+    los = as_strided(disp_map).flatten()
     samp = int(emp_sampling)
 
     map_ramp, map_flata, map_topo, rmsi = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
-      y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l, ax_dphi)
+      y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l )
 
     if (lin_start is not None) and (lin_end is not None):
-        indexref = np.nonzero(np.logical_and(elev<maxtopo,
-        np.logical_and(elev>mintopo,
+        indexref = np.nonzero(np.logical_and(elev_map<maxtopo,
+        np.logical_and(elev_map>mintopo,
             np.logical_and(mask_flat>float(threshold_mask),
             np.logical_and(~np.isnan(map_temp),
-                np.logical_and(~np.isnan(rmsmap),
-                np.logical_and(~np.isnan(elev),
-                np.logical_and(rmsmap<float(threshold_rms),
-                np.logical_and(rmsmap>1.e-6,
+                np.logical_and(~np.isnan(rms_map),
+                np.logical_and(~np.isnan(elev_map),
+                np.logical_and(rms_map<float(threshold_rms),
+                np.logical_and(rms_map>1.e-6,
                 np.logical_and(~np.isnan(map_temp),
                 np.logical_and(pix_az>lin_start,
                 np.logical_and(pix_az<lin_end,
                 np.logical_and(pix_rg>col_start,
                 np.logical_and(pix_rg<col_end, 
-                    aspect>0.,
+                    aspect_map>0.,
                 ))))))))))))
                 ))
         
@@ -3099,22 +3183,23 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
              sys.exit()
 
         ## Set data minus temporal model to zero in the ref area
-        zone = as_strided(map_flata[:,:] - models[:,:,l])
-        los_ref2 = zone[indexref].flatten()
-        rms_ref = rmsmap[indexref].flatten()
+        res = as_strided(map_flata[:,:] - model_map[:,:])
+        res_ref = res[indexref].flatten()
+        rms_ref = rms_map[indexref].flatten()
         amp_ref = 1./rms_ref
         amp_ref = amp_ref/np.nanmax(amp_ref)
         # weigth avera of the phase
-        cst = np.nansum(los_ref2*amp_ref) / np.nansum(amp_ref)
+        cst = np.nansum(res_ref*amp_ref) / np.nansum(amp_ref)
         logger.info('Re-estimation of a constant within lines {0}-{1} and cols {2}-{3}'.format(lin_start,lin_end,col_start,col_end))
         logger.info('Average phase within ref area: {0}:'.format(cst))
         if np.isnan(cst):
           cst = 0.
         map_ramp, map_flata = map_ramp + cst, map_flata - cst
-        del zone
+        del res, res_ref, rms_ref, amp_ref, cst
       
   else:
-    map_flata = np.copy(maps[:,:,l])
+    logger.info('Empty displacements for date: {}'.format(l))
+    map_flata = np.copy(disp_map)
     map_ramp, map_topo  = np.zeros(np.shape(map_flata)), np.zeros(np.shape(map_flata))
     rmsi = 1
 
@@ -3126,14 +3211,81 @@ def empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, t
   topo[kk] = float('NaN')
   del ramp, topo, map_temp
  
-  if arguments["--topofile"] is not None: 
+  if topofile is not None: 
     return map_flata, map_topo, rmsi 
   else:
     return map_flata, rmsi 
 
-def temporal_decomp(pix, disp, sigma, cond, ineq, equality):
-    j = pix  % (new_cols)
-    i = int(pix/(new_cols))
+
+def init_worker(maps_path , maps_flata_path, models_path, elev_path, aspect_path, rms_path, shape_2d, shape_3d, dtype):
+    global _global_data
+    _global_data['maps'] = np.memmap(maps_path, dtype=dtype, mode='r', shape=shape_3d)
+    _global_data['maps_flata'] = np.memmap(maps_flata_path, dtype=dtype, mode='r+', shape=shape_3d)
+    _global_data['models'] = np.memmap(models_path, dtype=dtype, mode='r', shape=shape_3d)
+    _global_data['elev_map'] = np.memmap(elev_path, dtype=dtype, mode='r', shape=shape_2d)
+    _global_data['aspect_map'] = np.memmap(aspect_path, dtype=dtype, mode='r', shape=shape_2d)
+    _global_data['rms_map'] = np.memmap(rms_path, dtype=dtype, mode='r+', shape=shape_2d)
+    _global_data['residuals_emp'] = np.memmap('residuals_emp', dtype=dtype, mode='w+', shape=(shape_3d[2],))  # (N,)
+    _global_data['maps_topo'] = np.memmap('maps_topo', dtype=dtype, mode='w+', shape=shape_3d)
+
+def empirical_cor_wrapper(l, ibeg_emp, iend_emp, mintopo, maxtopo, topofile, perc_los, threshold_rms, threshold_mask, emp_sampling):
+    disp_map = _global_data['maps'][:, :, l]
+    model_map = _global_data['models'][:, :, l]
+    elev_map = _global_data['elev_map']
+    aspect_map = _global_data['aspect_map']
+    rms_map = _global_data['rms_map']
+
+    if topofile is not None:
+        map_topo = _global_data['maps_topo'][:, :, l]
+        _global_data['maps_flata'][:, :, l], _global_data['maps_topo'][:, :, l], _global_data['residuals_emp'][l] = empirical_cor(
+            l, disp_map, model_map, elev_map, aspect_map, rms_map,
+            ibeg_emp, iend_emp, mintopo, maxtopo,
+            topofile, perc_los, threshold_rms, threshold_mask, emp_sampling
+        )
+        _global_data['maps_topo'].flush()   
+    else:
+        _global_data['maps_flata'][:, :, l], _global_data['residuals_emp'][l] = empirical_cor(
+            l, disp_map, model_map, elev_map, aspect_map, rms_map,
+            ibeg_emp, iend_emp, mintopo, maxtopo,
+            topofile, perc_los, threshold_rms, threshold_mask, emp_sampling
+        )
+    _global_data['maps_flata'].flush()
+    _global_data['residuals_emp'].flush()
+
+def init():
+    global N, M, dates
+
+def compute_auto_block_size(new_lines, new_cols, N, dtype='float32', target_memory_MB=200):
+    """
+    Détermine une taille de bloc (nb de lignes) pour rester dans target_memory_MB
+    """
+    bytes_per_element = np.dtype(dtype).itemsize
+    bytes_per_pixel = N * bytes_per_element
+    bytes_per_line = new_cols * bytes_per_pixel
+
+    target_bytes = target_memory_MB * 1024 * 1024
+    block_size = target_bytes // bytes_per_line
+
+    # Toujours >= 1 et <= new_lines
+    return max(1, min(int(block_size), new_lines))
+
+def temporal_decomp_chunk(chunk, sigma, cond, ineq, equality):
+    # chunk: (N, nb_pixels)
+    N, P = chunk.shape
+    m_all = np.empty((P, M), dtype=np.float32)
+    sigmam_all = np.empty((P, M), dtype=np.float32)
+    models_all = np.empty((P, N), dtype=np.float32)
+
+    for i in range(P):
+        disp = chunk[:, i]
+        m, sigmam, model = temporal_decomp(disp, sigma, cond, ineq, equality)
+        m_all[i, :] = m
+        sigmam_all[i, :] = sigmam
+        models_all[i, :] = model
+
+    return m_all, sigmam_all, models_all
+
+def temporal_decomp(disp, sigma, cond, ineq, equality):
 
     # Initialisation
     mdisp=np.ones((N), dtype=np.float32)*float('NaN')
@@ -3163,7 +3315,7 @@ def temporal_decomp(pix, disp, sigma, cond, ineq, equality):
             G[:,l]=basis[l].g(tabx)
         for l in range((Mker)):
             G[:,Mbasis+l]=kernels[l].g(k)
-        
+       
         # inversion
         m,sigmam = consInvert(G,taby,sigma[k],cond=cond,ineq=ineq,equality=equality)
 
@@ -3172,13 +3324,20 @@ def temporal_decomp(pix, disp, sigma, cond, ineq, equality):
 
     return m, sigmam, mdisp 
 
-# initialization
-models = np.zeros((new_lines,new_cols,N), dtype=np.float32) # temporal models
-maps_flata = np.copy(maps) # flatten maps
+# Create memmap output file to store tempor models and flatten maps
+logger.info('Save time series cube for temporal models: {}'.format('disp_cumul_models'))
+models = np.memmap('disp_cumul_models', dtype='float32', mode='w+',
+                        shape=(new_lines, new_cols, N))
+write_envi_hdr('disp_cumul_models', shape=(new_lines, new_cols, N))
+models.flush()
+del models 
 
-# prepare flatten maps
-if arguments["--topofile"] is not None:
-    maps_topo = np.zeros((new_lines,new_cols,N),dtype=np.float32)
+logger.info('Save flatten time series cube: {}'.format('disp_cumul_flat'))
+maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
+    shape=(new_lines, new_cols, N))
+maps_flat.flush()  # Force l’écriture sur disque
+write_envi_hdr('disp_cumul_flat', shape=(new_lines, new_cols, N))
+del maps_flat
 
 for ii in range(int(arguments["--niter"])):
     print()
@@ -3190,13 +3349,7 @@ for ii in range(int(arguments["--niter"])):
     # SPATIAL ITERATION N  ######
     #############################
 
-    rms = np.zeros((N),dtype=np.float32)
-    pix_az, pix_rg = np.indices((new_lines,new_cols))
-    # if radar file just initialise figure
-    if arguments["--topofile"] is not None:
-      nfigure +=1
-      fig_dphi = plt.figure(nfigure,figsize=(14,10))
-    
+    _global_data = {}
     # if iteration = 0 or spatialiter==yes, then spatial estimation
     if (ii==0) or (arguments["--spatialiter"]=='yes') :
 
@@ -3207,64 +3360,45 @@ for ii in range(int(arguments["--niter"])):
       print('---------------')
       #########################################
       print()
-    
-      for l in range((N)):
-          if arguments["--topofile"] is not None:
-            maps_flata[:,:,l], maps_topo[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
-          else:
-            maps_flata[:,:,l], rms[l] = empirical_cor(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"], lin_start, lin_end, col_start, col_end)
 
-      if N < 30:
-        # plot corrected ts
-        nfigure +=1
-        plot_displacement_maps(maps_flata, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
-
-        if arguments["--topofile"] is not None:
-            fig_dphi.savefig('phase-topo.eps', format='EPS',dpi=150)
-            nfigure +=1
-            plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps') 
-            del maps_topo
-
+      nprocess = min(N, nproc)
+      with multiprocessing.Pool(processes=nprocess, initializer=init_worker, initargs=('disp_cumul_clean', 'disp_cumul_flat' ,'disp_cumul_models', 'elev_map', 'aspect_map', 'rms_map', (new_lines, new_cols), (new_lines, new_cols, N), 'float32')) as pool:
+          results = pool.starmap(empirical_cor_wrapper, [(l, ibeg_emp, iend_emp, mintopo, maxtopo, arguments["--topofile"], arguments["--perc_los"], arguments["--threshold_rms"], arguments["--threshold_mask"], arguments["--emp_sampling"]) for l in range(N)]) 
+     
     if plot=='yes':
         plt.show()
     plt.close('all')
 
+    del _global_data
+    gc.collect()
+    
     # save rms
     if (arguments["--aps"] is None and ii==0):
         # aps from rms
         logger.info('Use RMS empirical estimations as input APS for time decomposition')
-        in_aps = np.copy(rms)
-        logger.info('Set very low values to the 2 percentile to avoid overweighting...')
-        # scale between 0 and 1 
-        maxaps = np.nanmax(in_aps)
-        in_aps = in_aps/maxaps
-        in_aps[imref] = 0.5
-        min_aps= np.nanpercentile(in_aps,2)
-        index = np.flatnonzero(in_aps<min_aps)
-        in_aps[index] = min_aps
+        in_aps = np.memmap('residuals_emp', dtype='float32', mode='r+', shape=(N,)) 
+        in_aps = in_aps + std_maps
+        meanaps = np.nanmean(in_aps)
+        in_aps[imref] = meanaps
+        # update in_sigma
         in_sigma = in_aps * in_rms
+        logger.info(in_sigma)
+        logger.info('Save RMS empirical corrections in rms_empcor.txt file')
         np.savetxt('rms_empcor.txt', in_aps.T)
-        del rms
+    
+    if N < 30:
+        # plot corrected ts
+        nfigure +=1
+        maps_flata = np.memmap('disp_cumul_flat', dtype='float32', mode='r',shape=(new_lines, new_cols, N))
+        plot_displacement_maps(maps_flata, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Corrected time series maps from empirical estimations', filename='maps_flat.eps')
+        del maps_flata
 
-    #######################################################
-    # Save new cubes
-    #######################################################
-
-    # create new cube
-    if flat>0:
-        logger.info('Save flatten time series cube: {}'.format('disp_cumule_flat'))
-        fid = open('disp_cumule_flat', 'wb')
-        maps_flata[:,:,:].astype('float32').tofile(fid)
-        in_hdr = arguments["--cube"] + '.hdr'
-        arguments["--cube"] = 'disp_cumule_flat' # update depl_cumul
-        out_hdr = 'disp_cumule_flat.hdr'
-        try:
-            shutil.copy(in_hdr, out_hdr)
-        except:
-            pass
-        fid.close()
-        del fid
-
+        if arguments["--topofile"] is not None:
+            nfigure +=1
+            maps_topo = np.memmap('maps_topo', dtype='float32', mode='r',shape=(new_lines, new_cols, N))
+            plot_displacement_maps(maps_topo, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series RAMPS+TROPO', filename='maps_models_tropo.eps')
+            del maps_topo
+ 
     ########################
     # TEMPORAL ITERATION N #
     ########################
@@ -3278,50 +3412,93 @@ for ii in range(int(arguments["--niter"])):
     print()
 
     logger.info('Input uncertainties: {}'.format(in_sigma))
-
-    # reiinitialize maps models at each iteration
-    models = np.zeros((new_lines,new_cols,N),dtype=np.float32)
+    
+    # number of lines per block
+    #block_size = compute_auto_block_size(new_lines, new_cols, N)
+    block_size = 100 
+    logger.info('Block size for parallelisation: {} '.format(block_size))
 
     with TimeIt():
-        for pix in range(0,(new_lines)*(new_cols),int(arguments["--sampling"])):
-              j = pix  % (new_cols)
-              i = int(pix/(new_cols))
-              if ((i % 20) == 0) and (j==0):
-                  logger.info('Processing line: {} --- {} seconds ---'.format(i,time.time() - start_time))
-              disp = as_strided(maps_flata[i,j,:])
-              m, sigmam, models[i,j,:]  = temporal_decomp(pix, disp, in_sigma, arguments['--cond'], arguments['--ineq'], equality)
+      with multiprocessing.Pool(processes=nproc, initializer=init) as pool:
+        for line in range(0, new_lines, block_size):
+            end_line = min(line + block_size, new_lines)
+            block_size_local = end_line - line
+            logger.info('Processing line: {} --- {:.2f} seconds ---'.format(line, time.time() - start_time)) 
+           
+            results = [pool.apply_async(read_band, args=(i+1, 'disp_cumul_flat', line, new_cols, block_size_local)) for i in range(N)] #lecture asynchrone des N bandes 
+            bands_data = [result.get() for result in results] # Récupère les résultats des apply_async
+            temp_array = np.concatenate([np.expand_dims(band, axis=0) for band in bands_data], axis=0)
+            line_time_series = np.array(temp_array)
+            line_time_series = np.reshape(line_time_series, (N,new_cols*block_size_local))
+            line_time_series = np.squeeze(line_time_series)
+  
+            #line_time_series = temp_array.transpose(2, 0, 1).reshape(N, -1) 
+            chunks = np.array_split(line_time_series, nproc, axis=1)
+
+            args_list = [
+                (chunk, in_sigma, arguments['--cond'], arguments['--ineq'], equality)
+                for chunk in chunks
+            ]
+            results_read = pool.starmap(temporal_decomp_chunk, args_list) 
             
-              # save m
-              for l in range((Mbasis)):
-                  basis[l].m[i,j] = m[l]
-                  basis[l].sigmam[i,j] = sigmam[l]
+            # separer les resultats
+            m_chunks, sigmam_chunks, models_chunks = zip(*results_read)
+            
+            # reformer les tableaux
+            m = np.concatenate(m_chunks, axis=0) # shape: (nb_pixels, M)
 
-              for l in range((Mker)):
-                  kernels[l].m[i,j] = m[Mbasis+l]
-                  kernels[l].sigmam[i,j] = sigmam[Mbasis+l]
+            sigmam = np.concatenate(sigmam_chunks, axis=0) # shape: (nb_pixels, M) 
 
-              del m, sigmam
+            models_temp = np.concatenate(models_chunks, axis=0) # shape: (nb_pixels, N)
+            models_temp =  models_temp.reshape(block_size_local, new_cols, N)
 
+            # stocker les tableaux
+            results_write = [pool.apply_async(write_band, args=(i+1, 'disp_cumul_models', models_temp[:, :, i], 0, line)) for i in range(N)]
+            [res.get() for res in results_write] # attend la fin des écritures
+
+            # Stocker les coefficients m et sigmam dans les objets basis[] et kernels[]
+            for idx in range(block_size_local * new_cols):
+                i = line + (idx // new_cols)
+                j = idx % new_cols
+                for l in range(Mbasis):
+                    basis[l].m[i, j] = m[idx, l]
+                    basis[l].sigmam[i, j] = sigmam[idx, l]
+                for l in range(Mker):
+                    basis_idx = Mbasis + l
+                    kernels[l].m[i, j] = m[idx, basis_idx]
+                    kernels[l].sigmam[i, j] = sigmam[idx, basis_idx]
+
+            # nettoyage
+            del m, sigmam, m_chunks, sigmam_chunks, models_chunks, models_temp, results_read, results_write 
+            gc.collect()
+ 
+    # open temporal models and flatten maps with gdal 
+    maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
+                        shape=(new_lines, new_cols, N))
+ 
+    models = np.memmap('disp_cumul_models', dtype='float32', mode='r+',
+                        shape=(new_lines, new_cols, N))
+    
     # compute RMSE
     # remove outiliers
     index = np.logical_or(models>9999., models<-9999)
     models[index] = 0.
-    squared_diff = (np.nan_to_num(maps_flata,nan=0) - np.nan_to_num(models, nan=0))**2
+    squared_diff = (np.nan_to_num(maps_flat,nan=0) - np.nan_to_num(models, nan=0))**2
     res = np.sqrt(np.nanmean(squared_diff, axis=(0,1))**2)  
 
     # remove low res to avoid over-fitting in next iter
-    min_res= np.nanpercentile(res,2)
-    index = np.flatnonzero(res < min_res)
-    res[index] = min_res
+    res = res + std_maps
 
     print('Dates      Residuals  ')
     for l in range(N):
-        print (idates[l], res[l])
-    np.savetxt('aps_{}.txt'.format(ii), res.T, fmt=('%.6f'))
+        print(f"{idates[l]}    {res[l]:.4f}")
+    np.savetxt('sigma_{}.txt'.format(ii), res.T, fmt=('%.6f'))
     # set apsf is yes for next iteration
     arguments["--aps"] == 'yes'
     # update aps for next iterations taking into account in_aps and the residues of the last iteration
     in_sigma = res * in_aps * in_rms
+
+    del maps_flat, models
 
 #######################################################
 # Save functions in binary file
@@ -3394,46 +3571,45 @@ else:
         kernels[l].sigmam.astype('float32').tofile(fid)
         fid.close()
 
-#######################################################
-# Save models
-#######################################################
-
-if arguments["--fulloutput"]=='yes':
-   logger.info('Save  time series cube model: {}'.format('disp_cumule_models'))
-   fid = open('depl_cumule_models', 'wb')
-   models[:,:,:].astype('float32').tofile(fid)
-   in_hdr = arguments["--cube"] + '.hdr'
-   out_hdr = 'depl_cumule_models.hdr'
-   try:
-     shutil.copy(in_hdr, out_hdr)
-   except:
-     pass
-   fid.close()
-   del fid
 
 #######################################################
-# Plot models and residuals
+# Save new maps
 #######################################################
 
 if N < 30:
+
+  maps_flat = np.memmap('disp_cumul_flat', dtype='float32', mode='r',
+                        shape=(new_lines, new_cols, N))
+  models = np.memmap('disp_cumul_models', dtype='float32', mode='r',
+                        shape=(new_lines, new_cols, N))
+
+  # plot displacements models and residuals
   nfigure +=1
   figclr = plt.figure(nfigure)
   # plot color map
   ax = figclr.add_subplot(1,1,1)
-  vmax = np.nanpercentile(maps[:,:,:],99.)
-  vmin = np.nanpercentile(maps[:,:,:],1.)  
-  cax = ax.imshow(maps[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
+  vmax = np.nanpercentile(maps_flat[:,:,:],99.)
+  vmin = np.nanpercentile(maps_flat[:,:,:],1.)  
+  cax = ax.imshow(maps_flat[:,:,-1],cmap=cmap,vmax=vmax,vmin=vmin)
   plt.setp( ax.get_xticklabels(), visible=False)
   cbar = figclr.colorbar(cax, orientation='horizontal',aspect=5)
-  figclr.savefig('colorscale.eps', format='EPS',dpi=150) 
-
+  figclr.savefig('colorscale.eps', format='EPS',dpi=150)
+  
   nfigure +=1
   plot_displacement_maps(models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series models', filename='maps-time-models.eps')
   nfigure +=1
-  plot_displacement_maps(maps-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
+  plot_displacement_maps(maps_flat-models, idates, nfigure=nfigure, cmap=cmap, plot=plot, title='Time series residuals', filename='maps-residuals.eps')
+  
+  # clean memory
+  del maps_flat, models
 
-# clean memory
-del maps, models
+#######################################################
+# Remove arrays
+#######################################################
+
+if os.path.exists('disp_cumul_clean'):
+    os.remove('disp_cumul_clean')
+    logger.info("Remove file : disp_cumul_clean")
 
 #######################################################
 # Compute Amplitude and phase seasonal
