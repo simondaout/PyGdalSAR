@@ -1186,6 +1186,12 @@ def flat_model(config,kk):
         copyrsc(inrsc,outrsc)
         copyrsc(inrsc,filtoutrsc)
 
+        #Parameters
+        nregion = int(1)
+        thresh_amp = 0.1
+        thresh_cohreg = 0.6
+        thresh_model = 0.4
+
         if force:
             rm(outfile); rm(param)
             try:
@@ -1196,8 +1202,8 @@ def flat_model(config,kk):
             do = checkoutfile(config,outfile)
             if do:
                 try:
-                    run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
-                    +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
+                    run(f"flatten_stack.py {infile} {filtfile} {config.model} --outfile={outfile} --nreg={nregion} --thresh_amp={thresh_amp} --thresh_cohreg={thresh_cohreg} --thresh_model={thresh_model}")
+                    #run("flatten_stack.py "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+"--outfile="+str(outfile)+" "+"--nreg="+str(nregion)+ "")
                     # move param file into a file name independent of prefix and suffix
                     force_link(param,newparam)
                 except Exception as e:
@@ -1688,16 +1694,20 @@ def add_model_back(config,kk):
             outfile = config.stack.getfiltROI(kk) + '.unw'
             outrsc = outfile + '.rsc'
             copyrsc(unwrsc,outrsc)
-
+            print(param)
             if force:
                 rm(outfile)
             if config.model != None:
                 if path.exists(param) is True:
+                    with open(param, "r") as f:
+                        coeff = float(f.read())
                     do = checkoutfile(config,outfile)
                     if do:
                         try:
+                            print(coeff)
                             run("length.pl "+str(unwfile))
-                            run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
+                            run(f"flatten_stack.py add "+str(unwfile)+" "+str(config.model)+" "+"--coeff="+str(coeff)+" "+"--outfile="+str(outfile))
+                            #run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
                         except Exception as e:
                             logger.critical(e)
                             logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))

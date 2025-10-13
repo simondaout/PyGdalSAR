@@ -12,6 +12,7 @@ Temporal decomposition of the time series delays of selected pixels (used depl_c
 
 Usage: invers_disp_pixel.py --cols=<values> --lines=<values> [--cube=<path>] [--list_images=<path>] [--windowsize=<value>] [--windowrefsize=<value>]  [--lectfile=<path>] [--aps=<path>] \
 [--linear=<value>] [--steps=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
+[--linear=<value>] [--acceleration=<value>] [--steps=<value>] [--postseismic=<value>] [--seasonal=<yes/no>] [--seasonal_increase=<yes/no>] [--vector=<path>] [--info=<path>]\
 [--semianual=<yes/no>] [--bianual=<yes/no>] [--degreeday=<values>] [--bperp=<yes/no>] [--imref=<value>] [--cond=<value>] [--slowslip=<value>] [--ineq=<value>] \
 [--name=<value>] [--scale=<value>] [--plot=<yes/no>] [<iref>] [<jref>] [--bounds=<value>] [--dateslim=<values>] [--plot_dateslim=<values>] [--color=<value>] [--fillstyle=<value>] [--ndatasets=<nb_data_sets>] 
 
@@ -24,11 +25,12 @@ Options:
 --cube PATH             Path to displacement file [default: depl_cumul_flat]
 --list_images PATH      Path to list images file made of 5 columns containing for each images 1) number 2) Doppler freq (not read) 3) date in YYYYMMDD format 4) numerical date 5) perpendicular baseline [default: images_retenues]
 --windowsize VALUE      Number of pixels around the pixel defining the window [default: 0]
---windowrefsize VALUE      Number of pixels around the referenced pixel defining the window [default: windowsize]
+--windowrefsize VALUE   Number of pixels around the referenced pixel defining the window [default: windowsize]
 --lectfile PATH         Path to the lect.in file (output of invers_pixel) [default: lect.in]
 --aps PATH              Path to the APS file giving the error associated to each dates [default: No weigthing]
---linear PATH     Add a linear function to the inversion
---steps PATH        Add heaviside functions to the inversion .Indicate steps time (e.g 2004.,2006.)
+--linear PATH           Add a linear function to the inversion
+--acceleration=PATH     Add an acceleration fonction in the inversion [default: no]
+--steps PATH            Add heaviside functions to the inversion .Indicate steps time (e.g 2004.,2006.)
 --postseismic PATH      Add logarithmic transients to each steps step. Indicate characteristic time of the log function, must be a serie of values of the same lenght than steps (e.g 1.,1.). To not associate postseismic function to a given steps step, put None (e.g None,1.) 
 --slowslip   VALUE      Add slow-slip function in the inversion (as defined by Larson et al., 2004). Indicate median and characteristic time of the events (e.g. 2004.,1,2006,0.5) [default: None] 
 --seasonal PATH         If yes, add seasonal terms in the inversion
@@ -38,15 +40,19 @@ Options:
 --bianual PATH          If yes, add bianual  terms in the inversion
 --vector PATH           Path to the vector text files containing a value for each dates [default: None]
 --info PATH             Path to extra file in r4 or tif format to plot is value on the selected pixel, e.g. aspect [default: None].
+<<<<<<< HEAD
 --bperp PATH              If yes, add term proportional to the perpendicular baseline in the inversion
+=======
+--bperp PATH            If yes, add term proportional to the perpendicular baseline in the inversion
+>>>>>>> 06ce944 (Add an acceleration fonction in the inversion [default: no])
 --imref VALUE           Reference image number [default: 1]
 --cond VALUE            Condition value for optimization: Singular value smaller than cond are considered zero [default: 1.e-6]
 --ineq VALUE            If yes, add inequality constrained in the inversion: use least square result to iterate the inversion. Force postseismic to be the  same sign than steps [default: no].       
 --name Value            Name output figures [default: None] 
---scale                Scaling value between input data and desired output [default: 1]
+--scale                 Scaling value between input data and desired output [default: 1]
 --plot                  Display results [default: yes]            
-iref                  colum numbers of the reference pixel [default: None] 
-jref                  lign number of the reference pixel [default: None]
+iref                    colum numbers of the reference pixel [default: None] 
+jref                    lign number of the reference pixel [default: None]
 --bounds                yMin,yMax time series plots 
 --dateslim              Datemin,Datemax time series  
 --plot_dateslim         Datemin,Datemax time series for plot only 
@@ -97,7 +103,6 @@ import time
 
 # docopt (command line parser)
 import docopt
-
 
 ########################################################################
 # Define basis functions
@@ -151,6 +156,15 @@ class linear(pattern):
 
     def g(self,t):
         func=(t-self.to)
+        return func
+    
+class acceleration(pattern):
+    def __init__(self,name,reduction,date):
+        pattern.__init__(self,name,reduction,date)
+        self.to=date
+
+    def g(self,t):
+        func= (t-self.to)**2
         return func
 
 class sint(pattern):
@@ -356,6 +370,10 @@ if arguments["--linear"] ==  None:
     inter = 'no'
 else:
     inter = arguments["--linear"]
+if arguments["--acceleration"] == None:
+    acc = 'no'
+else:
+    acc = arguments["--acceleration"]
 if arguments["--seasonal"] ==  None:
     seasonal = 'no'
 else:
@@ -653,6 +671,11 @@ if inter=='yes':
       # 1
       indexinter=index
       index = index + 1
+
+if acc =='yes':
+    basis.append(acceleration(name='acceleration', reduction='acc', date=datemin))
+    indexacc=index
+    index += 1 
 
 if degreeday=='yes':
    indexdd = index
@@ -961,8 +984,10 @@ for jj in range((Npix)):
     disp_seas = np.zeros((N))
     disp_seast = np.zeros((N))
 
-    if inter=='yes':
+    if inter=='yes' and acc=='no':
         lin[k] = np.dot(G[:,indexinter],m[indexinter])
+    if inter=='yes' and acc=='yes':
+        lin[k] = np.dot(G[:,indexinter],m[indexinter]) + np.dot(G[:, indexacc], m[indexacc])
 
     # plot data and model minus bperp error and seasonal terms
     if seasonal=='yes':
@@ -991,7 +1016,7 @@ for jj in range((Npix)):
             # convert between 0 and 2pi
             if phit<0: 
                 phit = phit + 2*np.pi
-
+            
             print(phi,phit)
             print(m[indexseas+1]/m[indexseas],m[indexseast+1]/m[indexseast] )
  
@@ -1038,7 +1063,14 @@ for jj in range((Npix)):
         )
   
     # plot data and model minus bperp error and linear term
+<<<<<<< HEAD
     if inter=='yes':
+=======
+    if inter=='yes' and acc=='no':
+        ax3.plot(x,disp-bperperr-lin,markers[jj],color=color,fillstyle=fillstyle,markersize=4,label='detrended data')
+        ax3.errorbar(x,disp-bperperr-lin,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
+    elif inter=='yes' and acc=='yes':
+>>>>>>> 06ce944 (Add an acceleration fonction in the inversion [default: no])
         ax3.plot(x,disp-bperperr-lin,markers[jj],color=color,fillstyle=fillstyle,markersize=4,label='detrended data')
         ax3.errorbar(x,disp-bperperr-lin,yerr = sigmad, ecolor=color,fmt='none', alpha=0.5)
             
@@ -1061,8 +1093,13 @@ for jj in range((Npix)):
         G[:,Mbasis+l]=np.interp(tdec,tabx,kernels[l].g(k))
     model = np.dot(G,m)
     
-    if inter=='yes':
+    if inter=='yes' and acc=='no':
         model_lin = np.dot(G[:,indexinter],m[indexinter])
+<<<<<<< HEAD
+=======
+    elif inter=='yes' and acc=='yes':
+        model_lin = np.dot(G[:,indexinter],m[indexinter]) + np.dot(G[:, indexacc], m[indexacc])
+>>>>>>> 06ce944 (Add an acceleration fonction in the inversion [default: no])
    
     # we need to substrat bperp model to the whole model 
     if bperp=='yes':
@@ -1096,6 +1133,7 @@ for jj in range((Npix)):
 
     # plot model
     if inter=='yes':
+<<<<<<< HEAD
         if seasonal=='yes' and seasonalt=='no':
             ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],amp,phi))
             ax3.plot(t,model-model_lin-model_bperp,'-r')
@@ -1105,6 +1143,26 @@ for jj in range((Npix)):
         elif seasonal=='no' and seasonalt=='yes':
             ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}'.format(m[indexinter],ampt,phit))
             ax3.plot(t,model-model_lin-model_bperp,'-r')
+=======
+        if seasonal=='yes' and seasonalt=='no' and acc=='no':
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],amp,phi))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
+        elif seasonal=='yes' and seasonalt=='no' and acc=='yes':
+            ax.plot(t,model-model_bperp,'-r',label='Acc: {:.2f}, Rate: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexacc], m[indexinter],amp,phi))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
+        elif seasonal=='yes' and seasonalt=='yes' and acc=='no':
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexinter],ampt,phit,amp,phi))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
+        elif seasonal=='yes' and seasonalt=='yes' and acc=='yes':
+            ax.plot(t,model-model_bperp,'-r',label='Acc: {:.2f}, Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}, Amp: {:.2f}, Phi: {:.2f}'.format(m[indexacc], m[indexinter],ampt,phit,amp,phi))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')        
+        elif seasonal=='no' and seasonalt=='yes' and acc=='no':
+            ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}'.format(m[indexinter],ampt,phit))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
+        elif seasonal=='no' and seasonalt=='yes' and acc=='yes':
+            ax.plot(t,model-model_bperp,'-r',label='Acc: {:.2f}, Rate: {:.2f}, Ampt: {:.2f}, Phit: {:.2f}'.format(m[indexacc], m[indexinter],ampt,phit))
+            ax3.plot(t,model-model_lin-model_bperp,'-r')
+>>>>>>> 06ce944 (Add an acceleration fonction in the inversion [default: no])
         else:
             ax.plot(t,model-model_bperp,'-r',label='Rate: {:.2f}'.format(m[indexinter]))
             ax3.plot(t,model-model_lin-model_bperp,'-r')
@@ -1152,3 +1210,4 @@ for jj in range((Npix)):
 if plot == 'yes':
     plt.show()
 sys.exit()
+
