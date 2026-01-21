@@ -3,8 +3,10 @@
 ############################################
 
 ############################################
-# Author        : Simon DAOUT (Oxford)
+# Author        : Simon DAOUT 
+# revised version Jan 2026 to include flatten_stack.py (Hugo Watine)
 ############################################
+
 
 """\
 nsb_filtflatunw.py
@@ -24,7 +26,7 @@ Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
-  --cutfile=<path>      Cut file for unwrappin [default: None]
+  --cutfile=<path>      Cut file for unwrapping [default: None]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
   --remove_bridges      If Yes remove bridge.in file before running unwrapping
@@ -1185,6 +1187,12 @@ def flat_model(config,kk):
         filtoutrsc = filtout + '.rsc'
         copyrsc(inrsc,outrsc)
         copyrsc(inrsc,filtoutrsc)
+        
+        #Parameters                                                                                                          
+        nregion = int(28)                                                                                                   
+        thresh_amp = 0.1                                                                                                   
+        thresh_cohreg = 0.6                                                                                               
+        thresh_model = 0.
 
         if force:
             rm(outfile); rm(param)
@@ -1196,10 +1204,13 @@ def flat_model(config,kk):
             do = checkoutfile(config,outfile)
             if do:
                 try:
-                    run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
-                    +" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
+                    #run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
+                    #+" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
+                    run(f"flatten_stack.py {infile} {filtfile} {config.model} --nreg={nregion} --thresh_amp={thresh_amp} --thresh_cohreg={thresh_cohreg} --thresh_model={thresh_model}")
                     # move param file into a file name independent of prefix and suffix
-                    force_link(param,newparam)
+                    #force_link(param,newparam)
+                    #logger.info("length.pl "+str(outfile))
+                    r = subprocess.call("length.pl "+str(outfile), shell=True)
                 except Exception as e:
                     logger.critical(e)
                     logger.critical("Flatten model failed for int. {0} Failed!".format(infile))
@@ -1693,11 +1704,15 @@ def add_model_back(config,kk):
                 rm(outfile)
             if config.model != None:
                 if path.exists(param) is True:
+                    with open(param, "r") as f:
+                        coeff = float(f.read())
                     do = checkoutfile(config,outfile)
                     if do:
                         try:
                             run("length.pl "+str(unwfile))
-                            run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
+                            #run("unflatten_stack "+str(unwfile)+" "+str(outfile)+" "+str(config.model)+" "+str(param)+" >> log_flatmodel.txt")
+                            run(f"flatten_stack.py add "+str(unwfile)+" "+str(config.model)+" "+"--coeff="+str(coeff)+" "+"--outfile="+str(outfile))
+
                         except Exception as e:
                             logger.critical(e)
                             logger.critical("Unflatten model failed for int. {0} Failed!".format(unwfile))
