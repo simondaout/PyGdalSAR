@@ -1206,7 +1206,7 @@ def flat_model(config,kk):
                 try:
                     #run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
                     #+" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
-                    run(f"flatten_stack.py {infile} {filtfile} {config.model} --nreg={nregion} --thresh_amp={thresh_amp} --thresh_cohreg={thresh_cohreg} --thresh_model={thresh_model}")
+                    run(f"flatten_stack.py {infile} {filtfile} {config.model} --nreg={nregion} --thresh_amp={thresh_amp} --thresh_cohreg={thresh_cohreg} --thresh_model={thresh_model} --weightmedian=yes")
                     # move param file into a file name independent of prefix and suffix
                     #force_link(param,newparam)
                     #logger.info("length.pl "+str(outfile))

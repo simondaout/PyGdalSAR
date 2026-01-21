@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 ############################################
-# Author        : Hugo Watine (CRPG)
+# Authors        : Hugo Watine, Leo Letellier (CRPG)
 # inspired from NSBAS code flatten_stack 
 ############################################
 
