@@ -10,7 +10,7 @@
 invert_ramp_topo_unw.py
 -------------
 Estimates atmospheric phase/elevation correlations or/and azimuthal and range ramps polynomial coefficients
-on unwrapped interferograms (ROI_PAC/GAMMA/GTIFF). Temporal inversion of all coeffient with a strong weight for
+on unwrapped interferograms (ROI_PAC/GAMMA/GTIFF/FLATSIM). Temporal inversion of all coeffient with a strong weight for
 small temporal baselines and lage cover interferograms. Reconstruction of the empirical phase correction.
 
 usage: invert_ramp_topo_unw.py --int_list=<path> [--ref_zone=<jstart,jend,istart,iend> ] [--int_path=<path>] [--out_path=<path>] \
@@ -59,7 +59,7 @@ if ivar=1 and nfit=1, add quadratic cross function of elev. (z) and azimuth to r
 --mask PATH           Mask in .r4 format. Keep only values > threshold_mask. [default:None]
 --threshold_mask      Thresclean_r4.pyhold on mask: take only values > threshold_mask [default: -1]
 --cohpixel  yes/no    If Yes, use amplitude interferogram to weight and mask pixels (e.g Coherence, Colinearity, Amp Filter) [default: no]
---format VALUE        Format input files: ROI_PAC, GAMMA, GTIFF [default: ROI_PAC]
+--format VALUE        Format input files: ROI_PAC, GAMMA, GTIFF, FLATSIM [default: ROI_PAC]
 --threshold_coh VALUE Threshold on cohpixel file [default:0]
 --ibeg_mask VALUE     Start line number for the mask [default: None]
 --iend_mask VALUE     Stop line number for the mask [default: None]  
@@ -1286,10 +1286,13 @@ def empirical_cor(kk):
         lines, cols = ds.RasterYSize, ds.RasterXSize
 
 
-    elif sformat == 'GTIFF':
-        folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
-        infile = int_path + folder + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.tiff'
-
+    elif sformat == 'GTIFF' or sformat == 'FLATSIM':
+        if sformat == 'GTIFF':
+            infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.geo.unw.tif'
+        if sformat == 'FLATSIM':
+            folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
+            infile = int_path + folder + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.tiff'
+        
         checkinfile(infile)
 
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
@@ -1321,9 +1324,12 @@ def empirical_cor(kk):
                 rms_map[:ds.RasterYSize,:ds.RasterXSize] = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)[:mlines,:mcols]
                 k = np.nonzero(np.logical_or(rms_map==0.0, rms_map==9999))
                 rms_map[k] = float('NaN')
-            elif sformat == 'GTIFF':
-                folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
-                rmsfile=  int_path + folder + 'CNES_Coh_geo_' + str(date1) + '_' + str(date2) + rlook + '.tiff'
+            elif sformat == 'GTIFF' or sformat == 'FLATSIM':
+                if sformat == 'GTIFF':
+                    rmsfile=  int_path + str(date1) + '_' + str(date2) + '.geo.cc.tif'
+                if sformat == 'FLATSIM':
+                    folder =  'int_'+ str(date1) + '_' + str(date2) + '/'
+                    rmsfile=  int_path + folder + 'CNES_Coh_geo_' + str(date1) + '_' + str(date2) + rlook + '.tiff'
                 checkinfile(rmsfile)
                 ds = gdal.Open(rmsfile, gdal.GA_ReadOnly)
                 ds_band1 = ds.GetRasterBand(1)
@@ -1547,7 +1553,7 @@ def empirical_cor(kk):
     plt.colorbar(cax, cax=c)
     fig.tight_layout()
 
-    if sformat == 'ROI_PAC' or sformat == 'GTIFF':
+    if sformat == 'ROI_PAC' or sformat == 'GTIFF' or  sformat == 'FLATSIM':
         fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
     else:
         fig.savefig(out_path + idate +'corrections.png', format='PNG')
@@ -1594,10 +1600,14 @@ def apply_cor(kk, sp, sp_inv):
         rms_map = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
         lines, cols = ds.RasterYSize, ds.RasterXSize
 
-    elif sformat == 'GTIFF':
+    elif sformat == 'GTIFF' or sformat == 'FLATSIM':
+        if sformat == 'GTIFF':
+            infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.geo.unw.tif'
+            outfile = out_path + prefix + str(date1) + '_' + str(date2) + suffix + suffout +  rlook + '.geo.unw.tif'
+        if sformat == 'FLATSIM':
+            infile = int_path + folder + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.tiff'
+            outfile = out_path + folder + prefix + str(date1) + '_' + str(date2) + suffix + suffout +  rlook + '.tiff'
 
-        infile = int_path + prefix + str(date1) + '_' + str(date2) + suffix + rlook + '.geo.unw.tif'
-        outfile = out_path + prefix + str(date1) + '_' + str(date2) + suffix + suffout +  rlook + '.geo.unw.tif' 
         ds = gdal.Open(infile, gdal.GA_ReadOnly)
         ds_band2 = ds.GetRasterBand(1)
         los_map = ds_band2.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
@@ -1605,8 +1615,10 @@ def apply_cor(kk, sp, sp_inv):
         lines, cols = ds.RasterYSize, ds.RasterXSize
 
         if rmsf == 'yes':
-          rmsfile=  int_path + str(date1) + '_' + str(date2) + 'geo.cc.tif'
-          rmsfile=  int_path + str(date1) + '_' + str(date2) + '.geo.cc.tif'
+          if sformat == 'GTIFF':
+            rmsfile=  int_path + str(date1) + '_' + str(date2) + 'geo.cc.tif'
+          if sformat == 'FLATSIM':
+            rmsfile=  int_path + folder + 'CNES_Coh_geo_' + str(date1) + '_' + str(date2) + rlook + '.tiff'
           ds = gdal.Open(rmsfile, gdal.GA_ReadOnly)
           ds_band1 = ds.GetRasterBand(1)
           rms_map = ds_band1.ReadAsArray(0, 0, ds.RasterXSize, ds.RasterYSize)
@@ -1687,7 +1699,7 @@ def apply_cor(kk, sp, sp_inv):
         dst_band2.FlushCache()
         del dst_ds, ds
 
-    elif sformat == 'GTIFF':
+    elif sformat == 'GTIFF' or sformat == 'FLATSIM':
         dst_ds = driver.Create(outfile, cols, lines, 1, gdal.GDT_Float32)
         dst_band2 = dst_ds.GetRasterBand(1)
         dst_band2.WriteArray(flatlos,0,0)
@@ -1749,7 +1761,7 @@ def apply_cor(kk, sp, sp_inv):
     plt.colorbar(cax, cax=c)
     fig.tight_layout()
 
-    if sformat == 'ROI_PAC':
+    if sformat == 'ROI_PAC' or sformat == 'FLATSIM':
         fig.savefig( int_path + folder + idate + '_reconstruc_corrections.png', format='PNG')
     else:
         fig.savefig( out_path + idate + '_reconstruc_corrections.png', format='PNG')
@@ -1784,7 +1796,7 @@ else:
     int_path=arguments["--int_path"] 
 
 if arguments["--out_path"] == None:
-    out_path=np.copy(int_path)
+    out_path=np.copy(int_path).item()
 else:
     out_path=arguments["--out_path"] + '/'
     makedirs(out_path)
@@ -1984,7 +1996,7 @@ for i in range((nmax)):
 # load ref to define mlines, mcols and format
 if ref is not None:
     ds_extension = os.path.splitext(ref)[1]
-    if sformat == 'GTIFF':
+    if sformat == 'GTIFF' or sformat == 'FLATSIM':
         geotiff = arguments["--ref"]
         georef = gdal.Open(ref)
         gt = georef.GetGeoTransform()
@@ -2011,7 +2023,7 @@ if radar is not None:
       fid.close()
 
     else:
-        if sformat == 'GTIFF':
+        if sformat == 'GTIFF' or sformat == 'FLATSIM':
             geotiff = arguments["--geotiff"]
             georef = gdal.Open(radar)
             gt = georef.GetGeoTransform()
