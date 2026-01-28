@@ -14,7 +14,7 @@ nsb_filtflatunw.py
 
 usage:
   nsb_filtflatunw.py [-v] [-f] [--nproc=<nb_cores>] [--prefix=<value>] [--suffix=<value>] [--jobs=<job1/job2/...>] [--list_int=<path>] [--look=<value>] \
-  [--model=<path>] [--cutfile=<path>] [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>] [--remove_bridges=yes/no]  <proc_file> 
+  [--model=<path>] [--cutfile=<path>] [--corfile=<path>]  [--ibeg_mask=<value>] [--iend_mask=<value>] [--jbeg_mask=<value>] [--jend_mask=<value>] [--remove_bridges=yes/no]  <proc_file> 
   nsb_filtflatunw.py -h | --help
 
 options:
@@ -26,7 +26,8 @@ Job list is: check_look ecmwf look_int replace_amp filterSW filterROI flatr flat
   --list_int=<path>     Overwrite liste ifg in proc file            
   --look=<value>        starting look number, default is Rlooks_int
   --model=<path>        Model to be removed from wrapped IFG [default: None]
-  --cutfile=<path>      Cut file for unwrapping [default: None]
+  --cutfile=<path>      Cut file for unwrapping: if cut close to cutmax, coherence is decreased, if cut close to 0, coherence does not change [default: None]
+  --corfile=<path>      Coherence file for weighted average during SWfiltering [default: .cor]
   --ibeg_mask,iend_mask Starting and Ending columns defining mask for empirical estimations [default: 0,0]
   --jbeg_mask,jend_mask Starting and Ending lines defining mask for empirical estimations [default: 0,0]
   --remove_bridges      If Yes remove bridge.in file before running unwrapping
@@ -463,9 +464,10 @@ class FiltFlatUnw:
     suffix, preffix: define name of the interferogram at the start of the processes
     model: model to be removed from wrapped interferograms (default: None)
     cutfile: cut file fro unwrapping, decrease coh threshold for pixel with cut>0
+    corfile: Coherence file for weighted average during SWfiltering
     """
 
-    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None,remove_bridges=None):
+    def __init__(self, params, prefix='', suffix='_sd', look=2, ibeg_mask=0, iend_mask=0, jbeg_mask=0, jend_mask=0, model=None,force=False,cutfile=None,remove_bridges=None,corfile=None):
         (self.ListInterfero, self.SARMasterDir, self.IntDir, self.EraDir,
         self.Rlooks_int, self.Rlooks_unw, 
         self.nfit_range, self.thresh_amp_range,
@@ -487,6 +489,7 @@ class FiltFlatUnw:
         self.model = model
         self.strat = False
         self.cutfile = cutfile
+        self.corfile = corfile
         self.remove_bridges = remove_bridges
 
         # initilise radar file
@@ -674,7 +677,11 @@ def filterSW(config, kk):
         inbase = config.stack.getname(kk) 
         inrsc = inbase + '.int.rsc'
         infile = inbase + '.int'; checkinfile(infile)
-        corfile = config.stack.getcor(kk); checkinfile(corfile)
+        if config.corfile is not None:
+            logger.warning('Carefull: Coherence file is overwritten by input corfile during SW filtering')
+            corfile = config.corfile
+        else:
+            corfile = config.stack.getcor(kk); checkinfile(corfile)
         corbase = path.splitext(corfile)[0]
         filtbase = config.stack.getfiltSW(kk)
         filtrsc = filtbase + '.int.rsc'
@@ -1356,7 +1363,7 @@ def unwrapping(config,kk):
             rm(filtROIfile); rm(filtSWfile); rm(unwfiltROI); rm(unwSWrsc)
             #rm(unwfiltROI); rm(unwSWfile)
 
-        # Filter with colinearity
+        # Filter with colinearity weighted by coherence or cutfile 
         if path.exists(filtROIfile) == False:
             filterROI(config, kk)
             checkinfile(filtROIfile)
@@ -1371,6 +1378,12 @@ def unwrapping(config,kk):
             
             if config.unw_method == 'mpd':
                 logger.info("Unwraped IFG:{0} with MP.DOIN algorthim (Grandin et al., 2012) ".format(unwfile))
+                
+                if config.cutfile==None:
+                    opt=0
+                else:
+                    opt=1
+
                 if path.exists(filtSWfile) == False:
                     filterSW(config, kk)
                     checkinfile(filtSWfile)
@@ -1381,12 +1394,6 @@ def unwrapping(config,kk):
                     wf = open(bridgefile,"w")
                     wf.write("1  1  1  1  0 ")
                     wf.close()
-
-                if config.cutfile==None:
-                    opt=0
-                else:
-                    opt=1
-
                 # my deroul_interf has an additional input parameter for threshold on amplitude infile (normally colinearity)
                 #run("my_deroul_interf_filt "+str(filtSWfile)+" "+str(config.cutfile)+" "+str(infile)+" "+str(filtROIfile)\
                 #    +" "+str(config.seedx)+" "+str(config.seedy)+" "+str(config.threshold_unfilt)+" "+str(config.threshold_unw)+" "+str(opt)+" > log_unw.txt")
@@ -1780,6 +1787,11 @@ if arguments["--cutfile"] == None:
 else:
     cutfile = path.abspath(home)+'/'+arguments["--cutfile"]
 
+if arguments["--corfile"] == None:
+    corfile = None
+else:
+    corfile = path.abspath(home)+'/'+arguments["--corfile"]
+
 if arguments["--ibeg_mask"] == None:
     ibeg_mask = 0
 else:
@@ -1951,7 +1963,7 @@ for p in jobs:
         proc["FilterStrength"], proc["Filt_method"], 
         proc["nfit_topo"], proc["thresh_amp_atmo"], proc["ivar"], proc["z_ref"], proc["max_z"], proc["delta_z"],
         proc["seedx"], proc["seedy"], proc["threshold_unw"], proc["threshold_unfilt"], proc["unw_method"],proc["ref_top"], proc["ref_left"],proc["ref_width"],proc["ref_length"]], 
-        prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, force=force, 
+        prefix=prefix, suffix=suffix, look=look, model=model, cutfile=cutfile, corfile=corfile, force=force, 
         ibeg_mask=ibeg_mask, iend_mask=iend_mask, jbeg_mask=jbeg_mask, jend_mask=jend_mask, remove_bridges = remove_bridges,
         ) 
 
