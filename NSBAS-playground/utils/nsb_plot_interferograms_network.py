@@ -100,12 +100,13 @@ def onpick(event):
     an.set_text(num2date(x).strftime("%Y/%m/%d"))
     an.set_visible(True)
     fig.canvas.draw()
-an = ax.annotate("",
-                 xy=(0, 0), xycoords="data",
-                 xytext=(0, 0), textcoords="data",
-                 arrowprops=dict(facecolor="black", width=1, frac=0.3),
-                 bbox=dict(boxstyle="round", fc="w"))
-an.set_visible(False)
+
+#an = ax.annotate("",
+#                 xy=(0, 0), xycoords="data",
+#                 xytext=(0, 0), textcoords="data",
+#                 arrowprops=dict(facecolor="black", width=1, frac=0.3),
+#                 bbox=dict(boxstyle="round", fc="w"))
+#an.set_visible(False)
 fig.canvas.mpl_connect("pick_event", onpick)
 # Show
 #fig.canvas.set_window_title("Interferogram network")

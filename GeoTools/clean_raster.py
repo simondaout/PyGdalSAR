@@ -221,7 +221,7 @@ elif arguments["--filter"] == 'LP':
 
 if ramp != 'no':
     # clean for ramp
-    maxlos,minlos=np.nanpercentile(m,98),np.nanpercentile(m,2)
+    maxlos,minlos=np.nanpercentile(m,99.5),np.nanpercentile(m,.5)
     print('Clean outliers for ramp estimation outside:', maxlos,minlos)
     kk = np.nonzero(
         np.logical_or(m<minlos,m>maxlos))
@@ -447,7 +447,6 @@ vmax = np.nanpercentile(mf,98)
 vmin = np.nanpercentile(mf,2)
 
 if setzero == 'yes':
-    print('HELLO')
     # replace "NaN" to 0
     mf[np.isnan(mf)] = 0.
     #mf[np.isnan(m)] = np.nan

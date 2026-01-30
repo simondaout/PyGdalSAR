@@ -72,7 +72,7 @@ if arguments["--nproc"] == None:
 else:
   nproc = int(arguments["--nproc"])
 
-
+print(homedir, int_list)
 date_1,date_2=np.loadtxt(int_list,comments="#",unpack=True,usecols=(0,1),dtype='i,i')
 kmax=len(date_1)
 # cleanif 

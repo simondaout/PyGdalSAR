@@ -10,11 +10,11 @@
 ############################################
 
 """\
-geo2r4.py
+r42geo.py
 -------------
 Convert r4 file to geotif.
 
-Usage: geo2r4.py --infile=<path> --ref=<path> [--lectfile=<path>] 
+Usage: r42geo.py --infile=<path> --ref=<path> [--lectfile=<path>] 
 geo2r4.py -h | --help
 
 Options:
