@@ -807,7 +807,7 @@ def flata(config,kk):
         filtfile = config.stack.getfiltSW(kk) + '.int'
 
         # parameter file
-        param = config.stack.getname(kk) + '.flata'
+        param = config.stack.getname(kk) + '.az'
         newparam = config.stack.getflatafile(kk)
 
         if path.exists(filtfile) == False:
@@ -822,8 +822,10 @@ def flata(config,kk):
         outfile = config.stack.getname(kk) + '.int' 
         filtout = config.stack.getfiltSW(kk) + '.int'
         outrsc = outfile + '.rsc'
+        filtoutrsc = filtout + '.rsc'
         print(inrsc,outrsc)
         copyrsc(inrsc,outrsc)
+        copyrsc(inrsc,filtoutrsc)
 
         if force:
             try:
@@ -835,7 +837,7 @@ def flata(config,kk):
         if do:
             try:
                 run("flatten_az "+str(infile)+" "+str(filtfile)+" "+str(outfile)+" "+str(filtout)+\
-                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az)+" > log_flata.txt")
+                " "+str(config.nfit_az)+" "+str(config.thresh_amp_az)+" 0.0  > log_flata.txt")
             except Exception as e:
                 logger.critical(e)
                 logger.critical("Flatten azimuth failed for int. {0}-{1} Failed!".format(date1,date2))
@@ -1198,7 +1200,7 @@ def flat_model(config,kk):
         #Parameters                                                                                                          
         nregion = int(28)                                                                                                   
         thresh_amp = 0.1                                                                                                   
-        thresh_cohreg = 0.6                                                                                               
+        thresh_cohreg = 0.4                                                                                               
         thresh_model = 0.
 
         if force:
@@ -1211,12 +1213,8 @@ def flat_model(config,kk):
             do = checkoutfile(config,outfile)
             if do:
                 try:
-                    #run("flatten_stack "+str(infile)+" "+str(filtfile)+" "+str(config.model)+" "+str(outfile)+" "+str(filtout)\
-                    #+" "+str(config.thresh_amp_atmo)+" > log_flatmodel.txt")
                     run(f"flatten_stack.py {infile} {filtfile} {config.model} --nreg={nregion} --thresh_amp={thresh_amp} --thresh_cohreg={thresh_cohreg} --thresh_model={thresh_model} --weightmedian=yes")
-                    # move param file into a file name independent of prefix and suffix
-                    #force_link(param,newparam)
-                    #logger.info("length.pl "+str(outfile))
+                    #run(f"flatten_stack.py {infile} {filtfile} {config.model} --nreg={nregion} --thresh_amp={thresh_amp} --thresh_cohreg={thresh_cohreg} --thresh_model={thresh_model} --weightmedian=yes --plot=yes")
                     r = subprocess.call("length.pl "+str(outfile), shell=True)
                 except Exception as e:
                     logger.critical(e)
