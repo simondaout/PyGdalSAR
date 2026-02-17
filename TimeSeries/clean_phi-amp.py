@@ -199,12 +199,22 @@ phi_map[dem_map<minelev] = float('NaN')
 amp_map[dem_map<minelev] = float('NaN')
 lin_map[dem_map<minelev] = float('NaN')
 
+# thrshold based on amp
 phi_map[amp_map<threshold_amp] = float('NaN')
 phi_map[amp_map>maxamp] = float('NaN')
 # lin_map[amp_map<threshold_amp] = float('NaN')
 
+# compute sin and cos terms
+sin_map = amp_map*np.sin(phi_map)
+cos_map = amp_map*np.cos(phi_map) 
+
 # convert phi between 0 and 2pi
 phi_map[phi_map<0] = phi_map[phi_map<0] + 2*np.pi
+
+# clean based on hardcoding threshold on phi
+#index = np.logical_or(phi_map<2., phi_map>5.) 
+#phi_map[index] = float('NaN')
+#amp_map[index] = float('NaN')
 
 #save output
 fid1 = open(ampoutf,'wb')
@@ -216,6 +226,12 @@ fid2.close()
 fid3 = open(linoutf,'wb')
 lin_map.flatten().astype('float32').tofile(fid3)
 fid3.close()
+fid4 = open('sinwt_clean.r4','wb')
+sin_map.flatten().astype('float32').tofile(fid4)
+fid4.close()
+fid5 = open('coswt_clean.r4','wb')
+cos_map.flatten().astype('float32').tofile(fid5)
+fid5.close()
 
 # conversion
 amp_map,sigamp_map,sigphi_map = amp_map*abs(rad2mm),sigamp_map*abs(rad2mm),sigphi_map*abs(rad2mm)
