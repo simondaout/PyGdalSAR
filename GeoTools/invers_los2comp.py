@@ -517,10 +517,10 @@ for i in range(ibeg,iend):
         # Inversion
         if len(data)>1:
             try:
-                Cd = np.diag(rms**2, k = 0)
-                pars = np.dot(np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G)),np.dot(np.dot(G.T,np.linalg.inv(Cd)),data))
-                #pars = lst.lstsq(G,data)[0]
-                #pars = np.dot(np.linalg.inv(G),data)
+                W = np.diag(1.0 / rms)
+                pars =  np.linalg.lstsq(W @ G, W @ data, rcond=None)[0]
+                #Cd = np.diag(rms**2, k = 0)
+                #pars = np.dot(np.linalg.inv(np.dot(np.dot(G.T,np.linalg.inv(Cd)),G)),np.dot(np.dot(G.T,np.linalg.inv(Cd)),data))
 
                 if iter > 1:
                     _func = lambda x: np.sum(((np.dot(G,x)-data)/rms)**2)
@@ -541,10 +541,10 @@ for i in range(ibeg,iend):
 
             except:
                 pars = np.zeros((N))
-                print(i,j)
-                print('data:',data)
-                print('G:',G)
-                print()
+                #print(i,j)
+                #print('data:',data)
+                #print('G:',G)
+                #print()
 
 ################################
 # CLEAN RESULTS
