@@ -3031,11 +3031,11 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
   logger.debug('Apply gaussian filter with an abitrary half-window size of 3 for empirical estimations to remove outliers')
   m_filter_vals = np.copy(map_temp)
   m_filter_vals[np.isnan(map_temp)] = 0.
-  m_lp_vals = scipy.ndimage.gaussian_filter(m_filter_vals, 3)
+  m_lp_vals = sp.ndimage.gaussian_filter(m_filter_vals, 3)
   # make same size array full of ones, but set to zero where there is a nan in mf
-  m_filter_ones = 0*np.copy(los_map)+1
-  m_filter_ones[np.isnan(los_map)] = 0.
-  m_lp_ones = scipy.ndimage.gaussian_filter(m_filter_ones, 3)
+  m_filter_ones = 0*np.copy(map_temp)+1
+  m_filter_ones[np.isnan(map_temp)] = 0.
+  m_lp_ones = sp.ndimage.gaussian_filter(m_filter_ones, 3)
   # find the ratio to make coefficients sum to one near nan values
   map_temp = m_lp_vals/m_lp_ones
   map_temp[np.isnan(disp_map)] = float('nan')
