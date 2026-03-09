@@ -3039,7 +3039,7 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
   # find the ratio to make coefficients sum to one near nan values
   map_temp = m_lp_vals/m_lp_ones
   map_temp[np.isnan(disp_map)] = float('nan')
-
+  
   # no estimation on the ref image set to zero 
   if np.nansum(disp_map) != 0:
 
