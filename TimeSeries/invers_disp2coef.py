@@ -1258,7 +1258,7 @@ def consInvert(A, b, sigmad, ineq='yes', cond=1e-6, iter=60, acc=5e-4, equality=
 
     return fsoln, sigmam
 
-def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
+def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
 
       # initialize topo
@@ -1266,64 +1266,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
       ramp = np.zeros((new_lines,new_cols))      
 
       # y: range, x: azimuth
-      if arguments["--topofile"] is None:
-          topobins = topo_clean
-          rgbins, azbins = rg, az
-          data = np.copy(los_clean)
-
-      else:
-          # lets try to digitize to improve the fit
-          # digitize data in bins, compute median and std
-          bins = np.arange(mintopo,maxtopo,abs(maxtopo-mintopo)/500.)
-          inds = np.digitize(topo_clean,bins)
-          topobins = []
-          losbins = []
-          losstd = []
-          azbins, rgbins = [], []
-          los_clean2, topo_clean2, az_clean2, rg_clean2, sigma_clean2 = [], [], [], [], []
-          for j in range(len(bins)-1):
-                  uu = np.flatnonzero(inds == j)
-                  if len(uu)>200:
-                      topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
-
-                      # do a small clean within the bin
-                      indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
-                          los_clean[uu],100-float(arguments["--perc_los"])),los_clean[uu]<np.percentile(los_clean[uu],float(arguments["--perc_los"]))))
-
-                      losstd.append(np.nanstd(los_clean[uu][indice]))
-                      losbins.append(np.nanmedian(los_clean[uu][indice]))
-                      azbins.append(np.nanmedian(az[uu][indice]))
-                      rgbins.append(np.nanmedian(rg[uu][indice]))
-
-                      # remove outliers from data
-                      los_clean2.append(los_clean[uu][indice])
-                      az_clean2.append(az[uu][indice])
-                      rg_clean2.append(rg[uu][indice])
-                      topo_clean2.append(topo_clean[uu][indice])
-                      # new sigma is clean sigma time the standard deviation of the los within the bin
-                      sigma_clean2.append(sigma[uu][indice]*np.nanstd(los_clean[uu][indice]))
-
-          topobins = np.array(topobins)
-          rgbins, azbins = np.array(rgbins),np.array(azbins)
-
-          # data and model cleaned a second time by sliding median
-          los_clean = np.concatenate(los_clean2)
-          az, rg = np.concatenate(az_clean2), np.concatenate(rg_clean2)
-          topo_clean = np.concatenate(topo_clean2)
-          sigma = np.concatenate(sigma_clean2)
-          del los_clean2, topo_clean2, az_clean2, rg_clean2, sigma_clean2 
-          
-          if order == 0 and ivar == 0:
-              data = np.array(losbins)
-              sigma = np.array(losstd)
-
-          else:
-              data = np.array(los_clean)
-
-          if len(data) < 10:
-            logger.critical('Too small area for empirical phase/topo relationship. Re-defined crop values Exit!')
-            sys.exit()
-    
       if order==0:
 
         if arguments["--topofile"] is None:
@@ -1337,7 +1279,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             if (ivar==0 and nfit==0):
                 G=np.zeros((len(data),2))
                 G[:,0] = 1
-                G[:,1] = topobins
+                G[:,1] = topo_clean
 
                 # ramp inversion
                 pars = linear_inv(G, data, sigma)
@@ -1349,7 +1291,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1364,8 +1306,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             elif (ivar==0 and nfit==1):
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topobins
-                G[:,2] = topobins**2
+                G[:,1] = topo_clean
+                G[:,2] = topo_clean**2
 
                 # ramp inversion
                 pars = linear_inv(G, data, sigma)
@@ -1377,7 +1319,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 funcbins = a
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,b*x+c*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1402,10 +1344,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a + c*topo_clean*az
-                funcbins = a + c*topobins*azbins
+                funcbins = a + c*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,b*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1434,10 +1376,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a + b*topo_clean*az
-                funcbins = a + b*topobins*azbins
+                funcbins = a + b*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1489,10 +1431,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg + b
-                funcbins = a*rgbins + b
+                funcbins = a*rg + b
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1521,10 +1463,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b
-                funcbins = a*rgbins+ b
+                funcbins = a*rg+ b
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x+d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1554,10 +1496,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b + d*topo_clean*az
-                funcbins = a*rgbins+ b + d*topobins*azbins
+                funcbins = a*rg+ b + d*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1590,10 +1532,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b + c*topo_clean*az
-                funcbins = a*rgbins+ b + c*topobins*azbins
+                funcbins = a*rg+ b + c*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1647,10 +1589,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az + b
-                funcbins = a*azbins + b
+                funcbins = a*az + b
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1680,10 +1622,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az + b
-                funcbins = a*azbins + b
+                funcbins = a*az + b
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x + d*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1713,10 +1655,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az + b + d*topo_clean*az
-                funcbins = a*azbins + b + d*topobins*azbins
+                funcbins = a*az + b + d*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,c*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1749,10 +1691,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az + b + c*topo_clean*az
-                funcbins = a*azbins + b + c*topobins*azbins
+                funcbins = a*az + b + c*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1807,10 +1749,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c
-                funcbins = a*rgbins+ b*azbins + c
+                funcbins = a*rg+ b*az + c
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1842,10 +1784,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c
-                funcbins = a*rgbins+ b*azbins + c
+                funcbins = a*rg+ b*az + c
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,d*x+e*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1877,10 +1819,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c + e*topo_clean*az
-                funcbins = a*rgbins+ b*azbins + c + e*topobins*azbins
+                funcbins = a*rg+ b*az + c + e*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,d*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -1915,10 +1857,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c + d*topo_clean*az
-                funcbins = a*rgbins+ b*azbins + c + d*topobins*azbins
+                funcbins = a*rg+ b*az + c + d*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.1, alpha=0.01, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -1978,10 +1920,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d
-                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
+                funcbins = a*rg+ b*az + c*az*rg+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2016,10 +1958,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d
-                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d
+                funcbins = a*rg+ b*az + c*az*rg+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2054,10 +1996,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d + f*topo_clean*az
-                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + f*topobins*azbins
+                funcbins = a*rg+ b*az + c*az*rg+ d + f*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2095,10 +2037,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*az*rg+ d + e*topo_clean*az
-                funcbins = a*rgbins+ b*azbins + c*azbins*rgbins+ d + e*topobins*azbins
+                funcbins = a*rg+ b*az + c*az*rg+ d + e*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2162,10 +2104,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d
-                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
+                funcbins = a*rg**2 + b*rg+ c*az + d
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2199,10 +2141,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d
-                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d
+                funcbins = a*rg**2 + b*rg+ c*az + d
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
 
@@ -2239,10 +2181,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d + f*topo_clean*az
-                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + f*topobins*azbins
+                funcbins = a*rg**2 + b*rg+ c*az + d + f*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2280,10 +2222,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg**2 + b*rg+ c*az + d + e*topo_clean*az
-                funcbins = a*rgbins**2 + b*rgbins+ c*azbins + d + e*topobins*azbins
+                funcbins = a*rg**2 + b*rg+ c*az + d + e*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2347,10 +2289,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d
-                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
+                funcbins = a*az**2 + b*az + c*rg+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2384,10 +2326,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d
-                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d
+                funcbins = a*az**2 + b*az + c*rg+ d
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x+f*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2421,10 +2363,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d + f*topo_clean*az
-                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + f*topobins*azbins
+                funcbins = a*az**2 + b*az + c*rg+ d + f*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2462,10 +2404,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg+ d + e*topo_clean*az + h*(topo_clean*az)**2
-                funcbins = a*azbins**2 + b*azbins + c*rgbins+ d + e*topobins*azbins + h*(topobins*azbins)**2
+                funcbins = a*az**2 + b*az + c*rg+ d + e*topo_clean*az + h*(topo_clean*az)**2
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2532,10 +2474,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*az+ e
-                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
+                funcbins = a*az**2 + b*az + c*rg**2 + d*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2572,10 +2514,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e
-                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e
+                funcbins = a*az**2 + b*az + c*rg**2 + d*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2611,10 +2553,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + g*topo_clean*az
-                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + g*topobins*azbins
+                funcbins = a*az**2 + b*az + c*rg**2 + d*rg+ e + g*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2653,10 +2595,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**2 + b*az + c*rg**2 + d*rg+ e + f*topo_clean*az
-                funcbins = a*azbins**2 + b*azbins + c*rgbins**2 + d*rgbins+ e + f*topobins*azbins
+                funcbins = a*az**2 + b*az + c*rg**2 + d*rg+ e + f*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2724,10 +2666,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
-                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
+                funcbins = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2765,10 +2707,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
-                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f
+                funcbins = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2807,10 +2749,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + h*topo_clean*az
-                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + h*topobins*azbins
+                funcbins = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f + h*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,g*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2852,10 +2794,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg + f + g*topo_clean*az + k*(topo_clean*az)**2
-                funcbins = a*azbins**3 + b*azbins**2 + c*azbins + d*rgbins**2 + e*rgbins+ f + g*topobins*azbins + k*(topobins*azbins)**2
+                funcbins = a*az**3 + b*az**2 + c*az + d*rg**2 + e*rg+ f + g*topo_clean*az + k*(topo_clean*az)**2
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,h*x+i*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -2922,11 +2864,11 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
                 # plot phase/elev_map
-                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
+                funcbins = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e
                 funct = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,e*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -2962,10 +2904,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e
-                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e
+                funcbins = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x+g*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -3002,10 +2944,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + g*topo_clean*az
-                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + g*topobins*azbins
+                funcbins = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e + g*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,f*x,'-r', lw =4.)
 
                 # build total G matrix
@@ -3044,10 +2986,10 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # plot phase/elev_map
                 funct = a*rg+ b*az + c*(rg*az)**2 + d*rg*az+ e + f*topo_clean*az
-                funcbins = a*rgbins+ b*azbins + c*(azbins*rgbins)**2 + d*azbins*rgbins+ e + f*topobins*azbins
+                funcbins = a*rg+ b*az + c*(az*rg)**2 + d*az*rg+ e + f*topo_clean*az
                 x = np.linspace(mintopo, maxtopo, 100)
                 #ax_dphi.scatter(topo_clean,los_clean-funct, s=0.01, alpha=0.3, rasterized=True)
-                #ax_dphi.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+                #ax_dphi.plot(topo_clean,losbins - funcbins,'-r', lw =1., label='sliding median')
                 #ax_dphi.plot(x,g*x+h*x**2,'-r', lw =4.)
 
                 # build total G matrix
@@ -3085,6 +3027,18 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
   
   # in iteration 2, empirical estimation is computed on residuals between data and temporal model
   map_temp = disp_map - model_map
+  
+  logger.debug('Apply gaussian filter with an abitrary half-window size of 3 for empirical estimations to remove outliers')
+  m_filter_vals = np.copy(map_temp)
+  m_filter_vals[np.isnan(map_temp)] = 0.
+  m_lp_vals = scipy.ndimage.gaussian_filter(m_filter_vals, 3)
+  # make same size array full of ones, but set to zero where there is a nan in mf
+  m_filter_ones = 0*np.copy(los_map)+1
+  m_filter_ones[np.isnan(los_map)] = 0.
+  m_lp_ones = scipy.ndimage.gaussian_filter(m_filter_ones, 3)
+  # find the ratio to make coefficients sum to one near nan values
+  map_temp = m_lp_vals/m_lp_ones
+  map_temp[np.isnan(disp_map)] = float('nan')
 
   # no estimation on the ref image set to zero 
   if np.nansum(disp_map) != 0:
