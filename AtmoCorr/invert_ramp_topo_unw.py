@@ -111,7 +111,6 @@ from numpy.lib.stride_tricks import as_strided
 import scipy
 import scipy.optimize as opt
 import scipy.linalg as lst
-import scipy.ndimage
 
 try:
     from nsbas import docopt
@@ -187,7 +186,7 @@ def poolcontext(*arg, **kargs):
 # FUNCTIONS
 #####################################################################################
 
-def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref,az_ref,topo_ref):
+def estim_ramp(los,data,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref,az_ref,topo_ref):
     """
     Empircal estmation function on flatten los vector
     """
@@ -198,65 +197,6 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
     # initialize correction
     corr = np.zeros((mlines,mcols))
  
-    if radar is None:
-        data = los_clean
-        losbins = los_clean
-        topobins = topo_clean
-        rgbins, azbins = rg, az
-        losstd = rms
-
-    else:
-        # lets try to digitize to improve the fit
-        # digitize data in bins, compute median and std
-        bins = np.arange(minelev,maxelev,abs(maxelev-minelev)/500.)
-        inds = np.digitize(topo_clean,bins)
-        topobins = []
-        losbins = []
-        losstd = []
-        azbins, rgbins = [], []
-        los_clean2, topo_clean2, az_clean2, rg_clean2, rms_clean2 = [], [], [], [], []
-        for j in range(len(bins)-1):
-                uu = np.flatnonzero(inds == j)
-                if len(uu)>200:
-                    topobins.append(bins[j] + (bins[j+1] - bins[j])/2.)
-
-                    # do a clean within the bin
-                    indice = np.flatnonzero(np.logical_and(los_clean[uu]>np.percentile(\
-                        los_clean[uu],100-perc),los_clean[uu]<np.percentile(los_clean[uu],perc)))
-
-                    losstd.append(np.nanstd(los_clean[uu][indice]))
-                    losbins.append(np.nanmedian(los_clean[uu][indice]))
-                    azbins.append(np.nanmedian(az[uu][indice]))
-                    rgbins.append(np.nanmedian(rg[uu][indice]))
-
-                    # remove outliers from data
-                    los_clean2.append(los_clean[uu][indice])
-                    az_clean2.append(az[uu][indice])
-                    rg_clean2.append(rg[uu][indice])
-                    topo_clean2.append(topo_clean[uu][indice])
-                    # new rms is clean rms time the standard deviation of the los within the bin
-                    rms_clean2.append(rms[uu][indice]*np.nanstd(los_clean[uu][indice]))
-
-        # digitize data and model
-        losbins = np.array(losbins)
-        losstd = np.array(losstd)
-        topobins = np.array(topobins)
-        rgbins, azbins = np.array(rgbins),np.array(azbins)
-        
-        # data and model cleaned a second time by sliding median
-        los_clean = np.concatenate(los_clean2)
-        az, rg = np.concatenate(az_clean2), np.concatenate(rg_clean2)
-        topo_clean = np.concatenate(topo_clean2)
-        rms = np.concatenate(rms_clean2)
-        del los_clean2, az_clean2, rg_clean2, topo_clean2
-
-        if order == 0 and ivar == 0:
-            data = losbins
-            rms = losstd
-
-        else:
-            data = los_clean
-
     if order==0:  
     #0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
 
@@ -273,7 +213,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
             if ivar==0 and nfit==0:
                 G=np.zeros((len(data),2))
                 G[:,0] = 1
-                G[:,1] = topobins
+                G[:,1] = topo_clean
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -295,8 +235,8 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
             elif ivar==0 and nfit==1:
                 G=np.zeros((len(data),3))
                 G[:,0] = 1
-                G[:,1] = topobins
-                G[:,2] = topobins**2
+                G[:,1] = topo_clean
+                G[:,2] = topo_clean**2
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
@@ -1257,7 +1197,7 @@ def estim_ramp(los,los_clean,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref
     # plt.imshow(corr)
     # plt.show()
 
-    return sol, corr, var, rgbins, azbins, topobins, losbins, losstd
+    return sol, corr, var, rg, az, topo_clean, data, rms
 
 def empirical_cor(kk):
     """
@@ -1342,10 +1282,32 @@ def empirical_cor(kk):
 
     # time.sleep(1.)
     # clean for estimation
-    _los_map = np.copy(los_map)
-    _los_map[los_map==0] = float('NaN')
+    logger.debug('Apply gaussian filter with an abitrary half-window size of 3 for estimation')
+    m_filter_vals = np.copy(los_map)
+    m_filter_vals[np.isnan(los_map)] = 0.
+    m_lp_vals = scipy.ndimage.gaussian_filter(m_filter_vals, 3) 
+    # make same size array full of ones, but set to zero where there is a nan in mf
+    m_filter_ones = 0*np.copy(los_map)+1
+    m_filter_ones[np.isnan(los_map)] = 0.
+    m_lp_ones = scipy.ndimage.gaussian_filter(m_filter_ones, 3)
+    # find the ratio to make coefficients sum to one near nan values
+    _los_map = m_lp_vals/m_lp_ones
+    
+    _los_map[np.logical_or(los_map == 0, _los_map == 0)] = float('NaN')
+    _los_map[np.isnan(los_map)] = float('NaN')
     maxlos,minlos = np.nanpercentile(_los_map,perc),np.nanpercentile(_los_map,(100-perc))
 
+    ## plot check
+    #fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    ## Affichage de los_map
+    #axes[0].imshow(los_map, cmap=cmap, vmin=minlos, vmax=maxlos)
+    #axes[0].set_title('Data')
+    ## Affichage de _los_map
+    #axes[1].imshow(_los_map, cmap=cmap, vmin=minlos, vmax=maxlos)
+    #axes[1].set_title('Data (après filtrage gaussien)')
+    #plt.tight_layout()
+    #plt.show()   
+ 
     ## CRITICAL STEP ####
     # select points for estimation only: minmax elev, los not NaN, rms<rmsthreshold ....
     index = np.nonzero(
@@ -1365,7 +1327,6 @@ def empirical_cor(kk):
     np.logical_or(pix_az<ibeg_mask,pix_az>iend_mask)
     )))))))))))))
     )
-
  
     indexref = np.nonzero(
     np.logical_and(elev_map<maxelev,
@@ -1399,7 +1360,6 @@ def empirical_cor(kk):
     logger.info('Estimation of a constant within lines {0}-{1} and cols {2}-{3}'.format(lin_start,lin_end,col_start,col_end))
     logger.info('Average phase within ref area: {0}:'.format(cst))
     rg_ref, az_ref, topo_ref = np.nanmean(pix_rg[indexref]),np.nanmean(pix_az[indexref]),np.nanmean(elev_temp[indexref])
-
 
     # logger.info('Average rg: {0}, az:{1}, topo:{2}, within ref area'.format(np.int(rg_ref), np.int(az_ref), np.int(topo_ref)))
     # sys.exit()
@@ -1437,15 +1397,15 @@ def empirical_cor(kk):
       ivar_temp=ivar
 
     #try:
-    sol, corr, var, rgbins, azbins, topobins, losbins, losstd = estim_ramp(los_map.flatten(),
+    sol, corr, var, rg, az, topo_clean, data, rms = estim_ramp(los_map.flatten(),
         los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
         temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
     #except:
     #    sol = np.zeros((13))
     #    corr = np.zeros((mlines,mcols))
     #    var = 1
-    #    rgbins, azbins = az[::samp],rg[::samp]
-    #    topobins,losbins,losstd = elev_clean[::samp],los_clean[::samp],rms_clean[::samp]
+    #    rg, az = az[::samp],rg[::samp]
+    #    topo_clean,data,rms = elev_clean[::samp],los_clean[::samp],rms_clean[::samp]
 
     logger.info('RMS: {0} '.format(var))
 
@@ -1457,18 +1417,18 @@ def empirical_cor(kk):
     if radar is not None: 
        # plot phase/elevation
 
-       funcbins = sol[0]*rgbins**3 + sol[1]*rgbins**2 + sol[2]*rgbins + sol[3]*azbins**3 + sol[4]*azbins**2 \
-       + sol[5]*azbins + sol[6]*(rgbins*azbins)**2 + sol[7]*rgbins*azbins + sol[11]*azbins*topobins + \
-       sol[12]*((azbins*topobins)**2)
+       funcbins = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
+       + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*topo_clean + \
+       sol[12]*((az*topo_clean)**2)
 
        fig2 = plt.figure(2,figsize=(9,4))
        ax = fig2.add_subplot(1,1,1)
        z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
        # the sliding rms is only taken into account when flat =0 
        if ivar_temp == 0 and temp_flat == 0:
-           ax.fill_between(topobins,losbins-losstd-funcbins,losbins+losstd-funcbins,color='red',alpha=0.1,label='sliding RMS')
+           ax.fill_between(topo_clean,data-rms-funcbins,data+rms-funcbins,color='red',alpha=0.1,label='sliding RMS')
        ax.scatter(elev_clean[::samp],los_clean[::samp] - func[::samp], s=0.005, alpha=0.05,rasterized=True)
-       ax.plot(topobins,losbins - funcbins,'-r', lw =1., label='sliding median')
+       ax.plot(topo_clean,data - funcbins,'-r', lw =1., label='sliding median')
        if nfit==0:
             ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
        else:
@@ -2048,7 +2008,7 @@ if radar is not None:
         logger.info('Max-Min topography for empirical estimation: {0:.1f}-{1:.1f}'.format(maxelev,minelev))
 
     # compute slope
-    toposmooth = scipy.ndimage.filters.gaussian_filter(elev_map,3.)
+    toposmooth = scipy.ndimage.gaussian_filter(elev_map,3.)
     Py, Px = np.gradient(toposmooth)
     slope_map = np.sqrt(Px**2+Py**2)
     minslope = np.nanpercentile(slope_map,100-perc_slope)
