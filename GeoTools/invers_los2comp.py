@@ -358,9 +358,9 @@ else:
     comp = np.array(comp) - 1 
     for n in range(len(comp)):
         if int(comp[n]) == 0:
-            name = 'East + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
+            name = 'East + {} deg (clockwise)'.format(np.rad2deg(rot))
         elif int(comp[n]) == 1:
-            name = 'North + {} deg (anti-clockwise)'.format(np.rad2deg(rot))
+            name = 'North + {} deg (clockwise)'.format(np.rad2deg(rot))
         elif int(comp[n]) == 2:
             name = 'Up '
         else:
