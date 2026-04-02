@@ -500,6 +500,8 @@ if arguments["--topofile"] ==  None:
    arguments["--topofile"] = None
 if arguments["--cond"] ==  None:
     arguments["--cond"] = 1e-5
+else:
+    arguments["--cond"] = float(arguments["--cond"])
 if arguments["--rmspixel"] ==  None:
     arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
@@ -1169,14 +1171,14 @@ else:
 in_sigma = in_rms * in_aps  
 logger.info('Input uncertainties: {}'.format(in_sigma))
 
-def linear_inv(A, b, sigmad):
+def linear_inv(A, b, sigmad, cond):
     W = 1.0 / sigmad
     A_w = W[:, np.newaxis] * A
     b_w = W * b
     fsoln = np.linalg.lstsq(A_w, b_w, rcond=cond)[0]  
     return fsoln
 
-def consInvert(A, b, sigmad, ineq='yes', cond=cond, iter=60, acc=5e-4, equality=False):
+def consInvert(A, b, sigmad, ineq='yes', cond=1e-05, iter=60, acc=5e-4, equality=False):
     """
     Résout Ax ≈ b sous contraintes d'inégalité (et éventuellement d’égalité).
 
@@ -1184,7 +1186,9 @@ def consInvert(A, b, sigmad, ineq='yes', cond=cond, iter=60, acc=5e-4, equality=
         fsoln : vecteur de solution
         sigmam : incertitudes (diag de la covariance)
     """
+
     global indexpo, indexco, indexpofull, pos, indexseas, indexseast
+    
     if A.shape[0] != len(b):
         raise ValueError('Dimensions incompatibles pour A et b')
 
@@ -1258,7 +1262,7 @@ def consInvert(A, b, sigmad, ineq='yes', cond=cond, iter=60, acc=5e-4, equality=
 
     return fsoln, sigmam
 
-def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
+def estim_ramp(los, data, topo_clean, az, rg, order, sigma, nfit, ivar, l, cond):
       'Ramp/Topo estimation and correction. Estimation is performed on sliding median'
 
       # initialize topo
@@ -1282,7 +1286,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,1] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]
                 logger.info('Remove ref frame %f + %f z for date: %i'%(a,b,idates[l]))
 
@@ -1310,7 +1314,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,2] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c=pars[2]
                 print ('Remove ref frame %f + %f z + %f z**2 for date: %i'%(a,b,c,idates[l]))
 
@@ -1338,7 +1342,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,2] = az*topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ref frame %f + %f z + %f az*z for date: %i'%(a,b,c,idates[l]))
 
@@ -1370,7 +1374,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,3] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ref frame %f + %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1403,7 +1407,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
             # ramp inversion
             x0 = lst.lstsq(G,data)[0]
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]
             print ('Remove ramp %f r + %f for date: %i'%(a,b,idates[l]))
 
@@ -1425,7 +1429,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f r + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
@@ -1457,7 +1461,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,3] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d=pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1490,7 +1494,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,3] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1526,7 +1530,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,4] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1561,7 +1565,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,1] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]
             print ('Remove ramp %f az + %f for date: %i'%(a,b,idates[l]))
 
@@ -1583,7 +1587,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,2] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]
                 print ('Remove ramp %f az + %f + %f z for date: %i'%(a,b,c,idates[l]))
 
@@ -1616,7 +1620,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,3] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1649,7 +1653,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,3] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1685,7 +1689,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,4] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az + %f + %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1720,7 +1724,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,2] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]
             print ('Remove ramp %f r  + %f az + %f for date: %i'%(a,b,c,idates[l]))
 
@@ -1743,7 +1747,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,3] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
                 print ('Remove ramp %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1778,7 +1782,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:-1,4] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1813,7 +1817,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,4] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]
                 print ('Remove ramp %f r  + %f az + %f + %f z +  %f z*az for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -1851,7 +1855,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e=pars[4]; f=pars[5]
                 print ('Remove ramp %f r  + %f az + %f +  %f z*az + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -1888,7 +1892,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,3] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print ('Remove ramp %f r %f az  + %f r*az + %f for date: %i'%(a,b,c,d,idates[l]))
 
@@ -1913,7 +1917,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,4] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
@@ -1951,7 +1955,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
@@ -1989,7 +1993,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,idates[l]))
@@ -2030,7 +2034,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,6] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
                 print ('Remove ramp %f r, %f az  + %f r*az + %f + + %f az*z +  %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
@@ -2070,7 +2074,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,3] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print ('Remove ramp %f r**2 + %f r  + %f az + %f for date: %i'%(a,b,c,d,idates[l]))
 
@@ -2098,7 +2102,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,4] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2135,7 +2139,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2175,7 +2179,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2216,7 +2220,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,6] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond )
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f r**2 + %f r  + %f az + %f + + %f z*az + %f z +%f z**2 for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2257,7 +2261,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,3] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]
             print ('Remove ramp %f az**2 + %f az  + %f r + %f for date: %i'%(a,b,c,d,idates[l]))
 
@@ -2283,7 +2287,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,4] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2320,7 +2324,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2357,7 +2361,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2398,7 +2402,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,7] = (topo_clean*az)**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h = pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r + %f + %f z*az + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2440,7 +2444,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,4] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2468,7 +2472,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2508,7 +2512,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
 
                 # ramp inversion
                 x0 = lst.lstsq(G,data)[0]
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2547,7 +2551,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,6] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2589,7 +2593,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,7] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g=pars[6]; h=pars[7]
                 print ('Remove ramp %f az**2 + %f az  + %f r**2 + %f r + %f +  %f az*z + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2630,7 +2634,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,5] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
             print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f for date: %i'%(a,b,c,d,e,f,idates[l]))
 
@@ -2660,7 +2664,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,6] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
 
@@ -2701,7 +2705,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,7] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h = pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z**2 for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2743,7 +2747,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,7] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f + %f z + %f z*az for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
 
@@ -2788,7 +2792,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,9] = (topo_clean*az)**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]; h=pars[7]; i=pars[8]; k=pars[9]
                 print ('Remove ramp %f az**3 + %f az**2  + %f az + %f r**2 + %f r + %f z*az + %f + %f z + %f z**2 + %f (z*az)**2 for date: %i'%(a,b,c,d,e,f,g,h,i,k,idates[l]))
 
@@ -2831,7 +2835,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
             G[:,4] = 1
 
             # ramp inversion
-            pars = linear_inv(G, data, sigma)
+            pars = linear_inv(G, data, sigma, cond)
             a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]
             print ('Remove ramp %f r + %f az  + %f r*az**2 + %f r*az + %f for date: %i'%(a,b,c,d,e,idates[l]))
 
@@ -2858,7 +2862,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,5] = topo_clean
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z for date: %i'%(a,b,c,d,e,f,idates[l]))
@@ -2897,7 +2901,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,6] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5]; g = pars[6]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,idates[l]))
@@ -2937,7 +2941,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,6] = topo_clean*az
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f z + %f az*z for date: %i'%(a,b,c,d,e,f,g,idates[l]))
@@ -2979,7 +2983,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,sigma,nfit,ivar,l):
                 G[:,7] = topo_clean**2
 
                 # ramp inversion
-                pars = linear_inv(G, data, sigma)
+                pars = linear_inv(G, data, sigma, cond)
                 a = pars[0]; b = pars[1]; c = pars[2]; d = pars[3]; e = pars[4]; f = pars[5] ; g = pars[6]; h=pars[7]
 
                 print ('Remove ramp %f r + %f az  + %f (r*az)**2 + %f r*az + %f + %f az*z + %f z + %f z**2  for date: %i'%(a,b,c,d,e,f,g,h,idates[l]))
@@ -3111,8 +3115,8 @@ def empirical_cor(t, disp_map, model_map, elev_map, aspect_map, rms_map, ibeg_em
     los = as_strided(disp_map).flatten()
     samp = int(emp_sampling)
 
-    map_ramp, map_flata, map_topo, rmsi = estim_ramp(los,los_clean[::samp],topo_clean[::samp],x[::samp],\
-      y[::samp],temp_flat,rms_clean[::samp],nfit_temp, ivar_temp, l )
+    map_ramp, map_flata, map_topo, rmsi = estim_ramp(los, los_clean[::samp], topo_clean[::samp], x[::samp],\
+      y[::samp], temp_flat, rms_clean[::samp], nfit_temp, ivar_temp, l, arguments["--cond"])
 
     if (lin_start is not None) and (lin_end is not None):
         indexref = np.nonzero(np.logical_and(elev_map<maxtopo,
@@ -3271,7 +3275,7 @@ def temporal_decomp(disp, sigma, cond, ineq, equality):
             G[:,Mbasis+l]=kernels[l].g(k)
        
         # inversion
-        m,sigmam = consInvert(G,taby,sigma[k],cond=cond,ineq=ineq,equality=equality)
+        m,sigmam = consInvert(G, taby, sigma[k], cond=cond, ineq=ineq, equality=equality)
 
         # forward model in original order
         mdisp[k] = np.dot(G,m)
