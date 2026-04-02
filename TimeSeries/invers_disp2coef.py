@@ -499,7 +499,7 @@ if arguments["--scale_mask"] ==  None:
 if arguments["--topofile"] ==  None:
    arguments["--topofile"] = None
 if arguments["--cond"] ==  None:
-    arguments["--cond"] = 1e-6
+    arguments["--cond"] = 1e-5
 if arguments["--rmspixel"] ==  None:
     arguments["--rmspixel"] = None
 if arguments["--ineq"] ==  None:
@@ -1173,10 +1173,10 @@ def linear_inv(A, b, sigmad):
     W = 1.0 / sigmad
     A_w = W[:, np.newaxis] * A
     b_w = W * b
-    fsoln = np.linalg.lstsq(A_w, b_w, rcond=1e-5)[0]  
+    fsoln = np.linalg.lstsq(A_w, b_w, rcond=cond)[0]  
     return fsoln
 
-def consInvert(A, b, sigmad, ineq='yes', cond=1e-6, iter=60, acc=5e-4, equality=False):
+def consInvert(A, b, sigmad, ineq='yes', cond=cond, iter=60, acc=5e-4, equality=False):
     """
     Résout Ax ≈ b sous contraintes d'inégalité (et éventuellement d’égalité).
 
