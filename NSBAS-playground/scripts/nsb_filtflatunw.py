@@ -1261,7 +1261,7 @@ def colin(config,kk):
                 #run("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
                 #" 3 0.0001 2 > log_colin.txt")
                 run("colin "+str(infile)+" temp "+str(outfile)+" "+str(width)+" "+str(length)+\
-                " 3 0.1 0 > log_colin.txt")
+                " 3 0.1 1 > log_colin.txt")
                 rm('temp')
             except Exception as e:
                 logger.critical(e)

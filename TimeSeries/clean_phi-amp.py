@@ -196,7 +196,7 @@ lin_map[sigphi_map>np.nanpercentile(sigphi_map,perc_sig)] = float('NaN')
 
 # clean based on elev
 phi_map[dem_map<minelev] = float('NaN')
-amp_map[dem_map<minelev] = float('NaN')
+amp_map[dem_map<minelev] = 0.0
 lin_map[dem_map<minelev] = float('NaN')
 
 # thrshold based on amp
