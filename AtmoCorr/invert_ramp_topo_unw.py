@@ -1197,7 +1197,7 @@ def estim_ramp(los,data,topo_clean,az,rg,order,rms,nfit,ivar,los_ref,rg_ref,az_r
     # plt.imshow(corr)
     # plt.show()
 
-    return sol, corr, var, rg, az, topo_clean, data, rms
+    return sol, corr, var, rms
 
 def empirical_cor(kk):
     """
@@ -1397,7 +1397,7 @@ def empirical_cor(kk):
       ivar_temp=ivar
 
     #try:
-    sol, corr, var, rg, az, topo_clean, data, rms = estim_ramp(los_map.flatten(),
+    sol, corr, var, rms = estim_ramp(los_map.flatten(),
         los_clean[::samp],elev_clean[::samp],az[::samp],rg[::samp],
         temp_flat,rms_clean[::samp],nfit_temp,ivar_temp,cst, rg_ref, az_ref, topo_ref)
     #except:
@@ -1409,26 +1409,24 @@ def empirical_cor(kk):
 
     logger.info('RMS: {0} '.format(var))
 
-    # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
-    func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
-    + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
-    sol[12]*((az*elev_clean)**2)
 
     if radar is not None: 
        # plot phase/elevation
 
-       funcbins = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
-       + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*topo_clean + \
-       sol[12]*((az*topo_clean)**2)
-
        fig2 = plt.figure(2,figsize=(9,4))
        ax = fig2.add_subplot(1,1,1)
+       
        z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
-       # the sliding rms is only taken into account when flat =0 
-       if ivar_temp == 0 and temp_flat == 0:
-           ax.fill_between(topo_clean,data-rms-funcbins,data+rms-funcbins,color='red',alpha=0.1,label='sliding RMS')
-       ax.scatter(elev_clean[::samp],los_clean[::samp] - func[::samp], s=0.005, alpha=0.05,rasterized=True)
-       ax.plot(topo_clean,data - funcbins,'-r', lw =1., label='sliding median')
+       # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
+       func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
+       + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
+       sol[12]*((az*elev_clean)**2)
+       
+       ## the sliding rms is only taken into account when flat =0 
+       ##if ivar_temp == 0 and temp_flat == 0:
+       ##    ax.fill_between(elev_clean, los_map.flatten() -rms -func, los_map.flatten() + rms-func, color='red',alpha=0.1,label='sliding RMS')
+       ax.scatter(elev_clean[::5], los_clean[::5] - func[::5], s=0.05, alpha=0.1, rasterized=True)
+       ##ax.plot(elev_map.flatten(), los_map.flatten() - func, '-r', lw =1., label='sliding median')
        if nfit==0:
             ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
        else:
@@ -1438,9 +1436,9 @@ def empirical_cor(kk):
        ax.set_ylabel('LOS (rad)')
        plt.legend(loc='best')
        if sformat == 'ROI_PAC':
-          fig2.savefig( int_path + folder + idate+'phase-topo.png', format='PNG')
+          fig2.savefig( int_path + folder + idate+'_phase-topo.png', format='PNG')
        else:
-          fig2.savefig(out_path + idate+'phase-topo.png', format='PNG')
+          fig2.savefig(out_path + idate+'_phase-topo.png', format='PNG')
 
     _los_map = np.copy(los_map)
     _los_map[los_map==0] = float('NaN')
@@ -1508,9 +1506,9 @@ def empirical_cor(kk):
     fig.tight_layout()
 
     if sformat == 'ROI_PAC' or sformat == 'GTIFF':
-        fig.savefig(int_path + folder + idate +'corrections.png', format='PNG')
+        fig.savefig(int_path + folder + idate +'_corrections.png', format='PNG')
     else:
-        fig.savefig(out_path + idate +'corrections.png', format='PNG')
+        fig.savefig(out_path + idate +'_corrections.png', format='PNG')
 
     if plot=='yes':
         plt.show()
@@ -1863,7 +1861,7 @@ if arguments["--perc"] ==  None:
 else:
     perc = float(arguments["--perc"])
 if arguments["--perc_slope"] ==  None:
-    perc_slope = 92.
+    perc_slope = 98.
 else:
     perc_slope = float(arguments["--perc_slope"])
 
@@ -1890,7 +1888,7 @@ else:
     suffout = arguments["--suffix_output"]
 
 if arguments["--samp"] == None:
-    samp = 2
+    samp = 1
 else:
     samp = int(arguments["--samp"])
 
