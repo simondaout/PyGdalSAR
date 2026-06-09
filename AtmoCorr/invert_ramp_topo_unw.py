@@ -1410,35 +1410,35 @@ def empirical_cor(kk):
     logger.info('RMS: {0} '.format(var))
 
 
-    if radar is not None: 
-       # plot phase/elevation
+    #if radar is not None: 
+    #   # plot phase/elevation
 
-       fig2 = plt.figure(2,figsize=(9,4))
-       ax = fig2.add_subplot(1,1,1)
+    #   fig2 = plt.figure(2,figsize=(9,4))
+    #   ax = fig2.add_subplot(1,1,1)
        
-       z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
-       # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
-       func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
-       + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
-       sol[12]*((az*elev_clean)**2)
+    #   z = np.linspace(np.min(elev_clean), np.max(elev_clean), 100)
+    #   # 0:y**3 1:y**2 2:y 3:x**3 4:x**2 5:x 6:xy**2 7:xy 8:cst 9:z 10:z**2 11:yz 12:yz**2
+    #   func = sol[0]*rg**3 + sol[1]*rg**2 + sol[2]*rg + sol[3]*az**3 + sol[4]*az**2 \
+    #   + sol[5]*az + sol[6]*(rg*az)**2 + sol[7]*rg*az + sol[11]*az*elev_clean + \
+    #   sol[12]*((az*elev_clean)**2)
        
-       ## the sliding rms is only taken into account when flat =0 
-       ##if ivar_temp == 0 and temp_flat == 0:
-       ##    ax.fill_between(elev_clean, los_map.flatten() -rms -func, los_map.flatten() + rms-func, color='red',alpha=0.1,label='sliding RMS')
-       ax.scatter(elev_clean[::5], los_clean[::5] - func[::5], s=0.05, alpha=0.1, rasterized=True)
+    #   ## the sliding rms is only taken into account when flat =0 
+    #   ##if ivar_temp == 0 and temp_flat == 0:
+    #   ##    ax.fill_between(elev_clean, los_map.flatten() -rms -func, los_map.flatten() + rms-func, color='red',alpha=0.1,label='sliding RMS')
+    #   ax.scatter(elev_clean[::5], los_clean[::5] - func[::5], s=0.05, alpha=0.1, rasterized=True)
        ##ax.plot(elev_map.flatten(), los_map.flatten() - func, '-r', lw =1., label='sliding median')
-       if nfit==0:
-            ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
-       else:
-            ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{0:.3f}*z**2 + {1:.3f}*z + {2:.3f}'.format(sol[10],sol[9],sol[8]))
+    #   if nfit==0:
+    #        ax.plot(z,sol[8]+sol[9]*z,'-r',lw =3.,label='{0:.3f}*z + {1:.3f}'.format(sol[9],sol[8])) 
+    #   else:
+    #        ax.plot(z,sol[8]+sol[9]*z+sol[10]*z**2, '-r', lw =3.,label='{0:.3f}*z**2 + {1:.3f}*z + {2:.3f}'.format(sol[10],sol[9],sol[8]))
 
-       ax.set_xlabel('Elevation (m)')
-       ax.set_ylabel('LOS (rad)')
-       plt.legend(loc='best')
-       if sformat == 'ROI_PAC':
-          fig2.savefig( int_path + folder + idate+'_phase-topo.png', format='PNG')
-       else:
-          fig2.savefig(out_path + idate+'_phase-topo.png', format='PNG')
+    #   ax.set_xlabel('Elevation (m)')
+    #   ax.set_ylabel('LOS (rad)')
+    #   plt.legend(loc='best')
+    #   if sformat == 'ROI_PAC':
+    #      fig2.savefig( int_path + folder + idate+'_phase-topo.png', format='PNG')
+    #   else:
+    #      fig2.savefig(out_path + idate+'_phase-topo.png', format='PNG')
 
     _los_map = np.copy(los_map)
     _los_map[los_map==0] = float('NaN')
