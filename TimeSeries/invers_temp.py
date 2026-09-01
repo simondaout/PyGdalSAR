@@ -508,17 +508,17 @@ def main():
     in_sigma = in_aps * in_rms  # initial uncertainty
 
     # ── save cube to memmap for parallel reads ────────────────────────────────
-    mm = np.memmap('depl_cumule', dtype='float32', mode='w+',
+    mm = np.memmap('.tmp_meanmap_depl_cumule', dtype='float32', mode='w+',
                    shape=(new_lines, new_cols, N))
     mm[:] = maps[:]
     mm.flush()
-    write_envi_hdr('depl_cumule', shape=(new_lines, new_cols, N))
+    write_envi_hdr('.tmp_meanmap_depl_cumule', shape=(new_lines, new_cols, N))
     del mm, maps
 
-    mm_models = np.memmap('disp_cumul_models', dtype='float32', mode='w+',
+    mm_models = np.memmap('.tmp_meanmap_disp_cumul_models', dtype='float32', mode='w+',
                            shape=(new_lines, new_cols, N))
     mm_models.flush()
-    write_envi_hdr('disp_cumul_models', shape=(new_lines, new_cols, N))
+    write_envi_hdr('.tmp_meanmap_disp_cumul_models', shape=(new_lines, new_cols, N))
     del mm_models
 
     # ── iteration loop ────────────────────────────────────────────────────────
@@ -559,7 +559,7 @@ def main():
                 logger.info(f'  line {line:4d}/{new_lines}  '
                              f'({time.time()-start_time:.1f}s)')
 
-                cube_r = np.memmap('depl_cumule', dtype='float32',
+                cube_r = np.memmap('.tmp_meanmap_depl_cumule', dtype='float32',
                                    mode='r', shape=(new_lines, new_cols, N))
                 block  = cube_r[line:end_line, :, :].copy()  # (bsz, ncol, N)
                 del cube_r
@@ -579,7 +579,7 @@ def main():
 
                 # add avg back to models (Fortran: phapred fitted on deplac-avg)
                 md_all += avg[np.newaxis, np.newaxis, :]
-                mm_w = np.memmap('disp_cumul_models', dtype='float32',
+                mm_w = np.memmap('.tmp_meanmap_disp_cumul_models', dtype='float32',
                                  mode='r+', shape=(new_lines, new_cols, N))
                 mm_w[line:end_line, :, :] = md_all
                 mm_w.flush()
@@ -596,9 +596,9 @@ def main():
                 gc.collect()
 
         # ── residuals → update in_sigma ───────────────────────────────────────
-        cube_r  = np.memmap('depl_cumule',  dtype='float32', mode='r',
+        cube_r  = np.memmap('.tmp_meanmap_depl_cumule',  dtype='float32', mode='r',
                             shape=(new_lines, new_cols, N))
-        mod_r   = np.memmap('disp_cumul_models', dtype='float32', mode='r',
+        mod_r   = np.memmap('.tmp_meanmap_disp_cumul_models', dtype='float32', mode='r',
                             shape=(new_lines, new_cols, N))
         mod_c   = np.copy(mod_r)
         mod_c[np.abs(mod_c) > 9999] = 0.
@@ -680,7 +680,7 @@ def main():
     # # ── write disp_cumul_flat = cube - avg ───────────────────────────────────
     # # Fortran equivalent: depl_cumule_ref(k) = deplac(k) - avg(k)
     # logger.info('Writing disp_cumul_flat …')
-    # cube_f = np.memmap('depl_cumule',     dtype='float32', mode='r',
+    # cube_f = np.memmap('.tmp_meanmap_depl_cumule',     dtype='float32', mode='r',
     #                    shape=(new_lines, new_cols, N))
     # flat_f = np.memmap('disp_cumul_flat', dtype='float32', mode='w+',
     #                    shape=(new_lines, new_cols, N))
@@ -692,9 +692,10 @@ def main():
     # write_envi_hdr('disp_cumul_flat', shape=(new_lines, new_cols, N))
     # del cube_f, flat_f, cube_arr
 
-    # cleanup temporary working files
-    for tmp in ['depl_cumule', 'depl_cumule.hdr',
-                'disp_cumul_models', 'disp_cumul_models.hdr']:
+    # cleanup temporary working files (distinct names so we never touch
+    # a real depl_cumule/disp_cumul_models the user may have as input)
+    for tmp in ['.tmp_meanmap_depl_cumule', '.tmp_meanmap_depl_cumule.hdr',
+                '.tmp_meanmap_disp_cumul_models', '.tmp_meanmap_disp_cumul_models.hdr']:
         if os.path.exists(tmp):
             os.remove(tmp)
 
