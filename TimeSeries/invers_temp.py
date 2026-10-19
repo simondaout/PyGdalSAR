@@ -385,10 +385,28 @@ def main():
         sys.exit(1)
     ncol, nlines, N_cube = ds.RasterXSize, ds.RasterYSize, ds.RasterCount
     maps_temp = np.zeros((nlines, ncol, N_cube), dtype=np.float32)
+    nodata_vals = set()
     for bi in range(1, N_cube + 1):
-        maps_temp[:, :, bi-1] = ds.GetRasterBand(bi).ReadAsArray()
-    maps_temp[np.isin(maps_temp, [9990, 9999])] = np.nan
+        band = ds.GetRasterBand(bi)
+        maps_temp[:, :, bi-1] = band.ReadAsArray()
+        nd = band.GetNoDataValue()
+        if nd is not None:
+            nodata_vals.add(nd)
+    # Mask no-data BEFORE the reference-date subtraction below. We catch both
+    # the GDAL-declared nodata value(s) (e.g. 0.0 for this NSBAS cube
+    # convention) and the legacy 9990/9999 sentinels used by other FLATSIM
+    # products. Catching only 9990/9999 (the previous behaviour) missed every
+    # cube whose real nodata value is 0.0: at non-reference dates, a no-data
+    # pixel (raw 0.0) minus a *valid* reference-date value (cst != 0) does NOT
+    # land back on exactly 0.0, so it silently escaped the old fallback check
+    # below and was fed into the temporal fit as a bogus constant measurement
+    # (= -cst, repeated once per missing date). That is confirmed to be the
+    # source of the extreme linear-rate outliers seen near layover/shadow
+    # zones (intermittent coherence -> more missing dates per pixel there).
+    sentinels = nodata_vals | {9990, 9999}
+    maps_temp[np.isin(maps_temp, list(sentinels))] = np.nan
     logger.info(f'Cube shape: {maps_temp.shape}')
+    logger.info(f'No-data sentinel value(s) masked: {sorted(sentinels)}')
 
     # reference image subtraction
     cst = np.copy(maps_temp[:, :, imref])
@@ -396,6 +414,9 @@ def main():
     for l in range(N_cube):
         maps_temp[:, :, l] -= cst
         if l != imref:
+            # Defensive fallback only now (real no-data is already NaN above):
+            # catches the rare coincidence of two genuinely valid dates with
+            # numerically identical raw values.
             maps_temp[:, :, l][maps_temp[:, :, l] == 0.] = np.nan
 
     # select date range
