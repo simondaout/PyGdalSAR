@@ -15,6 +15,7 @@ import getopt
 import os, math
 from os import path
 import logging
+import sys
 
 import numpy as np
 import scipy.ndimage
@@ -246,7 +247,7 @@ def compute_slope_aspect(path, filter_size=2.0):
     ds = gdal.Open(path,gdal.GA_ReadOnly)
     band = ds.GetRasterBand(1)
     topo = band.ReadAsArray()
-    ncols, nlines = ds.RasterYSize, ds.RasterXSize
+    nlines, ncols = ds.RasterYSize, ds.RasterXSize
 
     gt = ds.GetGeoTransform()
     projref = ds.GetProjectionRef()
@@ -260,14 +261,13 @@ def compute_slope_aspect(path, filter_size=2.0):
     lat_mean = np.mean(lats)
     print("GeoTransform:", gt)
     print("Average latitude:", lat_mean)
-
     # Determine resolution based on coordinate system
     res_x, res_y = gt[1], gt[5]
     srs = osr.SpatialReference(wkt=projref)
 
     if srs.IsGeographic():
-        res_x *= 40075e3 / 360  # Convert degrees to meters
-        res_y *= (40075e3 / 360) * np.cos(np.deg2rad(lat_mean))
+        res_x *= 40075e3 / 360  *np.cos(np.deg2rad(lat_mean))   # longitudes variables
+        res_y *= (40075e3 / 360)  # lattitudes constantes
         print("Geographic coordinates (converted to meters)")
     else:
         print("Projected coordinates (meters)")
@@ -278,18 +278,18 @@ def compute_slope_aspect(path, filter_size=2.0):
     dsm_dy, dsm_dx = np.gradient(filtered_topo, res_y, res_x)
 
     # Calculate slope and aspect
-    slope = np.sqrt(dsm_dx**2 + dsm_dy**2)
+    slope = np.arctan(np.sqrt(dsm_dx**2 + dsm_dy**2))
     aspect = np.arctan2(dsm_dy, -dsm_dx)  # Clockwise from east
    
     # Create aspect and slope files
-    dst = drv.Create('slope.tif', nlines, ncols, 1, gdal.GDT_Float32)
+    dst = drv.Create('slope.tif', ncols, nlines, 1, gdal.GDT_Float32)
     bandt = dst.GetRasterBand(1)
     bandt.WriteArray(np.rad2deg(slope))
     dst.SetGeoTransform(gt)
     dst.SetProjection(projref)
     bandt.FlushCache()
 
-    dst = drv.Create('aspect.tif', nlines, ncols, 1, gdal.GDT_Float32)
+    dst = drv.Create('aspect.tif', ncols, nlines, 1, gdal.GDT_Float32)
     bandt = dst.GetRasterBand(1)
     bandt.WriteArray(np.rad2deg(aspect))
     dst.SetGeoTransform(gt)
@@ -564,7 +564,7 @@ for n in range(N):
     #d[index] = float('NaN')
     m[index] = 0.
     # clean based on outiliers
-    index = np.logical_or(d>np.percentile(d,99.8),d<np.percentile(d,.2))
+    index = np.logical_or(d>np.nanpercentile(d,99.8),d<np.nanpercentile(d,.2))
     #d[index]= float('NaN') 
     m[index] = 0.
     
